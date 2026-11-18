@@ -478,7 +478,7 @@ async fn a_router_built_after_the_stop_starts_no_lasting_task() {
     let served = table.write().insert("gone".into(), p.clone(), p);
     served.stop();
     let late = tokio::spawn(std::future::pending::<()>());
-    served.adopt(vec![late.abort_handle()]);
+    served.adopt(vec![late.abort_handle()], &std::sync::Weak::new());
     let ended = tokio::time::timeout(std::time::Duration::from_secs(10), late)
         .await
         .expect("the late task was left running");

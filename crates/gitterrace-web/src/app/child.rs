@@ -29,6 +29,10 @@ const THREADS_VAR: &str = "GITTERRACE_INDEX_THREADS";
 const MESSAGES_VAR: &str = "GITTERRACE_INDEX_MESSAGES";
 /// Prefix of every line the child reports on stdout. A harness may print lines of its own.
 const TAG: &str = "gitterrace-index";
+/// Harness only: a folder. At its first progress report the child writes a file named by its
+/// pid there, holding its cache folder, then waits forever, so a test can stop a repository
+/// while its child is mid-build.
+const HOLD_VAR: &str = "TEST_INDEX_CHILD_HOLD";
 
 /// Whether this process may start index children, see [`index_child`].
 static CHILDREN: AtomicBool = AtomicBool::new(false);
@@ -50,7 +54,7 @@ pub fn index_child() {
         drop(io::copy(&mut io::stdin().lock(), &mut io::sink()));
         std::process::exit(3);
     });
-    let code = match run(PathBuf::from(dir)) {
+    let code = match run(&PathBuf::from(dir)) {
         Ok(()) => 0,
         Err(e) => {
             let kind = if gitterrace_index::feed::SourceError::of(&e).is_some() {
@@ -67,18 +71,22 @@ pub fn index_child() {
 }
 
 /// The child's work: one [`Index::update`], its progress and steps reported on stdout.
-fn run(dir: PathBuf) -> io::Result<()> {
+fn run(dir: &std::path::Path) -> io::Result<()> {
     let var = |k: &str| std::env::var(k).map_err(|e| io::Error::other(format!("{k}: {e}")));
     let threads = var(THREADS_VAR)?.parse().map_err(io::Error::other)?;
     let repo = Repo::discover(&PathBuf::from(var(GIT_VAR)?))
         .map_err(io::Error::other)?
         .with_workers(threads);
-    let index = Index::open_dir(dir)?;
+    let index = Index::open_dir(dir.to_path_buf())?;
     index.set_message_index(var(MESSAGES_VAR)? == "1");
     // The merge would die half done with this process if it ran on a thread of its own.
     index.set_merge_inline(true);
+    let hold = std::env::var_os(HOLD_VAR).map(PathBuf::from);
     index.update(&repo, &var(REV_VAR)?, &|p| {
         report(&format!("progress {} {}", p.done, p.total));
+        if let Some(h) = &hold {
+            hold_here(h, dir);
+        }
     })?;
     let steps: Vec<String> = index
         .phases()
@@ -88,6 +96,18 @@ fn run(dir: PathBuf) -> io::Result<()> {
         .collect();
     report(&format!("phases {}", steps.join(" ")));
     Ok(())
+}
+
+/// See [`HOLD_VAR`]. The file appears whole: written atomically.
+fn hold_here(folder: &std::path::Path, cache: &std::path::Path) -> ! {
+    let name = std::process::id().to_string();
+    let bytes = cache.as_os_str().as_encoded_bytes();
+    if let Err(e) = gitterrace_git::write_atomic(folder, &name, bytes, 0o600) {
+        report(&format!("failed hold file: {}", one_line(&e.to_string())));
+    }
+    loop {
+        std::thread::park();
+    }
 }
 
 /// One tagged line to the server. A server gone away is no reason to stop here: the closed
@@ -111,8 +131,8 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         return app.index.update(&app.repo, rev, &|p| app.set_progress(p));
     }
     let cfg = app.cfg();
-    let mut child = Command::new(std::env::current_exe()?)
-        .args(std::env::args_os().skip(1))
+    let mut cmd = Command::new(std::env::current_exe()?);
+    cmd.args(std::env::args_os().skip(1))
         .env(CHILD_VAR, app.index.dir())
         .env(REV_VAR, rev)
         .env(GIT_VAR, app.repo.git_dir())
@@ -123,14 +143,24 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
-        .spawn()?;
-    // Held until the child ends: its closing is what stops an orphaned child.
-    let stdin = child.stdin.take();
-    let out = child
-        .stdout
-        .take()
-        .ok_or_else(|| io::Error::other("no child stdout"))?;
+        .stderr(Stdio::inherit());
+    let out = {
+        // Spawned under the lock `App::halt` takes: a child is either seen by it or never
+        // started.
+        let mut slot = app.index_child.lock().map_err(|_| halted())?;
+        if app.index.halted() {
+            return Err(halted());
+        }
+        let mut child = cmd.spawn()?;
+        // The stdin stays with the handle until the child is reaped: its closing is what
+        // stops a child whose server died.
+        let out = child
+            .stdout
+            .take()
+            .ok_or_else(|| io::Error::other("no child stdout"))?;
+        *slot = Some(child);
+        out
+    };
     let mut failure = None;
     for line in io::BufReader::new(out).lines() {
         let line = line?;
@@ -155,8 +185,12 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
             _ => {}
         }
     }
+    // Gone from the slot: `App::halt` took it, killed and reaped it.
+    let child = app.index_child.lock().map_err(|_| halted())?.take();
+    let Some(mut child) = child else {
+        return Err(halted());
+    };
     let status = child.wait()?;
-    drop(stdin);
     if let Some(e) = failure {
         return Err(e);
     }
@@ -164,6 +198,40 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         return Err(io::Error::other(format!("index child exited: {status}")));
     }
     Ok(())
+}
+
+fn halted() -> io::Error {
+    io::Error::new(io::ErrorKind::Interrupted, "index update halted")
+}
+
+impl App {
+    fn set_progress(&self, p: Progress) {
+        if let Ok(mut g) = self.progress.lock() {
+            *g = p;
+        }
+    }
+
+    /// Stops every index write for this repository, for one taken off the server: the
+    /// in-process update returns at its next record, and the index child is killed and
+    /// reaped before this returns, so nothing writes into the cache afterwards. Both leave
+    /// the cache at its last whole set: each write step swaps its files in by one manifest
+    /// rename.
+    pub(crate) fn halt(&self) {
+        self.index.halt();
+        let mut g = match self.index_child.lock() {
+            Ok(g) => g,
+            Err(e) => e.into_inner(),
+        };
+        if let Some(mut c) = g.take() {
+            // Kill fails only for a child already gone; the wait reaps it either way.
+            if let Err(e) = c.kill() {
+                tracing::debug!("{}: index child already ended: {e}", self.name);
+            }
+            if let Err(e) = c.wait() {
+                tracing::warn!("{}: reaping the index child: {e}", self.name);
+            }
+        }
+    }
 }
 
 /// `name=secs` pairs as the child printed them.

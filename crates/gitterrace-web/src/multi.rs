@@ -13,7 +13,7 @@ use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, RwLock},
+    sync::{Arc, Mutex, RwLock, Weak},
 };
 
 use axum::{
@@ -27,7 +27,7 @@ use gitterrace_git::{CommitSummary, DAY, Repo};
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
-use crate::app::Env;
+use crate::app::{App, Env};
 pub use crate::multi::discover::{discover_repos, search_roots};
 use crate::{fmt, spark};
 
@@ -46,12 +46,17 @@ pub(crate) struct Served {
     /// `None` once stopped: a router built after that (its build was already under way) has
     /// its tasks aborted at once instead of stored, so they never outlive the removal.
     tasks: Mutex<Option<Vec<tokio::task::AbortHandle>>>,
+    /// The app its router serves, halted when the repository is taken off.
+    app: Mutex<Weak<App>>,
     /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move or new local day instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
     /// The working tree's dirty answer and when it was measured, reused for `DIRTY_TTL`.
     dirty: Mutex<Option<(std::time::Instant, bool)>>,
 }
+
+/// A repository's router, the background tasks it started and its app.
+pub(crate) type Built = (Router, Vec<tokio::task::AbortHandle>, Weak<App>);
 
 /// What the index shows for one repository: its newest commit and its recent commits,
 /// bucketed to fit its age.
@@ -216,9 +221,11 @@ impl Table {
 
     /// Takes the repository named `name`, or at canonical `root`, off the running server: its
     /// URLs answer 404 from now on, and its index refresher, idle release and warm-up stop, so
-    /// its caches go with the last in-flight request. An index update already running in a
-    /// blocking thread finishes its batch first; nothing starts after. The on-disk index and the
-    /// name claim stay, so adding it again is fast and keeps its URL. The last repository stays.
+    /// its caches go with the last in-flight request. An index update already running stops
+    /// before its next write and its index child is killed and reaped before this returns, so
+    /// the cache keeps its last whole set and nothing writes into it after. The on-disk index
+    /// and the name claim stay, so adding it again is fast and keeps its URL. The last
+    /// repository stays.
     pub(crate) fn take(&self, name: Option<&str>, root: Option<&Path>) -> Result<String, Kept> {
         let mut g = self.write();
         let found = g
@@ -282,8 +289,8 @@ impl Table {
         served
             .router
             .get_or_try_init(|| async {
-                let (router, tasks) = repo_router(served, self.live.clone(), &self.env)?;
-                served.adopt(tasks);
+                let (router, tasks, app) = repo_router(served, self.live.clone(), &self.env)?;
+                served.adopt(tasks, &app);
                 Ok::<_, io::Error>(router)
             })
             .await
@@ -318,6 +325,7 @@ impl Repos {
             root,
             router: OnceCell::new(),
             tasks: Mutex::new(Some(Vec::new())),
+            app: Mutex::new(Weak::new()),
             recent: Mutex::new(None),
             dirty: Mutex::new(None),
         });
@@ -335,22 +343,36 @@ impl Repos {
 }
 
 impl Served {
-    /// Stops the background tasks its router started.
-    fn stop(&self) {
+    /// Stops the background tasks its router started and every index write: an update
+    /// running in-process returns at its next record, the index child is killed and reaped
+    /// before this returns.
+    pub(crate) fn stop(&self) {
         let held = self.tasks.lock().map(|mut g| g.take()).unwrap_or_default();
         for t in held.unwrap_or_default() {
             t.abort();
         }
+        let app = self.app.lock().map(|g| g.upgrade()).unwrap_or_default();
+        if let Some(app) = app {
+            app.halt();
+        }
     }
 
-    /// Keeps the tasks a fresh router started, or aborts them when the repository was taken
-    /// off while its router was being built.
-    fn adopt(&self, tasks: Vec<tokio::task::AbortHandle>) {
+    /// Keeps the tasks and app a fresh router started, or aborts and halts them when the
+    /// repository was taken off while its router was being built.
+    fn adopt(&self, tasks: Vec<tokio::task::AbortHandle>, app: &Weak<App>) {
         let mut late = tasks;
+        let mut stopped = true;
         if let Ok(mut g) = self.tasks.lock()
             && let Some(held) = g.as_mut()
         {
             held.append(&mut late);
+            stopped = false;
+            if let Ok(mut a) = self.app.lock() {
+                *a = app.clone();
+            }
+        }
+        if stopped && let Some(a) = app.upgrade() {
+            a.halt();
         }
         for t in late {
             t.abort();
@@ -533,7 +555,7 @@ fn repo_router(
     served: &Served,
     live: Option<Arc<crate::actions::Live>>,
     env: &Env,
-) -> io::Result<(Router, Vec<tokio::task::AbortHandle>)> {
+) -> io::Result<Built> {
     let base = format!("/r/{}", served.name);
     crate::repo_router_tasks(&served.path, base, served.name.clone(), live, env)
 }

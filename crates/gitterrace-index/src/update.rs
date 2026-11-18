@@ -20,7 +20,9 @@ impl Index {
         rev: &str,
         progress: &dyn Fn(Progress),
     ) -> io::Result<()> {
-        if let Some((order, shallow)) = self.update_held(source, rev, progress)? {
+        if let Some((order, shallow)) = self.update_held(source, rev, progress)?
+            && !self.halted()
+        {
             // After the writer lock is gone: the merge takes it too, and an inline merge under
             // the update's own lock would wait on itself forever.
             self.merge_in_background(order, shallow);
@@ -56,12 +58,7 @@ impl Index {
         let held = self.held()?;
         let todo = todo(&order, &held);
         if todo.is_empty() {
-            ph.start("messages");
-            self.sync_messages(source)?;
-            ph.start("chain");
-            chain::sync(&self.dir)?;
-            tip::sync(&self.dir)?;
-            ph.end();
+            self.sync_side(source)?;
             if held.len() == order.len()
                 && let Some(t) = tip
             {
@@ -94,6 +91,7 @@ impl Index {
                 &ids,
                 BATCH,
                 &mut |r| {
+                    self.go_on()?;
                     read += 1;
                     fresh.push(r);
                     Ok(())
@@ -101,6 +99,7 @@ impl Index {
                 &mut |done| progress(Progress { done, total }),
             )?;
             ph.start("append");
+            self.go_on()?;
             if !fresh.is_empty() {
                 let after = store::append_segment(&self.dir, prev.clone(), &shallow, &fresh)
                     .map_err(seg)?;
@@ -113,10 +112,11 @@ impl Index {
             // Each record folds into the segment as it passes: the build never holds history.
             let mut build =
                 store::SegmentBuild::new(&self.dir, previous.as_ref(), &shallow).map_err(seg)?;
-            source.stream_records(
+            let streamed = source.stream_records(
                 &ids,
                 BATCH,
                 &mut |r| {
+                    self.go_on()?;
                     read += 1;
                     let t = std::time::Instant::now();
                     let pushed = build.push(&r).map_err(seg);
@@ -124,26 +124,42 @@ impl Index {
                     pushed
                 },
                 &mut |done| progress(Progress { done, total }),
-            )?;
+            );
+            if let Err(e) = streamed.and_then(|()| self.go_on()) {
+                build.discard();
+                return Err(e);
+            }
             ph.start("finish");
             build.finish(previous, Vec::new()).map_err(seg)?;
         }
         ph.add("stream.fold", fold);
-        ph.start("messages");
-        self.sync_messages(source)?;
-        ph.start("chain");
-        chain::sync(&self.dir)?;
-        ph.start("tip");
-        tip::sync(&self.dir)?;
-        ph.end();
+        self.sync_side(source)?;
         // A skipped commit is not in the set, so it stays pending and the next update appends
         // it; until then HEAD's pages read the reach view, and the tip marker is not written.
+        self.go_on()?;
         if read < total {
             skipped(total - read, &self.dir);
         } else if let Some(t) = tip {
             cache::write_atomic(&self.dir, TIP_FILE, t.as_bytes())?;
         }
         Ok(merge)
+    }
+
+    /// Brings the message column, the chain and the tip file in step with the set, each step
+    /// skipped once halted.
+    fn sync_side(&self, source: &dyn CommitSource) -> io::Result<()> {
+        let ph = &self.phases;
+        self.go_on()?;
+        ph.start("messages");
+        self.sync_messages(source)?;
+        self.go_on()?;
+        ph.start("chain");
+        chain::sync(&self.dir)?;
+        self.go_on()?;
+        ph.start("tip");
+        tip::sync(&self.dir)?;
+        ph.end();
+        Ok(())
     }
 
     /// Folds the segments into one once there are more than 8, off the caller's thread, so a
@@ -171,3 +187,7 @@ impl Index {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "halt_tests.rs"]
+mod tests;

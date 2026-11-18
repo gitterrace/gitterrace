@@ -71,6 +71,21 @@ impl SegmentBuild {
         Ok(())
     }
 
+    /// Drops a build that will not finish with its temp files. They are no part of the live
+    /// set, so readers never saw them; without this they would wait for the next open's
+    /// sweep, an hour later.
+    pub(crate) fn discard(self) {
+        let (dir, g) = (self.dir.clone(), self.generation);
+        drop(self);
+        for name in [
+            format!("rows-{g}.gts.tmp"),
+            format!("cols-{g}.gts.tmp"),
+            format!("spill-{g}.gts.tmp"),
+        ] {
+            drop(std::fs::remove_file(dir.join(name)));
+        }
+    }
+
     /// Writes the segment, its string delta and the order file, then the manifest naming
     /// them plus `extra` (plain files such as `lines.json`, already written). Files of
     /// `previous` that are not live again are retired. String deltas of a retired segment

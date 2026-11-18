@@ -157,6 +157,8 @@ pub struct Index {
     phases: phases::Phases,
     /// Run a segment merge on the updating thread, see [`Index::set_merge_inline`].
     merge_inline: std::sync::atomic::AtomicBool,
+    /// Set by [`Index::halt`]: no update writes from then on.
+    halted: std::sync::atomic::AtomicBool,
 }
 
 impl Index {
@@ -196,6 +198,7 @@ impl Index {
             messages: std::sync::atomic::AtomicBool::new(false),
             phases: phases::Phases::default(),
             merge_inline: std::sync::atomic::AtomicBool::new(false),
+            halted: std::sync::atomic::AtomicBool::new(false),
         })
     }
 
@@ -212,6 +215,32 @@ impl Index {
     pub fn set_merge_inline(&self, on: bool) {
         self.merge_inline
             .store(on, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// Stops every update of this handle for good: one running returns an `Interrupted` error
+    /// at its next record or write step, before writing anything more, and a later one returns
+    /// it at once. A step already writing finishes it, and every step swaps its files in by
+    /// a manifest rename, so readers see the set before or after it, never half of it. For a
+    /// repository taken off the server, whose cache must not change any more.
+    pub fn halt(&self) {
+        self.halted
+            .store(true, std::sync::atomic::Ordering::Release);
+    }
+
+    /// Whether [`Index::halt`] was called.
+    pub fn halted(&self) -> bool {
+        self.halted.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    /// `Interrupted` once halted: called before each write step of an update.
+    fn go_on(&self) -> io::Result<()> {
+        if self.halted() {
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "index update halted",
+            ));
+        }
+        Ok(())
     }
 
     /// Takes the steps of an update another process ran, by name, for [`Index::phases`].
@@ -284,6 +313,7 @@ impl Index {
     /// running server. Without it every write and rebuild failed on the missing folder until
     /// a restart. A newer build's cache is still refused.
     fn writable(&self) -> io::Result<()> {
+        self.go_on()?;
         if !self.dir.is_dir() {
             store::ensure_dir(&self.dir)?;
         }

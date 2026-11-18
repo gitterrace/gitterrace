@@ -325,7 +325,9 @@ pub(crate) struct App {
     pub(crate) key: String,
     /// Set when actions are on: pages embed the token and the menu.
     pub(crate) actions: Option<Arc<crate::actions::Live>>,
-    progress: Mutex<Progress>,
+    pub(crate) progress: Mutex<Progress>,
+    /// The index child running now, so `App::halt` (child.rs) can end it.
+    pub(crate) index_child: Mutex<Option<std::process::Child>>,
     ready: AtomicBool,
     /// Last time a page read the insights source, see [`App::release_idle`].
     records_used: Mutex<Instant>,
@@ -393,6 +395,7 @@ impl App {
             base: String::new(),
             actions: None,
             progress: Mutex::new(Progress::default()),
+            index_child: Mutex::new(None),
             ready: AtomicBool::new(false),
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
@@ -544,12 +547,6 @@ impl App {
     /// Digest of the newest fingerprint.
     pub(crate) fn version(&self) -> u64 {
         self.version.load(Ordering::Acquire)
-    }
-
-    fn set_progress(&self, p: Progress) {
-        if let Ok(mut g) = self.progress.lock() {
-            *g = p;
-        }
     }
 
     pub(crate) fn progress(&self) -> Progress {

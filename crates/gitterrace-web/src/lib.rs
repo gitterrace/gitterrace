@@ -154,16 +154,16 @@ fn repo_router(
     Ok(repo_router_tasks(repo_path, base, key, live, env)?.0)
 }
 
-/// [`repo_router`] and the handles of the background tasks it started (index refresher, idle
-/// release, warm-up), so a repository taken off a running server stops them and its memory
-/// returns.
+/// [`repo_router`], the handles of the background tasks it started (index refresher, idle
+/// release, warm-up) and its app, so a repository taken off a running server stops them,
+/// halts its index writes and its memory returns.
 fn repo_router_tasks(
     repo_path: &Path,
     base: String,
     key: String,
     live: Option<Arc<actions::Live>>,
     env: &Env,
-) -> io::Result<(axum::Router, Vec<tokio::task::AbortHandle>)> {
+) -> io::Result<multi::Built> {
     let cfg = env.cfg();
     let (text_bytes, blame_bytes) = app::repo_limits(&cfg);
     let repo = Repo::discover(repo_path)
@@ -218,7 +218,7 @@ fn repo_router_tasks(
         pages
     };
     tasks.push(tokio::spawn(prewarm(Arc::clone(&app), pages.clone())).abort_handle());
-    Ok((pages, tasks))
+    Ok((pages, tasks, Arc::downgrade(&app)))
 }
 
 /// A failed bind with the address and, when the port is taken, what to do about it. The kind
