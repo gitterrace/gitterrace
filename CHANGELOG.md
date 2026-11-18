@@ -37,6 +37,9 @@ All notable changes are listed here. The format follows
 - web: meet target size, link and avatar contrast rules
 - ci: shellcheck composite action run blocks
 - deps: ignore the chrono unmaintained advisory
+- index: never make a deleted .git again for the cache
+- web: a repository taken off while its router builds keeps nothing running
+- web: stop index writes of a repository taken off
 
 ### Performance
 
