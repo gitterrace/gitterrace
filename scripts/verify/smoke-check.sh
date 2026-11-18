@@ -34,12 +34,14 @@ native() {
 exe() {
   if [ "${GT_WINE:-}" = 1 ]; then wine "$bin" "$@"; else "$bin" "$@"; fi
 }
-# Is a process with this image name still running?
+# Is the hang action's own child still running? On unix it is found by its unique argument, so
+# another process of the same name (a runner's, an earlier test's) never reads as ours. Windows
+# lists image names only.
 alive() {
   case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) tasklist 2>/dev/null | grep -qi "^$1" ;;
   *)
-    if [ "${GT_WINE:-}" = 1 ]; then wine tasklist 2>/dev/null | grep -qi "$1"; else pgrep -x "$1" >/dev/null; fi
+    if [ "${GT_WINE:-}" = 1 ]; then wine tasklist 2>/dev/null | grep -qi "$1"; else pgrep -f "$2" >/dev/null; fi
     ;;
   esac
 }
@@ -68,8 +70,10 @@ if [ "${GT_WINE:-}" = 1 ] || [ "$(uname -s | cut -c1-4)" = MING ] || [ "$(uname 
   sleeper='"ping.exe", "-n", "600", "127.0.0.1"'
   image=PING.EXE
 else
-  sleeper='"sleep", "600"'
-  image='sleep'
+  # A duration no other process uses: the kill check looks for exactly this child.
+  nap=$((600000 + $$))
+  sleeper="\"sleep\", \"$nap\""
+  image="sleep $nap"
 fi
 cat >"$cfg/actions.toml" <<TOML
 version = 1
@@ -137,8 +141,12 @@ else
   reply=$(curl -sS -X POST "$base/_actions/run" -H 'Content-Type: application/json' \
     -H 'Sec-Fetch-Site: same-origin' -H "Origin: $base" -H "X-Gitterrace-Token: $token" -d "$req")
   echo "$reply" | grep -q 'timed out' && ok "action timed out" || bad "action did not time out: $reply"
-  sleep 2
-  if alive "$image"; then bad "action child still alive"; else ok "action child killed"; fi
+  # The kill is asynchronous: give it up to 10 s, polling, before calling the child alive.
+  for _ in $(seq 1 50); do
+    alive "$image" "$image" || break
+    sleep 0.2
+  done
+  if alive "$image" "$image"; then bad "action child still alive"; else ok "action child killed"; fi
 fi
 
 echo "failures: $fails"
