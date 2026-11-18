@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" viewBox="0 0 640 86" width="640" height="86" aria-label="Cold page, slowest per repository against its budget">
+<title>Cold page, slowest (ms) against budget</title>
+<text x="8" y="16" fill="#2b2b2b" font-family="sans-serif" font-size="13" font-weight="600">Cold page, slowest (ms)</text>
+<text x="8" y="47" fill="#2b2b2b" font-family="sans-serif" font-size="12">control</text>
+<rect x="84" y="34" width="7.2" height="18" rx="2" fill="#5f8a6e"/>
+<line x1="435.9" y1="30" x2="435.9" y2="56" stroke="#2b2b2b" stroke-width="1.5" stroke-dasharray="3 2"/>
+<text x="478" y="47" fill="#2b2b2b" font-family="sans-serif" font-size="12">31 of 1500</text>
+<path d="M90.9 43H92.8M90.9 39V47M92.8 39V47" stroke="#2b2b2b" stroke-width="1" fill="none"><title>spread 29 to 37</title></path>
+<rect x="88.9" y="31" width="4" height="24" fill="none" stroke="#2b2b2b" stroke-width="1.5"><title>previous run: 29</title></rect>
+<text x="84" y="80" fill="#2b2b2b" font-family="sans-serif" font-size="11" opacity="0.7">dashed line: budget    whisker: min to max    hollow marker: previous run</text></svg>
