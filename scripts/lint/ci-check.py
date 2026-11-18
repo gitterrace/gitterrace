@@ -16,6 +16,10 @@
 6. The release gate runs `make check` with the same arguments as the Linux gate of
    lint-and-test.yml (check-linux): a flag only CI sets, such as the Windows cross-check, would
    let a tag skip a check main passed, or fail on a step main never ran.
+7. Every `run: |` block of a composite action under .github/actions parses under shellcheck
+   (errors only). actionlint checks workflow steps but not composite actions, so a syntax
+   error there, or a comment starting `# shellcheck` that reads as a broken directive, would
+   first show on a runner. Skipped with a note when shellcheck is not installed.
 
 Read with a small indentation reader (2-space job keys under `jobs:`), no YAML library.
 
@@ -26,6 +30,8 @@ Read with a small indentation reader (2-space job keys under `jobs:`), no YAML l
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import sys
 import tempfile
 from pathlib import Path
@@ -122,6 +128,47 @@ def problems(repo: Path) -> list[str]:
             )
     bad += gate_problems(tiers, release)
     bad += cliff_problems(repo)
+    bad += action_shell_problems(repo)
+    return bad
+
+
+def run_blocks(text: str) -> list[str]:
+    """The bodies of `run: |` blocks, dedented by their first line."""
+    out = []
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not re.match(r"^\s*(- )?run: \|\s*$", line):
+            continue
+        body, indent = [], None
+        for nxt in lines[i + 1 :]:
+            if nxt.strip() and indent is None:
+                indent = len(nxt) - len(nxt.lstrip())
+            if nxt.strip() and len(nxt) - len(nxt.lstrip()) < (indent or 0):
+                break
+            body.append(nxt[indent or 0 :])
+        out.append("\n".join(body) + "\n")
+    return out
+
+
+def action_shell_problems(repo: Path) -> list[str]:
+    sc = shutil.which("shellcheck")
+    if not sc:
+        print("ci-check: shellcheck not installed, composite actions not checked")
+        return []
+    bad = []
+    for action in sorted((repo / ".github/actions").glob("*/action.y*ml")):
+        for n, block in enumerate(run_blocks(action.read_text())):
+            r = subprocess.run(
+                [sc, "-s", "bash", "-S", "error", "-f", "gcc", "-"],
+                input=block,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if r.returncode:
+                rel = action.relative_to(repo)
+                first = r.stdout.strip().splitlines()[:1]
+                bad.append(f"{rel}: run block {n + 1} fails shellcheck: {first}")
     return bad
 
 
@@ -225,6 +272,31 @@ def fixture(d: Path, ci: str, tiers: str, rel: str, tools: str = "") -> Path:
     return d
 
 
+def shell_self_test() -> int:
+    if not shutil.which("shellcheck"):
+        print(
+            "ci-check self-test: shellcheck not installed, action shell cases skipped"
+        )
+        return 0
+    ok = "runs:\n  steps:\n    - run: |\n        # The tool release\n        echo hi\n"
+    for body, red in (
+        (ok, False),
+        # A comment that reads as a shellcheck directive.
+        (ok.replace("The tool release", "shellcheck from its release"), True),
+        # A syntax error.
+        (ok.replace("echo hi", "if true; then echo hi"), True),
+    ):
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t) / ".github/actions/x"
+            d.mkdir(parents=True)
+            (d / "action.yml").write_text(body)
+            got = action_shell_problems(Path(t))
+        if bool(got) != red:
+            print(f"ci-check self-test: action shell case {body!r}: {got}")
+            return 1
+    return 0
+
+
 def self_test() -> int:
     cases = [
         (CALL, FAST + MAC + WIN, REL, False),
@@ -294,6 +366,8 @@ def self_test() -> int:
                 f"ci-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
             )
             return 1
+    if shell_self_test():
+        return 1
     print("ci-check self-test: ok")
     return 0
 

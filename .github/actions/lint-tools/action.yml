@@ -51,7 +51,7 @@ runs:
           echo "$bin" >> "$GITHUB_PATH"
         else
           sudo apt-get update
-          # shellcheck from its release, at the version macOS gets: apt's lags and flags
+          # The shellcheck release, at the version macOS gets: apt's lags and flags
           # other lines, so the two gates would disagree on one tree.
           sudo apt-get install -y shfmt
           cargo install typos-cli --version 1.52.2 --locked
