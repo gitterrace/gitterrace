@@ -142,7 +142,8 @@ names:
 	python3 scripts/lint/names-check.py --self-test
 	python3 scripts/lint/names-check.py
 
-# lines: Source files stay under 600 lines, comments carry no process labels
+# lines: Source files stay under 600 lines, comments carry no process labels, and a release
+# section about to be tagged is exactly what git-cliff makes
 lines:
 	python3 scripts/lint/lines-check.py --repo .
 	python3 scripts/lint/width-check.py --self-test && python3 scripts/lint/width-check.py
@@ -150,6 +151,7 @@ lines:
 	python3 scripts/lint/stubs-check.py --self-test && python3 scripts/lint/stubs-check.py
 	python3 scripts/lint/types-check.py --self-test && python3 scripts/lint/types-check.py
 	python3 scripts/dev/keep-report.py --self-test
+	python3 scripts/lint/changelog-check.py --self-test && python3 scripts/lint/changelog-check.py
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
 docs-check:
