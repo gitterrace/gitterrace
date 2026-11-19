@@ -193,3 +193,88 @@ fn delete(addr: std::net::SocketAddr, token: &str, body: &str) -> std::io::Resul
     s.read_to_string(&mut buf)?;
     Ok(buf)
 }
+
+/// Guard class: a child that drops the budget protocol, whether it never reads its stdin,
+/// stops at the first line, or keeps running once the server's pipe closes. The real child,
+/// held mid-build, acknowledges each budget line it applies, and exits once its stdin closes.
+#[cfg(unix)]
+#[test]
+fn an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes() {
+    use std::io::{BufRead, Write};
+    gitterrace_web::index_child();
+    let dir = tempfile::tempdir().expect("tmp");
+    let repo = gitterrace_testkit::Fixture::init(&dir.path().join("r"))
+        .write("a.txt", "one\n")
+        .commit("feat: one")
+        .path()
+        .to_owned();
+    let hold = dir.path().join("hold");
+    std::fs::create_dir(&hold).expect("hold dir");
+    let mut child = std::process::Command::new(std::env::current_exe().expect("exe"))
+        .args([
+            "--exact",
+            "an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes",
+        ])
+        .env("GITTERRACE_INDEX_CHILD", repo.join(".git/gitterrace"))
+        .env("GITTERRACE_INDEX_REV", "HEAD")
+        .env("GITTERRACE_INDEX_GIT_DIR", repo.join(".git"))
+        .env("GITTERRACE_INDEX_THREADS", "4")
+        .env("GITTERRACE_INDEX_MESSAGES", "0")
+        .env("GITTERRACE_INDEX_BUDGET", "4")
+        .env("TEST_INDEX_CHILD_HOLD", &hold)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .spawn()
+        .expect("spawn child");
+    let pid = child.id();
+    let mut stdin = child.stdin.take().expect("stdin");
+    let stdout = child.stdout.take().expect("stdout");
+    let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+    let flag = std::sync::Arc::clone(&done);
+    // On a thread of its own, so a child that never answers fails the deadline below instead
+    // of blocking the suite on a read.
+    let talk = std::thread::spawn(move || {
+        let mut out = std::io::BufReader::new(stdout).lines();
+        let mut next = |want: &str| {
+            out.by_ref()
+                .map_while(Result::ok)
+                .any(|l| l.starts_with(want))
+        };
+        let mut seen = vec![next("gitterrace-index progress ")];
+        for n in [2, 0, 3] {
+            seen.push(writeln!(stdin, "budget {n}").is_ok());
+            seen.push(next(&format!("gitterrace-index budget {n}")));
+        }
+        drop(stdin);
+        let code = child.wait().ok().and_then(|s| s.code());
+        flag.store(true, std::sync::atomic::Ordering::SeqCst);
+        (seen, code)
+    });
+    // A child that hangs is killed as this test fails, never left running.
+    let reap = KillOnDrop(pid);
+    gitterrace_testkit::wait::until_blocking(
+        "the child to follow its budget lines and end",
+        || done.load(std::sync::atomic::Ordering::SeqCst),
+    );
+    std::mem::forget(reap);
+    let (seen, code) = talk.join().expect("talk");
+    assert!(seen.iter().all(|s| *s), "a line went unanswered: {seen:?}");
+    assert_eq!(code, Some(3), "the child did not end on its closed stdin");
+}
+
+/// Kills the process `0` when dropped: a failing test leaves no child behind.
+#[cfg(unix)]
+struct KillOnDrop(u32);
+
+#[cfg(unix)]
+impl Drop for KillOnDrop {
+    fn drop(&mut self) {
+        let pid = i32::try_from(self.0)
+            .ok()
+            .and_then(rustix::process::Pid::from_raw);
+        // A child that already ended has nothing to kill: the error is the expected case.
+        if let Some(p) = pid {
+            rustix::process::kill_process(p, rustix::process::Signal::KILL).unwrap_or_default();
+        }
+    }
+}

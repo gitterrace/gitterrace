@@ -75,6 +75,9 @@ pub(crate) fn worker(on: bool) {
 pub(crate) struct WorkerGuard {
     started: Instant,
     busy: Duration,
+    /// Parked outside the worker budget: not part of the busy share, which measures the
+    /// workers that may run.
+    parked: Duration,
 }
 
 impl WorkerGuard {
@@ -83,6 +86,7 @@ impl WorkerGuard {
         Self {
             started: Instant::now(),
             busy: Duration::ZERO,
+            parked: Duration::ZERO,
         }
     }
 
@@ -93,12 +97,21 @@ impl WorkerGuard {
         self.busy += t.elapsed();
         r
     }
+
+    /// Waits outside the budget, counted as neither alive nor busy.
+    pub(crate) fn idle<R>(&mut self, wait: impl FnOnce() -> R) -> R {
+        let t = Instant::now();
+        let r = wait();
+        self.parked += t.elapsed();
+        r
+    }
 }
 
 impl Drop for WorkerGuard {
     fn drop(&mut self) {
         let nanos = |d: Duration| u64::try_from(d.as_nanos()).unwrap_or(u64::MAX);
-        ALIVE.fetch_add(nanos(self.started.elapsed()), Ordering::Relaxed);
+        let alive = self.started.elapsed().saturating_sub(self.parked);
+        ALIVE.fetch_add(nanos(alive), Ordering::Relaxed);
         BUSY.fetch_add(nanos(self.busy), Ordering::Relaxed);
         worker(false);
     }

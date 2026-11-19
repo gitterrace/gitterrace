@@ -381,6 +381,7 @@ impl Repo {
             workers,
             crate::diff::Window {
                 first: &merges,
+                budget: self.budget.as_ref(),
                 ..NUMSTAT_WINDOW
             },
             || {

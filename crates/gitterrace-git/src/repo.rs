@@ -37,6 +37,7 @@ pub(crate) const NUMSTAT_WINDOW: crate::diff::Window<'static> = crate::diff::Win
     items: 1 << 16,
     bytes: 64 * 1024 * 1024,
     first: &[],
+    budget: None,
 };
 /// Blob pairs whose line counts one index build remembers (about 100 bytes each with the map's
 /// overhead, so 256k pairs is about 25 MB). Past that the memo starts over: slower, never
@@ -62,6 +63,8 @@ pub struct Repo {
     worktree_diff_bytes: AtomicU64,
     /// Threads [`Repo::numstat_many`] uses; 0 means one per core.
     workers: usize,
+    /// How many of them may run now, see [`Repo::with_budget`].
+    budget: Option<crate::Budget>,
     /// Ahead and behind per (branch tip, base): immutable for a pair of commits.
     pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
     /// The root-commit id, see `repo_id.rs`.
@@ -96,6 +99,7 @@ impl Repo {
             worktree_files: AtomicUsize::new(crate::worktree::WORKTREE_FILES),
             worktree_diff_bytes: AtomicU64::new(crate::worktree::WORKTREE_DIFF_BYTES),
             workers: 0,
+            budget: None,
             divergence: Mutex::new(HashMap::new()),
             id_cache: OnceLock::new(),
             committed_only: AtomicBool::new(false),
@@ -204,6 +208,14 @@ impl Repo {
     #[must_use]
     pub const fn with_workers(mut self, workers: usize) -> Self {
         self.workers = workers;
+        self
+    }
+
+    /// Lets `budget` cap the index workers while a build runs: lowering it parks workers
+    /// between commits, raising it wakes them, up to the thread count.
+    #[must_use]
+    pub fn with_budget(mut self, budget: crate::Budget) -> Self {
+        self.budget = Some(budget);
         self
     }
 

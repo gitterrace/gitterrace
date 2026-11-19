@@ -27,6 +27,11 @@ const REV_VAR: &str = "GITTERRACE_INDEX_REV";
 const GIT_VAR: &str = "GITTERRACE_INDEX_GIT_DIR";
 const THREADS_VAR: &str = "GITTERRACE_INDEX_THREADS";
 const MESSAGES_VAR: &str = "GITTERRACE_INDEX_MESSAGES";
+/// The workers the child may run at the start, all of `index.threads` when unset; later
+/// changes come as [`BUDGET_LINE`] lines on its stdin.
+const BUDGET_VAR: &str = "GITTERRACE_INDEX_BUDGET";
+/// A line on the child's stdin, `budget <n>`: from now on at most `n` index workers run.
+const BUDGET_LINE: &str = "budget";
 /// Prefix of every line the child reports on stdout. A harness may print lines of its own.
 const TAG: &str = "gitterrace-index";
 /// Harness only: a folder. At its first progress report the child writes a file named by its
@@ -48,13 +53,20 @@ pub fn index_child() {
         CHILDREN.store(true, Ordering::Relaxed);
         return;
     };
+    let budget = gitterrace_git::Budget::new(
+        std::env::var(BUDGET_VAR)
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(usize::MAX),
+    );
+    let lines = budget.clone();
     // A server that dies leaves this child with a closed stdin: stop with it, never keep
-    // building for nobody.
-    std::thread::spawn(|| {
-        drop(io::copy(&mut io::stdin().lock(), &mut io::sink()));
+    // building for nobody. Until then each line it sends sets the worker budget.
+    std::thread::spawn(move || {
+        follow(io::stdin().lock(), &lines);
         std::process::exit(3);
     });
-    let code = match run(&PathBuf::from(dir)) {
+    let code = match run(&PathBuf::from(dir), budget) {
         Ok(()) => 0,
         Err(e) => {
             let kind = if gitterrace_index::feed::SourceError::of(&e).is_some() {
@@ -71,12 +83,13 @@ pub fn index_child() {
 }
 
 /// The child's work: one [`Index::update`], its progress and steps reported on stdout.
-fn run(dir: &std::path::Path) -> io::Result<()> {
+fn run(dir: &std::path::Path, budget: gitterrace_git::Budget) -> io::Result<()> {
     let var = |k: &str| std::env::var(k).map_err(|e| io::Error::other(format!("{k}: {e}")));
     let threads = var(THREADS_VAR)?.parse().map_err(io::Error::other)?;
     let repo = Repo::discover(&PathBuf::from(var(GIT_VAR)?))
         .map_err(io::Error::other)?
-        .with_workers(threads);
+        .with_workers(threads)
+        .with_budget(budget);
     let index = Index::open_dir(dir.to_path_buf())?;
     index.set_message_index(var(MESSAGES_VAR)? == "1");
     // The merge would die half done with this process if it ran on a thread of its own.
@@ -115,6 +128,27 @@ fn hold_here(folder: &std::path::Path, cache: &std::path::Path) -> ! {
 fn report(line: &str) {
     let mut out = io::stdout().lock();
     drop(writeln!(out, "{TAG} {line}").and_then(|()| out.flush()));
+}
+
+/// Applies every [`BUDGET_LINE`] line of `input` to `budget`, each acknowledged on stdout,
+/// and returns when it closes or breaks. Other lines are ignored.
+fn follow(input: impl BufRead, budget: &gitterrace_git::Budget) {
+    for line in input.lines() {
+        let Ok(line) = line else { return };
+        if let Some(n) = parse_budget(&line) {
+            budget.set(n);
+            report(&format!("{BUDGET_LINE} {n}"));
+        }
+    }
+}
+
+/// The worker count of a [`BUDGET_LINE`] line, `None` for any other line.
+fn parse_budget(line: &str) -> Option<usize> {
+    line.strip_prefix(BUDGET_LINE)?
+        .strip_prefix(' ')?
+        .trim()
+        .parse()
+        .ok()
 }
 
 fn one_line(s: &str) -> String {
@@ -237,5 +271,21 @@ impl App {
                 tracing::warn!("{}: reaping the index child: {e}", self.name);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// Each budget line sets the budget, in order, and anything else leaves it alone; the
+    /// end of input returns, which the child turns into its exit. Catches a reader that stops
+    /// at the first line, applies a malformed one, or keeps reading past the end.
+    #[test]
+    fn budget_lines_apply_in_order_and_the_end_of_input_returns() {
+        let budget = gitterrace_git::Budget::new(8);
+        let input = "budget 2\nbudget x\nhello\nbudgets 9\nbudget 5\n";
+        super::follow(input.as_bytes(), &budget);
+        assert_eq!(budget.get(), 5);
+        assert_eq!(super::parse_budget("budget 3"), Some(3));
+        assert_eq!(super::parse_budget("budget -1"), None);
     }
 }

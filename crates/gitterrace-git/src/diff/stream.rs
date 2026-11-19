@@ -11,6 +11,30 @@ pub(crate) struct Window<'a> {
     pub(crate) bytes: usize,
     /// Positions to start ahead of the others, ascending, see [`stream`].
     pub(crate) first: &'a [usize],
+    /// How many workers may take items now, changed by another thread meanwhile. `None`
+    /// lets every worker run.
+    pub(crate) budget: Option<&'a crate::Budget>,
+}
+
+/// The next item a worker may start, waiting while the window is full. `None` once the run
+/// stops.
+fn next_item(
+    emitted: &(std::sync::Mutex<Ahead<'_>>, std::sync::Condvar),
+    stop: &std::sync::atomic::AtomicBool,
+    len: usize,
+    span: usize,
+    budget: usize,
+) -> Option<usize> {
+    let mut e = emitted.0.lock().ok()?;
+    loop {
+        if stop.load(std::sync::atomic::Ordering::Relaxed) {
+            return None;
+        }
+        if let Some(i) = e.take(len, span, budget) {
+            return Some(i);
+        }
+        e = emitted.1.wait(e).ok()?;
+    }
 }
 
 /// What the workers of [`stream`] wait on, and the two queues they take items from.
@@ -110,6 +134,7 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
         items: span,
         bytes: budget,
         first,
+        budget: live,
     } = window;
     let span = span.max(1);
     let workers = workers.clamp(1, items.len().max(1));
@@ -129,7 +154,7 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
         emitted.1.notify_all();
     };
     std::thread::scope(|scope| {
-        for _ in 0..workers {
+        for id in 0..workers {
             let tx = tx.clone();
             let (stop, emitted, setup, work, weight) = (&stop, &emitted, &setup, &work, &weight);
             scope.spawn(move || {
@@ -142,18 +167,16 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
                     }
                 };
                 loop {
-                    let Ok(mut e) = emitted.0.lock() else { return };
-                    let i = loop {
-                        if stop.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        if let Some(i) = e.take(len, span, budget) {
-                            break i;
-                        }
-                        let Ok(g) = emitted.1.wait(e) else { return };
-                        e = g;
+                    // Parked between items while the budget leaves this worker out: what it
+                    // took is done, so the item next to emit stays with a live worker.
+                    if let Some(b) = live
+                        && !hook.idle(|| b.wait_turn(id, || stop.load(Ordering::Relaxed)))
+                    {
+                        return;
+                    }
+                    let Some(i) = next_item(emitted, stop, len, span, budget) else {
+                        return;
                     };
-                    drop(e);
                     let Some(item) = items.get(i) else { return };
                     if stop.load(Ordering::Relaxed) {
                         return;
@@ -201,9 +224,11 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
                 release(want, freed);
             }
         }
-        if out.is_err() {
-            stop.store(true, Ordering::Relaxed);
-            release(usize::MAX, 0);
+        // Every worker leaves: the parked ones too, or the scope would wait on them forever.
+        stop.store(true, Ordering::Relaxed);
+        release(usize::MAX, 0);
+        if let Some(b) = live {
+            b.wake();
         }
         drop(rx);
         out

@@ -2,6 +2,7 @@
 //! the working tree is never touched.
 
 mod atomic;
+mod budget;
 mod diff;
 mod divergence;
 mod error;
@@ -30,6 +31,7 @@ pub use atomic::{
     open_append_no_follow, open_read_no_follow, read_no_follow_bounded, refused, synced_files,
     write_atomic, write_atomic_unsynced,
 };
+pub use budget::Budget;
 pub use error::{Error, Result};
 pub use fnv::{fnv1a32, fnv1a64};
 pub use generated::{generated_paths, is_lockfile};

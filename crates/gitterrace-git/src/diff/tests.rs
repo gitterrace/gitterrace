@@ -18,6 +18,7 @@ fn collect<R: Send>(
             items: window,
             bytes: usize::MAX,
             first: &[],
+            budget: None,
         },
         || Ok(()),
         |(), i| work(i),
@@ -107,6 +108,7 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
             items: 1000,
             bytes: 10 * 100,
             first: &[],
+            budget: None,
         },
         || Ok(()),
         |(), i| {
@@ -145,6 +147,7 @@ fn start_order(n: u64, workers: usize, span: usize, bytes: usize, first: Vec<usi
                 items: span,
                 bytes,
                 first: &first,
+                budget: None,
             },
             || Ok(()),
             |(), i| {
@@ -200,6 +203,105 @@ fn a_tiny_window_with_late_first_items_still_finishes() {
     assert_eq!(order.len(), 10);
 }
 
+/// Guard class: a worker limit lowered mid-run that the workers ignore, whether never read
+/// or read only once at the start. Eight workers start and the budget drops to two once item
+/// 50 is emitted. A worker that passed its check just before the drop still finishes the one
+/// item it took, and the 8-item window keeps those below item 80, so from item 80 on at most
+/// two run at once. The budget rises again at item 300 and more than two run. Output keeps
+/// the input order throughout. Counted, never timed.
+#[test]
+fn a_budget_lowered_mid_run_shrinks_the_live_workers() -> crate::Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let items: Vec<u64> = (0..400).collect();
+    let budget = crate::Budget::new(8);
+    let (running, peak_low, peak_high) = (
+        AtomicUsize::new(0),
+        AtomicUsize::new(0),
+        AtomicUsize::new(0),
+    );
+    let mut out = Vec::new();
+    stream(
+        &items,
+        8,
+        Window {
+            items: 8,
+            bytes: usize::MAX,
+            first: &[],
+            budget: Some(&budget),
+        },
+        || Ok(()),
+        |(), i| {
+            let now = running.fetch_add(1, Ordering::SeqCst) + 1;
+            match *i {
+                80..300 => peak_low.fetch_max(now, Ordering::SeqCst),
+                320.. => peak_high.fetch_max(now, Ordering::SeqCst),
+                _ => 0,
+            };
+            // Long enough that the other workers are mid-item too.
+            gitterrace_testkit::wait::pause_blocking(Duration::from_millis(2));
+            running.fetch_sub(1, Ordering::SeqCst);
+            Ok(*i)
+        },
+        |_| 0,
+        |n, r| {
+            match n {
+                50 => budget.set(2),
+                300 => budget.set(8),
+                _ => {}
+            }
+            out.push(r);
+            Ok(())
+        },
+    )?;
+    assert_eq!(out, items);
+    let low = peak_low.load(Ordering::SeqCst);
+    assert!(low <= 2, "{low} workers ran under a budget of two");
+    let high = peak_high.load(Ordering::SeqCst);
+    assert!(
+        high > 2,
+        "the raised budget woke no parked worker: peak {high}"
+    );
+    Ok(())
+}
+
+/// One live worker of four under a tiny window still finishes: the three parked ones leave
+/// when the run ends instead of holding the scope open. Catches an end that wakes only the
+/// window's waiters, not the budget's.
+#[test]
+fn a_run_ends_with_every_parked_worker_released() {
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let done = Arc::new(AtomicBool::new(false));
+    let d = Arc::clone(&done);
+    let run = std::thread::spawn(move || {
+        let items: Vec<u64> = (0..20).collect();
+        let budget = crate::Budget::new(1);
+        let mut out = Vec::new();
+        let r = stream(
+            &items,
+            4,
+            Window {
+                items: 2,
+                bytes: 0,
+                first: &[],
+                budget: Some(&budget),
+            },
+            || Ok(()),
+            |(), i| Ok(*i),
+            |_| 1,
+            |_, r| {
+                out.push(r);
+                Ok(())
+            },
+        );
+        d.store(true, Ordering::SeqCst);
+        r.is_ok() && out == items
+    });
+    // A deadline instead of a hung suite when a parked worker is never released.
+    gitterrace_testkit::wait::until_blocking("the run to end", || done.load(Ordering::SeqCst));
+    assert!(run.join().unwrap_or(false), "the run failed or reordered");
+}
+
 #[test]
 fn results_keep_input_order_and_errors_surface() {
     let items: Vec<u64> = (0..1000).collect();
@@ -219,6 +321,7 @@ fn results_keep_input_order_and_errors_surface() {
             items: 8,
             bytes: usize::MAX,
             first: &[],
+            budget: None,
         },
         || Ok(()),
         |(), _| Ok(()),
@@ -239,6 +342,7 @@ fn results_keep_input_order_and_errors_surface() {
             items: 8,
             bytes: usize::MAX,
             first: &[],
+            budget: None,
         },
         || Err::<(), _>(crate::Error::Git("x".into())),
         |(), _| Ok(()),
