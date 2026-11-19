@@ -5,6 +5,7 @@ scripts/bench/bench-report.py. Imported, not run.
 
 from __future__ import annotations
 
+import importlib
 import json
 import re
 import sys
@@ -13,6 +14,8 @@ from pathlib import Path
 from typing import Any
 
 Json = dict[str, Any]
+
+bl = importlib.import_module("bench-lib")
 
 ROOT = Path(__file__).resolve().parents[2]
 DOC = ROOT / "docs/benchmarks.md"
@@ -80,20 +83,9 @@ def fmt(key: str, v: float) -> str:
 # Corpus -------------------------------------------------------------------------------------
 
 
-def corpus_repos() -> list[dict[str, str]]:
-    """The [[repo]] tables of corpus.toml as flat string maps, in corpus order."""
-    out: list[dict[str, str]] = []
-    cur: dict[str, str] | None = None
-    for line in CORPUS.read_text().splitlines():
-        if line.strip() == "[[repo]]":
-            cur = {}
-            out.append(cur)
-        elif line.startswith("["):
-            cur = None
-        elif cur is not None and "=" in line and not line.startswith("#"):
-            k, v = (x.strip() for x in line.split("=", 1))
-            cur[k] = v.strip('"')
-    return out
+def corpus_repos() -> list[dict[str, Any]]:
+    """The [[repo]] tables of corpus.toml, in corpus order."""
+    return bl.parse_toml(CORPUS.read_text())["repo"]
 
 
 def corpus() -> list[tuple[str, str, str]]:
