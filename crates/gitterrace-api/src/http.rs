@@ -34,17 +34,25 @@ pub fn router(state: ApiState) -> Router {
         .with_state(state)
 }
 
-/// Runs a blocking read off the async runtime.
+/// Runs a blocking read off the async runtime, holding one of the state's job slots until
+/// the read exits.
 async fn blocking<T, F>(state: &ApiState, f: F) -> Reply<T>
 where
     T: Serialize + Send + 'static,
     F: FnOnce(&ApiState) -> Result<T, ApiError> + Send + 'static,
 {
     let state = state.clone();
-    tokio::task::spawn_blocking(move || f(&state))
+    let slot = state
+        .job_slot()
         .await
-        .map_err(|e| ApiError::Task(e.to_string()))?
-        .map(Json)
+        .ok_or_else(|| ApiError::Task("blocking job slots closed".to_owned()))?;
+    tokio::task::spawn_blocking(move || {
+        let _slot = slot;
+        f(&state)
+    })
+    .await
+    .map_err(|e| ApiError::Task(e.to_string()))?
+    .map(Json)
 }
 
 /// Refuses a query key the endpoint does not list with 400: an unread key would answer
@@ -83,10 +91,14 @@ async fn etag(
     req: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
-    let tag = tokio::task::spawn_blocking(move || state.etag())
-        .await
-        .ok()
-        .flatten();
+    let slot = state.job_slot().await;
+    let tag = tokio::task::spawn_blocking(move || {
+        let _slot = slot;
+        state.etag()
+    })
+    .await
+    .ok()
+    .flatten();
     let Some(tag) = tag else {
         return next.run(req).await;
     };

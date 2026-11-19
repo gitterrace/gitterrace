@@ -15,7 +15,6 @@ use gitterrace_git::Repo;
 use gitterrace_index::{Index, Progress};
 use tokio::sync::{Notify, Semaphore, broadcast, watch};
 
-use crate::error::Result;
 use crate::live::Change;
 
 /// Rendered stats pages are reused this long; time-relative windows move slowly.
@@ -30,6 +29,7 @@ pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 mod child;
 mod events;
 mod history;
+mod jobs;
 mod memo;
 mod records;
 mod refresh;
@@ -38,6 +38,7 @@ mod touched;
 
 pub use child::index_child;
 pub(crate) use history::PathLog;
+pub(crate) use jobs::blocking;
 pub(crate) use refresh::{keep_index_fresh_supervised, on_refreshed, release_when_idle};
 pub(crate) use state::RepoState;
 
@@ -118,6 +119,16 @@ fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
 }
 
 impl Env {
+    /// One page-building slot, for blocking work outside [`blocking`] such as the
+    /// multi-repository home. Move it into the blocking task, so a dropped request frees it
+    /// only when the work exits.
+    pub(crate) async fn job_slot(&self) -> std::io::Result<tokio::sync::OwnedSemaphorePermit> {
+        Arc::clone(&self.jobs)
+            .acquire_owned()
+            .await
+            .map_err(|_| std::io::Error::other("blocking job slots closed"))
+    }
+
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;
@@ -464,6 +475,7 @@ impl App {
             }
         }));
         api.share_pages(self.pages_share());
+        api.share_jobs(Arc::clone(&self.env.jobs));
         self.api.set(api).ok();
     }
 
@@ -558,34 +570,6 @@ impl App {
     pub(crate) fn progress(&self) -> Progress {
         self.progress.lock().map(|g| *g).unwrap_or_default()
     }
-}
-
-pub(crate) async fn blocking<T: Send + 'static>(
-    app: &Arc<App>,
-    f: impl FnOnce(&App) -> Result<T> + Send + 'static,
-) -> Result<T> {
-    let app = Arc::clone(app);
-    let rev = crate::fmt::REQUEST_REV
-        .try_with(Clone::clone)
-        .unwrap_or_else(|_| "HEAD".to_owned());
-    // Moved into the job, so a cancelled request cannot free the slot while git still runs.
-    let slot = Arc::clone(&app.env.jobs)
-        .acquire_owned()
-        .await
-        .map_err(|_| std::io::Error::other("blocking job slots closed"))?;
-    let cfg = app.cfg();
-    let absolute = cfg.display.dates == gitterrace_types::DateStyle::Absolute;
-    // Every page is built here, so every page reads one table of what is switched on.
-    let on = crate::features::Effective::of(&cfg, Some(&app.name));
-    tokio::task::spawn_blocking(move || {
-        let _slot = slot;
-        crate::features::with(on, || {
-            crate::fmt::with_dates(absolute, || {
-                crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
-            })
-        })
-    })
-    .await?
 }
 
 #[cfg(test)]

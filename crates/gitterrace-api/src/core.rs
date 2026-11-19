@@ -3,6 +3,7 @@
 
 mod page_tables;
 mod rebuild;
+mod settings;
 
 pub use page_tables::Pages;
 
@@ -13,13 +14,13 @@ use gitterrace_actions::{Lines, styled};
 use gitterrace_git::Repo;
 use gitterrace_index::feed::{Checked, InsightsSource};
 use gitterrace_index::{Index, Options, Selected};
-use gitterrace_types::LinkStyle;
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
     RepoResponse, RepoTotals, TreeResponse,
 };
 
 use crate::bounds::{checked, checked_path};
+use crate::core::settings::Settings;
 use crate::error::ApiError;
 use crate::{insights, wire};
 
@@ -64,25 +65,14 @@ pub struct ApiState {
     pages: Arc<RwLock<Option<Pages>>>,
     /// A rebuild this state started itself is running.
     rebuilding: Arc<std::sync::atomic::AtomicBool>,
+    /// Slots for blocking reads. One per core on its own; the web server hands in its page
+    /// job slots ([`ApiState::share_jobs`]), so API reads and pages share one bound.
+    jobs: Arc<RwLock<Arc<tokio::sync::Semaphore>>>,
 }
 
 /// Deletes an unreadable cache and starts its rebuild. Returns at once: the answer meanwhile
 /// is a 503 with `Retry-After`.
 pub type Rebuild = Arc<dyn Fn() + Send + Sync>;
-
-/// What the configuration decides for the API.
-#[derive(Clone, Default)]
-struct Settings {
-    /// Form of the `link` field; `permalink` is always `/go`.
-    style: LinkStyle,
-    /// Counting options when a request names none: the `insights` configuration, the same
-    /// defaults the web pages start from.
-    defaults: Options,
-    /// How much one answer may carry, from `[api]` (see `gitterrace_config::Api`): a vendored
-    /// commit holds millions of diff lines, one minified line can be megabytes, and a path
-    /// filter walks every skipped commit.
-    caps: gitterrace_config::Api,
-}
 
 /// Per commit id: the ignore files (finding them walks the tree) and the line count of every
 /// head file (a walk plus a cache read). Blobs are immutable, so a key never goes stale.
@@ -109,42 +99,10 @@ impl ApiState {
             on_unreadable: Arc::default(),
             pages: Arc::default(),
             rebuilding: Arc::default(),
+            jobs: Arc::new(RwLock::new(Arc::new(tokio::sync::Semaphore::new(
+                std::thread::available_parallelism().map_or(2, usize::from),
+            )))),
         }
-    }
-
-    /// Link style and counting defaults from the configuration: `links.style`, `insights.*`
-    /// and this repository's `[repo.NAME] exclude`. The web's `/api/v1` and the MCP server both
-    /// build their state through here, so the two answer with the same numbers.
-    #[must_use]
-    pub fn configured(self, cfg: &gitterrace_config::Config) -> Self {
-        self.reconfigure(cfg);
-        self
-    }
-
-    /// Puts `cfg` in force for this state and every clone of it, such as a router built
-    /// earlier: a reloaded `config.toml` changes the next answer.
-    pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
-        self.index
-            .set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
-        self.index.set_message_index(cfg.index.has_messages);
-        let defaults = options_from(cfg, &self.repo.name());
-        let mut s = self.write_settings();
-        s.style = cfg.links.style;
-        s.defaults = defaults;
-        s.caps = cfg.api.clone();
-    }
-
-    fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {
-        self.settings
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-    }
-
-    fn settings(&self) -> Settings {
-        self.settings
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
     }
 
     /// Answers only for committed history, see [`Repo::restrict_to_committed`].

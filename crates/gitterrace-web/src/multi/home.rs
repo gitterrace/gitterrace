@@ -138,7 +138,10 @@ pub(super) async fn index(
         return Ok((StatusCode::FOUND, [(axum::http::header::LOCATION, to)]).into_response());
     }
     let q = query.q.unwrap_or_default();
+    // One page slot for the whole page and its reader threads, held until they exit.
+    let slot = table.env.job_slot().await?;
     let html = tokio::task::spawn_blocking(move || {
+        let _slot = slot;
         let now = fmt::now();
         let show_tree = shows_tree(&table);
         // Read before the rows: a change that lands while they are read makes the page behind,
@@ -236,7 +239,11 @@ fn follows_list(table: &Table) -> bool {
 /// read on the home page's threads. Each answer is reused for `DIRTY_TTL`. Not public: it
 /// describes trees.
 pub(super) async fn dirty(State(table): State<Arc<Table>>) -> Response {
+    let Ok(slot) = table.env.job_slot().await else {
+        return StatusCode::SERVICE_UNAVAILABLE.into_response();
+    };
     let names = tokio::task::spawn_blocking(move || {
+        let _slot = slot;
         if !shows_tree(&table) {
             return Vec::new();
         }

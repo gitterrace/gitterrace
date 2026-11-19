@@ -554,4 +554,27 @@ mod tests {
             "4xx keep their text: {v}"
         );
     }
+
+    /// API reads, the `ETag` pass included, run under the shared job slots: with every slot
+    /// taken a request waits before any blocking read, and each slot comes back after.
+    #[tokio::test]
+    async fn api_reads_wait_for_a_shared_job_slot() {
+        let (_d, s) = fixture();
+        let jobs = Arc::new(tokio::sync::Semaphore::new(1));
+        s.share_jobs(Arc::clone(&jobs));
+        let held = Arc::clone(&jobs).acquire_owned().await.expect("permit");
+        let waiting = tokio::spawn({
+            let s = s.clone();
+            async move { get(&s, "/repo").await.0 }
+        });
+        gitterrace_testkit::wait::pause(std::time::Duration::from_millis(100)).await;
+        assert!(!waiting.is_finished(), "no read starts without a slot");
+        drop(held);
+        let status = tokio::time::timeout(std::time::Duration::from_secs(10), waiting)
+            .await
+            .expect("served once a slot is free")
+            .expect("task");
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(jobs.available_permits(), 1, "the slot comes back");
+    }
 }

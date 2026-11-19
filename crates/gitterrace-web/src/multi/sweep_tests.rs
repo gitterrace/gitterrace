@@ -171,3 +171,34 @@ async fn an_open_home_hears_the_sweep_add_and_drop_a_repository() {
     notices(&mut events, &mut seen, 2).await;
     awaits(&router, &["alpha", "beta"], Some("gamma")).await;
 }
+
+/// The home reads every repository on its own threads, so it takes a page job slot like any
+/// page: with every slot held it waits, and it answers once one is free.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_home_waits_for_a_page_job_slot() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let root = dir.path().canonicalize().expect("canon");
+    for name in ["alpha", "beta"] {
+        repo(&root.join(name));
+    }
+    let mut cfg = gitterrace_config::Config::default();
+    cfg.resources.blocking_jobs = 1;
+    let env = crate::app::Env::new(cfg);
+    let paths = crate::discover_repos(std::slice::from_ref(&root), 2, &[]);
+    let router = crate::build_server(paths, None, None, &env, None, None)
+        .expect("server")
+        .0;
+    let held = env.job_slot().await.expect("slot");
+    let home = tokio::spawn({
+        let router = router.clone();
+        async move { get(&router, "/").await.0 }
+    });
+    wait::pause(std::time::Duration::from_millis(100)).await;
+    assert!(!home.is_finished(), "the home waits for the held slot");
+    drop(held);
+    let status = tokio::time::timeout(std::time::Duration::from_secs(10), home)
+        .await
+        .expect("served once the slot is free")
+        .expect("task");
+    assert_eq!(status, 200);
+}
