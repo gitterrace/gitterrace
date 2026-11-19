@@ -375,10 +375,14 @@ impl Repo {
         };
         let none = gix::mailmap::Snapshot::default();
         let memo = crate::diff::CountMemo::new(NUMSTAT_MEMO_PAIRS);
+        let merges = merge_positions(&self.repo(), ids);
         crate::diff::stream(
             ids,
             workers,
-            NUMSTAT_WINDOW,
+            crate::diff::Window {
+                first: &merges,
+                ..NUMSTAT_WINDOW
+            },
             || {
                 let mut repo = self.repo();
                 // Ten workers each keeping the shared 128 MB cache cost over 1 GB; the
@@ -413,6 +417,25 @@ impl Repo {
             emit,
         )
     }
+}
+
+/// Positions in `ids` of the merge commits, ascending: the index diffs them first. A merge's
+/// diff against its first parent spans a whole branch and can take seconds, where most other
+/// commits take microseconds, so started late it holds back the emitting behind it. Read from
+/// the commit-graph where it holds the commit, else from the commit's header. A commit that
+/// cannot be read counts as no merge: the order only changes when work starts, never a result.
+fn merge_positions(repo: &gix::Repository, ids: &[String]) -> Vec<usize> {
+    let graph = crate::graph::commit_graph(repo);
+    let parents = |id: &str| -> Option<usize> {
+        let oid = gix::ObjectId::from_hex(id.as_bytes()).ok()?;
+        if let Some(c) = graph.as_ref().and_then(|g| g.commit_by_id(oid)) {
+            return Some(c.iter_parents().count());
+        }
+        Some(repo.find_commit(oid).ok()?.parent_ids().count())
+    };
+    (0..ids.len())
+        .filter(|&i| parents(&ids[i]).is_some_and(|n| n > 1))
+        .collect()
 }
 
 /// Heap bytes one index result holds, roughly: what the reorder window budgets.
@@ -539,4 +562,29 @@ fn parents_from(
         out.push((info.id.to_string(), parents));
     }
     Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use gitterrace_testkit::Fixture;
+
+    /// The merges are found by position, from a commit-graph and from the objects alike.
+    /// Catches a count that reads only one of them, or that takes a single parent for a merge.
+    #[test]
+    fn merge_positions_find_merges_with_and_without_a_graph() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let f = Fixture::init(dir.path()).write("a", "1\n").commit("root");
+        let f = f.branch("side").write("b", "1\n").commit("side");
+        let f = f.checkout("main").write("c", "1\n").commit("main");
+        f.git(&["merge", "-q", "--no-ff", "-m", "merge", "side"]);
+        let repo = crate::Repo::discover(f.path()).expect("open");
+        let ids = repo.rev_list("HEAD").expect("rev list");
+        let merge = f.git(&["rev-parse", "HEAD"]);
+        let want: Vec<usize> = (0..ids.len()).filter(|&i| ids[i] == merge.trim()).collect();
+        assert_eq!(want.len(), 1, "{ids:?}");
+        assert_eq!(super::merge_positions(&repo.repo(), &ids), want);
+        f.git(&["commit-graph", "write", "--reachable"]);
+        let repo = crate::Repo::discover(f.path()).expect("open");
+        assert_eq!(super::merge_positions(&repo.repo(), &ids), want);
+    }
 }

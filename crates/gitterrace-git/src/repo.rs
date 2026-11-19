@@ -33,9 +33,10 @@ const INDEX_WORKER_PACK_CACHE_BYTES: usize = 24 * 1024 * 1024;
 /// of 4096 commits, samples of the linux build showed workers waiting on it for over half of
 /// their time. So the count is wide, and the held results are bounded by their estimated
 /// bytes instead, which a run of huge merges reaches long before the count.
-pub(crate) const NUMSTAT_WINDOW: crate::diff::Window = crate::diff::Window {
+pub(crate) const NUMSTAT_WINDOW: crate::diff::Window<'static> = crate::diff::Window {
     items: 1 << 16,
     bytes: 64 * 1024 * 1024,
+    first: &[],
 };
 /// Blob pairs whose line counts one index build remembers (about 100 bytes each with the map's
 /// overhead, so 256k pairs is about 25 MB). Past that the memo starts over: slower, never

@@ -17,6 +17,7 @@ fn collect<R: Send>(
         Window {
             items: window,
             bytes: usize::MAX,
+            first: &[],
         },
         || Ok(()),
         |(), i| work(i),
@@ -105,6 +106,7 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
         Window {
             items: 1000,
             bytes: 10 * 100,
+            first: &[],
         },
         || Ok(()),
         |(), i| {
@@ -122,6 +124,80 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
     let peak = peak.load(Ordering::SeqCst);
     assert!(peak <= 10 + 1 + 8, "{peak} started behind the slow item");
     Ok(())
+}
+
+/// Runs [`stream`] over 0..n with `first` on a thread of its own, records the order the items
+/// start in, and checks the results come out in input order. Waits on the run finishing, so a
+/// scheduler that can stall fails on the deadline instead of hanging the suite.
+fn start_order(n: u64, workers: usize, span: usize, bytes: usize, first: Vec<usize>) -> Vec<u64> {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::{Arc, Mutex};
+    let started = Arc::new(Mutex::new(Vec::new()));
+    let done = Arc::new(AtomicBool::new(false));
+    let (s, d) = (Arc::clone(&started), Arc::clone(&done));
+    let run = std::thread::spawn(move || {
+        let items: Vec<u64> = (0..n).collect();
+        let mut out = Vec::new();
+        let r = stream(
+            &items,
+            workers,
+            Window {
+                items: span,
+                bytes,
+                first: &first,
+            },
+            || Ok(()),
+            |(), i| {
+                s.lock()
+                    .map_err(|e| crate::Error::Git(e.to_string()))?
+                    .push(*i);
+                Ok(*i)
+            },
+            |_| 100,
+            |n, r| {
+                out.push((n, r));
+                Ok(())
+            },
+        );
+        d.store(true, Ordering::SeqCst);
+        (r.is_ok(), out)
+    });
+    gitterrace_testkit::wait::until_blocking("the stream to finish", || {
+        done.load(Ordering::SeqCst)
+    });
+    let (ok, out) = run.join().unwrap_or_default();
+    assert!(ok, "the stream failed");
+    let want: Vec<(usize, u64)> = (0..n).map(|i| (i as usize, i)).collect();
+    assert_eq!(out, want, "emitted out of order");
+    started.lock().map(|s| s.clone()).unwrap_or_default()
+}
+
+/// The items named first start before every other item the window lets in, and the output
+/// keeps the input order. Catches a `first` that is ignored, or one that reorders the output.
+#[test]
+fn items_named_first_start_ahead_of_the_rest() {
+    let order = start_order(50, 1, 1000, usize::MAX, vec![7, 30, 49]);
+    assert_eq!(order[..3], [7, 30, 49], "{order:?}");
+    let rest: Vec<u64> = (0..50).filter(|i| ![7, 30, 49].contains(i)).collect();
+    assert_eq!(order[3..], rest[..]);
+}
+
+/// With a tiny window and byte budget and the items named first far past it, the run still
+/// finishes on any worker count: the item next to emit can always start, from whichever queue
+/// holds it. Catches a scheduler that waits on the head of `first` while the window is full
+/// of earlier items no worker may start: every worker blocked, the collector waiting on an
+/// item nobody runs.
+#[test]
+fn a_tiny_window_with_late_first_items_still_finishes() {
+    for workers in [1, 2, 8] {
+        let order = start_order(100, workers, 2, 0, (90..100).collect());
+        let mut sorted = order.clone();
+        sorted.sort_unstable();
+        assert_eq!(sorted, (0..100).collect::<Vec<_>>(), "{workers} workers");
+    }
+    // A position past the end is ignored, never waited for.
+    let order = start_order(10, 4, 2, 0, vec![3, 50]);
+    assert_eq!(order.len(), 10);
 }
 
 #[test]
@@ -142,6 +218,7 @@ fn results_keep_input_order_and_errors_surface() {
         Window {
             items: 8,
             bytes: usize::MAX,
+            first: &[],
         },
         || Ok(()),
         |(), _| Ok(()),
@@ -161,6 +238,7 @@ fn results_keep_input_order_and_errors_surface() {
         Window {
             items: 8,
             bytes: usize::MAX,
+            first: &[],
         },
         || Err::<(), _>(crate::Error::Git("x".into())),
         |(), _| Ok(()),
