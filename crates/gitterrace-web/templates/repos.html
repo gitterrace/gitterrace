@@ -40,6 +40,7 @@
 {% endfor %}</ul>
 <p class="muted repos-none"{% if !none %} hidden{% endif %}>No repository matches</p></div>
 </main>
+<script src="{{ crate::asset_url("tip.js") }}" defer></script>
 <script src="{{ crate::asset_url("home.js") }}" defer></script>
 {% if live.is_some() %}<script src="{{ crate::asset_url("live.js") }}" defer></script>{% endif %}
 </body>
