@@ -284,11 +284,26 @@ def fetch_following(url: str) -> Answer:
     return 0, email.message.Message(), ""
 
 
+def sitemap_pages() -> list[str]:
+    """The body of every page the live sitemap lists, the home page aside."""
+    _, _, xml = fetch(f"https://{CANONICAL}/sitemap.xml", body=True)
+    urls = re.findall(r"<loc>(https://[^<]+)</loc>", xml)
+    return [
+        fetch(u, body=True)[2] for u in urls if u.rstrip("/") != f"https://{CANONICAL}"
+    ]
+
+
 def domains() -> list[str]:
     bad = []
     status, headers, page = fetch(f"https://{CANONICAL}/", body=True)
     policy = headers.get("Content-Security-Policy", "")
-    wrong = csp_problems(f"https://{CANONICAL}/", policy, page) if status == 200 else []
+    # The policy covers every page, as in `csp`: a script only the docs pages carry is still
+    # one it must list, so the hashes are checked against every page of the sitemap.
+    wrong = (
+        csp_problems(f"https://{CANONICAL}/", policy, [page, *sitemap_pages()])
+        if status == 200
+        else []
+    )
     for meta in META_CSP.findall(page):
         wrong += csp_problems(f"https://{CANONICAL}/ meta CSP", meta, page)
     ok = status == 200 and not wrong
@@ -381,6 +396,9 @@ def self_test() -> int:
         ("script-src 'self'", run, True),
         (f"script-src {h}; style-src 'unsafe-inline'", run, False),
         (f"script-src {h} 'unsafe-inline'", run, True),
+        # A hash only a second page needs is listed, not stray, once every page is read.
+        (f"script-src {h}", ["<p>home</p>", run], False),
+        (f"script-src {h}", "<p>home</p>", True),
     ]:
         if bool(csp_problems("t", policy, page)) != red:
             print(
