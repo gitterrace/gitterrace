@@ -41,6 +41,23 @@ async fn the_server_builds_its_index_without_a_worker_of_its_own() {
         body.contains("\"name\":\"stream\""),
         "steps of the child: {body}"
     );
+    // The child's CPU and worker busy share cross the pipe: a busy share is only measured
+    // where the workers ran, so one here came from the child.
+    let v: serde_json::Value = serde_json::from_str(&body).expect("json");
+    let steps = v["phases"].as_array().expect("phases");
+    let stream = steps
+        .iter()
+        .find(|p| p["name"] == "stream")
+        .expect("stream");
+    assert!(
+        stream["busy"].as_f64().is_some_and(|b| b > 0.0),
+        "no worker busy share from the child: {body}"
+    );
+    #[cfg(unix)]
+    assert!(
+        stream["cpu_secs"].as_f64().is_some(),
+        "no CPU seconds from the child: {body}"
+    );
     assert_eq!(
         WORKERS.load(Ordering::Relaxed),
         0,

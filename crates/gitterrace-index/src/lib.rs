@@ -153,7 +153,7 @@ pub struct Index {
     newer: Option<String>,
     /// Whether updates keep the message column, see [`Index::set_message_index`].
     messages: std::sync::atomic::AtomicBool,
-    /// Wall time per step of the last update, see [`Index::phases`].
+    /// Time per step of the last update, see [`Index::phases`].
     phases: phases::Phases,
     /// Run a segment merge on the updating thread, see [`Index::set_merge_inline`].
     merge_inline: std::sync::atomic::AtomicBool,
@@ -243,8 +243,8 @@ impl Index {
         Ok(())
     }
 
-    /// Takes the steps of an update another process ran, by name, for [`Index::phases`].
-    pub fn adopt_phases(&self, steps: &[(String, f64)]) {
+    /// Takes the steps of an update another process ran, for [`Index::phases`].
+    pub fn adopt_phases(&self, steps: Vec<PhaseTime>) {
         self.phases.adopt(steps);
     }
 
@@ -352,9 +352,10 @@ impl Index {
         m.commit(&self.dir).map_err(seg_io)
     }
 
-    /// Wall time per step of the update running now or last finished, in order, the running
-    /// one with its time so far, and its name. `stream.fold` is the part of `stream` spent
-    /// folding records into the segment, the rest is reading and diffing git.
+    /// Wall time, CPU time and worker busy share per step of the update running now or last
+    /// finished, in order, the running one with its time so far, and its name. `stream.fold`
+    /// is the part of `stream` spent folding records into the segment, the rest is reading
+    /// and diffing git.
     pub fn phases(&self) -> (Vec<PhaseTime>, Option<&'static str>) {
         self.phases.snapshot()
     }

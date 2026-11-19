@@ -426,7 +426,8 @@ struct ProgressBody {
     ready: bool,
     /// Idle releases so far, see `App::release_idle`.
     releases: u64,
-    /// Wall time per step of the last index update, the running one so far.
+    /// Wall time, CPU seconds and worker busy share per step of the last index update, the
+    /// running one so far.
     phases: Vec<gitterrace_index::PhaseTime>,
     /// The step running now, so a sampler can charge memory to it.
     phase: Option<&'static str>,

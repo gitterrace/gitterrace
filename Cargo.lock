@@ -1090,6 +1090,7 @@ dependencies = [
  "gitterrace-types",
  "libc",
  "proptest",
+ "rustix",
  "serde",
  "serde_json",
  "tempfile",

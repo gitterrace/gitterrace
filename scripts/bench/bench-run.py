@@ -56,7 +56,7 @@ discover = bl.discover
 pages = bl.pages
 ROOT = bl.ROOT
 FULL_RUNS = bq.FULL_RUNS
-HARNESS = 2
+HARNESS = 3
 FULL_IDLE_SECS = bq.FULL_IDLE_SECS
 COLD_SAMPLES = bq.COLD_SAMPLES
 DEFAULT_COMMITS = 500  # `export --commits` default (cli.rs)
@@ -524,6 +524,7 @@ def main():
         return 0
     result = {
         # 2: every repo records memory.footprint_idle_mb after an idle release.
+        # 3: every index step records cpu_secs and busy (null where none applies).
         "harness": HARNESS,
         "when": str(datetime.date.today()),
         "runs": a.runs,

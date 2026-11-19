@@ -92,7 +92,7 @@ fn run(dir: &std::path::Path) -> io::Result<()> {
         .phases()
         .0
         .iter()
-        .map(|p| format!("{}={}", p.name, p.secs))
+        .map(gitterrace_index::PhaseTime::encode)
         .collect();
     report(&format!("phases {}", steps.join(" ")));
     Ok(())
@@ -179,7 +179,9 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
                     app.set_progress(Progress { done, total });
                 }
             }
-            "phases" => app.index.adopt_phases(&steps(body)),
+            "phases" => app
+                .index
+                .adopt_phases(gitterrace_index::PhaseTime::decode(body)),
             "unreadable" => {
                 failure = Some(io::Error::other(gitterrace_index::feed::SourceError(
                     body.to_owned(),
@@ -235,28 +237,5 @@ impl App {
                 tracing::warn!("{}: reaping the index child: {e}", self.name);
             }
         }
-    }
-}
-
-/// `name=secs` pairs as the child printed them.
-fn steps(body: &str) -> Vec<(String, f64)> {
-    body.split(' ')
-        .filter_map(|s| {
-            let (n, v) = s.split_once('=')?;
-            Some((n.to_owned(), v.parse().ok()?))
-        })
-        .collect()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn steps_read_back_as_the_child_printed_them() {
-        assert_eq!(
-            steps("rev_list=0.5 held=0 bad stream=x"),
-            [("rev_list".to_owned(), 0.5), ("held".to_owned(), 0.0)]
-        );
     }
 }

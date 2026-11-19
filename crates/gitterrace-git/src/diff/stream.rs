@@ -69,8 +69,8 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
             let (next, stop, emitted, setup, work, weight) =
                 (&next, &stop, &emitted, &setup, &work, &weight);
             scope.spawn(move || {
-                let _hook = crate::worker_hook::WorkerGuard::start();
-                let mut state = match setup() {
+                let mut hook = crate::worker_hook::WorkerGuard::start();
+                let mut state = match hook.busy(setup) {
                     Ok(s) => s,
                     Err(e) => {
                         drop(tx.send((usize::MAX, Err(e), 0)));
@@ -93,7 +93,7 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
                     if stop.load(Ordering::Relaxed) {
                         return;
                     }
-                    let r = work(&mut state, item);
+                    let r = hook.busy(|| work(&mut state, item));
                     let w = r.as_ref().map_or(0, weight);
                     if let Ok(mut e) = emitted.0.lock() {
                         e.held = e.held.saturating_add(w);

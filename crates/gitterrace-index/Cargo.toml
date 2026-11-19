@@ -28,6 +28,8 @@ zstd = { version = "0.14", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
+# The process CPU clock each index step is charged with.
+rustix = { version = "1", default-features = false, features = ["std", "time"] }
 
 [dev-dependencies]
 gitterrace-index = { workspace = true, features = ["oracle"] }

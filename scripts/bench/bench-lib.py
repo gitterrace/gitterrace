@@ -439,17 +439,63 @@ INDEX_GATES = ("index_secs", "rss_mb")
 def phase_table(
     phases: list[dict[str, Any]], rss: dict[str, float], fp: dict[str, float]
 ) -> list[Json]:
-    """The server's step times, each with the peak RSS and peak footprint sampled while it
-    ran."""
+    """The server's step times, CPU seconds and worker busy share, each with the peak RSS and
+    peak footprint sampled while it ran."""
     out = []
     for p in phases:
         row = {"name": p["name"], "secs": round(float(p["secs"]), 3)}
+        # Kept as null when the step has none, so a missing key means an old server.
+        for k in ("cpu_secs", "busy"):
+            if k in p:
+                row[k] = None if p[k] is None else round(float(p[k]), 3)
         if p["name"] in rss:
             row["rss_mb"] = round(rss[p["name"]], 1)
         if p["name"] in fp:
             row["footprint_mb"] = round(fp[p["name"]], 1)
         out.append(row)
     return out
+
+
+def phase_cpu(run: Json, name: str) -> list[str]:
+    """A run from harness 3 records, per index step, its CPU seconds and worker busy share
+    (null for a step where none applies), so a slow step reads as short of cores or as
+    waiting. Older runs predate it. `name` labels the run in the errors."""
+    if run.get("harness", 1) < 3:
+        return []
+    errs: list[str] = []
+    for n, r in run["repos"].items():
+        steps = r.get("index", {}).get("phases", [])
+        if not steps:
+            errs.append(f"{name}: {n} recorded no index steps")
+        for p in steps:
+            for key in ("cpu_secs", "busy"):
+                if key not in p:
+                    errs.append(f"{name}: {n} step {p['name']} has no {key}")
+        if steps and not any(p.get("busy") is not None for p in steps):
+            errs.append(f"{name}: {n} has no step with a worker busy share")
+    return errs
+
+
+def phase_cpu_test() -> None:
+    """A harness 3 run whose index steps lack CPU seconds or a busy share is refused, a
+    harness 2 run passes untouched, and the step table keeps a null as null."""
+
+    def run(steps: list[Json], harness: int = 3) -> Json:
+        return {"harness": harness, "repos": {"r": {"index": {"phases": steps}}}}
+
+    good = [
+        {"name": "rev_list", "secs": 1.0, "cpu_secs": 0.9, "busy": None},
+        {"name": "stream", "secs": 9.0, "cpu_secs": 70.0, "busy": 0.8},
+    ]
+    no_cpu = [{k: v for k, v in p.items() if k != "cpu_secs"} for p in good]
+    no_busy = [{k: v for k, v in p.items() if k != "busy"} for p in good]
+    never_busy = [{**p, "busy": None} for p in good]
+    bad = [s for s in (no_cpu, no_busy, never_busy, []) if not phase_cpu(run(s), "t")]
+    if phase_cpu(run(good), "t") or phase_cpu(run(no_cpu, 2), "t") or bad:
+        sys.exit(f"bench self-test failed: step CPU guard passed {bad or 'a good run'}")
+    rows = phase_table(good + [{"name": "old", "secs": 1}], {}, {})
+    if rows[0]["busy"] is not None or "busy" in rows[2] or rows[1]["busy"] != 0.8:
+        sys.exit(f"bench self-test failed: phase table {rows}")
 
 
 def slowest_page(pages: Json) -> str:

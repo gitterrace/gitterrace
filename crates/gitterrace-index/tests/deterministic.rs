@@ -233,3 +233,37 @@ fn an_append_sequence_with_a_fork_indexes_the_same_on_any_thread_count() {
         assert!(build(threads, n) == one, "{threads} threads, run {n}");
     }
 }
+
+/// The stream step of a real build says how much CPU it used and how busy its workers were,
+/// so the bench can tell a step short of cores from one waiting on a slow commit. Red when a
+/// worker's time is never counted or the step never reads the process clock.
+#[test]
+fn a_real_build_reports_cpu_and_worker_busy_for_the_stream() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let mut f = Fixture::init(&dir.path().join("repo")).at("2024-01-01T00:00:00Z");
+    for i in 0..20 {
+        f = f
+            .write(&format!("f{i}.rs"), &format!("line {i}\n"))
+            .commit(&format!("fix: edit {i}"));
+    }
+    let source = Repo::discover(f.path()).expect("open").with_workers(4);
+    let index = Index::open_dir(dir.path().join("gitterrace")).expect("index");
+    index.update(&source, "HEAD", &|_| {}).expect("update");
+    let (steps, _) = index.phases();
+    let stream = steps
+        .iter()
+        .find(|p| p.name == "stream")
+        .expect("stream step");
+    assert!(
+        stream.busy.is_some_and(|b| b > 0.0 && b <= 1.0),
+        "{stream:?}"
+    );
+    if cfg!(unix) {
+        assert!(stream.cpu_secs.is_some_and(|c| c >= 0.0), "{stream:?}");
+    }
+    let rev_list = steps
+        .iter()
+        .find(|p| p.name == "rev_list")
+        .expect("rev_list");
+    assert!(rev_list.cpu_secs.is_some() || !cfg!(unix), "{rev_list:?}");
+}

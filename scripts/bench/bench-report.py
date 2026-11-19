@@ -177,6 +177,7 @@ def self_test() -> None:
     commit_test()
     wrap_test()
     footprint_test()
+    bl.phase_cpu_test()
     export_test()
     gate_test()
     bc.slowest_page_test(importlib.import_module("bench-run"))
@@ -508,6 +509,7 @@ def check(text: str, new: str) -> None:
     newest = published()[-1]
     errs = pins() + no_inline_svg() + newest_ok(newest) + cold_samples(newest)
     errs += footprint(newest)
+    errs += bl.phase_cpu(newest, run_name(newest))
     errs += [
         f"{p.name}: name is not <date>-<machine>.json"
         for p in runs()
