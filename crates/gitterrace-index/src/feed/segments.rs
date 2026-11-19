@@ -342,33 +342,32 @@ const fn sums(s: &agg::Sums) -> Sums {
     }
 }
 
+/// Declares trait methods that answer from `self.base` unchanged.
+macro_rules! from_base {
+    ($($name:ident($($arg:ident: $ty:ty),*) -> $ret:ty;)*) => {$(
+        fn $name(&self $(, $arg: $ty)*) -> $ret {
+            self.base.$name($($arg),*)
+        }
+    )*};
+}
+
 impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
-    fn len(&self) -> usize {
-        self.base.len()
-    }
-
-    fn commit(&self, rank: Rank) -> Option<CommitRow> {
-        self.base.commit(rank)
-    }
-
-    fn commits_in(&self, range: CommitRange) -> Stream<'_, CommitRow> {
-        self.base.commits_in(range)
-    }
-
-    fn rows_for(&self, commits: Vec<Rank>) -> Stream<'_, (Rank, Vec<FileRow>)> {
-        self.base.rows_for(commits)
-    }
-
-    fn commit_id(&self, rank: Rank) -> Option<Arc<str>> {
-        self.base.commit_id(rank)
-    }
-
-    fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
-        self.base.parent_ids(rank)
-    }
-
-    fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
-        self.base.find_commit(id)
+    from_base! {
+        len() -> usize;
+        commit(rank: Rank) -> Option<CommitRow>;
+        commits_in(range: CommitRange) -> Stream<'_, CommitRow>;
+        rows_for(commits: Vec<Rank>) -> Stream<'_, (Rank, Vec<FileRow>)>;
+        commit_id(rank: Rank) -> Option<Arc<str>>;
+        parent_ids(rank: Rank) -> Vec<Arc<str>>;
+        find_commit(id: &str) -> Result<Option<Rank>, SourceError>;
+        path(id: PathId) -> Option<Arc<str>>;
+        find_path(path: &str) -> Result<Option<PathId>, SourceError>;
+        paths() -> usize;
+        ident(id: IdentId) -> Option<(Arc<str>, Arc<str>)>;
+        idents() -> usize;
+        label(id: LabelId) -> Option<Arc<str>>;
+        find_label(name: &str) -> Result<Option<LabelId>, SourceError>;
+        has_tip() -> bool;
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
@@ -387,34 +386,6 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
         Box::new(self.or_log(self.edges()).into_iter())
     }
 
-    fn path(&self, id: PathId) -> Option<Arc<str>> {
-        self.base.path(id)
-    }
-
-    fn find_path(&self, path: &str) -> Result<Option<PathId>, SourceError> {
-        self.base.find_path(path)
-    }
-
-    fn paths(&self) -> usize {
-        self.base.paths()
-    }
-
-    fn ident(&self, id: IdentId) -> Option<(Arc<str>, Arc<str>)> {
-        self.base.ident(id)
-    }
-
-    fn idents(&self) -> usize {
-        self.base.idents()
-    }
-
-    fn label(&self, id: LabelId) -> Option<Arc<str>> {
-        self.base.label(id)
-    }
-
-    fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError> {
-        self.base.find_label(name)
-    }
-
     #[cfg(any(test, feature = "oracle"))]
     fn instance(&self) -> u64 {
         self.instance
@@ -428,10 +399,6 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
 
     fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
         self.base.tip_touches(each)
-    }
-
-    fn has_tip(&self) -> bool {
-        self.base.has_tip()
     }
 }
 
