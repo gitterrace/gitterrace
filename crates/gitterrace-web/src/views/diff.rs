@@ -195,11 +195,25 @@ fn no_hunks_line(f: &FileDiff) -> String {
 pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]) -> String {
     let mut out = String::new();
     let mut used = Spent::default();
-    for (i, f) in files.iter().enumerate() {
+    let folded = files.iter().filter(|f| is_generated(src, f)).count();
+    if folded > 0 {
         let _ = write!(
             out,
-            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\">\
-                <header id=\"{a}\"><span class=\"badge {k}\">{k}</span> ",
+            "<p class=\"muted pad generated-note\">{} folded, <a href=\"#\" \
+                data-expand-generated>expand them</a></p>",
+            crate::fmt::count(folded, "generated file", "generated files")
+        );
+    }
+    for (i, f) in files.iter().enumerate() {
+        let gen_attr = if is_generated(src, f) {
+            " data-generated"
+        } else {
+            ""
+        };
+        let _ = write!(
+            out,
+            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{gen_attr}>\
+                <header id=\"{a}\" tabindex=\"-1\"><span class=\"badge {k}\">{k}</span> ",
             k = f.kind.as_str(),
             p = esc(&f.path),
             a = esc(&crate::fmt::file_anchor(&f.path)),

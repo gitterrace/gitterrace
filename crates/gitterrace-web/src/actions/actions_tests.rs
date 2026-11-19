@@ -98,3 +98,13 @@ pub(crate) fn write_config(dir: &Path, template: &str, mode: u32) {
     std::fs::write(&p, body).expect("write");
     std::fs::set_permissions(&p, std::fs::Permissions::from_mode(mode)).expect("chmod");
 }
+
+/// The `]` and `[` keys move focus between file headers, which are focusable, and the `?`
+/// sheet lists them.
+#[test]
+fn bracket_keys_focus_the_file_headers() {
+    let nav = include_str!("../../static/nav.js");
+    assert!(nav.contains("k === \"]\"") && nav.contains("k === \"[\""));
+    assert!(nav.contains("section.file > header") && nav.contains("to.focus()"));
+    assert!(nav.contains("Next / previous changed file"));
+}

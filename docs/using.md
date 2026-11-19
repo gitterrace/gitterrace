@@ -141,5 +141,6 @@ Press `?` on any page for the full list. The common ones:
 | `b` | Switch branch or tag |
 | `y` | Copy a permalink to this revision |
 | `j`, `k` | Move through a list, `Enter` opens |
+| `]`, `[` | Jump to the next or previous changed file in a diff |
 | `g` then `c`, `l`, `b`, `i`, `s` | Code, log, branches, insights, search |
 | `.` | The action menu for the selection |

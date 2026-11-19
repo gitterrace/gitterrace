@@ -285,6 +285,11 @@
   // Outline and filter help: only where the page has one.
   if (document.querySelector("[data-outline], [data-filter-help]")) window.gtLazy("outline");
 
+  // Folded diff files: only where the page has one, or once a live refresh brings one.
+  function withDiffs() { if (document.querySelector("[data-load-diff]")) window.gtLazy("diffs"); }
+  withDiffs();
+  document.addEventListener("gt:live-refreshed", withDiffs);
+
   // Pickers: "b", a click on a switcher, a live repository change or ?open=refs.
   var pickers = false;
   function withPickers(done) { pickers = true; window.gtLazy("pickers", done); }

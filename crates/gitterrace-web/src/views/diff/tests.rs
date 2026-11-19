@@ -188,3 +188,23 @@ fn every_changed_line_says_added_or_removed() {
         assert_eq!(html.matches("vh sign").count(), 2, "{html}");
     }
 }
+
+#[test]
+fn generated_files_are_counted_above_the_diff_with_a_way_to_expand_them() {
+    let files = vec![file("a.rs", 3), file("Cargo.lock", 3), file("b.lock", 3)];
+    let generated: std::collections::HashSet<String> =
+        ["Cargo.lock".to_owned(), "b.lock".to_owned()].into();
+    let none = super::MediaFacts::new();
+    let src = |g| DiffSource::Commit {
+        rev: "abc",
+        parent: None,
+        media: &none,
+        generated: g,
+    };
+    let html = diff_html_with(&crate::views::Render::fold(400), src(&generated), &files);
+    assert!(html.contains("2 generated files folded"), "{html}");
+    assert!(html.contains("data-expand-generated"));
+    let empty = std::collections::HashSet::new();
+    let html = diff_html_with(&crate::views::Render::fold(400), src(&empty), &files);
+    assert!(!html.contains("folded"), "{html}");
+}

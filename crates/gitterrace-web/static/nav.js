@@ -306,7 +306,7 @@
   var SHORTCUTS = [
     ["t", "Go to file"], ["/", "Focus search"], ["y", "Permalink to this commit"],
     ["g c", "Code"], ["g i", "Insights"], ["g b", "Branches and tags"], ["g l", "Commits"], ["g s", "Search"],
-    ["b", "Switch branch or tag"], [".", "Action menu"], ["j / k", "Next / previous commit or result"], ["?", "This sheet"], ["Esc", "Close"]
+    ["b", "Switch branch or tag"], [".", "Action menu"], ["j / k", "Next / previous commit or result"], ["] / [", "Next / previous changed file"], ["?", "This sheet"], ["Esc", "Close"]
   ];
   // Action chords: "a" then the key the user gave an action in actions.toml.
   function actionChords() {
@@ -360,6 +360,23 @@
     if (a) location.href = a.href;
   }
 
+  // "]" and "[" focus the next or previous diff file: after the focused one, else from the top
+  // of the window.
+  function jumpFile(d) {
+    var hs = Array.prototype.slice.call(document.querySelectorAll("section.file > header"));
+    var at = document.activeElement.closest && document.activeElement.closest("section.file");
+    var i = at ? hs.indexOf(at.firstElementChild) : -1;
+    if (i < 0) {
+      i = d > 0 ? hs.length : -1;
+      for (var n = 0; n < hs.length; n++) {
+        var t = hs[n].getBoundingClientRect().top;
+        if (d > 0 ? t > 1 : t >= -1) { i = d > 0 ? n - 1 : n; break; }
+      }
+    }
+    var to = hs[Math.max(0, Math.min(hs.length - 1, i + d))];
+    if (to) { to.focus(); to.scrollIntoView({ block: "start" }); }
+  }
+
   // ---- keys ---------------------------------------------------------------
   // Single page keys: g, t, /, y, b, ?, j, k, Enter. RESERVED_KEYS in the actions config
   // refuses the letters among them as action keys; a test pins the two lists together.
@@ -386,6 +403,8 @@
     else if (k === "y") { permalink(); }
     else if (k === "b") { if (window.gtPickers) window.gtPickers.openRefs(); e.preventDefault(); }
     else if (k === "?") { openHelp(); e.preventDefault(); }
+    else if (k === "]") jumpFile(1);
+    else if (k === "[") jumpFile(-1);
     else if (k === "j") move(1);
     else if (k === "k") move(-1);
     else if (k === "Enter" && cursor >= 0) openCurrent();
@@ -473,54 +492,6 @@
       if (row && wantedLine()) loadBlame(row);
     });
   }
-
-  // ---- folded diffs -----------------------------------------------------------
-  // A folded file is a link to its body. Clicking it (or Enter on it) swaps the body in; a file
-  // folded only for the page budget (data-lazy) also loads when it scrolls near the viewport,
-  // and an #fN anchor opens its file. Find in page sees loaded files only.
-  function loadDiff(b) {
-    if (b.dataset.busy) return;
-    b.dataset.busy = "1";
-    if (lazyObs) lazyObs.unobserve(b);
-    fetch(b.dataset.loadDiff).then(function (r) { if (!r.ok) throw r; return r.text(); }).then(function (h) {
-      var p = b.parentNode, focused = document.activeElement === b;
-      p.insertAdjacentHTML("afterend", h);
-      var body = p.nextElementSibling;
-      p.remove();
-      if (focused && body) { body.tabIndex = -1; body.focus({ preventScroll: true }); }
-    }, function () {
-      delete b.dataset.busy;
-      // Watched again, so a lazy file that failed once retries when it next scrolls near.
-      if (lazyObs && b.hasAttribute("data-lazy")) lazyObs.observe(b);
-    });
-  }
-  document.addEventListener("click", function (e) {
-    var b = e.target.closest && e.target.closest("[data-load-diff]");
-    if (!b || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;
-    e.preventDefault();
-    loadDiff(b);
-  });
-  var lazyObs = window.IntersectionObserver ? new IntersectionObserver(function (es) {
-    es.forEach(function (x) { if (x.isIntersecting) loadDiff(x.target); });
-  }, { rootMargin: "1500px 0px" }) : null;
-  function watchLazy() {
-    if (!lazyObs) return;
-    Array.prototype.forEach.call(document.querySelectorAll("[data-load-diff][data-lazy]"), function (b) { lazyObs.observe(b); });
-  }
-  // The browser jumps to #fN itself. This only opens a folded target.
-  function openHashed() {
-    var m = /^#(f\d+|p\/.+)$/.exec(location.hash), id = m && m[1], s;
-    // #p/<path> names a file by path, so it survives a different file order.
-    try { if (id && id[0] === "p") id = decodeURIComponent(id); } catch (x) { id = null; }
-    s = id && document.getElementById(id);
-    s = s && s.closest("section");
-    var b = s && s.querySelector("[data-load-diff]");
-    if (b) loadDiff(b);
-  }
-  watchLazy();
-  openHashed();
-  window.addEventListener("hashchange", openHashed);
-  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(); });
 
   // ---- copy buttons ---------------------------------------------------------
   Array.prototype.forEach.call(document.querySelectorAll("[data-copyable]"), function (card) {
