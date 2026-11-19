@@ -70,7 +70,6 @@ struct State {
     now: Option<Running>,
 }
 
-/// The step running and the readings it started at.
 #[derive(Debug, Clone, Copy)]
 struct Running {
     name: &'static str,
@@ -89,7 +88,6 @@ impl Running {
         }
     }
 
-    /// The step from its start to now.
     fn measure(self) -> PhaseTime {
         PhaseTime {
             name: self.name,

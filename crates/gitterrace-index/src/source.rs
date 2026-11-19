@@ -14,7 +14,6 @@ pub trait CommitSource {
         None
     }
 
-    /// Builds the record for one commit.
     fn record(&self, id: &str) -> io::Result<CommitRecord>;
 
     /// Builds records for many commits, in the order of `ids`. A commit that cannot be read is

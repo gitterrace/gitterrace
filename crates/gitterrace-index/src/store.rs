@@ -194,7 +194,6 @@ pub(crate) fn sweep(dir: &Path, live: &[String]) -> io::Result<()> {
     Ok(())
 }
 
-/// Whether the stored format differs from ours.
 fn version_stale(dir: &Path) -> io::Result<bool> {
     Ok(stored_version(dir)?.as_deref() != Some(version_stamp().as_str()))
 }

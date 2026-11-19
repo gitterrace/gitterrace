@@ -32,7 +32,6 @@ pub struct ActivityFold {
     pub rework: Rework,
 }
 
-/// The commit of every item, in stream order.
 struct Rows(Vec<CommitRow>);
 
 impl Reducer for Rows {

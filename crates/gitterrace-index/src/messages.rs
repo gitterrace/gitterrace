@@ -23,7 +23,6 @@ use crate::seg::{Oid, SegError, SegResult, hex};
 /// Raw bytes packed before a block is compressed. Not configurable, any of these: on-disk
 /// format bounds that the writer and every reader must agree on.
 const BLOCK_RAW: usize = 64 * 1024;
-/// Largest item stored with its text.
 const INLINE_MAX: usize = 512 * 1024;
 /// Largest decompressed block a reader accepts: a full block plus one largest item.
 const MAX_RAW: usize = 1 << 20;

@@ -187,7 +187,6 @@ pub(crate) fn run(
     browse(&url)
 }
 
-/// What answers on an address.
 #[derive(Debug, PartialEq, Eq)]
 enum Listener {
     Free,

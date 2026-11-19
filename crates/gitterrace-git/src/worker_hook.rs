@@ -14,7 +14,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
 static HOOK: OnceLock<fn(bool)> = OnceLock::new();
-/// Nanoseconds every finished worker of this process lived.
 static ALIVE: AtomicU64 = AtomicU64::new(0);
 /// Nanoseconds of that spent in the work itself, not waiting on the window.
 static BUSY: AtomicU64 = AtomicU64::new(0);

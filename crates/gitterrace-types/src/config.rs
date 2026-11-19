@@ -3,7 +3,6 @@
 
 use crate::string_enum;
 
-/// Seconds in a day.
 const DAY: i64 = 86_400;
 
 string_enum! {

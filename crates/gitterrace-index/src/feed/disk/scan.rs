@@ -80,7 +80,6 @@ impl<'s> Scan<'s> {
         Ok(u64::from_le_bytes(b))
     }
 
-    /// The record of the current ordinal.
     fn record(&mut self, files: &mut Vec<FileRow>) -> SegResult<Rec> {
         let (s, o) = (self.seg, self.ord);
         let seg = &self.src.segs[s];
@@ -135,7 +134,6 @@ impl<'s> Scan<'s> {
         Ok(rec)
     }
 
-    /// The current ordinal's item of section 1.
     fn column(&mut self) -> SegResult<columns::Item> {
         let seg = &self.src.segs[self.seg];
         let o = self.ord;

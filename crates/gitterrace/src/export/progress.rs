@@ -8,7 +8,6 @@ use std::{
 
 /// Seconds between plain lines when stderr is not a terminal.
 const PLAIN_EVERY: Duration = Duration::from_secs(5);
-/// Shortest gap between redraws of the terminal line.
 const TTY_EVERY: Duration = Duration::from_millis(100);
 
 /// How progress reaches the user.

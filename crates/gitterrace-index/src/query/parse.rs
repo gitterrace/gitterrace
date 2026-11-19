@@ -100,7 +100,6 @@ impl Scan<'_> {
         }
     }
 
-    /// One term.
     fn term(&mut self) -> Result<Term, QueryError> {
         let start = self.at;
         let neg = self.peek() == Some('!');

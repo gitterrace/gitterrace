@@ -382,7 +382,6 @@ fn title(
     lossy_line(&t, 200)
 }
 
-/// The same string the built-in "Copy as markdown" produces.
 fn markdown(
     path: Option<&str>,
     lines: Option<Lines>,

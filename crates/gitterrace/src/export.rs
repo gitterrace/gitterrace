@@ -448,7 +448,6 @@ fn headers_file() -> String {
     )
 }
 
-/// The set of paths an export follows.
 struct Allowed {
     /// Commit ids in scope.
     commits: BTreeSet<String>,

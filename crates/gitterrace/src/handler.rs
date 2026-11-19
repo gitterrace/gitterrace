@@ -194,7 +194,6 @@ fn write_app(app: &Path, exe: &Path) -> anyhow::Result<()> {
     )
 }
 
-/// Who wrote the app at a path.
 #[derive(Debug, PartialEq, Eq)]
 enum Owner {
     Absent,

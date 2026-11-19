@@ -20,11 +20,8 @@ pub enum Control {
 
 /// A type a setting can have.
 pub trait Show: Sized {
-    /// Display form, the TOML literal.
     fn show(&self) -> String;
-    /// The type name for the docs.
     const TYPE: &'static str;
-    /// The input the settings form shows for this type.
     fn control() -> Control;
     fn from_toml(v: &toml::Value) -> Option<Self>;
     /// What a value that [`Show::from_toml`] refuses should have been, for the error.

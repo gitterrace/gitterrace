@@ -374,7 +374,6 @@ impl InsightsSource for MemorySource<'_> {
         Ok(self.t().label_ids.get(name).map(|&i| LabelId(i)))
     }
 
-    /// Records in memory meet no storage.
     fn failure(&self) -> Option<SourceError> {
         None
     }

@@ -7,7 +7,6 @@ use rustc_hash::FxHashMap as FastMap;
 
 use crate::insights::Options;
 
-/// Lock files and minified output: generated, not written.
 const GENERATED: [&str; 10] = [
     "*.lock",
     "package-lock.json",

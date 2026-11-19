@@ -124,7 +124,6 @@ impl Spill {
     }
 }
 
-/// Read state of one run.
 struct Run {
     pos: u64,
     left: u64,

@@ -44,7 +44,6 @@ pub type IdentMap<'a> =
 /// Receives one block: section, item count, payload.
 pub type Sink<'a> = dyn FnMut(u16, u32, &[u8]) -> SegResult<()> + 'a;
 
-/// One decoded commit record, raw ids.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Rec {
     oid: Oid,
@@ -91,7 +90,6 @@ struct Block {
     starts: Vec<u32>,
 }
 
-/// Least recently used blocks under a byte budget.
 #[derive(Debug, Default)]
 struct Cache {
     limit: usize,

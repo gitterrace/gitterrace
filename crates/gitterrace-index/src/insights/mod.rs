@@ -481,7 +481,6 @@ impl Derived {
     }
 }
 
-/// Decides every path once, spread over the cores.
 fn decide_all(paths: &[Arc<str>], filter: &PathFilter) -> Vec<bool> {
     decide_with(paths, |p| filter.decide(p))
 }

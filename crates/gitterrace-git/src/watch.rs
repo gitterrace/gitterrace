@@ -87,7 +87,6 @@ const fn inode(_: &Metadata) -> u64 {
     0
 }
 
-/// A ref directory as last listed.
 struct Listed {
     stamp: Stamp,
     children: Vec<PathBuf>,

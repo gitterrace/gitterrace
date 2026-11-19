@@ -47,7 +47,6 @@ impl Metric {
         }
     }
 
-    /// The person's value for ordering.
     fn of(self, commits: usize, add: u64, del: u64) -> i64 {
         let n = |v: u64| i64::try_from(v).unwrap_or(i64::MAX);
         match self {

@@ -180,7 +180,6 @@ struct Flags {
 }
 
 impl Flags {
-    /// The file with the flags laid over it, validated.
     fn load(&self) -> Result<gitterrace_config::Loaded, gitterrace_config::ConfigError> {
         let mut loaded = gitterrace_config::load(self.dir.as_deref())?;
         if let Some(a) = self.addr {

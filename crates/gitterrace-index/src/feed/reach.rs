@@ -155,7 +155,6 @@ impl<S: InsightsSource> Reach<S> {
             .and_then(|i| self.fresh.rows.get(i as usize))
     }
 
-    /// Every commit with its rows, chunked, ascending.
     fn each_row(&self, mut f: impl FnMut(&CommitRow, &[FileRow])) {
         let n = u32::try_from(self.len()).unwrap_or(u32::MAX);
         let mut at = 0;

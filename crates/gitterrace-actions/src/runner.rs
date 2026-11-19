@@ -25,7 +25,6 @@ use crate::payload::Payload;
 /// The first output line returned to the browser. Full output never leaves the server.
 /// Not configurable: it is the size of a toast, part of the page contract.
 const MAX_FIRST_LINE: usize = 200;
-/// Between SIGTERM and SIGKILL on timeout.
 const KILL_GRACE: Duration = Duration::from_secs(2);
 const POLL: Duration = Duration::from_millis(20);
 /// Inherited variables a script may see; everything else (tokens, agent sockets) is dropped
@@ -121,7 +120,6 @@ pub struct Runner {
     state: Arc<Mutex<State>>,
 }
 
-/// Releases the action's slot however the run ends.
 struct Slot {
     state: Arc<Mutex<State>>,
     id: String,

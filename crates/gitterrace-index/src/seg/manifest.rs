@@ -261,7 +261,6 @@ impl Manifest {
     }
 
     /// Deletes retired files, keeping the ones whose delete failed. A missing file is done.
-    /// Rewrites the manifest only when the list changed.
     fn sweep_retired(&mut self, dir: &Path, hook: &mut dyn FnMut(Step) -> bool) -> SegResult<()> {
         let before = self.retired.len();
         let mut kept = Vec::new();

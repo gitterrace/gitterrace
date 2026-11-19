@@ -71,7 +71,6 @@ impl Comparison {
     }
 }
 
-/// Per-language totals, largest net change first.
 fn sorted(langs: HashMap<String, (u64, u64, u64)>) -> Vec<LangDelta> {
     let mut languages: Vec<LangDelta> = langs
         .into_iter()

@@ -22,7 +22,6 @@ use crate::{Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result};
 /// Decoded-object cache; trees and commits are re-read constantly by walks and diffs. One per
 /// request thread, so it is multiplied by the jobs running at once: kept small.
 const OBJECT_CACHE_BYTES: usize = 16 * 1024 * 1024;
-/// Object cache of one index worker thread.
 const BLAME_OBJECT_CACHE_BYTES: usize = 8 * 1024 * 1024;
 pub(crate) const INDEX_WORKER_CACHE_BYTES: usize = 4 * 1024 * 1024;
 /// Delta-base (pack) cache of one index worker thread. gix defaults to up to 96 MB per handle,

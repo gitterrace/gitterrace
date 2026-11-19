@@ -29,7 +29,6 @@ use crate::seg::read::{Container, Store};
 use crate::seg::write::ContainerWriter;
 use crate::seg::{SegError, SegResult};
 
-/// Meta payload: fingerprint u64, commit count u32.
 const META_LEN: usize = 12;
 
 /// One row of a commit under its tip name.

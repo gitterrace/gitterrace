@@ -304,7 +304,6 @@ pub(crate) mod tests {
         assert_eq!(f[0].additions, 0);
     }
 
-    /// The rework window holds only the week's own commits.
     #[test]
     fn rework_counts_only_the_local_days_of_the_period() {
         let recs = edge_week();

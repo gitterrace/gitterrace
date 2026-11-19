@@ -47,7 +47,6 @@ pub use segments::SegmentSource;
 /// Where "now" comes from. Serving reads [`SystemClock`]; tests pass a [`FixedClock`], so no
 /// count depends on when a test runs.
 pub trait Clock: Send + Sync {
-    /// Seconds since the epoch.
     fn now(&self) -> i64;
 }
 
@@ -273,7 +272,6 @@ pub trait InsightsSource: Send + Sync {
         self.len() == 0
     }
 
-    /// One commit's columns.
     fn commit(&self, rank: Rank) -> Option<CommitRow>;
 
     /// Commit columns in `range`, ascending rank. A time range is a filter over ranks: author
@@ -300,7 +298,6 @@ pub trait InsightsSource: Send + Sync {
     /// (path, ident).
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow>;
 
-    /// Posting list, ascending.
     fn postings(&self, key: Posting) -> Stream<'_, Hit>;
 
     /// Every rename edge, ascending rank. Follow walks them newest first.
@@ -317,7 +314,6 @@ pub trait InsightsSource: Send + Sync {
     fn ident(&self, id: IdentId) -> Option<(Arc<str>, Arc<str>)>;
     fn idents(&self) -> usize;
 
-    /// Kind or scope name.
     fn label(&self, id: LabelId) -> Option<Arc<str>>;
     /// The id of a kind or scope: `Ok(None)` when no commit carries it.
     fn find_label(&self, name: &str) -> Result<Option<LabelId>, SourceError>;
