@@ -5,7 +5,7 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::api::signature::Signature;
+use crate::api::Signature;
 use crate::git::{ChangeKind, LineKind};
 
 /// One commit of a log page.
