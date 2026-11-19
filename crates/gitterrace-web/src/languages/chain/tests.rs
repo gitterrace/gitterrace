@@ -286,12 +286,6 @@ impl<S: InsightsSource + ?Sized> InsightsSource for Reads<&S> {
     fn failure(&self) -> Option<feed::SourceError> {
         self.inner.failure()
     }
-    fn chain(&self, each: &mut dyn FnMut(&feed::ChainStep)) -> bool {
-        self.inner.chain(each)
-    }
-    fn chain_len(&self) -> Option<usize> {
-        self.inner.chain_len()
-    }
 }
 
 /// The chain by oid lookups, one per step: the walk the page must agree with.
@@ -368,5 +362,3 @@ fn views_match_the_full_chain_across_merges() {
         }
     }
 }
-
-mod stored;

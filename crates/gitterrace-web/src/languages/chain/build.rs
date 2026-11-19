@@ -1,6 +1,5 @@
-//! Builds a [`Skeleton`]: one pass over the first-parent chain, newest first, from the chain
-//! the index stored when there is one (no commit record read), else by walking the records.
-//! Both feed one tally, so they give the same skeleton.
+//! Builds a [`Skeleton`]: one pass over the first-parent chain, newest first, walking the
+//! records into one tally.
 
 use std::collections::{BTreeSet, HashMap};
 
@@ -8,7 +7,7 @@ use gitterrace_index::PathFilter;
 use gitterrace_index::feed::{FileRow, InsightsSource, PathId, Rank};
 
 use crate::languages::chain::{
-    Fold, MARKS, MIN_GAP, Mark, Point, Skeleton, point, rows_newest_first, walk, wanted,
+    Fold, MARKS, MIN_GAP, Mark, Skeleton, point, rows_newest_first, walk, wanted,
 };
 
 /// Tally state at one commit: its rank, net lines per slot and the added and removed sums.
@@ -63,21 +62,6 @@ impl<'a> Tally<'a> {
         }
     }
 
-    /// Decides the language of every path in `ids` in ascending id order. The string blocks
-    /// hold ids in runs, so this reads each block once; deciding them lazily in chain order
-    /// jumps between blocks and, once the path table outgrows the shared block cache, re-reads
-    /// a block per path and evicts what the pages read next.
-    pub(super) fn decide(&mut self, mut ids: Vec<PathId>) {
-        ids.sort_unstable();
-        ids.dedup();
-        for id in ids {
-            if !self.lang_of.contains_key(&id) {
-                let s = self.slot_of(id);
-                self.lang_of.insert(id, s);
-            }
-        }
-    }
-
     fn slot_of(&mut self, id: PathId) -> Option<usize> {
         let path = self.src.path(id).unwrap_or_default();
         if self.filter.skips(&path) {
@@ -106,17 +90,13 @@ impl<'a> Tally<'a> {
     }
 }
 
-/// Where a kept position's id, time and offset come from: the stored chain carries them,
-/// the walk reads them from the commit row afterwards.
-type Kept = (usize, Snapshot, Option<(String, i64, i32)>);
-
 /// What one pass over the chain leaves: the tally and its snapshots.
 struct Pass<'a> {
     n: usize,
     gap: usize,
     want: BTreeSet<usize>,
     tally: Tally<'a>,
-    fixed: Vec<Kept>,
+    fixed: Vec<(usize, Snapshot)>,
     marks: Vec<Snapshot>,
     pos: usize,
 }
@@ -134,18 +114,12 @@ impl<'a> Pass<'a> {
         }
     }
 
-    /// The next commit, newer than every one before it in the pass. `at` gives the commit's
-    /// id, time and offset when the stream carries them, asked only for a kept position.
-    fn step(
-        &mut self,
-        r: Rank,
-        files: &[FileRow],
-        at: impl FnOnce() -> Option<(String, i64, i32)>,
-    ) {
+    /// The next commit, newer than every one before it in the pass.
+    fn step(&mut self, r: Rank, files: &[FileRow]) {
         self.pos -= 1;
         let pos = self.pos;
         if self.want.contains(&pos) {
-            self.fixed.push((pos, self.tally.snapshot(r), at()));
+            self.fixed.push((pos, self.tally.snapshot(r)));
         }
         if pos % self.gap == self.gap - 1 || pos == self.n - 1 {
             self.marks.push(self.tally.snapshot(r));
@@ -156,27 +130,8 @@ impl<'a> Pass<'a> {
 
 impl Skeleton {
     /// One pass over the chain, keeping the unranged view's positions and one mark per gap.
-    /// The stored chain is read when the source has it, streamed and never held; otherwise
-    /// the chain is walked, once. A stored chain cut short is dropped for the walk, and the
-    /// source's failure makes the caller refuse the result anyway.
+    /// The chain is walked once; the source's failure makes the caller refuse the result.
     pub(crate) fn build(src: &dyn InsightsSource, filter: &PathFilter) -> Self {
-        if let Some(n) = src.chain_len() {
-            let mut p = Pass::new(n, src, filter);
-            // One cheap sequential read of the chain for its path ids, so their names are
-            // read in id order before the pass, see `Tally::decide`.
-            let mut ids = Vec::new();
-            src.chain(&mut |s| ids.extend(s.files.iter().map(|f| f.path)));
-            p.tally.decide(ids);
-            let had = src.chain(&mut |s| {
-                // A chain longer than its meta says is damage, which the source reports.
-                if p.pos > 0 {
-                    p.step(s.rank, &s.files, || Some((hex(&s.oid), s.time, s.offset)));
-                }
-            });
-            if had && p.pos == 0 {
-                return Self::from_pass(src, p);
-            }
-        }
         let newest = src
             .len()
             .checked_sub(1)
@@ -185,7 +140,7 @@ impl Skeleton {
         // counting and then streaming the chain walked it twice (1.3M steps on linux).
         let chain: Vec<Rank> = walk(src, newest).collect();
         let mut p = Pass::new(chain.len(), src, filter);
-        rows_newest_first(src, chain, |r, files| p.step(r, files, || None));
+        rows_newest_first(src, chain, |r, files| p.step(r, files));
         Self::from_pass(src, p)
     }
 
@@ -225,20 +180,9 @@ impl Skeleton {
             .collect();
         let fixed = fixed
             .into_iter()
-            .map(|(p, m, at)| {
+            .map(|(p, m)| {
                 let (lines, added, removed) = after(&m);
-                let kept = match at {
-                    Some((id, time, offset)) => Point {
-                        id,
-                        time,
-                        offset,
-                        lines,
-                        added,
-                        removed,
-                    },
-                    None => point(src, m.0, lines, added, removed),
-                };
-                (p, kept)
+                (p, point(src, m.0, lines, added, removed))
             })
             .collect();
         Self {
@@ -249,14 +193,4 @@ impl Skeleton {
             fixed,
         }
     }
-}
-
-fn hex(oid: &[u8; 20]) -> String {
-    const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut s = String::with_capacity(40);
-    for b in oid {
-        s.push(char::from(DIGITS[usize::from(b >> 4)]));
-        s.push(char::from(DIGITS[usize::from(b & 15)]));
-    }
-    s
 }

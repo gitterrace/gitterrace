@@ -41,11 +41,11 @@ fn a_newer_cache_stays_untouched() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
-    fs::write(dir.join(VERSION_FILE), "v2\n")?;
+    fs::write(dir.join(VERSION_FILE), "v3\n")?;
     fs::write(dir.join("seg-9-0.gts"), "future")?;
-    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("2"));
+    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("3"));
     assert_eq!(names(&dir)?, ["VERSION", "seg-9-0.gts"]);
-    assert_eq!(fs::read(dir.join(VERSION_FILE))?, b"v2\n");
+    assert_eq!(fs::read(dir.join(VERSION_FILE))?, b"v3\n");
     assert_eq!(fs::read(dir.join("seg-9-0.gts"))?, b"future");
     Ok(())
 }
@@ -76,9 +76,9 @@ fn the_current_version_opens_normally() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     assert_eq!(ensure_dir(&dir)?, None);
-    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v1\n");
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v2\n");
     assert_eq!(ensure_dir(&dir)?, None);
-    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v1\n");
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v2\n");
     Ok(())
 }
 
@@ -117,13 +117,7 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
     }
     let m = b.finish(None, Vec::new()).map_err(io::Error::other)?;
     let live: Vec<&str> = m.live.iter().map(|f| f.name.as_str()).collect();
-    let want = [
-        "seg-1-0.gts",
-        "str-1-0.gts",
-        "ord-1.gts",
-        "chain-1.gts",
-        "tip-1.gts",
-    ];
+    let want = ["seg-1-0.gts", "str-1-0.gts", "ord-1.gts", "tip-1.gts"];
     assert_eq!(live, want);
     assert_eq!(m.commits, 3);
     assert_eq!(ensure_dir(&dir)?, None);
@@ -132,7 +126,6 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
         [
             "MANIFEST",
             VERSION_FILE,
-            "chain-1.gts",
             LOCK_FILE,
             "ord-1.gts",
             "seg-1-0.gts",
@@ -269,11 +262,7 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
                 .map(|f| fs::read(dir.join(&f.name)))
                 .collect::<io::Result<_>>()?;
             assert_eq!(got, want, "after update {u}");
-            assert_eq!(
-                m.live.len(),
-                5,
-                "segment, delta, order file, chain and tip file"
-            );
+            assert_eq!(m.live.len(), 4, "segment, delta, order file and tip file");
             // The merge rewrites the commit rows too, one row per commit, not only the
             // tables, and the files of the merged steps are gone.
             let store = crate::seg::read::Store::open(&dir)
@@ -419,7 +408,7 @@ fn a_read_only_current_cache_opens_without_the_variable() -> io::Result<()> {
     Ok(())
 }
 
-/// Every file a manifest names is on disk, and the set opens whole with a current chain.
+/// Every file a manifest names is on disk, and the set opens whole.
 fn assert_whole(dir: &std::path::Path) -> io::Result<crate::seg::manifest::Manifest> {
     let store = crate::seg::read::Store::open(dir)
         .map_err(io::Error::other)?
@@ -427,17 +416,11 @@ fn assert_whole(dir: &std::path::Path) -> io::Result<crate::seg::manifest::Manif
     for f in &store.manifest.live {
         assert!(dir.join(&f.name).is_file(), "{} is named but gone", f.name);
     }
-    let chain = store
-        .chain
-        .as_ref()
-        .ok_or_else(|| io::Error::other("no chain"))?;
-    let current = crate::chain::current(chain, &store.manifest).map_err(io::Error::other)?;
-    assert!(current.is_some(), "the chain is for another set");
     Ok(store.manifest)
 }
 
 /// Nine appends then a merge: after every step, and after the merge, every named file exists
-/// and the chain is current, so no step's sweep takes a file a later manifest still names. A
+/// and the set opens, so no step's sweep takes a file a later manifest still names. A
 /// merge that fails halfway publishes nothing: the nine-segment set stays live and whole.
 #[test]
 fn appends_and_a_failed_then_good_merge_keep_every_named_file() -> io::Result<()> {

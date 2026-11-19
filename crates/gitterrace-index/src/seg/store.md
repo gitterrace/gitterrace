@@ -141,13 +141,13 @@ is `Unreadable`.
 
 All integers little endian. CRC is CRC32 (IEEE, `crc32fast`). One container
 serves every kind of immutable file (segment, string delta, order list,
-messages, chain, tip rows).
+messages, tip rows).
 
 Container file:
 
 | Part   | Bytes                      | Fields                                                                              |
 | ------ | -------------------------- | ----------------------------------------------------------------------------------- |
-| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages, 5 chain, 6 tip), zero u32 |
+| Header | 16                         | magic `GTS1`, version u32, kind u32 (1 segment, 2 strings, 3 order, 4 messages, 6 tip), zero u32 |
 | Blocks | each at most 1 MiB         | payload only, back to back from offset 16                                           |
 | TOC    | 24 per entry, at most 4096 | section u16, zero u16, items u32, offset u64, len u32, crc u32 (of the payload)     |
 | Footer | 64, the last bytes         | see below                                                                           |
@@ -176,7 +176,7 @@ last name (`seg/canon.rs`), 8 path x author, 9 life x month (touches, line
 sums, last touch), 10 life x identity, 16 paths, 17 identities, 18 labels, 32
 order, 33 rank (per segment, u32 per local ordinal: its position in the order
 file, read by pread at index, never held as a map), 34 rows, 35 row index, 36
-oid index, 40 messages, 48 and 49 chain, 50 and 51 tip rows. Ids 7 and 9 once
+oid index, 40 messages, 48 and 49 reserved, 50 and 51 tip rows. Ids 7 and 9 once
 named sections no released build wrote. A new section is a new id, a changed
 encoding is a `VERSION` bump.
 
@@ -225,20 +225,8 @@ the regex on `message \n name <email>` (the tip's mailmap applied to each
 distinct author once), replays git's newest-first commit-date walk over the
 stored times and parents, and reads from git only the commits it lists.
 
-Chain (kind 5, `chain-<gen>.gts`): the first-parent chain of
-the newest rank, newest first, in section 48. A step is rank u32, oid (20 B),
-raw author time i64, offset i32, then a varint row count and per file row the
-path id, added and removed lines as varints: the numbers the languages tally
-reads, keyed by path so the language and the path filter stay decided at read
-time. Section 49 is one 16 B meta item, written last: the manifest's order
-fingerprint u64, its commit count u32 and the step count u32. A chain whose
-fingerprint or count is not the manifest's is stale and not read. Every build,
-append and merge writes it again from the stored rows (no git read, one record
-decode per chain step) before its manifest goes live, and names it in that
-manifest, so no published set lacks its chain. On read the first rank must be
-the newest, each next rank lower, every path id below the string count and
-every count a u32, else `Unreadable`.
-On rust it is about 2% of the store.
+Kind 5 and sections 48 and 49 held a stored first-parent chain until cache
+format 2. They stay reserved.
 
 Manifest (`MANIFEST`, not a container, read whole, at most 1 MiB):
 

@@ -13,7 +13,7 @@ use gitterrace_git::WorkerTime;
 
 /// Every step name an update records, so steps read back from another process keep a
 /// static name.
-const NAMES: [&str; 9] = [
+const NAMES: [&str; 8] = [
     "rev_list",
     "held",
     "stream",
@@ -21,7 +21,6 @@ const NAMES: [&str; 9] = [
     "append",
     "finish",
     "messages",
-    "chain",
     "tip",
 ];
 

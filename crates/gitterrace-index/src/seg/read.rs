@@ -177,8 +177,6 @@ pub struct Store {
     pub order: Option<Container>,
     /// The message column's files in manifest order, empty when it is off.
     pub messages: Vec<Container>,
-    /// The stored first-parent chain, absent until the update after a build writes it.
-    pub chain: Option<Container>,
     /// The tip touch table (`crate::tip`), absent until the update after a build writes it.
     pub tip: Option<Container>,
 }
@@ -194,11 +192,11 @@ impl Store {
     }
 
     /// Opens the set `manifest` names, which need not be the published one: a merge reads its
-    /// staged set this way to write the chain before the manifest naming both goes live.
+    /// staged set this way to write the tip file before the manifest naming both goes live.
     pub(crate) fn of(dir: &Path, manifest: Manifest) -> SegResult<Self> {
         manifest.verify(dir)?;
         let (mut segments, mut strings, mut order) = (Vec::new(), Vec::new(), None);
-        let (mut messages, mut chain, mut tip) = (Vec::new(), None, None);
+        let (mut messages, mut tip) = (Vec::new(), None);
         for f in &manifest.live {
             match Kind::from_u32(u32::from(f.kind)) {
                 Some(Kind::Segment) => segments.push(Container::open(dir, &f.name, Kind::Segment)?),
@@ -211,12 +209,6 @@ impl Store {
                 }
                 Some(Kind::Messages) => {
                     messages.push(Container::open(dir, &f.name, Kind::Messages)?);
-                }
-                Some(Kind::Chain) if chain.is_none() => {
-                    chain = Some(Container::open(dir, &f.name, Kind::Chain)?);
-                }
-                Some(Kind::Chain) => {
-                    return Err(SegError::unreadable(&f.name, 0, "second chain file"));
                 }
                 Some(Kind::Tip) if tip.is_none() => {
                     tip = Some(Container::open(dir, &f.name, Kind::Tip)?);
@@ -243,7 +235,6 @@ impl Store {
             strings,
             order,
             messages,
-            chain,
             tip,
         })
     }
@@ -255,7 +246,6 @@ impl Store {
             .chain(&self.strings)
             .chain(&self.order)
             .chain(&self.messages)
-            .chain(&self.chain)
             .chain(&self.tip)
             .try_for_each(Container::check_all)
     }

@@ -17,7 +17,7 @@ pub(crate) use segments::{
 ///
 /// The container byte version (`seg::format::VERSION`) is separate: it moves only when the
 /// container bytes change.
-pub const FORMAT_VERSION: &str = "1";
+pub const FORMAT_VERSION: &str = "2";
 
 /// What `VERSION` holds: `v` and then `FORMAT_VERSION`, like `v1`. Builds before the first
 /// release wrote a bare number (2 to 9) and never a `v`, so a bare number is a pre-release

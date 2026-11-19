@@ -352,20 +352,6 @@ pub trait InsightsSource: Send + Sync {
         0
     }
 
-    /// Streams the first-parent chain from the newest rank, newest first, with each step's
-    /// file rows (path, add and del only), when the index stored it for exactly this set.
-    /// `false` when it did not: the caller walks the records then. A view whose ranks are not
-    /// the stored set's (another rev, a scope) keeps the default.
-    fn chain(&self, _each: &mut dyn FnMut(&ChainStep)) -> bool {
-        false
-    }
-
-    /// The length of [`InsightsSource::chain`] from its meta, read before the steps, `None`
-    /// when there is no stored chain for this set.
-    fn chain_len(&self) -> Option<usize> {
-        None
-    }
-
     /// Hands every commit's file rows keyed by the file's name at the indexed tip to `each`,
     /// ascending rank, merges with none, when the index stored them for exactly this set (see
     /// `crate::tip`). `false` when it did not: the caller reads the rows then. A view whose
@@ -378,17 +364,6 @@ pub trait InsightsSource: Send + Sync {
     fn has_tip(&self) -> bool {
         false
     }
-}
-
-/// One step of [`InsightsSource::chain`].
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct ChainStep {
-    pub rank: Rank,
-    pub oid: Oid,
-    /// Author time, clamped as [`CommitRow::time`].
-    pub time: i64,
-    pub offset: i32,
-    pub files: Vec<FileRow>,
 }
 
 /// Set when a source summed stored counts past u64. The sum is then wrong whichever way it is

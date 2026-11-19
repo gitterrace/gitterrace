@@ -3,7 +3,6 @@
 //! by [`Insights`].
 
 mod cache;
-mod chain;
 mod conventional;
 pub mod feed;
 pub mod graph;

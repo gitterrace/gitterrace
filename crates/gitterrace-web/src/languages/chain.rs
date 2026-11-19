@@ -109,14 +109,9 @@ impl Skeleton {
         self.n
     }
 
-    /// The oldest chain position whose local day is `first_day` or later, if any. One read
-    /// of the stored chain, else one walk over commit rows; no file rows either way.
+    /// The oldest chain position whose local day is `first_day` or later, if any. One walk
+    /// over commit rows, no file rows.
     pub(crate) fn first_from_day(&self, src: &dyn InsightsSource, first_day: i64) -> Option<usize> {
-        let mut days = Vec::with_capacity(self.n);
-        let day = gitterrace_index::feed::local_day_of;
-        if src.chain(&mut |s| days.push(day(s.time, s.offset))) && days.len() == self.n {
-            return first_from(days.into_iter(), self.n, first_day);
-        }
         let newest = src
             .len()
             .checked_sub(1)

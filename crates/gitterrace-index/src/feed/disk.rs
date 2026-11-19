@@ -12,11 +12,11 @@
 //! answers as absent. The index maps a remembered error to a rebuild, so
 //! a corrupt block never serves wrong data.
 
-mod chain;
 mod columns;
 mod record;
 mod scan;
 mod source;
+mod stored;
 mod writer;
 
 use std::sync::{Arc, Mutex, OnceLock};
@@ -154,8 +154,6 @@ pub struct DiskSource {
     /// See [`InsightsSource::instance`].
     #[cfg(any(test, feature = "oracle"))]
     pub(super) instance: u64,
-    /// The stored chain and its length when it was written for this set, see `crate::chain`.
-    chain: Option<(Container, u32)>,
     /// The stored tip touches when written for this set, see `crate::tip`.
     tip: Option<Container>,
 }
@@ -178,16 +176,11 @@ impl DiskSource {
             manifest,
             segments,
             strings,
-            chain,
             tip,
             ..
         } = store;
         let tip = match tip {
             Some(c) => crate::tip::current(&c, &manifest)?.map(|_| c),
-            None => None,
-        };
-        let chain = match chain {
-            Some(c) => crate::chain::current(&c, &manifest)?.map(|n| (c, n)),
             None => None,
         };
         let mut segs = Vec::with_capacity(segments.len());
@@ -247,7 +240,6 @@ impl DiskSource {
             over: crate::feed::SumOverflow::new(),
             #[cfg(any(test, feature = "oracle"))]
             instance: crate::feed::next_instance(),
-            chain,
             tip,
         };
         let mut raw = Vec::with_capacity(counts[1].min(1 << 20) as usize);

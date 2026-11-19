@@ -165,11 +165,11 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
     let two = Index::open_dir(two_dir.clone()).expect("index");
     for tip in &tips[5..] {
         two.update(&source, tip, &|_| {}).expect("step");
-        // Each step names a chain, and every file it names is on disk, not swept. The last
+        // Each step names a tip file, and every file it names is on disk, not swept. The last
         // step starts the merge, which may swap the set under the check, so it is left out.
         if tip != &head {
-            let has = kinds(&two_dir).contains(&(Kind::Chain as u8));
-            assert!(has, "chain after a step");
+            let has = kinds(&two_dir).contains(&(Kind::Tip as u8));
+            assert!(has, "tip file after a step");
         }
     }
     // The merge runs on a background thread: wait until the set is one segment again.

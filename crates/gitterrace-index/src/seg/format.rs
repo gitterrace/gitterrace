@@ -26,8 +26,7 @@ pub enum Kind {
     Order = 3,
     /// The message column of commit search (`messages.rs`).
     Messages = 4,
-    /// The first-parent chain of the tip and its line totals (`chain.rs`).
-    Chain = 5,
+    // 5 held the stored first-parent chain, dropped in cache format 2. Never reuse it.
     /// Slim file rows of the non-merge commits, the per-file pages' read (`tip.rs`).
     Tip = 6,
 }
@@ -39,7 +38,6 @@ impl Kind {
             2 => Some(Self::Strings),
             3 => Some(Self::Order),
             4 => Some(Self::Messages),
-            5 => Some(Self::Chain),
             6 => Some(Self::Tip),
             _ => None,
         }
@@ -76,11 +74,7 @@ pub mod section {
     pub const OID_INDEX: u16 = 36;
     /// Message items, zstd blocks, one item per rank (kind 4 only).
     pub const MESSAGES: u16 = 40;
-    /// One item per first-parent chain position, newest first (kind 5): rank u32, oid, raw
-    /// time i64, offset i32, row count varint, then path id, add and del varints per row.
-    pub const CHAIN: u16 = 48;
-    /// Chain file meta, written last: order fingerprint u64, commit count u32, length u32.
-    pub const CHAIN_META: u16 = 49;
+    // 48 and 49 held the dropped chain file (kind 5): never reuse them.
     /// One item per rank, ascending: the commit's file rows keyed by the file's name at the
     /// indexed tip, none for a merge (kind 6, `tip.rs`).
     pub const TIP_TOUCHES: u16 = 50;

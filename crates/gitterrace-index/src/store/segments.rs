@@ -146,11 +146,10 @@ impl SegmentBuild {
     }
 }
 
-/// Writes the chain of the set `m` names into it, then makes `m` the live manifest. Every
-/// writer of a new set goes through here, so no published set lacks the chain a one-step build
-/// holds, and a failed chain write publishes nothing: the old manifest stays live and whole.
+/// Writes the tip file of the set `m` names into it, then makes `m` the live manifest. Every
+/// writer of a new set goes through here, so no published set lacks the tip file a one-step
+/// build holds, and a failed write publishes nothing: the old manifest stays live and whole.
 fn publish(dir: &Path, m: &mut crate::seg::manifest::Manifest) -> crate::seg::SegResult<()> {
-    crate::chain::stage(dir, m)?;
     crate::tip::stage(dir, m)?;
     m.commit(dir)
 }
@@ -269,11 +268,7 @@ pub(crate) fn append_segment<'r>(
         previous
             .live
             .iter()
-            .filter(|f| {
-                f.kind == kind(Kind::Order)
-                    || f.kind == kind(Kind::Chain)
-                    || f.kind == kind(Kind::Tip)
-            })
+            .filter(|f| f.kind == kind(Kind::Order) || f.kind == kind(Kind::Tip))
             .map(|f| f.name.clone()),
     );
     segs.push(seg);

@@ -107,7 +107,7 @@ config keys lives in `gitterrace_config::naming`.
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 
-The format version is `1`, stored as `v1`.
+The format version is `2`, stored as `v2`.
 
 <!-- END GENERATED: cache -->
 
@@ -130,19 +130,11 @@ the [store design](../crates/gitterrace-index/src/seg/store.md).
 ### How the languages page reads the index
 
 The languages page charts lines per language along the first-parent history.
-Every update stores the chain of the indexed tip in `chain-<gen>.gts` (per step
-its rank, oid, time, offset and each file row's path id and line counts), and
-the page reads it once, front to back.
+The page walks the first parents through the stored records, newest first, and
+reads each walked commit's file rows in bounded batches.
 
 Rows are keyed by path, and the language and path filters apply when the page is
 built, so changing them needs no rebuild.
-
-The chain is rewritten after every update and segment merge, with no git read,
-and named in the same manifest as its set: if it cannot be written, nothing is
-published. A chain for another set (a reset, a rewritten history) is not read,
-and the page walks the records. The chain stores no cut points: the page lays
-its marks while reading, with the walk's gap, so both paths agree by
-construction.
 
 Format numbers: the cache format (`VERSION`, `FORMAT_VERSION` in `store.rs`) is
 stored with a `v` prefix, and a bare number without it is reset, not

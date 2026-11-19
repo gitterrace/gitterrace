@@ -426,14 +426,6 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
             .or_else(|| self.base.failure())
     }
 
-    fn chain(&self, each: &mut dyn FnMut(&crate::feed::ChainStep)) -> bool {
-        self.base.chain(each)
-    }
-
-    fn chain_len(&self) -> Option<usize> {
-        self.base.chain_len()
-    }
-
     fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
         self.base.tip_touches(each)
     }

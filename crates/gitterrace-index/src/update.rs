@@ -4,8 +4,7 @@ use std::collections::HashSet;
 use std::io;
 
 use crate::{
-    BATCH, CommitSource, Index, Progress, TIP_FILE, cache, chain, seg, seg_io, skipped, store, tip,
-    todo,
+    BATCH, CommitSource, Index, Progress, TIP_FILE, cache, seg, seg_io, skipped, store, tip, todo,
 };
 
 impl Index {
@@ -145,16 +144,13 @@ impl Index {
         Ok(merge)
     }
 
-    /// Brings the message column, the chain and the tip file in step with the set, each step
+    /// Brings the message column and the tip file in step with the set, each step
     /// skipped once halted.
     fn sync_side(&self, source: &dyn CommitSource) -> io::Result<()> {
         let ph = &self.phases;
         self.go_on()?;
         ph.start("messages");
         self.sync_messages(source)?;
-        self.go_on()?;
-        ph.start("chain");
-        chain::sync(&self.dir)?;
         self.go_on()?;
         ph.start("tip");
         tip::sync(&self.dir)?;
