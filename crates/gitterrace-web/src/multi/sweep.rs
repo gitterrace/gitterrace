@@ -104,7 +104,7 @@ pub(crate) async fn sweep_now(table: &Arc<Table>, site: &Site) {
     for (served, repo) in swept.fresh {
         if let Err(e) = table.router_of(&served).await {
             tracing::warn!("opening {}: {e}", served.name);
-            table.remove(&served.name);
+            table.remove(&served);
             continue;
         }
         site.push_target(Target {

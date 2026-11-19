@@ -66,16 +66,16 @@ fn recent_is_memoised_by_head() {
 /// repository must not show an empty tail.
 #[test]
 fn the_window_counts_every_commit_in_it() {
-    let now = 100 * super::SPARK_CAP;
+    let now = 100 * super::recent::SPARK_CAP;
     // 5000 commits evenly over the 26 weeks, far more than the old 2000-commit read.
     // Weeks end at the end of today, a day past now: the commits stay a day inside the cap.
-    let step = (super::SPARK_CAP - 86_400) / 5000;
+    let step = (super::recent::SPARK_CAP - 86_400) / 5000;
     let times: Vec<i64> = (0..5000).map(|i| now - i * step).collect();
     let s = crate::spark::series(
         times,
         Some(0),
         crate::spark::End::local(now, 0),
-        super::SPARK_CAP,
+        super::recent::SPARK_CAP,
     );
     assert_eq!(s.counts.len(), 26);
     assert!(s.counts.iter().all(|n| *n > 0), "{:?}", s.counts);
@@ -475,7 +475,7 @@ async fn a_router_built_after_the_stop_starts_no_lasting_task() {
     )
     .expect("table");
     let p = dir.path().to_path_buf();
-    let served = table.write().insert("gone".into(), p.clone(), p);
+    let served = table.write().insert("gone".into(), p.clone(), p, false);
     served.stop();
     let late = tokio::spawn(std::future::pending::<()>());
     served.adopt(vec![late.abort_handle()], &std::sync::Weak::new());
@@ -486,4 +486,41 @@ async fn a_router_built_after_the_stop_starts_no_lasting_task() {
         ended.is_err_and(|e| e.is_cancelled()),
         "the late task is aborted"
     );
+}
+
+/// Taking an entry off by a stale handle leaves a repository added under the same name since.
+/// Red when removal goes by name: the failed first opening would drop the second entry.
+#[tokio::test]
+async fn a_stale_handle_does_not_remove_a_re_added_repository() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let mk = |n: &str| {
+        gitterrace_testkit::Fixture::init(&dir.path().join(n))
+            .write("a", "a\n")
+            .commit("c")
+            .path()
+            .canonicalize()
+            .expect("canon")
+    };
+    let (a, b) = (mk("a"), mk("b"));
+    let table = Table::new(
+        vec![a],
+        crate::app::Env::new(gitterrace_config::Config::default()),
+        None,
+    )
+    .expect("table");
+    let super::Added::Fresh(first) = table.add(b.clone(), "b").expect("add") else {
+        panic!("fresh");
+    };
+    assert_eq!(table.take(Some("b"), None), Ok("b".to_owned()));
+    let super::Added::Fresh(second) = table.add(b, "b").expect("add") else {
+        panic!("fresh again");
+    };
+    assert!(!table.remove(&first), "the stale entry was not served");
+    assert!(
+        table
+            .get("b")
+            .is_some_and(|s| std::sync::Arc::ptr_eq(&s, &second))
+    );
+    assert!(table.remove(&second));
+    assert!(table.get("b").is_none());
 }

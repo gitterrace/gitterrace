@@ -48,6 +48,19 @@ fn body(p: &Path) -> String {
     serde_json::json!({ "path": p }).to_string()
 }
 
+/// `uri` once its repository is open: an addition answers 503 until its router is built.
+pub(super) async fn opened(r: &axum::Router, uri: &str) -> (u16, String) {
+    let last = std::sync::Mutex::new((0, String::new()));
+    gitterrace_testkit::wait::until(&format!("{uri} is open"), || async {
+        let got = get(r, uri).await;
+        let open = got.0 != 503;
+        *last.lock().expect("last") = got;
+        open
+    })
+    .await;
+    last.into_inner().expect("last")
+}
+
 async fn get(r: &axum::Router, uri: &str) -> (u16, String) {
     send(
         r,
@@ -125,7 +138,7 @@ async fn adds_and_guards(several: bool) {
     let name = v["name"].as_str().expect("name").to_owned();
     assert!(name.starts_with("a-") && name.len() == 8, "{js}");
     assert_eq!(v["base"], format!("/r/{name}/"), "{js}");
-    let (s, page) = get(&r, &format!("/r/{name}/")).await;
+    let (s, page) = opened(&r, &format!("/r/{name}/")).await;
     assert_eq!(s, 200);
     assert!(
         page.contains(&format!("/r/{name}/tree/")),
@@ -319,6 +332,67 @@ async fn an_addition_answers_before_the_repository_opens() {
     );
     lock.unlock().expect("release");
     ready(&r, "/r/b").await;
+}
+
+/// An addition is listed as indexing and its pages answer "try again" while its router is
+/// built, held here at the cache's writer lock; once the lock goes it serves. Red when a page
+/// waits on the build (the request hangs) or the list shows no state.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_addition_shows_indexing_until_it_opens() {
+    let t = tempfile::tempdir().expect("tmp");
+    let a = repo(&t.path().join("a"), "a root");
+    let b = repo(&t.path().join("b"), "b root");
+    let cache = b.join(".git/gitterrace");
+    std::fs::create_dir_all(&cache).expect("cache");
+    std::fs::write(cache.join("VERSION"), "0\n").expect("old format");
+    let lock = std::fs::File::create(cache.join("lock")).expect("lock");
+    lock.lock().expect("hold the writer lock");
+    let token = gitterrace_actions::Token::generate().expect("token");
+    let secret = token.as_str().to_owned();
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let (r, _) = crate::build_server(vec![a], None, None, &env, Some(token), None).expect("r");
+    assert_eq!(send(&r, post(Some(&secret)), body(&b)).await.0, 202);
+    let (status, page) = get(&r, "/r/b/").await;
+    assert_eq!(status, 503, "{page}");
+    let (_, home) = get(&r, "/").await;
+    assert!(
+        home.contains("indexing"),
+        "the home page shows the state: {home}"
+    );
+    lock.unlock().expect("release");
+    ready(&r, "/r/b").await;
+    assert_eq!(get(&r, "/r/b/").await.0, 200);
+}
+
+/// A repository taken off while its addition still opens stays off: the late router is
+/// stopped, never served, and a second addition of the same folder is its own entry.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_removal_during_the_opening_stays_removed() {
+    let t = tempfile::tempdir().expect("tmp");
+    let a = repo(&t.path().join("a"), "a root");
+    let b = repo(&t.path().join("b"), "b root");
+    let cache = b.join(".git/gitterrace");
+    std::fs::create_dir_all(&cache).expect("cache");
+    std::fs::write(cache.join("VERSION"), "0\n").expect("old format");
+    let lock = std::fs::File::create(cache.join("lock")).expect("lock");
+    lock.lock().expect("hold the writer lock");
+    let token = gitterrace_actions::Token::generate().expect("token");
+    let secret = token.as_str().to_owned();
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let (r, _) = crate::build_server(vec![a], None, None, &env, Some(token), None).expect("r");
+    assert_eq!(send(&r, post(Some(&secret)), body(&b)).await.0, 202);
+    let del = Request::delete(ADD_PATH)
+        .header("host", gitterrace_testkit::on_port("localhost"))
+        .header(TOKEN_HEADER, &secret);
+    assert_eq!(send(&r, del, r#"{"name":"b"}"#.into()).await.0, 200);
+    assert_eq!(
+        send(&r, post(Some(&secret)), body(&b)).await.0,
+        202,
+        "added again"
+    );
+    lock.unlock().expect("release");
+    ready(&r, "/r/b").await;
+    assert_eq!(get(&r, "/r/b/").await.0, 200, "the new entry serves");
 }
 
 #[tokio::test]

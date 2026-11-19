@@ -240,9 +240,10 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
 async fn open_added(adder: Arc<Adder>, served: Arc<crate::multi::Served>, root: PathBuf) {
     if let Err(e) = adder.table.router_of(&served).await {
         tracing::warn!("cannot open the added repository {}: {e}", served.name);
-        adder.table.remove(&served.name);
-        adder.site.drop_target(&served.name);
-        adder.table.announce();
+        if adder.table.remove(&served) {
+            adder.site.drop_target(&served.name);
+            adder.table.announce();
+        }
         return;
     }
     if !adder

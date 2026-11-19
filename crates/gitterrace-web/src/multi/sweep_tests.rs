@@ -74,8 +74,11 @@ async fn a_deleted_repository_folder_leaves_and_a_recreated_one_returns() {
     assert!(!home.contains("/r/alpha/"), "{home}");
     repo(&root.join("alpha"));
     awaits(&router, &["alpha", "beta"], None).await;
-    let (s, page) = get(&router, "/r/alpha/").await;
-    assert_eq!(s, 200, "{page}");
+    // A found repository answers 503 until its router is built.
+    wait::until("alpha opens", || async {
+        get(&router, "/r/alpha/").await.0 == 200
+    })
+    .await;
 }
 
 /// A folder that stays but whose `.git` is removed is no repository any more: it is dropped too.

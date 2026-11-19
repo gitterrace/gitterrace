@@ -2,7 +2,7 @@ use std::{path::Path, time::Duration};
 
 use axum::{Router, http::Request};
 
-use super::tests::{repo, send};
+use super::tests::{opened, repo, send};
 use crate::add::TOKEN_HEADER;
 
 fn req(method: &str, token: Option<&str>) -> axum::http::request::Builder {
@@ -108,7 +108,7 @@ async fn remove_is_gated_and_takes_the_repository_off() {
     let (s, js) = send(&r, req("POST", tok), add).await;
     assert_eq!(s, 202, "{js}");
     assert!(js.contains("\"/r/b/\""), "same name again: {js}");
-    assert_eq!(get(&r, "/r/b/").await.0, 200, "re-added");
+    assert_eq!(opened(&r, "/r/b/").await.0, 200, "re-added");
 }
 
 /// Guard class: a public server has no way to change its repositories, with or without the

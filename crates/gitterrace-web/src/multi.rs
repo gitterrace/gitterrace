@@ -7,13 +7,17 @@
 
 mod discover;
 mod home;
+mod recent;
 pub(crate) mod sweep;
 
 use std::{
     collections::HashMap,
     io,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex, RwLock, Weak},
+    sync::{
+        Arc, Mutex, RwLock, Weak,
+        atomic::{AtomicBool, Ordering},
+    },
 };
 
 use axum::{
@@ -23,17 +27,14 @@ use axum::{
     response::{IntoResponse, Redirect, Response},
     routing::get,
 };
-use gitterrace_git::{CommitSummary, DAY, Repo};
+use gitterrace_git::Repo;
 use tokio::sync::OnceCell;
 use tower::ServiceExt;
 
 use crate::app::{App, Env};
+use crate::fmt;
 pub use crate::multi::discover::{discover_repos, search_roots};
-use crate::{fmt, spark};
-
-/// The index sparkline's longest window, half a year.
-/// Not configurable: a chart definition (the span a sparkline shows), not a resource limit.
-const SPARK_CAP: i64 = 26 * spark::WEEK;
+use crate::multi::recent::Recent;
 
 /// One served repository: its URL name and where it lives.
 pub(crate) struct Served {
@@ -42,6 +43,9 @@ pub(crate) struct Served {
     /// Canonical top folder, what an addition is compared against.
     pub(crate) root: PathBuf,
     router: OnceCell<Router>,
+    /// Set for an addition until its router is built: the repository is listed as indexing and
+    /// its pages answer 503 meanwhile, instead of waiting on a cache another process may hold.
+    opening: AtomicBool,
     /// The background tasks the router started, stopped when the repository is taken off.
     /// `None` once stopped: a router built after that (its build was already under way) has
     /// its tasks aborted at once instead of stored, so they never outlive the removal.
@@ -57,18 +61,6 @@ pub(crate) struct Served {
 
 /// A repository's router, the background tasks it started and its app.
 pub(crate) type Built = (Router, Vec<tokio::task::AbortHandle>, Weak<App>);
-
-/// What the index shows for one repository: its newest commit and its recent commits,
-/// bucketed to fit its age.
-#[derive(Default)]
-struct Recent {
-    last: Option<CommitSummary>,
-    series: spark::Series,
-    /// Commits since the local midnight of the newest commit's zone.
-    today: u32,
-    /// The end of the local day `today` counts, past which the read is stale.
-    day_end: i64,
-}
 
 /// The repository table. A URL name resolves only through this map, never by joining it
 /// onto a filesystem path.
@@ -147,7 +139,7 @@ impl Table {
                             path.display()
                         ))
                     })?;
-            g.insert(name, path, root);
+            g.insert(name, path, root, false);
         }
         Ok(table)
     }
@@ -196,18 +188,30 @@ impl Table {
             });
         }
         let name = self.allocate(&g, &url_stem(stem), &root)?;
-        Ok(Added::Fresh(g.insert(name, root.clone(), root)))
+        Ok(Added::Fresh(g.insert(name, root.clone(), root, true)))
     }
 
-    /// Drops `name` again, for an addition whose repository would not open.
-    /// Its name claim goes too, so it is not held for a repository that was never served.
-    pub(crate) fn remove(&self, name: &str) {
-        let gone = self.write().drop_name(name);
+    /// Drops `served` again, for an addition whose repository would not open. Its name claim
+    /// goes too, so it is not held for a repository that was never served. Only this very
+    /// entry: the name may belong to a repository added again meanwhile, which stays. Whether
+    /// it was still served.
+    pub(crate) fn remove(&self, served: &Arc<Served>) -> bool {
+        let mut g = self.write();
+        if !g
+            .by_name
+            .get(&served.name)
+            .is_some_and(|s| Arc::ptr_eq(s, served))
+        {
+            return false;
+        }
+        let gone = g.drop_name(&served.name);
+        drop(g);
         if let (Some(dir), Some(s)) = (&self.state, gone)
             && let Err(e) = crate::registry::forget(dir, &s.root)
         {
-            tracing::warn!("forgetting the name {name}: {e}");
+            tracing::warn!("forgetting the name {}: {e}", served.name);
         }
+        true
     }
 
     /// Takes `name` off the running server, as [`Self::take`] does: its URLs answer 404. For a
@@ -284,13 +288,28 @@ impl Table {
     }
 
     /// The repository's router, built on first use. Building starts its index refresher and
-    /// warm-up, so an addition calls it at once rather than on the first visit.
-    pub(crate) async fn router_of(&self, served: &Served) -> io::Result<Router> {
+    /// warm-up, so an addition calls it at once rather than on the first visit. The build runs
+    /// as its own task on the blocking pool (it opens the cache, which can wait for another
+    /// writer) and is never cut short by the caller going away: a router built and then
+    /// dropped would leave its tasks running for no one.
+    pub(crate) async fn router_of(self: &Arc<Self>, served: &Arc<Served>) -> io::Result<Router> {
+        let (table, served) = (Arc::clone(self), Arc::clone(served));
+        tokio::spawn(async move { table.build(&served).await })
+            .await
+            .map_err(io::Error::other)?
+    }
+
+    async fn build(&self, served: &Arc<Served>) -> io::Result<Router> {
         served
             .router
             .get_or_try_init(|| async {
-                let (router, tasks, app) = repo_router(served, self.live.clone(), &self.env)?;
+                let (s, live, env) = (Arc::clone(served), self.live.clone(), self.env.clone());
+                let (router, tasks, app) =
+                    tokio::task::spawn_blocking(move || repo_router(&s, live, &env))
+                        .await
+                        .map_err(io::Error::other)??;
                 served.adopt(tasks, &app);
+                served.opening.store(false, Ordering::Release);
                 Ok::<_, io::Error>(router)
             })
             .await
@@ -318,12 +337,13 @@ impl Table {
 }
 
 impl Repos {
-    fn insert(&mut self, name: String, path: PathBuf, root: PathBuf) -> Arc<Served> {
+    fn insert(&mut self, name: String, path: PathBuf, root: PathBuf, opening: bool) -> Arc<Served> {
         let served = Arc::new(Served {
             name: name.clone(),
             path,
             root,
             router: OnceCell::new(),
+            opening: AtomicBool::new(opening),
             tasks: Mutex::new(Some(Vec::new())),
             app: Mutex::new(Weak::new()),
             recent: Mutex::new(None),
@@ -379,49 +399,6 @@ impl Served {
         }
     }
 
-    /// The newest commit and the sparkline, one discover and one bounded walk per HEAD. The
-    /// walk stops at the window's cap, so it counts every commit in it however busy the
-    /// repository is. The repository's start comes from the same walk: when it dropped no
-    /// parent the whole history is inside the cap, else the window is capped.
-    fn recent(&self, now: i64) -> Arc<Recent> {
-        let Ok(repo) = Repo::discover(&self.path) else {
-            return Arc::default();
-        };
-        let Ok(head) = repo.resolve("HEAD") else {
-            return Arc::default();
-        };
-        if let Ok(g) = self.recent.lock()
-            && let Some((at, r)) = g.as_ref()
-            && *at == head
-            && now < r.day_end
-        {
-            return Arc::clone(r);
-        }
-        let since = now - SPARK_CAP;
-        let (times, first) = repo.commit_times_since(&head, since).unwrap_or_default();
-        // HEAD resolved, so there is history: when it reaches past the cap, cap the window.
-        let first = first.or(Some(since - 1));
-        let last = repo
-            .log(&head, None, 0, 1)
-            .ok()
-            .and_then(|l| l.into_iter().next());
-        // Days end at local midnight of the newest commit's zone, as on the sidebar.
-        let offset = last.as_ref().map_or(0, |c| c.author.offset);
-        let day_end = spark::End::local(now, offset).day_end;
-        let today =
-            u32::try_from(times.iter().filter(|t| **t >= day_end - DAY).count()).unwrap_or(0);
-        let r = Arc::new(Recent {
-            today,
-            day_end,
-            series: spark::series(times, first, spark::End::local(now, offset), SPARK_CAP),
-            last,
-        });
-        if let Ok(mut g) = self.recent.lock() {
-            *g = Some((head, Arc::clone(&r)));
-        }
-        r
-    }
-
     /// Whether the working tree differs from HEAD, reused for `DIRTY_TTL` like a repository's
     /// own chip: the home page then scans each tree at most once per bound, however often it
     /// is reloaded, and a change shows within the bound.
@@ -439,7 +416,17 @@ impl Served {
     /// The insights state of its app, `None` until its router is built: a repository is
     /// served at once, its app only on first use or an addition.
     fn insights_state(&self) -> Option<crate::app::RepoState> {
-        self.app.lock().ok()?.upgrade().map(|a| a.state())
+        let built = self.app.lock().ok()?.upgrade().map(|a| a.state());
+        built.or_else(|| {
+            self.opening
+                .load(Ordering::Acquire)
+                .then_some(crate::app::RepoState::Indexing)
+        })
+    }
+
+    /// Whether an addition's router is still being built.
+    fn opening(&self) -> bool {
+        self.opening.load(Ordering::Acquire) && self.router.get().is_none()
     }
 
     /// The dirty answer when one inside the bound is at hand, without scanning: what the home
@@ -529,6 +516,9 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
             "No repository named {seg} is served here. The overview lists the ones that are."
         ));
     };
+    if served.opening() {
+        return opening_page(&served.name);
+    }
     let router = match table.router_of(&served).await {
         Ok(r) => r,
         Err(e) => {
@@ -555,6 +545,19 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
         Ok(r) => r,
         Err(never) => match never {},
     }
+}
+
+/// What a page of an added repository answers while it opens: it is listed and indexing, and
+/// the page can be asked again.
+fn opening_page(name: &str) -> Response {
+    let status = StatusCode::SERVICE_UNAVAILABLE;
+    let detail = format!("The repository {name} is being added and indexed. Try again shortly.");
+    (
+        status,
+        [(axum::http::header::RETRY_AFTER, "2")],
+        crate::error::page(status, &detail),
+    )
+        .into_response()
 }
 
 fn repo_router(
