@@ -42,7 +42,7 @@ bq = importlib.import_module("bench-quiet-lib")
 bc = importlib.import_module("bench-chart-lib")
 
 Json = dict[str, Any]
-HARNESS = 3
+HARNESS = 4
 DEFAULT_COMMITS = 500  # `export --commits` default (cli.rs)
 
 
@@ -124,13 +124,13 @@ def bench_phases(
         "load": {"limit": bq.max_load(), "phases": loads},
     }
     try:
-        secs, listen, peak = srv.wait_ready()
-        res["index"] = {"secs": secs, "listen_secs": listen, "peak_rss_mb": peak}
+        secs, ready, peak = srv.wait_ready()
+        res["index"] = {"secs": secs, "ready_secs": ready, "peak_rss_mb": peak}
         res["index"]["peak_footprint_mb"] = srv.peak_footprint
         res["index"]["phases"] = bl.phase_table(srv.phases, srv.phase_rss, srv.phase_fp)
         print(
-            f"  index {secs:.1f} s, peak footprint {srv.peak_footprint:.0f} MB, "
-            f"peak RSS {peak:.0f} MB",
+            f"  index {secs:.1f} s, ready {ready:.1f} s, peak footprint "
+            f"{srv.peak_footprint:.0f} MB, peak RSS {peak:.0f} MB",
             flush=True,
         )
         for p in res["index"]["phases"]:
@@ -175,15 +175,16 @@ def bench_phases(
     # Cold metrics are one sample per server start, so repeat them from an empty cache and a
     # fresh server. The warm and idle numbers above already are medians or windows.
     plan = bl.pages(probe, repo.get("search", "fn"))
-    index = [res["index"]["secs"]]
+    index, ready = [res["index"]["secs"]], [res["index"]["ready_secs"]]
     cold = {k: [p["cold"]["total_ms"]] for k, p in res["pages"].items()}
     for i in range(2, samples + 1):
         shutil.rmtree(cache, ignore_errors=True)
         bq.quiet(f"index#{i}", loads, wait, sampler)
         srv = bl.Server(binary, repo_dir, logdir)
         try:
-            secs, _, _ = srv.wait_ready()
+            secs, to_ready, _ = srv.wait_ready()
             index.append(secs)
+            ready.append(to_ready)
             bq.quiet(f"pages#{i}", loads, wait, sampler)
             prefix = bl.site_prefix(srv.port)
             for label, page in plan.items():
@@ -196,6 +197,8 @@ def bench_phases(
         print(f"  cold round {i}: index {secs:.1f} s", flush=True)
     res["index"]["samples"] = index
     res["index"]["secs"] = statistics.median(index)
+    res["index"]["ready_samples"] = ready
+    res["index"]["ready_secs"] = statistics.median(ready)
     for label, xs in cold.items():
         res["pages"][label]["cold"]["samples"] = xs
         res["pages"][label]["cold"]["total_ms"] = statistics.median(xs)
@@ -321,9 +324,18 @@ def judge(res: Json, budgets: Json) -> Json:
         b.get("index_secs"),
         res["index"].get("samples"),
     )
+    # A run from before harness 4 has no time to ready to judge.
+    if "ready_secs" in res["index"]:
+        put(
+            "ready_secs",
+            res["index"]["ready_secs"],
+            b.get("ready_secs"),
+            res["index"].get("ready_samples"),
+        )
     phases = res["index"].get("phases", [])
-    if "index_secs" in out:
-        out["index_secs"]["phase"] = bl.slowest(phases, "secs")
+    for key in ("index_secs", "ready_secs"):
+        if key in out:
+            out[key]["phase"] = bl.slowest(phases, "secs")
     put(
         "idle_cpu_pct",
         max(field(res, f) for f in bc.SOURCES["idle_cpu_pct"]),
@@ -572,13 +584,13 @@ def main():
 
 
 def budgets(corpus: Json) -> Json:
-    """The corpus budgets. TEST_BENCH_INDEX_SECS sets every class's index_secs, so the guard
-    sees a run fail red on the tiny synthetic repo."""
+    """The corpus budgets, with every class's index_secs and ready_secs set by
+    TEST_BENCH_INDEX_SECS and TEST_BENCH_READY_SECS, so the guard sees the synthetic run red."""
     b = corpus.get("budgets", {})
-    forced = os.environ.get("TEST_BENCH_INDEX_SECS")
-    if forced is None:
-        return b
-    return {k: {**v, "index_secs": float(forced)} for k, v in b.items()}
+    for key in ("index_secs", "ready_secs"):
+        if (forced := os.environ.get(f"TEST_BENCH_{key.upper()}")) is not None:
+            b = {k: {**v, key: float(forced)} for k, v in b.items()}
+    return b
 
 
 if __name__ == "__main__":

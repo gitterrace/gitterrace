@@ -295,11 +295,12 @@ class Server:
         )
         self.pid = self.proc.pid
 
-    def wait_ready(self, timeout: float = 14400) -> tuple[float, float | None, float]:
-        """Index build: seconds until the repo's api/progress says ready, and peak RSS meanwhile.
+    def wait_ready(self, timeout: float = 14400) -> tuple[float, float, float]:
+        """Seconds until the repo's api/progress leaves indexing (the index holds HEAD), seconds
+        until it says ready (the warm-up is done too), and peak RSS meanwhile.
 
         Progress lives under the repo prefix, which /api/repos names once the server listens."""
-        peak, listening = 0.0, None
+        peak, indexed = 0.0, None
         prefix: str | None = None
         # Peak RSS and physical footprint per index step, charged to the step the last
         # answer named. Footprint leaves out clean mapped pack files, the gated number.
@@ -320,7 +321,6 @@ class Server:
             try:
                 if prefix is None:
                     prefix = site_prefix(self.port)
-                    listening = time.perf_counter() - self.t0
                 c = http.client.HTTPConnection("127.0.0.1", self.port, timeout=30)
                 c.request("GET", f"{prefix}/api/progress")
                 r = c.getresponse()
@@ -332,8 +332,11 @@ class Server:
                 c.close()
                 step = body.get("phase") or step
                 self.phases = body.get("phases", [])
+                now = time.perf_counter() - self.t0
+                if indexed is None and body.get("state") in INDEXED_STATES:
+                    indexed = now
                 if body.get("ready"):
-                    return time.perf_counter() - self.t0, listening, peak
+                    return indexed if indexed is not None else now, now, peak
             except (OSError, ValueError):
                 pass
             time.sleep(0.2)
@@ -432,8 +435,11 @@ def pages(probe: Json, search: str) -> dict[str, str]:
     return p
 
 
-# Budgets a run fails on without BENCH_STRICT: the index build, which blocks a release.
-INDEX_GATES = ("index_secs", "rss_mb")
+# Budgets a run fails on without BENCH_STRICT: the index build and the time from start to a
+# ready repository, which block a release.
+INDEX_GATES = ("index_secs", "ready_secs", "rss_mb")
+# The repository states of /api/progress once the index holds HEAD.
+INDEXED_STATES = ("warming", "ready")
 
 
 def phase_table(
@@ -454,6 +460,42 @@ def phase_table(
             row["footprint_mb"] = round(fp[p["name"]], 1)
         out.append(row)
     return out
+
+
+def ready_recorded(run: Json, name: str) -> list[str]:
+    """A run from harness 4 records, per repo, the seconds to ready next to the index build's,
+    and ready is never before the index is done. Older runs predate it."""
+    if run.get("harness", 1) < 4:
+        return []
+    errs: list[str] = []
+    for n, r in run["repos"].items():
+        idx = r.get("index", {})
+        if "ready_secs" not in idx:
+            errs.append(f"{name}: {n} recorded no ready_secs")
+        elif idx["ready_secs"] < idx.get("secs", 0):
+            errs.append(f"{name}: {n} was ready before its index was built")
+    return errs
+
+
+def ready_recorded_test() -> None:
+    """A harness 4 run without ready_secs, or ready before the index, is refused; harness 3
+    passes untouched."""
+
+    def run(index: Json, harness: int = 4) -> Json:
+        return {"harness": harness, "repos": {"r": {"index": index}}}
+
+    good = {"secs": 5.0, "ready_secs": 6.0}
+    bad = [
+        i
+        for i in ({"secs": 5.0}, {"secs": 5.0, "ready_secs": 4.0})
+        if not ready_recorded(run(i), "t")
+    ]
+    if (
+        ready_recorded(run(good), "t")
+        or ready_recorded(run({"secs": 1}, 3), "t")
+        or bad
+    ):
+        sys.exit(f"bench self-test failed: ready guard passed {bad or 'a good run'}")
 
 
 def phase_cpu(run: Json, name: str) -> list[str]:

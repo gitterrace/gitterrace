@@ -10,9 +10,11 @@ with min and max. Cold is the first request after the index is ready, with the
 OS file cache warmed by one untimed read of the repository. Warm is the runs
 after it.
 
-1. **Index build.** Seconds from process start until `/api/progress` reports
-   ready, from an empty cache, plus peak RSS sampled meanwhile and the size of
-   the cache on disk.
+1. **Index build.** Seconds from process start until `/api/progress` leaves
+   indexing (the index holds HEAD), from an empty cache, plus peak RSS sampled
+   meanwhile and the size of the cache on disk. **Add to ready** is the seconds
+   until it reports ready: the index build plus the warm-up, which renders the
+   first pages before a visitor asks for them.
 2. **Pages.** Time to first byte and full response for `/`, `/tree/HEAD`, a deep
    tree path, `/blob` of the largest file under the text limit, `/blame` of that
    file, `/log/HEAD`, `/commit` and `/diff` fragment of the newest commit,
@@ -47,8 +49,9 @@ disk is under the corpus `need_gb`.
 
 Each size class has a target per metric in the corpus file: the first measured
 run plus headroom, except three product goals: a warm page in 300 ms, idle at 1%
-CPU and the huge index in 600 s. An index time or memory over budget fails the
-run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
+CPU and the huge index in 600 s. The time to ready holds the index budget until
+a run calibrates it. An index time, time to ready or memory over budget fails
+the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
 The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
 `phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages. RSS
