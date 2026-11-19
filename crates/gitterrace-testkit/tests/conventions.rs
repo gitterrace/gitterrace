@@ -273,6 +273,88 @@ fn the_sleep_guard_sees_both_kinds_of_test_code() {
     assert_eq!(caught("crates/a/tests/x.rs", "    // a sleep( in prose"), 0);
 }
 
+/// A process looked up by its bare name: `pidof`, `killall`, `pgrep -x`/`pkill -x`, or a
+/// `pgrep`/`pkill` whose pattern is a single word. Any other process of that name on the
+/// runner (its own `sleep`, another test's server) then reads as the one under test.
+fn bare_process_match(line: &str) -> bool {
+    let code = line.split("//").next().unwrap_or_default();
+    let code = code.split(" #").next().unwrap_or_default();
+    if [concat!("pid", "of "), concat!("kill", "all ")]
+        .iter()
+        .any(|s| code.contains(s))
+    {
+        return true;
+    }
+    // Without `-f` both match the process name only, never the arguments that make it ours.
+    [concat!("pg", "rep "), concat!("pk", "ill ")]
+        .iter()
+        .any(|tool| {
+            code.find(tool).is_some_and(|at| {
+                !code[at + tool.len()..]
+                    .split_whitespace()
+                    .take_while(|a| a.starts_with('-'))
+                    .any(|a| a.contains('f'))
+            })
+        })
+}
+
+/// Guard class: a check that finds a process by its name alone also finds a foreign one,
+/// and a busy runner always has one. Verification scripts and test code match the unique
+/// command line of the process they started (`pgrep -f "<unique argument>"`). Catches
+/// `pidof`, `killall`, `pgrep -x name` and a one-word `pgrep name` alike.
+#[test]
+fn checks_find_their_own_process_not_one_of_the_same_name() {
+    let mut found = hits(
+        &["scripts/verify", "crates"],
+        &["sh", "mjs", "js", "py"],
+        &[],
+        bare_process_match,
+    );
+    for f in scan::files_in(&root(), &["crates"], &["rs"]) {
+        let rel = f
+            .strip_prefix(root())
+            .unwrap_or(&f)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let Ok(text) = fs::read_to_string(&f) else {
+            continue;
+        };
+        for (n, line) in test_lines(&rel, &text) {
+            if bare_process_match(&line) {
+                found.push(format!("{rel}:{n}: {}", line.trim()));
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "match the process by its unique command line (pgrep -f):\n{}",
+        found.join("\n")
+    );
+}
+
+/// The process guard's own red and green cases.
+#[test]
+fn the_process_guard_refuses_a_bare_name_and_allows_a_unique_command_line() {
+    let red = [
+        concat!("pg", "rep -x ", "sleep"),
+        concat!("if pg", "rep ", "sleep; then"),
+        concat!("pid", "of ", "sleep"),
+        concat!("kill", "all ", "git-terrace"),
+        concat!("pk", "ill -x ", "serve"),
+    ];
+    for l in red {
+        assert!(bare_process_match(l), "missed: {l}");
+    }
+    let green = [
+        concat!("pgrep -f \"sleep 4", "17.3\" >/dev/null"),
+        concat!("pkill -f \"target/release/git-terrace ", ".*$addr\""),
+        "  # pidof would match any sleep",
+    ];
+    for l in green {
+        assert!(!bare_process_match(l), "refused: {l}");
+    }
+}
+
 /// Each `Body::from_stream(` call up to its closing parenthesis, as `file:line` and text.
 fn from_stream_calls(text: &str) -> Vec<(usize, String)> {
     let mut out = Vec::new();
