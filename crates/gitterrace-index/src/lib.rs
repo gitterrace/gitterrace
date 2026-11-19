@@ -169,6 +169,24 @@ impl Index {
         Self::open_with(git.join("gitterrace"), store::fallback_dir(git))
     }
 
+    /// Whether [`Index::open`] could make and write `repo`'s cache.
+    ///
+    /// Checked without opening it: no format reset and no writer lock, so it never waits on
+    /// another writer. An addition
+    /// asks this before it answers, so a repository whose cache cannot be made is refused then,
+    /// not after it was accepted.
+    pub fn check_openable(repo: &Repo) -> io::Result<()> {
+        let git = repo.git_dir();
+        let probe = |d: &std::path::Path| cache::cache_dir(d).and_then(|()| store::writable(d));
+        match probe(&git.join("gitterrace")) {
+            Err(e) if store::cannot_write(&e) => match store::fallback_dir(git) {
+                Some((dir, _)) => probe(&dir),
+                None => Err(e),
+            },
+            other => other,
+        }
+    }
+
     /// [`Index::open`] with the user-cache folder passed in. Without one: [`Index::open_dir`].
     fn open_with(own: PathBuf, fallback: Option<(PathBuf, PathBuf)>) -> io::Result<Self> {
         let Some((dir, real)) = fallback else {

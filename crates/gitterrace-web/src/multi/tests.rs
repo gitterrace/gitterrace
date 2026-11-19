@@ -228,7 +228,7 @@ async fn every_start_shape_serves_and_indexes_its_repositories() {
     let res = tower::ServiceExt::oneshot(router.clone(), req)
         .await
         .expect("res");
-    assert_eq!(res.status(), 201, "join a bare clone");
+    assert_eq!(res.status(), 202, "join a bare clone");
     assert_eq!(listed(&router).await, ["work", "jq"]);
     assert_indexed(&router, "jq").await;
 }

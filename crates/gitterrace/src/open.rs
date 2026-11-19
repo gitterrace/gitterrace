@@ -293,12 +293,12 @@ fn ensure_server(
     Ok(addr)
 }
 
-/// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). Already
-/// served (409) counts as added.
+/// Asks the gitterrace server on `addr` to add the repository at `root` (canonical). Accepted
+/// (202, it opens in the background) and already served (409) both count as added.
 /// The `/r/NAME/` prefix the server serves `root` under, new or already there.
 fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, ServerError> {
     match secret_request(addr, state, "POST", &AddBody { path: root })? {
-        (201 | 409, v) => Ok(v.base.unwrap_or_else(|| "/".to_owned())),
+        (202 | 409, v) => Ok(v.base.unwrap_or_else(|| "/".to_owned())),
         (404 | 405, _) => Err(ServerError::NoAdding),
         (status, v) => Err(ServerError::Status {
             status,

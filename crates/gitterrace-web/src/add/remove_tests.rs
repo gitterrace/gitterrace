@@ -106,7 +106,7 @@ async fn remove_is_gated_and_takes_the_repository_off() {
 
     let add = serde_json::json!({ "path": b }).to_string();
     let (s, js) = send(&r, req("POST", tok), add).await;
-    assert_eq!(s, 201, "{js}");
+    assert_eq!(s, 202, "{js}");
     assert!(js.contains("\"/r/b/\""), "same name again: {js}");
     assert_eq!(get(&r, "/r/b/").await.0, 200, "re-added");
 }

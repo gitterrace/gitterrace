@@ -45,6 +45,9 @@ enum RootError {
     NotTop { top: PathBuf },
     #[error("this repository holds actions.toml")]
     HoldsActions,
+    /// Found, but its cache cannot be made: answered 422, the path itself was fine.
+    #[error("cannot open the repository: {0}")]
+    Unopenable(std::io::Error),
 }
 
 /// Every body `/_repos` answers with. Absent keys stay absent.
@@ -179,6 +182,12 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     .await;
     let (root, stem) = match checked {
         Ok(Ok(found)) => found,
+        Ok(Err(why @ RootError::Unopenable(_))) => {
+            return reply(
+                StatusCode::UNPROCESSABLE_ENTITY,
+                &AddReply::error(&why.to_string()),
+            );
+        }
         Ok(Err(why)) => return bad(&why.to_string()),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
     };
@@ -197,18 +206,7 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
         }
         Err(e) => return bad(&e.to_string()),
     };
-    // Build now: starts the index refresher and the warm-up, as a startup repository gets. A
-    // repository that will not open is taken out again and never remembered, so it does not
-    // come back on the next start. Only a local server takes additions, so the reason (which
-    // may name a host folder) goes back to the caller.
-    if let Err(e) = adder.table.router_of(&served).await {
-        tracing::warn!("opening added {}: {e}", served.name);
-        adder.table.remove(&served.name);
-        return reply(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            &AddReply::error(&format!("cannot open the repository: {e}")),
-        );
-    }
+    // Permalinks resolve from the reply on: the reader opens the base it names at once.
     match Repo::discover(&root) {
         Ok(repo) => adder.site.push_target(crate::actions::Target {
             key: served.name.clone(),
@@ -217,19 +215,50 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
         }),
         Err(e) => tracing::warn!("permalinks to added {}: {e}", served.name),
     }
-    let state = adder.state.clone();
-    tokio::task::spawn_blocking(move || crate::remember(state.as_deref(), &[root]));
-    tracing::info!("added {} at /r/{}/", stem, served.name);
     // Open pages show the switcher, or its new entry, without a reload.
     adder.table.announce();
+    let base = format!("/r/{}/", served.name);
+    let name = served.name.clone();
+    // The reply goes now and the opening after it: opening a cache in an old format waits for
+    // its writer lock, which another process building it may hold for minutes. The
+    // repository's state shows on its progress and in the list meanwhile.
+    tokio::spawn(open_added(adder, served, root));
     reply(
-        StatusCode::CREATED,
+        StatusCode::ACCEPTED,
         &AddReply {
-            base: Some(&format!("/r/{}/", served.name)),
-            name: Some(&served.name),
+            base: Some(&base),
+            name: Some(&name),
             ..AddReply::NONE
         },
     )
+}
+
+/// Builds an added repository's router, which starts its index refresher and warm-up as a
+/// startup repository gets, then remembers it for the next start. One that will not open is
+/// taken off again and never remembered, so a restart does not bring it back; one taken off
+/// while it opened is not remembered either.
+async fn open_added(adder: Arc<Adder>, served: Arc<crate::multi::Served>, root: PathBuf) {
+    if let Err(e) = adder.table.router_of(&served).await {
+        tracing::warn!("cannot open the added repository {}: {e}", served.name);
+        adder.table.remove(&served.name);
+        adder.site.drop_target(&served.name);
+        adder.table.announce();
+        return;
+    }
+    if !adder
+        .table
+        .get(&served.name)
+        .is_some_and(|s| Arc::ptr_eq(&s, &served))
+    {
+        return;
+    }
+    let state = adder.state.clone();
+    let remembered =
+        tokio::task::spawn_blocking(move || crate::remember(state.as_deref(), &[root])).await;
+    if let Err(e) = remembered {
+        tracing::warn!("remembering {}: {e}", served.name);
+    }
+    tracing::info!("added {} at /r/{}/", served.name, served.name);
 }
 
 /// What `DELETE /_repos` names: a URL name, or a canonical top folder.
@@ -312,6 +341,9 @@ fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, St
     if actions_file.is_some_and(|f| f.canonicalize().is_ok_and(|f| f.starts_with(&root))) {
         return Err(RootError::HoldsActions);
     }
+    // Everything a caller can be told now is told now: only opening, which may wait on
+    // another writer, happens after the reply.
+    gitterrace_index::Index::check_openable(&repo).map_err(RootError::Unopenable)?;
     Ok((root, repo.name()))
 }
 

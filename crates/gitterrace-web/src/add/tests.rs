@@ -119,7 +119,7 @@ async fn adds_and_guards(several: bool) {
     assert_eq!(send(&r, post(tok), body(&dot_dot)).await.0, 400, "dot-dot");
 
     let (s, js) = send(&r, post(tok), body(&b)).await;
-    assert_eq!(s, 201, "{js}");
+    assert_eq!(s, 202, "{js}");
     // Same folder name as the first: the newcomer is named by its path, the first keeps `a`.
     let v: serde_json::Value = serde_json::from_str(&js).expect("json");
     let name = v["name"].as_str().expect("name").to_owned();
@@ -214,7 +214,7 @@ async fn an_open_page_hears_a_repository_join() {
         .expect("events");
     assert_eq!(res.status(), 200);
     let mut events = res.into_body();
-    assert_eq!(send(&r, post(Some(&secret)), body(&b)).await.0, 201);
+    assert_eq!(send(&r, post(Some(&secret)), body(&b)).await.0, 202);
     let mut seen = String::new();
     let end = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
     while !seen.contains("\"repos\"") && tokio::time::Instant::now() < end {
@@ -235,8 +235,9 @@ async fn multi_repository_server_adds() {
     adds_and_guards(true).await;
 }
 
-/// A repository that is found but will not open (its cache folder cannot be made) answers
-/// 422, is not listed and is not written to the state file, so no restart brings it back.
+/// A repository that is found but whose cache cannot be made answers 422 before anything is
+/// added: it is not listed, not written to the state file, and a restart from that state does
+/// not bring it back. Red when the check moves behind the 202.
 #[cfg(unix)]
 #[tokio::test]
 async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
@@ -251,22 +252,73 @@ async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
         return;
     }
     let state = t.path().join("state");
-    let token = gitterrace_actions::Token::generate().expect("token");
-    let secret = token.as_str().to_owned();
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let (server, _) =
-        crate::build_server(vec![a], None, None, &env, Some(token), Some(state.clone()))
-            .expect("r");
+    let start = |state: &Path| {
+        let token = gitterrace_actions::Token::generate().expect("token");
+        let secret = token.as_str().to_owned();
+        let env = crate::app::Env::new(gitterrace_config::Config::default());
+        let (server, _) = crate::build_server(
+            vec![a.clone()],
+            None,
+            None,
+            &env,
+            Some(token),
+            Some(state.to_owned()),
+        )
+        .expect("r");
+        (server, secret)
+    };
+    let (server, secret) = start(&state);
     let (status, js) = send(&server, post(Some(&secret)), body(&b)).await;
     std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     assert_eq!(status, 422, "{js}");
-    let (_, list) = get(&server, "/api/repos").await;
-    assert!(!list.contains("/r/b/"), "{list}");
+    assert!(js.contains("cannot open the repository"), "{js}");
+    assert!(
+        !get(&server, "/api/repos").await.1.contains("/r/b/"),
+        "listed"
+    );
     assert_eq!(get(&server, "/r/b/").await.0, 404, "not served");
-    // A refused add writes nothing later either.
-    gitterrace_testkit::wait::pause(std::time::Duration::from_millis(200)).await;
     let recorded = std::fs::read_to_string(state.join("repos.json")).unwrap_or_default();
     assert!(!recorded.contains(b.to_str().expect("utf8")), "{recorded}");
+    let (again, _) = start(&state);
+    let (_, list) = get(&again, "/api/repos").await;
+    assert!(!list.contains("/r/b/"), "brought back by a restart: {list}");
+}
+
+/// Guard class: any wait on the repository itself before the reply, whether its router, its
+/// index, its cache or its git reads. Opening the added repository is held at its cache's
+/// writer lock (an old-format cache resets under it), and the add still answers while the
+/// lock is held; the repository is listed at once and opens once the lock goes.
+#[tokio::test(flavor = "multi_thread")]
+async fn an_addition_answers_before_the_repository_opens() {
+    let t = tempfile::tempdir().expect("tmp");
+    let a = repo(&t.path().join("a"), "a root");
+    let b = repo(&t.path().join("b"), "b root");
+    let cache = b.join(".git/gitterrace");
+    std::fs::create_dir_all(&cache).expect("cache");
+    std::fs::write(cache.join("VERSION"), "0\n").expect("old format");
+    let lock = std::fs::File::create(cache.join("lock")).expect("lock");
+    lock.lock().expect("hold the writer lock");
+    let token = gitterrace_actions::Token::generate().expect("token");
+    let secret = token.as_str().to_owned();
+    let env = crate::app::Env::new(gitterrace_config::Config::default());
+    let (r, _) = crate::build_server(vec![a], None, None, &env, Some(token), None).expect("r");
+    let sent = {
+        let (r, b) = (r.clone(), b.clone());
+        tokio::spawn(async move { send(&r, post(Some(&secret)), body(&b)).await })
+    };
+    gitterrace_testkit::wait::until("the add answers while the lock is held", || async {
+        sent.is_finished()
+    })
+    .await;
+    let (status, js) = sent.await.expect("add");
+    assert_eq!(status, 202, "{js}");
+    assert!(js.contains("\"base\":\"/r/b/\""), "{js}");
+    assert!(
+        get(&r, "/api/repos").await.1.contains("/r/b/"),
+        "listed at once"
+    );
+    lock.unlock().expect("release");
+    ready(&r, "/r/b").await;
 }
 
 #[tokio::test]
@@ -359,7 +411,7 @@ async fn links_handed_out_survive_a_join_and_a_restart() {
     }
 
     let (s, js) = send(&alone, post(Some(&secret)), body(&b)).await;
-    assert_eq!(s, 201, "{js}");
+    assert_eq!(s, 202, "{js}");
     let same = |r: axum::Router, why: &'static str| {
         let (urls, before, gone, go) = (urls.clone(), before.clone(), gone.clone(), go.clone());
         async move {
