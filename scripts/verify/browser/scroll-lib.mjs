@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, sh } from '../../lib/browser-lib.mjs';
+import { serve, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
 export function checks(env) {
@@ -29,8 +29,7 @@ export function checks(env) {
     try {
       sh(repo, 'git', 'init', '-q', '-b', 'main');
       for (let i = 0; i < FILES; i++) writeFileSync(join(repo, name2(i)), body('base'));
-      sh(repo, 'git', 'add', '-A');
-      sh(repo, 'git', 'commit', '-q', '-m', 'base');
+      commitAll(repo, 'base');
       for (let i = 0; i < FILES; i++) writeFileSync(join(repo, name2(i)), body('edited'));
       writeFileSync(
         join(repo, 's45big.txt'),

@@ -3,15 +3,14 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh, serve, WATCH_BOUND_MS } from '../../lib/browser-lib.mjs';
+import { sh, serve, WATCH_BOUND_MS, commitAll } from '../../lib/browser-lib.mjs';
 
 /** A one-commit repository in `dir`. */
 function small(dir) {
   mkdirSync(dir, { recursive: true });
   sh(dir, 'git', 'init', '-q', '-b', 'main');
   writeFileSync(join(dir, 'a.txt'), 'a\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'feat: first');
+  commitAll(dir, 'feat: first');
 }
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */

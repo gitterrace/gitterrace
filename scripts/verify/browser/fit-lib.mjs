@@ -4,7 +4,7 @@
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createServer } from 'node:http';
 import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
-import { sh } from '../../lib/browser-lib.mjs';
+import { sh, commitAll } from '../../lib/browser-lib.mjs';
 import { join, extname, resolve } from 'node:path';
 
 const WIDTHS = [1440, 900, 360];
@@ -147,8 +147,7 @@ export function checks(env) {
     const fn = (i) => `pub fn f${i}() -> u32 {\n    0\n}\n`;
     const syms = Array.from({ length: 12 }, (_, i) => fn(i)).join('\n');
     writeFileSync(join(dir, 'fit-symbols.rs'), syms);
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', 'docs: fit fixtures');
+    commitAll(dir, 'docs: fit fixtures');
   }
   async function all(label, fn) {
     fixtures();

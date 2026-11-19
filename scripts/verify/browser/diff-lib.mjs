@@ -13,7 +13,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve, sh } from '../../lib/browser-lib.mjs';
+import { serve, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 const RENAMES = 1960;
 const EDITS = 40;
@@ -29,15 +29,13 @@ function makeHugeRepo() {
   mkdirSync(join(dir, 'big'));
   for (let i = 0; i < RENAMES; i++) writeFileSync(join(dir, 'old', `m${String(i).padStart(4, '0')}.txt`), `file ${i}\nsecond line ${i}\n`);
   for (let i = 0; i < EDITS; i++) writeFileSync(join(dir, 'big', `e${String(i).padStart(2, '0')}.txt`), `start ${i}\n`);
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'base');
+  commitAll(dir, 'base');
   // git mv of the whole folder keeps every blob: pure renames. Then the large edits.
   sh(dir, 'git', 'mv', 'old', 'new');
   for (let i = 0; i < EDITS; i++) {
     writeFileSync(join(dir, 'big', `e${String(i).padStart(2, '0')}.txt`), Array.from({ length: 300 }, (_, k) => `edited line ${k} of file ${i} with some words`).join('\n') + '\n');
   }
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'move everything and edit some');
+  commitAll(dir, 'move everything and edit some');
   return dir;
 }
 

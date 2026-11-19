@@ -3,7 +3,7 @@
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh } from '../../lib/browser-lib.mjs';
+import { sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -73,8 +73,7 @@ async function pathCells() {
   mkdirSync(join(dir, top, 'views'), { recursive: true });
   for (let i = 0; i < 4; i++) {
     for (const f of deep) writeFileSync(join(dir, f), `${i}\n`);
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', `feat(web): coupled change ${i}`);
+    commitAll(dir, `feat(web): coupled change ${i}`);
   }
   await new Promise((ok) => setTimeout(ok, 1500));
   const pages = ['/stats/hotspots', '/stats/ownership'];
@@ -119,8 +118,7 @@ async function viewFileColumn() {
   const files = ['a.txt', long];
   mkdirSync(join(dir, 'pkgs/long-package-name/src'), { recursive: true });
   for (const f of files) writeFileSync(join(dir, f), 'base\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'test: files for the working tree list');
+  commitAll(dir, 'test: files for the working tree list');
   writeFileSync(join(dir, files[0]), 'edited\n');
   writeFileSync(join(dir, files[1]), 'x\n'.repeat(2500));
   await new Promise((ok) => setTimeout(ok, 1500));
@@ -158,8 +156,7 @@ async function viewFileColumn() {
 // and a diff set code at one size, so a shared rule cannot enlarge one of them.
 async function codeRows() {
   writeFileSync(join(dir, 'rows.txt'), 'one\n\nthree\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: rows with an empty line');
+  commitAll(dir, 'docs: rows with an empty line');
   await new Promise((ok) => setTimeout(ok, 600));
   for (const name of browsers) {
     const { b, ctx } = await context(name);

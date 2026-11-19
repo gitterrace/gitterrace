@@ -7,7 +7,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh, serve } from '../../lib/browser-lib.mjs';
+import { sh, serve, commitAll } from '../../lib/browser-lib.mjs';
 
 /** A repository with a source file of a few lines, one of them far wider than the card. */
 function hoverRepo() {
@@ -15,8 +15,7 @@ function hoverRepo() {
   sh(dir, 'git', 'init', '-q', '-b', 'main');
   const wide = `    let long = "${'x'.repeat(400)}";`;
   writeFileSync(join(dir, 'h.rs'), `fn main() {\n    let a = 1; // note\n${wide}\n}\n`);
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'hover fixture');
+  commitAll(dir, 'hover fixture');
   return dir;
 }
 

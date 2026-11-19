@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh } from '../../lib/browser-lib.mjs';
+import { sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {
@@ -12,8 +12,7 @@ export function checks(env) {
   // Escape closes the menu and returns focus to its button.
   async function outlineMenu() {
     writeFileSync(join(dir, 'menu-outline.md'), '# Doc\n\n' + Array.from({ length: 12 }, (_, i) => `## Head ${i}\n\ntext\n`).join('\n'));
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', 'docs: menu outline fixture');
+    commitAll(dir, 'docs: menu outline fixture');
     await new Promise((ok) => setTimeout(ok, 600));
     for (const name of browsers) {
       const { b, ctx } = await context(name);
@@ -46,8 +45,7 @@ export function checks(env) {
     const body = Array.from({ length: 40 }, (_, i) => fn(i)).join('\n');
     const head = 'pub struct Holder;\n\nimpl Holder {\n    pub fn new() -> Self { Holder }\n}\n\n';
     writeFileSync(join(dir, 'symbols.rs'), head + body);
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', 'feat: symbols fixture');
+    commitAll(dir, 'feat: symbols fixture');
     await new Promise((ok) => setTimeout(ok, 600));
     // The followed line: selected, its box, and the bottom of the path bar when it is pinned.
     // f5 is on line 47.
@@ -132,8 +130,7 @@ export function checks(env) {
   async function outlineCurrent() {
     const fn = (i) => `pub fn g${i}() -> u32 {\n${"    1 +\n".repeat(56)}    0\n}\n`;
     writeFileSync(join(dir, 'current.rs'), Array.from({ length: 90 }, (_, i) => fn(i)).join("\n"));
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', 'feat: current symbol fixture');
+    commitAll(dir, 'feat: current symbol fixture');
     await new Promise((ok) => setTimeout(ok, 600));
     // The symbol whose lines hold n: fn k starts on line 60k+1.
     const holding = (n) => `#L${60 * Math.floor((n - 1) / 60) + 1}`;

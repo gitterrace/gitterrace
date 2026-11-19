@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WATCH_BOUND_MS, makeRepo, serve, sh } from '../../lib/browser-lib.mjs';
+import { WATCH_BOUND_MS, makeRepo, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -21,8 +21,7 @@ async function marked() {
   const readme = readFileSync(join(dir, 'README.md'));
   try { await markedIn(); } finally {
     writeFileSync(join(dir, 'README.md'), readme);
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', 'docs: restore the README');
+    commitAll(dir, 'docs: restore the README');
     await new Promise((ok) => setTimeout(ok, 600));
   }
 }
@@ -32,8 +31,7 @@ async function markedIn() {
   mkdirSync(join(dir, 'notes'), { recursive: true });
   writeFileSync(join(dir, 'notes/guide.md'), GUIDE);
   writeFileSync(join(dir, 'notes/list.md'), LIST);
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: text to mark');
+  commitAll(dir, 'docs: text to mark');
   await new Promise((ok) => setTimeout(ok, 600));
   const raw = (a, b) => GUIDE.split('\n').slice(a - 1, b).join('\n');
   // Marks text in the page: whole code lines, a cut through a word, or a rendered block.
@@ -200,8 +198,7 @@ async function menuSame() {
 // ---- gutter -----------------------------------------------------------------------------------
 async function gutter() {
   writeFileSync(join(dir, 'long.txt'), Array.from({ length: 250 }, (_, i) => `line ${i + 1}`).join('\n') + '\n');
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: a file across chunks');
+  commitAll(dir, 'docs: a file across chunks');
   await new Promise((ok) => setTimeout(ok, 600));
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -339,8 +336,7 @@ async function dateTips() {
 async function outline() {
   const doc = ['# Doc', ...[1, 2, 3, 4, 5, 6].flatMap((i) => [`\n## Section ${i}\n`, ...Array.from({ length: 14 }, (_, j) => `Paragraph ${i}.${j} of filler text for scrolling.\n`), `### Part ${i}\n`, 'More text.\n'])].join('\n');
   writeFileSync(join(dir, 'outline.md'), doc);
-  sh(dir, 'git', 'add', '-A');
-  sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline fixture');
+  commitAll(dir, 'docs: outline fixture');
   await new Promise((ok) => setTimeout(ok, 600));
   const vis = (p, sel) => p.evaluate((s) => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; }, sel);
   for (const name of browsers) {
@@ -380,8 +376,7 @@ async function outline() {
       // Overview: the button lives in the README header bar, on its right, icon only.
       const readme = readFileSync(join(dir, 'README.md'));
       writeFileSync(join(dir, 'README.md'), '# Fixture\n\n' + Array.from({ length: 11 }, (_, i) => `## Topic ${i}\n\ntext\n`).join('\n') + '\n### Part 2\n\ntext\n');
-      sh(dir, 'git', 'add', '-A');
-      sh(dir, 'git', 'commit', '-q', '-m', 'docs: outline README');
+      commitAll(dir, 'docs: outline README');
       await new Promise((ok) => setTimeout(ok, 600));
       try {
         for (const scheme of ['light', 'dark']) for (const width of [1400, 900, 360]) {
@@ -406,8 +401,7 @@ async function outline() {
         }
       } finally {
         writeFileSync(join(dir, 'README.md'), readme);
-        sh(dir, 'git', 'add', '-A');
-        sh(dir, 'git', 'commit', '-q', '-m', 'docs: restore the README');
+        commitAll(dir, 'docs: restore the README');
         await new Promise((ok) => setTimeout(ok, 600));
       }
       if (bad.length) r.fail(`outline ${name} overview: ${JSON.stringify(bad)}`);
@@ -513,8 +507,7 @@ async function liveScroll() {
   try {
     sh(repo, 'git', 'init', '-q', '-b', 'main');
     for (let i = 0; i < FILES; i++) writeFileSync(join(repo, `s${String(i).padStart(2, '0')}.txt`), body('base'));
-    sh(repo, 'git', 'add', '-A');
-    sh(repo, 'git', 'commit', '-q', '-m', 'base');
+    commitAll(repo, 'base');
     for (let i = 0; i < FILES; i++) writeFileSync(join(repo, `s${String(i).padStart(2, '0')}.txt`), body('edited'));
     one = await serve(bin, repo, cfg);
     for (const name of browsers) {

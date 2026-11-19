@@ -82,6 +82,12 @@ export function sh(cwd, ...a) {
   return execFileSync(a[0], a.slice(1), { cwd, stdio: 'pipe', env: { ...process.env, ...ident } }).toString().trim();
 }
 
+/** Stages everything in `dir` and commits it with `subject`. */
+export function commitAll(dir, subject) {
+  sh(dir, 'git', 'add', '-A');
+  sh(dir, 'git', 'commit', '-q', '-m', subject);
+}
+
 const SUBJECTS = [
   'feat(core): a deliberately long commit subject that must stay on one line and carry a tip when the column cuts it short',
   'fix: short',

@@ -6,7 +6,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh } from '../../lib/browser-lib.mjs';
+import { sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** A branch name long enough to crowd its row. */
 export const LONG = 'a-rather-long-branch-name-that-crowds-the-row';
@@ -20,8 +20,7 @@ export function crowdedRepo() {
   sh(dir, 'git', 'init', '-q', '-b', 'main');
   const commit = (i, subject) => {
     writeFileSync(join(dir, 'f.txt'), `${i}\n`);
-    sh(dir, 'git', 'add', '-A');
-    sh(dir, 'git', 'commit', '-q', '-m', subject);
+    commitAll(dir, subject);
   };
   for (let i = 0; i < 6; i++) {
     commit(i, `feat(core): change number ${i} with a subject long enough to fill a row`);
