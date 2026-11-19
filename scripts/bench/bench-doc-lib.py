@@ -16,27 +16,6 @@ from typing import Any
 bc = importlib.import_module("bench-chart-lib")
 
 Json = dict[str, Any]
-ROOT = bc.ROOT
-DOC = bc.DOC
-RESULTS = bc.RESULTS
-BEGIN = bc.BEGIN
-END = bc.END
-KEEP = bc.KEEP
-METRICS = bc.METRICS
-SHORT = bc.SHORT
-ms = bc.ms
-num = bc.num
-fmt = bc.fmt
-corpus = bc.corpus
-normalize = bc.normalize
-dumps = bc.dumps
-run_name = bc.run_name
-runs = bc.runs
-load = bc.load
-DIRECTION = bc.DIRECTION
-chart = bc.chart
-charts = bc.charts
-picture = bc.picture
 
 
 # The doc block ------------------------------------------------------------------------------
@@ -48,7 +27,9 @@ def slowest_page(b: Json) -> str:
 
 
 def spread(key: str, b: Json) -> str:
-    return f" ({num(key, b['min'])} to {num(key, b['max'])})" if "min" in b else ""
+    return (
+        f" ({bc.num(key, b['min'])} to {bc.num(key, b['max'])})" if "min" in b else ""
+    )
 
 
 def samples_note(r: Json) -> str:
@@ -112,10 +93,10 @@ def summary(name: str, r: Json, when: str) -> list[str]:
         )
         + " Against budget: "
         + ", ".join(
-            f"{SHORT[k]} {fmt(k, b['value'])}{spread(k, b)}{slowest_page(b)} of {b['limit']} "
-            f"{METRICS[k][1]}"
+            f"{bc.SHORT[k]} {bc.fmt(k, b['value'])}{spread(k, b)}{slowest_page(b)} of {b['limit']} "
+            f"{bc.METRICS[k][1]}"
             for k, b in r["budget"].items()
-            if k in METRICS
+            if k in bc.METRICS
         )
         + ".",
         "",
@@ -129,8 +110,8 @@ def summary(name: str, r: Json, when: str) -> list[str]:
         ]
     for k, b in over:
         L.append(
-            f"- **Over budget:** {SHORT[k]} is {fmt(k, b['value'])} against a limit of "
-            f"{b['limit']} {METRICS[k][1]} ({b['value'] / b['limit']:.1f}x)."
+            f"- **Over budget:** {bc.SHORT[k]} is {bc.fmt(k, b['value'])} against a limit of "
+            f"{b['limit']} {bc.METRICS[k][1]} ({b['value'] / b['limit']:.1f}x)."
         )
     if over:
         L.append("")
@@ -226,7 +207,7 @@ def change(key: str, old: float, new: float) -> str:
     pct = (new - old) / old * 100
     if round(pct) == 0:
         return "unchanged"
-    lower, higher = DIRECTION[key]
+    lower, higher = bc.DIRECTION[key]
     return f"{abs(pct):.0f}% {lower if pct < 0 else higher}"
 
 
@@ -245,17 +226,18 @@ def comparison(cur: Json, old: Json) -> list[str]:
     for n, r in cur["repos"].items():
         prev = old["repos"].get(n)
         for k, b in r["budget"].items():
-            if k not in METRICS:
+            if k not in bc.METRICS:
                 continue
             p = prev["budget"].get(k) if prev else None
             if p is None:
                 L.append(
-                    f"| {n} | {SHORT[k]} | not run | {fmt(k, b['value'])} | new in this run |"
+                    f"| {n} | {bc.SHORT[k]} | not run | {bc.fmt(k, b['value'])} | new in this run |"
                 )
                 continue
             ch = change(k, p["value"], b["value"])
             L.append(
-                f"| {n} | {SHORT[k]} | {fmt(k, p['value'])} | {fmt(k, b['value'])} | {ch} |"
+                f"| {n} | {bc.SHORT[k]} | {bc.fmt(k, p['value'])} | "
+                f"{bc.fmt(k, b['value'])} | {ch} |"
             )
     return [*L, ""]
 
@@ -308,10 +290,10 @@ def block(cur: Json, old: Json | None, d: str) -> str:
     L.append("")
     L += bc.by_page(cur)
     L += idle_cause(cur)
-    names = charts(cur, old)
-    for key in METRICS:
+    names = bc.charts(cur, old)
+    for key in bc.METRICS:
         if f"{key}.svg" in names:
-            L += picture(cur, key, d)
+            L += bc.picture(cur, key, d)
     if old:
         L += comparison(cur, old)
     for n, r in cur["repos"].items():
@@ -332,11 +314,12 @@ def block(cur: Json, old: Json | None, d: str) -> str:
         for label, p in r["pages"].items():
             w = p["warm_total_ms"]
             row = (
-                f"| {label} | {ms(p['cold']['total_ms'])} | {ms(p['warm_ttfb_ms']['median'])} | "
-                f"{ms(w['median'])} | {ms(w['min'])} | {ms(w['max'])} | {p['bytes']} |"
+                f"| {label} | {bc.ms(p['cold']['total_ms'])} | "
+                f"{bc.ms(p['warm_ttfb_ms']['median'])} | "
+                f"{bc.ms(w['median'])} | {bc.ms(w['min'])} | {bc.ms(w['max'])} | {p['bytes']} |"
             )
             if prev and label in prev["pages"]:
-                row += f" {ms(prev['pages'][label]['warm_total_ms']['median'])} |"
+                row += f" {bc.ms(prev['pages'][label]['warm_total_ms']['median'])} |"
             elif prev:
                 row += " - |"
             L.append(row)
@@ -388,10 +371,10 @@ def wrap(md: str) -> str:
 
 def published() -> list[Json]:
     """The kept runs, oldest first, normalized."""
-    files = runs()
+    files = bc.runs()
     if not files:
         sys.exit("no results in tests/bench/results, run `make bench` first")
-    return [normalize(load(f)) for f in files[-KEEP:]]
+    return [bc.normalize(bc.load(f)) for f in files[-bc.KEEP :]]
 
 
 def expected() -> dict[Path, str]:
@@ -400,12 +383,12 @@ def expected() -> dict[Path, str]:
     raw = published()
     kept = [shown(r) for r in raw]
     for i, run in enumerate(kept):
-        name = run_name(run)
-        out[RESULTS / f"{name}.json"] = dumps(raw[i])
-        for f, svg in charts(run, kept[i - 1] if i else None).items():
-            out[RESULTS / name / f] = svg
-        out[RESULTS / name / "README.md"] = folder_readme(run)
-    out[RESULTS / "README.md"] = results_readme(kept)
+        name = bc.run_name(run)
+        out[bc.RESULTS / f"{name}.json"] = bc.dumps(raw[i])
+        for f, svg in bc.charts(run, kept[i - 1] if i else None).items():
+            out[bc.RESULTS / name / f] = svg
+        out[bc.RESULTS / name / "README.md"] = folder_readme(run)
+    out[bc.RESULTS / "README.md"] = results_readme(kept)
     return out
 
 
@@ -424,18 +407,18 @@ HEADLINE = ("index_secs", "page_warm_ms", "page_cold_ms", "rss_mb", "export_secs
 def folder_readme(run: Json) -> str:
     """What a run's chart folder shows when opened: its header and its charts."""
     L = [
-        f"# Benchmark run {run_name(run)}",
+        f"# Benchmark run {bc.run_name(run)}",
         "",
         header(run),
         "",
         *[x + "\n" for x in withheld_lines(run)],
-        f"Numbers: [`../{run_name(run)}.json`](../{run_name(run)}.json). "
+        f"Numbers: [`../{bc.run_name(run)}.json`](../{bc.run_name(run)}.json). "
         "Method: [docs/benchmarks.md](../../../../docs/benchmarks.md).",
         "",
     ]
-    for key in METRICS:
+    for key in bc.METRICS:
         if any(key in r["budget"] for r in run["repos"].values()):
-            L += picture(run, key, ".")
+            L += bc.picture(run, key, ".")
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
@@ -456,21 +439,21 @@ def results_table(cur: Json, old: Json | None) -> list[str]:
                     why = export_failure(r["export"])
                     status = "capped" if why == CAPPED_EXPORT else "failed"
                     L.append(
-                        f"| {n} | {SHORT[k]} | {why} | - | {status} |"
+                        f"| {n} | {bc.SHORT[k]} | {why} | - | {status} |"
                         + (" - |" if old else "")
                     )
                 continue
             p = prev.get(k)
             ch = change(k, p["value"], b["value"]) if p else "new in this run"
             L.append(
-                f"| {n} | {SHORT[k]} | {fmt(k, b['value'])}{spread(k, b)} | "
-                f"{b['limit']} {METRICS[k][1]} | {b['status']} |"
+                f"| {n} | {bc.SHORT[k]} | {bc.fmt(k, b['value'])}{spread(k, b)} | "
+                f"{b['limit']} {bc.METRICS[k][1]} | {b['status']} |"
                 + (f" {ch} |" if old else "")
             )
     for n in cur.get("held", {}):
         for k in HEADLINE:
             L.append(
-                f"| {n} | {SHORT[k]} | {HELD} | - | withheld |"
+                f"| {n} | {bc.SHORT[k]} | {HELD} | - | withheld |"
                 + (" - |" if old else "")
             )
     return L
@@ -493,7 +476,7 @@ def results_readme(kept: list[Json]) -> str:
         "| --- | --- | --- | --- | --- |",
     ]
     for run in reversed(kept):
-        m, n = run["machine"], run_name(run)
+        m, n = run["machine"], bc.run_name(run)
         L.append(
             f"| {run['when'][:10]} | {m['cpu']}, {m['cpus']} cores, {m['ram_gb']:.0f} GB RAM, "
             f"{m['os']} | {version(m)} | "
@@ -508,7 +491,7 @@ def results_readme(kept: list[Json]) -> str:
         *[x + "\n" for x in withheld_lines(cur)],
         *results_table(cur, old),
     ]
-    L += ["", block(cur, old, run_name(cur))]
+    L += ["", block(cur, old, bc.run_name(cur))]
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
@@ -528,10 +511,10 @@ def render() -> str:
 
 
 def spliced(text: str, body: str) -> str:
-    pat = re.escape(BEGIN) + ".*?" + re.escape(END)
+    pat = re.escape(bc.BEGIN) + ".*?" + re.escape(bc.END)
     if not re.search(pat, text, flags=re.S):
-        sys.exit(f"{DOC} has no generated results block")
-    return re.sub(pat, lambda _: f"{BEGIN}\n{body}\n{END}", text, flags=re.S)
+        sys.exit(f"{bc.DOC} has no generated results block")
+    return re.sub(pat, lambda _: f"{bc.BEGIN}\n{body}\n{bc.END}", text, flags=re.S)
 
 
 def owned(p: Path) -> bool:
@@ -539,7 +522,7 @@ def owned(p: Path) -> bool:
     return p.suffix in (".json", ".svg") or p.name == "README.md"
 
 
-def actual(root: Path = RESULTS) -> set[Path]:
+def actual(root: Path = bc.RESULTS) -> set[Path]:
     """The report's own files under root. Other files are stray(), never read as text."""
     return {p for p in root.rglob("*") if p.is_file() and owned(p)}
 
@@ -550,7 +533,7 @@ def ignored(paths: list[Path]) -> set[Path]:
         return set()
     r = subprocess.run(
         ["git", "check-ignore", "--stdin"],
-        cwd=ROOT,
+        cwd=bc.ROOT,
         input="\n".join(str(p) for p in paths),
         capture_output=True,
         text=True,
@@ -558,7 +541,7 @@ def ignored(paths: list[Path]) -> set[Path]:
     return {Path(x) for x in r.stdout.splitlines()}
 
 
-def stray(root: Path = RESULTS) -> list[str]:
+def stray(root: Path = bc.RESULTS) -> list[str]:
     """Files under root the report does not own and git does not ignore."""
     other = [p for p in root.rglob("*") if p.is_file() and not owned(p)]
     skip = ignored(other)

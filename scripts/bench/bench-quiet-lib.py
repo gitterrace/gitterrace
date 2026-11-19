@@ -19,11 +19,8 @@ from typing import Any
 bl = importlib.import_module("bench-lib")
 
 Json = dict[str, Any]
-run = bl.run
+# A module global, not bl.cpu_secs: the self-test swaps it for a probe.
 cpu_secs = bl.cpu_secs
-stats = bl.stats
-get = bl.get
-site_prefix = bl.site_prefix
 QUIET_SECS = 20
 # A published run uses these. Anything less is a smoke run, written to the cache.
 FULL_RUNS, FULL_IDLE_SECS = 5, 60
@@ -111,7 +108,7 @@ def split_cores(rows: list[list[str]], me: int) -> tuple[float, float]:
 
 def process_cores() -> tuple[float, float]:
     try:
-        out = run(["ps", "-Ao", "pid=,ppid=,pcpu="])
+        out = bl.run(["ps", "-Ao", "pid=,ppid=,pcpu="])
     except (OSError, subprocess.CalledProcessError):
         return 0.0, 0.0
     rows = [line.split() for line in out.splitlines() if len(line.split()) == 3]
@@ -136,7 +133,7 @@ NOISY = ("mediaanalysisd", "photoanalysisd", "mds_stores", "backupd")
 def busy_background():
     """CPU percent of known noisy daemons above 10% right now, by process name."""
     try:
-        out = run(["ps", "-Ao", "pcpu=,comm="])
+        out = bl.run(["ps", "-Ao", "pcpu=,comm="])
     except (OSError, subprocess.CalledProcessError):
         return {}
     seen = {}
@@ -181,16 +178,16 @@ def quiet(
 def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
     """Cold and warm timings per page. Anything but 200, a redirect included, fails the run."""
     out: Json = {}
-    prefix = site_prefix(port)
+    prefix = bl.site_prefix(port)
     for label, page in plan.items():
         path = prefix + page
-        status, ttfb, total, size = get(port, path)
+        status, ttfb, total, size = bl.get(port, path)
         if status != 200:
             raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
         cold = {"ttfb_ms": ttfb, "total_ms": total}
         ttfbs, totals = [], []
         for _ in range(runs):
-            status, a, b, _ = get(port, path)
+            status, a, b, _ = bl.get(port, path)
             if status != 200:
                 raise RuntimeError(f"{label} {path} answered HTTP {status}, not 200")
             ttfbs.append(a)
@@ -200,8 +197,8 @@ def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
             "status": status,
             "bytes": size,
             "cold": cold,
-            "warm_ttfb_ms": stats(ttfbs),
-            "warm_total_ms": stats(totals),
+            "warm_ttfb_ms": bl.stats(ttfbs),
+            "warm_total_ms": bl.stats(totals),
         }
         print(
             f"  {label:<22} {status} cold {total:8.0f} ms  warm {statistics.median(totals):7.0f} ms",
@@ -253,7 +250,7 @@ def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
         def hold():
             try:
                 c = http.client.HTTPConnection("127.0.0.1", server.port, timeout=5)
-                c.request("GET", f"{site_prefix(server.port)}/events")
+                c.request("GET", f"{bl.site_prefix(server.port)}/events")
                 r = c.getresponse()
                 while not stop.is_set():
                     with contextlib.suppress(OSError):

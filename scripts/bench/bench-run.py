@@ -42,28 +42,8 @@ bq = importlib.import_module("bench-quiet-lib")
 bc = importlib.import_module("bench-chart-lib")
 
 Json = dict[str, Any]
-LoadSampler = bq.LoadSampler
-Server = bl.Server
-parse_toml = bl.parse_toml
-run = bl.run
-dir_mb = bl.dir_mb
-rss_mb = bl.rss_mb
-get = bl.get
-site_prefix = bl.site_prefix
-isolated_config = bl.isolated_config
-ensure_clone = bl.ensure_clone
-discover = bl.discover
-pages = bl.pages
-ROOT = bl.ROOT
-FULL_RUNS = bq.FULL_RUNS
 HARNESS = 3
-FULL_IDLE_SECS = bq.FULL_IDLE_SECS
-COLD_SAMPLES = bq.COLD_SAMPLES
 DEFAULT_COMMITS = 500  # `export --commits` default (cli.rs)
-max_load = bq.max_load
-quiet = bq.quiet
-measure_pages = bq.measure_pages
-idle_cpu = bq.idle_cpu
 
 
 def bench_repo(
@@ -80,7 +60,7 @@ def bench_repo(
     name = repo["name"]
     print(f"== {name} ({repo['class']}) @ {repo.get('sha', 'HEAD')[:10]}", flush=True)
     rev = repo["sha"] if not repo.get("local") else "HEAD"
-    probe = discover(repo_dir, rev)
+    probe = bl.discover(repo_dir, rev)
     probe.update(
         {k: repo[k] for k in ("blob", "blame", "deep_tree", "commit") if k in repo}
     )
@@ -92,9 +72,9 @@ def bench_repo(
     )
     shutil.rmtree(cache, ignore_errors=True)
     # One untimed read warms the OS cache so cold means the first request, not the disk.
-    run(["git", "rev-list", "--count", rev], cwd=repo_dir)
+    bl.run(["git", "rev-list", "--count", rev], cwd=repo_dir)
     loads: Json = {}
-    sampler = LoadSampler()
+    sampler = bq.LoadSampler()
     try:
         res = bench_phases(
             repo,
@@ -133,15 +113,15 @@ def bench_phases(
     sampler: Any,
 ) -> Json:
     """The timed phases of bench_repo, each started through quiet() so the sampler follows."""
-    quiet("index", loads, wait, sampler)
-    srv = Server(binary, repo_dir, logdir)
+    bq.quiet("index", loads, wait, sampler)
+    srv = bl.Server(binary, repo_dir, logdir)
     # A local repo is measured at its HEAD, so report that, not the corpus pin.
     res = {
         "sha": probe["commit"] if repo.get("local") else repo["sha"],
         "class": repo["class"],
         "probe": probe,
         "config": "empty config.toml, no actions.toml",
-        "load": {"limit": max_load(), "phases": loads},
+        "load": {"limit": bq.max_load(), "phases": loads},
     }
     try:
         secs, listen, peak = srv.wait_ready()
@@ -159,27 +139,27 @@ def bench_phases(
                 f"{p.get('footprint_mb', 0):6.0f} MB  RSS {p.get('rss_mb', 0):6.0f} MB",
                 flush=True,
             )
-        rss_warm = rss_mb(srv.pid)
-        quiet("pages", loads, wait, sampler)
-        res["pages"] = measure_pages(
-            srv.port, pages(probe, repo.get("search", "fn")), runs
+        rss_warm = bl.rss_mb(srv.pid)
+        bq.quiet("pages", loads, wait, sampler)
+        res["pages"] = bq.measure_pages(
+            srv.port, bl.pages(probe, repo.get("search", "fn")), runs
         )
         res["memory"] = {
             "rss_after_index_mb": rss_warm,
-            "rss_after_pages_mb": rss_mb(srv.pid),
+            "rss_after_pages_mb": bl.rss_mb(srv.pid),
             "footprint_after_pages_mb": bl.footprint_mb(srv.pid) or 0.0,
         }
-        res["index"]["cache_mb"] = dir_mb(cache)
-        quiet("idle", loads, wait, sampler)
+        res["index"]["cache_mb"] = bl.dir_mb(cache)
+        bq.quiet("idle", loads, wait, sampler)
         res["idle"] = {
             "secs": idle_secs,
-            "cpu_pct": idle_cpu(srv, idle_secs, False),
-            "cpu_pct_events_client": idle_cpu(srv, idle_secs, True),
+            "cpu_pct": bq.idle_cpu(srv, idle_secs, False),
+            "cpu_pct_events_client": bq.idle_cpu(srv, idle_secs, True),
         }
         # Footprint is read after the server released what the pages built, never before.
         res["memory"]["footprint_releases"] = bl.wait_released(srv.port)
         res["memory"]["footprint_idle_mb"] = bl.footprint_mb(srv.pid)
-        res["memory"]["rss_idle_mb"] = rss_mb(srv.pid)
+        res["memory"]["rss_idle_mb"] = bl.rss_mb(srv.pid)
         res["memory"]["footprint_start_mb"] = start_footprint(binary, logdir)
         print(
             f"  idle footprint {mb(res['memory']['footprint_idle_mb'])}, fresh server "
@@ -194,20 +174,20 @@ def bench_phases(
         srv.stop()
     # Cold metrics are one sample per server start, so repeat them from an empty cache and a
     # fresh server. The warm and idle numbers above already are medians or windows.
-    plan = pages(probe, repo.get("search", "fn"))
+    plan = bl.pages(probe, repo.get("search", "fn"))
     index = [res["index"]["secs"]]
     cold = {k: [p["cold"]["total_ms"]] for k, p in res["pages"].items()}
     for i in range(2, samples + 1):
         shutil.rmtree(cache, ignore_errors=True)
-        quiet(f"index#{i}", loads, wait, sampler)
-        srv = Server(binary, repo_dir, logdir)
+        bq.quiet(f"index#{i}", loads, wait, sampler)
+        srv = bl.Server(binary, repo_dir, logdir)
         try:
             secs, _, _ = srv.wait_ready()
             index.append(secs)
-            quiet(f"pages#{i}", loads, wait, sampler)
-            prefix = site_prefix(srv.port)
+            bq.quiet(f"pages#{i}", loads, wait, sampler)
+            prefix = bl.site_prefix(srv.port)
             for label, page in plan.items():
-                status, _, total, _ = get(srv.port, prefix + page)
+                status, _, total, _ = bl.get(srv.port, prefix + page)
                 if status != 200:
                     raise RuntimeError(f"{label} answered HTTP {status}, not 200")
                 cold[label].append(total)
@@ -243,10 +223,10 @@ def start_footprint(binary: str, logdir: Path) -> float | None:
     serving-memory goal is measured above this, as memory_budget.rs does."""
     d = Path(logdir) / "fresh"
     if not d.exists():
-        run(["git", "init", "-q", str(d)])
+        bl.run(["git", "init", "-q", str(d)])
         (d / "a").write_text("a\n")
-        run(["git", "add", "a"], cwd=d)
-        run(
+        bl.run(["git", "add", "a"], cwd=d)
+        bl.run(
             [
                 "git",
                 "-c",
@@ -259,7 +239,7 @@ def start_footprint(binary: str, logdir: Path) -> float | None:
             ],
             cwd=d,
         )
-    srv = Server(binary, d, logdir)
+    srv = bl.Server(binary, d, logdir)
     try:
         srv.wait_ready()
         return bl.footprint_mb(srv.pid)
@@ -282,14 +262,14 @@ def export(
     commits = repo.get("export_commits", DEFAULT_COMMITS)
     out = Path(base) / f"export-{repo['name']}"
     shutil.rmtree(out, ignore_errors=True)
-    quiet("export" if i == 1 else f"export#{i}", loads, wait, sampler)
+    bq.quiet("export" if i == 1 else f"export#{i}", loads, wait, sampler)
     t = time.perf_counter()
-    cmd = [binary, "--config", str(isolated_config(logdir)), "export", str(out)]
+    cmd = [binary, "--config", str(bl.isolated_config(logdir)), "export", str(out)]
     r = subprocess.run(
         [*cmd, "--commits", str(commits)], cwd=repo_dir, capture_output=True, text=True
     )
     secs = time.perf_counter() - t
-    res = {"secs": secs, "out_mb": dir_mb(out), "ok": r.returncode == 0}
+    res = {"secs": secs, "out_mb": bl.dir_mb(out), "ok": r.returncode == 0}
     res["commits"] = commits
     if r.returncode != 0:
         # The last stderr line says why: the page cap by design, or a real failure.
@@ -382,20 +362,20 @@ def disk_name():
     """Disk size and medium under the clone dir, e.g. "1.0 TB SSD". Off macOS, the size alone."""
     size = f"{shutil.disk_usage(Path.home()).total / 1e12:.1f} TB"
     try:
-        info = run(["diskutil", "info", "/"])
+        info = bl.run(["diskutil", "info", "/"])
     except (OSError, subprocess.CalledProcessError):
         return size
     return f"{size} SSD" if re.search(r"Solid State:\s+Yes", info) else size
 
 
 def machine(binary: str) -> Json:
-    stamp = run([binary, "--version"]).strip()
+    stamp = bl.run([binary, "--version"]).strip()
     ram = 0
     with contextlib.suppress(ValueError, OSError):
         ram = os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / 2**30
     cpu = platform.processor()
     try:
-        cpu = run(["sysctl", "-n", "machdep.cpu.brand_string"]).strip()
+        cpu = bl.run(["sysctl", "-n", "machdep.cpu.brand_string"]).strip()
     except (OSError, subprocess.CalledProcessError):
         for line in (
             Path("/proc/cpuinfo").read_text().splitlines()
@@ -415,7 +395,7 @@ def machine(binary: str) -> Json:
         "cpu": cpu,
         "cpus": os.cpu_count(),
         "ram_gb": round(ram, 1),
-        "git": run(["git", "--version"]).strip(),
+        "git": bl.run(["git", "--version"]).strip(),
         # The version and the build's own 7-hex commit, kept apart: the commit names what was
         # measured. Dirty is its own flag, never part of the version string.
         "gitterrace": bl.version_stamp(stamp),
@@ -426,15 +406,15 @@ def machine(binary: str) -> Json:
 
 def synthetic(base: str | Path) -> tuple[Json, Path]:
     d = Path(base) / "synthetic"
-    run(["git", "init", "-q", str(d)])
+    bl.run(["git", "init", "-q", str(d)])
     env = ["-c", "user.name=b", "-c", "user.email=b@example.com"]
     for i in range(30):
         f = d / "src" / "a" / "b" / f"f{i % 5}.rs"
         f.parent.mkdir(parents=True, exist_ok=True)
         f.write_text("".join(f"fn item_{i}_{n}() {{}}\n" for n in range(i + 3)))
-        run(["git", "add", "-A"], cwd=d)
-        run(["git", *env, "commit", "-q", "-m", f"commit {i}"], cwd=d)
-    sha = run(["git", "rev-parse", "HEAD"], cwd=d).strip()
+        bl.run(["git", "add", "-A"], cwd=d)
+        bl.run(["git", *env, "commit", "-q", "-m", f"commit {i}"], cwd=d)
+    sha = bl.run(["git", "rev-parse", "HEAD"], cwd=d).strip()
     return {
         "name": "synthetic",
         "class": "small",
@@ -475,9 +455,9 @@ def main():
     ap.add_argument(
         "--fetch-only", action="store_true", help="clone and backfill, time nothing"
     )
-    ap.add_argument("--runs", type=int, default=FULL_RUNS)
-    ap.add_argument("--idle-secs", type=int, default=FULL_IDLE_SECS)
-    ap.add_argument("--bin", default=str(ROOT / "target/release/git-terrace"))
+    ap.add_argument("--runs", type=int, default=bq.FULL_RUNS)
+    ap.add_argument("--idle-secs", type=int, default=bq.FULL_IDLE_SECS)
+    ap.add_argument("--bin", default=str(bl.ROOT / "target/release/git-terrace"))
     ap.add_argument(
         "--synthetic", action="store_true", help="tiny generated repo, one run (guard)"
     )
@@ -495,7 +475,7 @@ def main():
     a.bin = str(Path(a.bin).resolve())
     if not Path(a.bin).exists():
         sys.exit(f"no binary at {a.bin}, run `make build` (release) first")
-    corpus = parse_toml((ROOT / "tests/bench/corpus.toml").read_text())
+    corpus = bl.parse_toml((bl.ROOT / "tests/bench/corpus.toml").read_text())
     base = Path(
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
@@ -518,7 +498,7 @@ def main():
                 sys.exit(
                     f"{r['name']} is opt-in: set BENCH_LARGE=1 (about {r.get('need_gb')} GB)"
                 )
-            todo.append((r, ensure_clone(r, base, logdir)))
+            todo.append((r, bl.ensure_clone(r, base, logdir)))
     if a.fetch_only:
         print("fetched: " + ", ".join(r["name"] for r, _ in todo))
         return 0
@@ -535,7 +515,9 @@ def main():
     over, fails = [], []
     # Only a full run is published and repeats the cold phases. A smoke run (fewer runs, shorter
     # idle) samples once and stays in the cache.
-    full = not a.synthetic and a.runs == FULL_RUNS and a.idle_secs == FULL_IDLE_SECS
+    full = (
+        not a.synthetic and a.runs == bq.FULL_RUNS and a.idle_secs == bq.FULL_IDLE_SECS
+    )
     for repo, d in todo:
         res = bench_repo(
             repo,
@@ -546,7 +528,7 @@ def main():
             logdir,
             base,
             not a.synthetic,
-            int(repo.get("cold_samples", COLD_SAMPLES)) if full else 1,
+            int(repo.get("cold_samples", bq.COLD_SAMPLES)) if full else 1,
         )
         res["budget"] = judge(res, budgets(corpus))
         fails += bl.index_over(repo["name"], res["budget"])
@@ -560,7 +542,7 @@ def main():
     out_dir = (
         logdir
         if a.synthetic
-        else ROOT / "tests/bench/results"
+        else bl.ROOT / "tests/bench/results"
         if full
         else base / "runs"
     )
@@ -572,7 +554,10 @@ def main():
         prev = json.loads(path.read_text())
         result["repos"] = {**prev.get("repos", {}), **result["repos"]}
     # Own shas become HEAD everywhere but the machine record, which names the build's commit.
-    result = {**bl.scrub_own(result, bl.own_shas(ROOT)), "machine": result["machine"]}
+    result = {
+        **bl.scrub_own(result, bl.own_shas(bl.ROOT)),
+        "machine": result["machine"],
+    }
     path.write_text(json.dumps(result, indent=1, sort_keys=True) + "\n")
     print(f"wrote {path}")
     if a.synthetic:

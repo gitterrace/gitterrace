@@ -40,39 +40,13 @@ bl = importlib.import_module("bench-lib")
 bq = importlib.import_module("bench-quiet-lib")
 
 Json = dict[str, Any]
-ROOT = bc.ROOT
-DOC = bc.DOC
-DOCS = bc.DOCS
-RESULTS = bc.RESULTS
-NAME = bc.NAME
-KEEP = bc.KEEP
-COLD_SAMPLES = bc.COLD_SAMPLES
-corpus_repos = bc.corpus_repos
-corpus = bc.corpus
-corpus_list = bc.corpus_list
-normalize = bc.normalize
-dumps = bc.dumps
-run_name = bc.run_name
-runs = bc.runs
-load = bc.load
-charts = bc.charts
-picture = bc.picture
-QUIET_NOTE = bd.QUIET_NOTE
-shown = bd.shown
-withheld_lines = bd.withheld_lines
-published = bd.published
-expected = bd.expected
-render = bd.render
-spliced = bd.spliced
-actual = bd.actual
-stray = bd.stray
 _own: set[str] = set()
 
 
 def own_commits() -> set[str]:
     """Every commit of this repository, read once."""
     if not _own:
-        _own.update(bl.own_shas(ROOT))
+        _own.update(bl.own_shas(bc.ROOT))
     return _own
 
 
@@ -102,7 +76,6 @@ def gate_test() -> None:
 
 
 # What the memory gate reads, see bench-chart-lib SOURCES.
-MEASURE = bl.footprint_mb
 CHILD = """
 import mmap, sys, time
 path, heap = sys.argv[1], int(sys.argv[2])
@@ -145,7 +118,7 @@ def memory_measure_test() -> None:
                     sys.exit(
                         "bench-report self-test failed: memory child did not start"
                     )
-                got.append(MEASURE(p.pid) or 0.0)
+                got.append(bl.footprint_mb(p.pid) or 0.0)
             finally:
                 p.kill()
                 p.wait()
@@ -166,10 +139,10 @@ def self_test() -> None:
         bad.parent.mkdir()
         bad.write_bytes(b"\x00\x80\xff not utf-8")
         (Path(d) / "a.json").write_text("{}")
-        got = stray(Path(d))
+        got = bd.stray(Path(d))
         if got != [
             f"unexpected file: {bad.relative_to(Path(d).parent.parent)}"
-        ] or actual(Path(d)) != {Path(d) / "a.json"}:
+        ] or bd.actual(Path(d)) != {Path(d) / "a.json"}:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
     own_load_test()
@@ -245,10 +218,10 @@ def commit_test() -> None:
 def page_test() -> None:
     """The pages show every measured repo (a withheld one as withheld) and name nothing that is
     not kept, nor any tracker id."""
-    raw = published()[-1]
-    kept = shown(raw)
+    raw = bd.published()[-1]
+    kept = bd.shown(raw)
     names = [n for n in raw["repos"]]
-    files, dates = {f"{run_name(raw)}.json"}, {raw["when"][:10]}
+    files, dates = {f"{bc.run_name(raw)}.json"}, {raw["when"][:10]}
     text = bd.results_readme([kept]) + bd.render()
     if got := page_problems(text, names, files, dates):
         sys.exit(f"bench-report self-test failed: a clean page was flagged: {got}")
@@ -266,7 +239,9 @@ def page_test() -> None:
     ]:
         if not any(want in e for e in page_problems(tweak, names, files, dates)):
             sys.exit(f"bench-report self-test failed: {label} passed the page guard")
-    withheld = shown({**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}})
+    withheld = bd.shown(
+        {**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}}
+    )
     if not withheld["held"] or any(
         n not in bd.results_readme([withheld]) for n in names
     ):
@@ -323,12 +298,14 @@ def loud_test() -> None:
             load["sampled"] = {"index": {"max": peak, "mean": 2.0, "n": 3}}
         return {"load": load}
 
-    view = shown({"repos": {"quiet": repo(4.9), "loud": repo(41.0), "old": repo(None)}})
+    view = bd.shown(
+        {"repos": {"quiet": repo(4.9), "loud": repo(41.0), "old": repo(None)}}
+    )
     if list(view["repos"]) != ["quiet", "old"] or view["withheld"] != {
         "loud": ["index"]
     }:
         sys.exit(f"bench-report self-test failed: loud phase published: {view}")
-    if QUIET_NOTE not in "".join(withheld_lines(view)):
+    if bd.QUIET_NOTE not in "".join(bd.withheld_lines(view)):
         sys.exit("bench-report self-test failed: withheld repo not named")
 
 
@@ -401,7 +378,7 @@ def pins() -> list[str]:
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
     errs: list[str] = []
-    for r in corpus_repos():
+    for r in bc.corpus_repos():
         d = base / f"{r['name']}.git"
         if r.get("sha") and (d / "bench-ready").exists():
             ok = subprocess.run(
@@ -426,13 +403,13 @@ def newest_ok(run: Json) -> list[str]:
         and c != bd.PENDING
         and not any(s.startswith(c) for s in own_commits())
     ):
-        errs.append(f"{run_name(run)}: machine.commit {c} is not in this history")
+        errs.append(f"{bc.run_name(run)}: machine.commit {c} is not in this history")
     if (m.get("dirty") or "dirty" in m.get("gitterrace", "")) and not run.get("note"):
-        errs.append(f"{run_name(run)}: measured a -dirty build")
+        errs.append(f"{bc.run_name(run)}: measured a -dirty build")
     for n, r in run["repos"].items():
         load = r.get("load")
         if not load:
-            errs.append(f"{run_name(run)}: {n} recorded no load")
+            errs.append(f"{bc.run_name(run)}: {n} recorded no load")
             continue
         for phase, v in load["phases"].items():
             if phase != "background" and v >= load["limit"]:
@@ -450,10 +427,10 @@ def footprint(run: Json) -> list[str]:
         m = r.get("memory", {})
         for key in ("footprint_idle_mb", "footprint_start_mb"):
             if m.get(key) is None:
-                errs.append(f"{run_name(run)}: {n} recorded no memory.{key}")
+                errs.append(f"{bc.run_name(run)}: {n} recorded no memory.{key}")
         if m.get("footprint_releases", 0) < 1:
             errs.append(
-                f"{run_name(run)}: {n} read its footprint before an idle release"
+                f"{bc.run_name(run)}: {n} read its footprint before an idle release"
             )
     return errs
 
@@ -461,20 +438,21 @@ def footprint(run: Json) -> list[str]:
 def cold_samples(run: Json) -> list[str]:
     """Cold metrics need COLD_SAMPLES samples, or the count corpus.toml allows for the repo."""
     allowed = {
-        r["name"]: int(r.get("cold_samples", COLD_SAMPLES)) for r in corpus_repos()
+        r["name"]: int(r.get("cold_samples", bc.COLD_SAMPLES))
+        for r in bc.corpus_repos()
     }
     return [
-        f"{run_name(run)}: {n} has {r.get('cold_samples', 1)} cold sample(s), "
-        f"needs {allowed.get(n, COLD_SAMPLES)}"
+        f"{bc.run_name(run)}: {n} has {r.get('cold_samples', 1)} cold sample(s), "
+        f"needs {allowed.get(n, bc.COLD_SAMPLES)}"
         for n, r in run["repos"].items()
-        if r.get("cold_samples", 1) < allowed.get(n, COLD_SAMPLES)
+        if r.get("cold_samples", 1) < allowed.get(n, bc.COLD_SAMPLES)
     ]
 
 
 def no_inline_svg() -> list[str]:
     return [
-        f"{p.relative_to(ROOT)}: inline <svg>, link a file through <picture> instead"
-        for p in sorted(DOCS.rglob("*.md"))
+        f"{p.relative_to(bc.ROOT)}: inline <svg>, link a file through <picture> instead"
+        for p in sorted(bc.DOCS.rglob("*.md"))
         if re.search(r"<svg[\s>]", p.read_text())
     ]
 
@@ -485,9 +463,9 @@ def no_hostname(paths: list[Path]) -> list[str]:
     for p in paths:
         text = p.read_text().lower()
         if p.suffix == ".json" and '"host"' in text:
-            errs.append(f"{p.relative_to(ROOT)}: has a host field")
+            errs.append(f"{p.relative_to(bc.ROOT)}: has a host field")
         if host and re.search(rf"\b{re.escape(host)}\b", p.name.lower() + "\n" + text):
-            errs.append(f"{p.relative_to(ROOT)}: contains the hostname")
+            errs.append(f"{p.relative_to(bc.ROOT)}: contains the hostname")
     return errs
 
 
@@ -495,9 +473,9 @@ def own_ids() -> list[str]:
     """No result names a commit of gitterrace's own history except the build commit in the
     machine record: the control repo is measured at HEAD and the run date names it. Upstream
     corpus shas stay."""
-    own = bl.own_shas(ROOT)
+    own = bl.own_shas(bc.ROOT)
     errs: list[str] = []
-    for p in runs():
+    for p in bc.runs():
         rest = {k: v for k, v in json.loads(p.read_text()).items() if k != "machine"}
         if bl.scrub_own(rest, own) != rest:
             errs.append(f"{p.name}: names a commit of this repository")
@@ -505,32 +483,32 @@ def own_ids() -> list[str]:
 
 
 def check(text: str, new: str) -> None:
-    want = expected()
-    newest = published()[-1]
+    want = bd.expected()
+    newest = bd.published()[-1]
     errs = pins() + no_inline_svg() + newest_ok(newest) + cold_samples(newest)
     errs += footprint(newest)
-    errs += bl.phase_cpu(newest, run_name(newest))
+    errs += bl.phase_cpu(newest, bc.run_name(newest))
     errs += [
         f"{p.name}: name is not <date>-<machine>.json"
-        for p in runs()
-        if not NAME.fullmatch(p.name)
+        for p in bc.runs()
+        if not bc.NAME.fullmatch(p.name)
     ]
-    errs += stray()
+    errs += bd.stray()
     errs += own_ids()
-    errs += no_hostname(sorted(actual()) + [DOC])
+    errs += no_hostname(sorted(bd.actual()) + [bc.DOC])
     for p, body in want.items():
         if not p.exists() or p.read_text() != body:
-            errs.append(f"{p.relative_to(ROOT)}: stale or missing")
+            errs.append(f"{p.relative_to(bc.ROOT)}: stale or missing")
     errs += [
-        f"{p.relative_to(ROOT)}: left over from an older run"
-        for p in actual() - set(want)
+        f"{p.relative_to(bc.ROOT)}: left over from an older run"
+        for p in bd.actual() - set(want)
     ]
     pages = "\n".join(body for p, body in want.items() if p.suffix == ".md") + new
     errs += page_problems(
         pages,
-        list(published()[-1]["repos"]),
-        {p.name for p in runs()},
-        {run["when"][:10] for run in published()},
+        list(bd.published()[-1]["repos"]),
+        {p.name for p in bc.runs()},
+        {run["when"][:10] for run in bd.published()},
     )
     if new != text:
         errs.append("docs/benchmarks.md#results is stale")
@@ -541,51 +519,52 @@ def check(text: str, new: str) -> None:
 
 def write() -> None:
     """Normalize the kept runs, render their charts, drop older runs, rewrite the doc."""
-    files = runs()
-    want = expected()
-    for p in files[:-KEEP]:
+    files = bc.runs()
+    want = bd.expected()
+    for p in files[: -bc.KEEP]:
         p.unlink()
-    for p in files[-KEEP:]:
+    for p in files[-bc.KEEP :]:
         if p not in want:
             p.unlink()
-    for d in RESULTS.iterdir():
+    for d in bc.RESULTS.iterdir():
         if d.is_dir() and not any(p.parent == d for p in want):
             shutil.rmtree(d)
-    for p in actual() - set(want):
+    for p in bd.actual() - set(want):
         p.unlink()
     for p, body in want.items():
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(body)
-    DOC.write_text(spliced(DOC.read_text(), render()))
+    bc.DOC.write_text(bd.spliced(bc.DOC.read_text(), bd.render()))
     print(
-        f"updated {DOC.relative_to(ROOT)} and tests/bench/results from {len(published())} run(s)"
+        f"updated {bc.DOC.relative_to(bc.ROOT)} and tests/bench/results "
+        f"from {len(bd.published())} run(s)"
     )
 
 
 def main() -> None:
     args = sys.argv[1:]
     if "--corpus" in args:
-        sys.stdout.write(corpus_list())
+        sys.stdout.write(bc.corpus_list())
         return
     if "--self-test" in args:
         self_test()
         return
     if "--normalize" in args:
         src = Path(args[args.index("--normalize") + 1])
-        run = normalize(load(src))
-        dst = src.with_name(f"{run_name(run)}.json")
-        dst.write_text(dumps(run))
+        run = bc.normalize(bc.load(src))
+        dst = src.with_name(f"{bc.run_name(run)}.json")
+        dst.write_text(bc.dumps(run))
         if dst != src:
             src.unlink()
         print(f"wrote {dst}")
         return
-    corpus()
-    body = render()
+    bc.corpus()
+    body = bd.render()
     if "--print" in args:
         sys.stdout.write(body)
         return
-    text = DOC.read_text()
-    new = spliced(text, body)
+    text = bc.DOC.read_text()
+    new = bd.spliced(text, body)
     if "--check" in args:
         check(text, new)
         return
