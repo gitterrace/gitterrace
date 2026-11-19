@@ -201,3 +201,32 @@ async fn generated_files_fold_in_the_working_tree_by_the_attributes_at_head() {
     assert!(!hand.contains("Generated"), "{hand}");
     assert!(hand.contains("class=\"diffwrap\""), "{hand}");
 }
+
+/// Each tab lists only its scope's files, counts show on every tab, and folded-file URLs keep
+/// the scope so the loaded body matches the tab.
+#[tokio::test]
+async fn worktree_scope_tabs_filter_files_and_keep_scope_in_links() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join("staged.txt"), "s\n").expect("write");
+    gitterrace_testkit::git(&p, &["add", "staged.txt"]);
+    std::fs::write(p.join("loose.txt"), "u\n").expect("write");
+    let r = router(&p, Config::default());
+    let (_, all) = get(&r, "/worktree").await;
+    assert!(
+        all.contains("staged.txt") && all.contains("loose.txt"),
+        "{all}"
+    );
+    let (_, st) = get(&r, "/worktree?scope=staged").await;
+    assert!(
+        st.contains("staged.txt") && !st.contains("loose.txt"),
+        "{st}"
+    );
+    assert!(st.contains("/worktree?scope=unstaged"), "{st}");
+    assert!(st.contains("Staged (1)") && st.contains("All (2)"), "{st}");
+    let (_, un) = get(&r, "/worktree?scope=unstaged").await;
+    assert!(
+        un.contains("loose.txt") && !un.contains("staged.txt"),
+        "{un}"
+    );
+}

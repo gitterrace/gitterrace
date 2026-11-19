@@ -4,7 +4,8 @@
 
 1. Run `git terrace` in the repository and open the address it prints.
 2. Click **Working tree** in the header, or open `/worktree`. It shows each
-   uncommitted file and its diff.
+   uncommitted file and its diff. The **Staged**, **Unstaged** and **All**
+   tabs show what the next commit holds, what it leaves out, or both.
 3. Select the lines a finding is about and press `.`.
 4. Pick a **Send to** target, add a note and press Send.
 

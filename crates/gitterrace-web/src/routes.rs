@@ -468,6 +468,7 @@ struct WorktreePage {
     files: Vec<WorktreeFileRow>,
     diff: String,
     clean: bool,
+    tabs: Vec<crate::worktree_scope::Tab>,
     adds: String,
     dels: String,
 }
@@ -479,8 +480,12 @@ struct WorktreeFileRow {
     blob: String,
 }
 
-async fn worktree(State(app): Shared) -> Result<Html<String>> {
-    let p = blocking(&app, |a| {
+async fn worktree(
+    State(app): Shared,
+    Query(q): Query<crate::worktree_scope::ScopeQuery>,
+) -> Result<Html<String>> {
+    let scope = q.scope();
+    let p = blocking(&app, move |a| {
         // Taken before the diff: an edit in between shows once more, never not at all. The
         // oldest render not yet compared stays: a newer one may already hold an edit an older
         // tab has not seen.
@@ -490,7 +495,8 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
         {
             *g = sig;
         }
-        let files = gitterrace_git::worktree_diff(&a.repo)?;
+        let files = gitterrace_git::worktree_diff_scoped(&a.repo, scope)?;
+        let tabs = crate::worktree_scope::tabs(scope, gitterrace_git::worktree_counts(&a.repo)?);
         let (adds, dels) = files
             .iter()
             .fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
@@ -515,10 +521,12 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
             head: crate::pagehead::worktree_head(files.len(), adds.into(), dels.into()),
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
+            tabs,
             diff: views::diff_html_with(
                 &views::Render::of(a),
                 views::DiffSource::Worktree {
                     generated: &views::worktree_generated(&a.repo, &files),
+                    scope,
                 },
                 &files,
             ),

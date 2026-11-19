@@ -29,14 +29,43 @@ fn open(repo: &Repo) -> Result<gix::Repository> {
     gix::open(repo.git_dir()).map_err(git)
 }
 
+/// Which pair of states the working tree page compares.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum Scope {
+    /// HEAD against the worktree: everything uncommitted.
+    #[default]
+    All,
+    /// HEAD against the index.
+    Staged,
+    /// The index against the worktree, untracked files included.
+    Unstaged,
+}
+
+/// How many files each [`Scope`] lists.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ScopeCounts {
+    pub all: usize,
+    pub staged: usize,
+    pub unstaged: usize,
+}
+
 /// Paths that differ between HEAD, the index and the worktree, sorted.
 fn changed_paths(repo: &gix::Repository, limit: usize) -> Result<BTreeSet<String>> {
+    scoped_paths(repo, Scope::All, limit)
+}
+
+/// The paths of one scope, sorted, stopping at `limit`.
+fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BTreeSet<String>> {
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
 
     let mut out = BTreeSet::new();
     // A bare repository has no working tree to differ from HEAD, and diffing HEAD against its
     // empty index would walk the whole tree on every watcher tick.
     if repo.workdir().is_none() {
+        return Ok(out);
+    }
+    if scope == Scope::Staged {
+        staged_paths(repo, &mut out, limit)?;
         return Ok(out);
     }
     let iter = repo
@@ -70,8 +99,21 @@ fn changed_paths(repo: &gix::Repository, limit: usize) -> Result<BTreeSet<String
             return Ok(out);
         }
     }
-    staged_paths(repo, &mut out, limit)?;
+    if scope == Scope::All {
+        staged_paths(repo, &mut out, limit)?;
+    }
     Ok(out)
+}
+
+/// The file count of every scope, from the path passes alone (no file is read).
+pub fn worktree_counts(repo: &Repo) -> Result<ScopeCounts> {
+    let r = open(repo)?;
+    let limit = repo.worktree_files();
+    Ok(ScopeCounts {
+        all: scoped_paths(&r, Scope::All, limit)?.len(),
+        staged: scoped_paths(&r, Scope::Staged, limit)?.len(),
+        unstaged: scoped_paths(&r, Scope::Unstaged, limit)?.len(),
+    })
 }
 
 /// Adds the paths staged against HEAD to `out`, stopping once it holds `limit`: a huge staged
@@ -163,16 +205,28 @@ pub fn is_dirty(repo: &Repo) -> bool {
 }
 
 /// Every uncommitted file as a diff against HEAD.
-///
-/// Only exact renames are paired, see `pair::exact_moves`. Files are read and diffed one at a
-/// time, so the bytes held at once are one file's old and new side, not the whole change.
 pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
+    worktree_diff_scoped(repo, Scope::All)
+}
+
+/// The files of one [`Scope`] as diffs: HEAD..index for `Staged`, index..worktree for
+/// `Unstaged` (untracked files are additions), HEAD..worktree for `All`.
+///
+/// Only `All` pairs exact renames, see `pair::exact_moves`: it reads HEAD and the disk, so it
+/// would mislabel a half-staged move. Files are read and diffed one at a time, so the bytes
+/// held at once are one file's old and new side, not the whole change.
+pub fn worktree_diff_scoped(repo: &Repo, scope: Scope) -> Result<Vec<FileDiff>> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    let paths = changed_paths(&r, repo.worktree_files())?;
+    let paths = scoped_paths(&r, scope, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let index = r.index_or_empty().map_err(git)?;
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
-    let moves = pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths, big);
+    let moves = if scope == Scope::All {
+        pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths, big)
+    } else {
+        pair::Moves::default()
+    };
     let mut out = Vec::new();
     for path in &paths {
         if moves.sources.contains(path.as_str()) {
@@ -186,15 +240,30 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
             });
             continue;
         }
-        let old = head
-            .as_ref()
-            .map_or(Read::Missing, |t| head_blob(&r, t, path, big));
-        let new = root
-            .as_deref()
-            .map_or(Read::Skip, |w| read_worktree(w, path, big));
+        let (old, new) = sides(&r, scope, head.as_ref(), &index, root.as_deref(), path, big);
         out.extend(classify(path, &old, &new));
     }
     Ok(out)
+}
+
+/// The two sides of `path` that `scope` compares.
+fn sides(
+    r: &gix::Repository,
+    scope: Scope,
+    head: Option<&gix::Tree<'_>>,
+    index: &gix::index::File,
+    root: Option<&Path>,
+    path: &str,
+    big: u64,
+) -> (Read, Read) {
+    let from_head = || head.map_or(Read::Missing, |t| head_blob(r, t, path, big));
+    let from_index = || index_blob(r, index, path, big);
+    let from_disk = || root.map_or(Read::Skip, |w| read_worktree(w, path, big));
+    match scope {
+        Scope::All => (from_head(), from_disk()),
+        Scope::Staged => (from_head(), from_index()),
+        Scope::Unstaged => (from_index(), from_disk()),
+    }
 }
 
 /// The working-tree bytes of one changed file, for the image previews of the working tree page.
@@ -236,6 +305,15 @@ pub fn worktree_blob(repo: &Repo, path: &str, max: u64) -> Result<Option<(Blob, 
 /// `None` unless `path` is one of the page's changed files, so an ignored file, anything
 /// under `.git` or a path with `..` is never read, whatever the URL asks for.
 pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
+    worktree_file_diff_scoped(repo, path, Scope::All)
+}
+
+/// [`worktree_file_diff`] for one [`Scope`]: `None` unless `path` is changed in that scope.
+pub fn worktree_file_diff_scoped(
+    repo: &Repo,
+    path: &str,
+    scope: Scope,
+) -> Result<Option<FileDiff>> {
     let plain = path
         .split('/')
         .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"));
@@ -244,17 +322,13 @@ pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
     }
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    if !changed_paths(&r, repo.worktree_files())?.contains(path) {
+    if !scoped_paths(&r, scope, repo.worktree_files())?.contains(path) {
         return Ok(None);
     }
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let index = r.index_or_empty().map_err(git)?;
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
-    let old = head
-        .as_ref()
-        .map_or(Read::Missing, |t| head_blob(&r, t, path, big));
-    let new = root
-        .as_deref()
-        .map_or(Read::Skip, |w| read_worktree(w, path, big));
+    let (old, new) = sides(&r, scope, head.as_ref(), &index, root.as_deref(), path, big);
     Ok(classify(path, &old, &new))
 }
 
@@ -284,7 +358,20 @@ fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str, big: u64)
     if mode.is_tree() || mode.is_commit() {
         return Read::Missing;
     }
-    let id = entry.object_id();
+    blob_read(repo, entry.object_id(), big)
+}
+
+fn index_blob(repo: &gix::Repository, index: &gix::index::File, path: &str, big: u64) -> Read {
+    let Some(e) = index.entry_by_path(path.into()) else {
+        return Read::Missing;
+    };
+    if e.mode.is_submodule() || e.mode.is_sparse() {
+        return Read::Missing;
+    }
+    blob_read(repo, e.id, big)
+}
+
+fn blob_read(repo: &gix::Repository, id: gix::ObjectId, big: u64) -> Read {
     match repo.find_header(id) {
         Ok(h) if h.size() > big => Read::Big,
         Ok(_) => repo
@@ -428,124 +515,4 @@ fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) 
 #[cfg(test)]
 mod pair_tests;
 #[cfg(test)]
-mod tests {
-    use gitterrace_testkit::git;
-
-    use crate::{ChangeKind, Repo, worktree_diff};
-
-    #[test]
-    fn a_bare_repository_is_never_dirty() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let src = dir.path().join("src");
-        std::fs::create_dir(&src).expect("mkdir");
-        git(&src, &["init", "-q", "-b", "main"]);
-        std::fs::write(src.join("a.txt"), "1\n").expect("write");
-        git(&src, &["add", "."]);
-        git(&src, &["commit", "-qm", "init"]);
-        let bare = dir.path().join("bare.git");
-        git(
-            dir.path(),
-            &["clone", "-q", "--bare", "src", bare.to_str().expect("utf8")],
-        );
-        let repo = Repo::discover(&bare).expect("repo");
-        assert!(!crate::is_dirty(&repo));
-        assert_eq!(crate::worktree_signature(&repo).expect("sig"), 0);
-        assert!(worktree_diff(&repo).expect("diff").is_empty());
-    }
-
-    #[test]
-    fn shows_staged_unstaged_untracked_and_deleted() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        for (n, c) in [("a.txt", "1\n2\n3\n"), ("b.txt", "x\n"), ("c.txt", "y\n")] {
-            std::fs::write(p.join(n), c).expect("write");
-        }
-        git(p, &["add", "."]);
-        git(p, &["commit", "-qm", "init"]);
-        let repo = Repo::discover(p).expect("repo");
-        assert!(!crate::is_dirty(&repo));
-        std::fs::write(p.join("a.txt"), "1\ntwo\n3\n").expect("write");
-        std::fs::write(p.join("b.txt"), "staged\n").expect("write");
-        git(p, &["add", "b.txt"]);
-        std::fs::remove_file(p.join("c.txt")).expect("rm");
-        std::fs::write(p.join("new.txt"), "n\n").expect("write");
-        assert!(crate::is_dirty(&repo));
-        let d = worktree_diff(&repo).expect("diff");
-        let kind = |n: &str| d.iter().find(|f| f.path == n).map(|f| f.kind);
-        assert_eq!(kind("a.txt"), Some(ChangeKind::Modified));
-        assert_eq!(kind("b.txt"), Some(ChangeKind::Modified));
-        assert_eq!(kind("c.txt"), Some(ChangeKind::Deleted));
-        assert_eq!(kind("new.txt"), Some(ChangeKind::Added));
-        let a = d.iter().find(|f| f.path == "a.txt").expect("a");
-        assert_eq!((a.additions, a.deletions), (1, 1));
-        assert!(!p.join(".git/index.lock").exists());
-    }
-
-    #[test]
-    fn signature_moves_on_edit_and_new_file_only() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        std::fs::write(p.join("a.txt"), "1\n").expect("write");
-        git(p, &["add", "."]);
-        git(p, &["commit", "-qm", "init"]);
-        let repo = Repo::discover(p).expect("repo");
-        let sig = || crate::worktree_signature(&repo).expect("sig");
-        let clean = sig();
-        assert_eq!(sig(), clean, "an untouched tree is stable");
-        std::fs::write(p.join("a.txt"), "changed\n").expect("write");
-        let edited = sig();
-        assert_ne!(edited, clean, "editing a tracked file");
-        std::fs::write(p.join("a.txt"), "changed again\n").expect("write");
-        let again = sig();
-        assert_ne!(again, edited, "editing a modified file again");
-        std::fs::write(p.join("new.txt"), "n\n").expect("write");
-        assert_ne!(sig(), again, "a new untracked file");
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn large_file_listed_without_reading_it() {
-        use std::os::unix::fs::PermissionsExt;
-        let dir = tempfile::tempdir().expect("tempdir");
-        let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        std::fs::write(p.join("a.txt"), "a\n").expect("write");
-        git(p, &["add", "."]);
-        git(p, &["commit", "-qm", "init"]);
-        // Unreadable, so any read fails and the file would be skipped: listing it proves
-        // the size cap ran on metadata alone.
-        let big = p.join("dump.sql");
-        std::fs::File::create(&big)
-            .and_then(|f| f.set_len(2 * super::WORKTREE_DIFF_BYTES))
-            .expect("sparse");
-        std::fs::set_permissions(&big, std::fs::Permissions::from_mode(0o000)).expect("chmod");
-        let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");
-        let f = d.iter().find(|f| f.path == "dump.sql").expect("listed");
-        assert!(f.binary && f.hunks.is_empty());
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn symlinked_directory_is_not_followed() {
-        let outside = tempfile::tempdir().expect("tempdir");
-        std::fs::write(outside.path().join("secret.txt"), "secret\n").expect("write");
-        let dir = tempfile::tempdir().expect("tempdir");
-        let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        std::fs::create_dir(p.join("docs")).expect("dir");
-        std::fs::write(p.join("docs/secret.txt"), "public\n").expect("write");
-        git(p, &["add", "."]);
-        git(p, &["commit", "-qm", "init"]);
-        std::fs::remove_dir_all(p.join("docs")).expect("rm");
-        std::os::unix::fs::symlink(outside.path(), p.join("docs")).expect("link");
-        let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");
-        let leaked = d
-            .iter()
-            .flat_map(|f| &f.hunks)
-            .flat_map(|h| &h.lines)
-            .any(|l| l.text.contains("secret"));
-        assert!(!leaked, "{d:?}");
-    }
-}
+mod tests;

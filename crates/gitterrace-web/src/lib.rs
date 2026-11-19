@@ -60,6 +60,7 @@ mod settings;
 mod settings_actions;
 mod settings_page;
 pub mod sitemap;
+mod worktree_scope;
 
 /// The markdown options every render path parses with, so the app and the site cannot drift.
 pub fn markdown_options() -> pulldown_cmark::Options {
