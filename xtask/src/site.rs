@@ -303,21 +303,24 @@ pub(crate) fn outline_script() -> String {
 /// The CSP source for [`SCRIPTS`]: the sha256 of each, so exactly those run and any other,
 /// inline or loaded, fails loudly in the browser instead of quietly shipping.
 fn script_hashes() -> String {
-    use base64::Engine as _;
-    use sha2::Digest as _;
     SCRIPTS
         .iter()
         .map(|s| (*s).to_owned())
         .chain([outline_script()])
-        .map(|s| {
-            let sum = sha2::Sha256::digest(s.as_bytes());
-            format!(
-                "'sha256-{}'",
-                base64::engine::general_purpose::STANDARD.encode(sum)
-            )
-        })
+        .map(|s| csp_hash(&s))
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+/// The sha256 CSP source of an inline script body.
+fn csp_hash(body: &str) -> String {
+    use base64::Engine as _;
+    use sha2::Digest as _;
+    let sum = sha2::Sha256::digest(body.as_bytes());
+    format!(
+        "'sha256-{}'",
+        base64::engine::general_purpose::STANDARD.encode(sum)
+    )
 }
 
 /// The files the static host reads beside the page: response headers, the 404 page, the

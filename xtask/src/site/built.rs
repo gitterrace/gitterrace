@@ -125,17 +125,6 @@ fn a_planted_dead_sitemap_url_redirect_or_font_is_reported() {
     assert_eq!(bad.lines().count(), 3, "{bad}");
 }
 
-/// The sha256 CSP source of an inline script body.
-fn csp_hash(body: &str) -> String {
-    use base64::Engine as _;
-    use sha2::Digest as _;
-    let sum = sha2::Sha256::digest(body.as_bytes());
-    format!(
-        "'sha256-{}'",
-        base64::engine::general_purpose::STANDARD.encode(sum)
-    )
-}
-
 /// Everything the built pages do that the `_headers` CSP would refuse or that weakens it: an
 /// inline script without its hash, `unsafe-inline`, an external origin in the policy, a `<style>`
 /// or `style=` (style-src is 'self'), a `<script src>`, or a `<link>` off this site.
