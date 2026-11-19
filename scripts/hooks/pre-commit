@@ -1,4 +1,25 @@
 #!/usr/bin/env bash
 # The shared pre-commit hook (vendor/schwarzwald/kit/hooks), kept here so core.hooksPath stays one
 # dir:   git config core.hooksPath scripts/hooks
-exec "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/vendor/schwarzwald/kit/hooks/pre-commit" "$@"
+# Before it, the staged shell scripts must be shfmt-clean at make lint's indent, so an
+# unformatted script fails here and not at landing. The kit's own files are its gate's.
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+staged=()
+# A read loop, not mapfile: macOS ships bash 3.2.
+while IFS= read -r -d '' f; do staged+=("$f"); done < <(git diff --cached --name-only \
+  --diff-filter=ACMR -z -- '*.sh' ':!:vendor/schwarzwald/kit/**')
+if [[ ${#staged[@]} -gt 0 ]]; then
+  if command -v shfmt >/dev/null 2>&1; then
+    # The staged content, not the worktree: a fix left unstaged does not pass.
+    for f in "${staged[@]}"; do
+      git show ":$f" | shfmt -d -i 2 --filename "$f" || {
+        echo "pre-commit: $f is not shfmt -i 2 clean: shfmt -w -i 2 $f, then stage it" >&2
+        exit 1
+      }
+    done
+  else
+    echo "pre-commit: shfmt not installed, staged shell scripts not format-checked (make deps)" >&2
+  fi
+fi
+exec "$root/vendor/schwarzwald/kit/hooks/pre-commit" "$@"
