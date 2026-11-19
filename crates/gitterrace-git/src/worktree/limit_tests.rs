@@ -25,6 +25,18 @@ fn worktree_files_caps_the_listed_files() {
 }
 
 #[test]
+fn worktree_files_caps_staged_files_too() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = dirty_repo(dir.path());
+    // Staged and unchanged since, so only the tree-to-index pass sees them.
+    git(dir.path(), &["add", "."]);
+    let r = super::open(&repo).expect("open");
+    assert_eq!(super::changed_paths(&r, 100).expect("paths").len(), 5);
+    assert_eq!(super::changed_paths(&r, 2).expect("paths").len(), 2);
+    assert!(super::is_dirty(&repo), "one staged file is dirty");
+}
+
+#[test]
 fn worktree_diff_bytes_lists_larger_files_without_hunks() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = dirty_repo(dir.path());

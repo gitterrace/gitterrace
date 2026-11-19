@@ -42,14 +42,8 @@ pub(super) async fn raw(
     Path((rev, path)): Path<(String, String)>,
 ) -> Result<Response> {
     let name = path.trim_matches('/').to_owned();
-    let (limit, budget) = (app.cfg().limits.raw_mb, app.cfg().limits.raw_concurrent_mb);
-    // Reserved before the read and held until the body is sent: gix inflates whole objects,
-    // so the budget bounds the bytes in memory, not the bytes on the wire.
-    let permit = Arc::clone(&app.env.raw_budget)
-        // Never more than the whole budget, so a budget below raw_mb serves one at a time.
-        .acquire_many_owned(u32::try_from(limit.min(budget)).unwrap_or(1))
-        .await
-        .map_err(|_| std::io::Error::other("raw budget closed"))?;
+    let limit = app.cfg().limits.raw_mb;
+    let permit = raw_permit(&app).await?;
     let loaded = blocking(&app, move |a| {
         // One resolve and one tree walk; the header size comes before any content read.
         let blob = a.repo.raw_blob(&rev, &name, |id, size| {
@@ -90,6 +84,19 @@ pub(super) async fn raw(
         Raw::Bytes(bytes, tag) => (bytes, tag),
     };
     Ok(media_response(&path, held(bytes, permit), Some(&tag)))
+}
+
+/// A share of `limits.raw_concurrent_mb` for one raw response, reserved before the read and
+/// held until the body is sent: gix inflates whole objects and a working tree file is read
+/// whole, so the budget bounds the bytes in memory, not the bytes on the wire. `/raw` and
+/// `/worktree/raw` both take it here.
+async fn raw_permit(app: &crate::app::App) -> Result<OwnedSemaphorePermit> {
+    let (limit, budget) = (app.cfg().limits.raw_mb, app.cfg().limits.raw_concurrent_mb);
+    Ok(Arc::clone(&app.env.raw_budget)
+        // Never more than the whole budget, so a budget below raw_mb serves one at a time.
+        .acquire_many_owned(u32::try_from(limit.min(budget)).unwrap_or(1))
+        .await
+        .map_err(|_| std::io::Error::other("raw budget closed"))?)
 }
 
 /// A body of `bytes` that keeps `permit` until the bytes are handed on, or the client leaves.
@@ -169,6 +176,7 @@ fn media_response(path: &str, bytes: impl Into<Body>, tag: Option<&str>) -> Resp
 /// as not found; a public server never routes here (`public.rs`).
 pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -> Result<Response> {
     let name = path.trim_matches('/').to_owned();
+    let permit = raw_permit(&app).await?;
     let limit = app.cfg().limits.raw_mb << 20;
     let bytes = blocking(&app, move |a| {
         Ok(gitterrace_git::worktree_bytes(&a.repo, &name, limit)?)
@@ -176,7 +184,7 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
     .await?;
     Ok(bytes.map_or_else(
         || crate::error::not_found("This file is not a changed file of the working tree."),
-        |b| media_response(&path, b, None),
+        |b| media_response(&path, held(b, permit), None),
     ))
 }
 

@@ -68,11 +68,13 @@ fn changed_paths(repo: &gix::Repository, limit: usize) -> Result<BTreeSet<String
             return Ok(out);
         }
     }
-    staged_paths(repo, &mut out)?;
+    staged_paths(repo, &mut out, limit)?;
     Ok(out)
 }
 
-fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>) -> Result<()> {
+/// Adds the paths staged against HEAD to `out`, stopping once it holds `limit`: a huge staged
+/// change must stay as cheap as a huge untracked tree.
+fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>, limit: usize) -> Result<()> {
     let head_tree = repo.head_tree_id_or_empty().map_err(git)?;
     let index = repo.index_or_empty().map_err(git)?;
     repo.tree_index_status(
@@ -82,7 +84,11 @@ fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>) -> Result<()
         gix::status::tree_index::TrackRenames::Disabled,
         |change, _, _| {
             out.insert(change.location().to_str_lossy().into_owned());
-            Ok(std::ops::ControlFlow::Continue(()))
+            Ok(if out.len() >= limit {
+                std::ops::ControlFlow::Break(())
+            } else {
+                std::ops::ControlFlow::Continue(())
+            })
         },
     )
     .map_err(git)?;
