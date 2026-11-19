@@ -222,109 +222,79 @@ fn tool_error_text(e: &ApiError) -> String {
     }
 }
 
-#[derive(Deserialize, JsonSchema, Default)]
-#[serde(deny_unknown_fields)]
-struct RepoArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
+/// Every tool takes `repo` and refuses unknown arguments, so the macro adds both.
+macro_rules! args {
+    ($($name:ident { $($body:tt)* })*) => {$(
+        #[derive(Deserialize, JsonSchema, Default)]
+        #[serde(deny_unknown_fields)]
+        struct $name {
+            /// Repository name from `list_repos`. Required when more than one is in scope.
+            repo: Option<String>,
+            $($body)*
+        }
+    )*};
 }
 
-#[derive(Deserialize, JsonSchema, Default)]
-#[serde(deny_unknown_fields)]
-struct RevArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    /// Branch, tag, sha or HEAD. Defaults to HEAD.
-    rev: Option<String>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct LogArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    /// Branch, tag, sha or HEAD. Defaults to HEAD.
-    rev: Option<String>,
-    /// Only commits touching this path (file or directory).
-    path: Option<String>,
-    /// 1-based page. Defaults to 1.
-    page: Option<usize>,
-    /// Commits per page, default 30, max 500.
-    per_page: Option<usize>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct ShowArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    /// Commit id, abbreviated id, branch or tag.
-    id: String,
-    /// Include hunks. Defaults to true. False lists changed files only.
-    diff: Option<bool>,
-    /// Cap on diff lines returned across all files. Defaults to 400.
-    max_lines: Option<usize>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct ReadArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    rev: Option<String>,
-    /// Repository-relative file path.
-    path: String,
-    /// 1-based first line. Defaults to 1.
-    start_line: Option<usize>,
-    /// Maximum lines, default and max 5000.
-    limit: Option<usize>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct TreeArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    rev: Option<String>,
-    /// Directory path, empty for the repository root.
-    path: Option<String>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct BlameArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    rev: Option<String>,
-    /// Repository-relative file path.
-    path: String,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct HotspotArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    rev: Option<String>,
-    /// `1w`, `1m`, `3m`, `1y` or `all` (default): only changes in that window count.
-    period: Option<String>,
-    #[schemars(schema_with = "query_schema")]
-    query: Option<String>,
-    /// Files to return. Defaults to 20.
-    limit: Option<usize>,
-}
-
-#[derive(Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-struct ActivityArgs {
-    /// Repository name from `list_repos`. Required when more than one is in scope.
-    repo: Option<String>,
-    rev: Option<String>,
-    /// `1w`, `1m`, `3m`, `1y` or `all` (default). The period sets the bucket unit: days up to
-    /// a month, weeks up to a year, then months, quarters or years.
-    period: Option<String>,
-    #[schemars(schema_with = "query_schema")]
-    query: Option<String>,
+args! {
+    RepoArgs {}
+    RevArgs {
+        /// Branch, tag, sha or HEAD. Defaults to HEAD.
+        rev: Option<String>,
+    }
+    LogArgs {
+        /// Branch, tag, sha or HEAD. Defaults to HEAD.
+        rev: Option<String>,
+        /// Only commits touching this path (file or directory).
+        path: Option<String>,
+        /// 1-based page. Defaults to 1.
+        page: Option<usize>,
+        /// Commits per page, default 30, max 500.
+        per_page: Option<usize>,
+    }
+    ShowArgs {
+        /// Commit id, abbreviated id, branch or tag.
+        id: String,
+        /// Include hunks. Defaults to true. False lists changed files only.
+        diff: Option<bool>,
+        /// Cap on diff lines returned across all files. Defaults to 400.
+        max_lines: Option<usize>,
+    }
+    ReadArgs {
+        rev: Option<String>,
+        /// Repository-relative file path.
+        path: String,
+        /// 1-based first line. Defaults to 1.
+        start_line: Option<usize>,
+        /// Maximum lines, default and max 5000.
+        limit: Option<usize>,
+    }
+    TreeArgs {
+        rev: Option<String>,
+        /// Directory path, empty for the repository root.
+        path: Option<String>,
+    }
+    BlameArgs {
+        rev: Option<String>,
+        /// Repository-relative file path.
+        path: String,
+    }
+    HotspotArgs {
+        rev: Option<String>,
+        /// `1w`, `1m`, `3m`, `1y` or `all` (default): only changes in that window count.
+        period: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
+        /// Files to return. Defaults to 20.
+        limit: Option<usize>,
+    }
+    ActivityArgs {
+        rev: Option<String>,
+        /// `1w`, `1m`, `3m`, `1y` or `all` (default). The period sets the bucket unit: days up to
+        /// a month, weeks up to a year, then months, quarters or years.
+        period: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
+    }
 }
 
 /// The `query` argument: the commit filter of the web page, its grammar read from the keyword
