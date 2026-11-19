@@ -132,6 +132,8 @@ pub(crate) fn html(name: &str, l: &Listing) -> String {
 mod tests {
     use std::io::Write as _;
 
+    use proptest::prelude::*;
+
     use super::*;
 
     fn zip_of(n: usize) -> Vec<u8> {
@@ -213,5 +215,39 @@ mod tests {
         assert_eq!(kind("x.tgz"), Some(Kind::TarGz));
         assert_eq!(kind("x.tar"), Some(Kind::Tar));
         assert_eq!(kind("x.gz"), None);
+    }
+
+    fn gz(b: &[u8]) -> Vec<u8> {
+        let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
+        e.write_all(b).expect("gz");
+        e.finish().expect("gz")
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(128))]
+
+        /// Bytes mutated or cut from a valid archive of any kind never panic, and a listing
+        /// that reads holds no more than the cap.
+        #[test]
+        fn mutated_archives_list_within_the_cap_or_not_at_all(
+            flips in prop::collection::vec((any::<usize>(), any::<u8>()), 0..8),
+            cut in any::<usize>(),
+            k in 0u8..3,
+        ) {
+            let names = ["a", "b/c.txt", "d", "e", "f"];
+            let (kind, mut b) = match k {
+                0 => (Kind::Zip, zip_of(5)),
+                1 => (Kind::Tar, tar_of(&names)),
+                _ => (Kind::TarGz, gz(&tar_of(&names))),
+            };
+            for (at, v) in flips {
+                let n = b.len();
+                b[at % n] = v;
+            }
+            b.truncate(cut % (b.len() + 1));
+            if let Some(l) = list(kind, &b, 3) {
+                prop_assert!(l.entries.len() <= 3);
+            }
+        }
     }
 }

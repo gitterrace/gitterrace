@@ -35,6 +35,8 @@ serde_json.workspace = true
 regex = "1"
 csv = "1"
 calamine = { version = "0.38", default-features = false }
+# The ods pre-count streams content.xml with the parser calamine already builds.
+quick-xml = { version = "0.42", default-features = false }
 zip = { version = "9", default-features = false }
 tar = { version = "0.4", default-features = false }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
@@ -49,6 +51,8 @@ gitterrace-index = { workspace = true, features = ["oracle"] }
 gitterrace-testkit.workspace = true
 tempfile.workspace = true
 http-body-util = "0.1"
+proptest = { version = "1.12", default-features = false, features = ["std"] }
+cap = { version = "0.1", features = ["stats"] }
 
 # The memory budget runs where the binary uses jemalloc: not on Windows (see the binary's
 # Cargo.toml), where jemalloc does not build.
