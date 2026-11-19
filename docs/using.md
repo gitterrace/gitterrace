@@ -98,6 +98,21 @@ list covers the part already highlighted.
 1. Click a line number. Shift-click another to select a range.
 2. Copy the address, or press `y` for a permalink pinned to the commit.
 
+## Work with a coding agent
+
+Two ways, and you can use both:
+
+- **Hand it a finding.** Mark lines, press `.` and pick **Ask Claude Code**,
+  **Ask Codex**, **Ask Kiro** or **Ask Gemini**. The agent opens in a terminal
+  in the repository with your note as its first prompt.
+  [Hand a finding to an agent](actions.md#hand-a-finding-to-an-agent) switches
+  them on.
+- **Let it read the repository.** `git terrace mcp` is a read-only MCP server
+  for your agent: history, blame, insights, a comparison of two revisions and
+  your uncommitted changes. Register it once in your agent's MCP settings, with
+  the command `git terrace mcp --served`. The
+  [tools and prompts](api.md#mcp-stdio) are listed in the API docs.
+
 ## Read the insights
 
 Open insights with `g i`. The languages page counts lines along the
