@@ -390,36 +390,41 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
         if let Some(read) = a.far(&head) {
             return Ok((crate::far::render(c, tab, read)?, false));
         }
-        Ok((
-            PendingPage {
-                c,
-                state: a.state().label(),
-                page_head: crate::pagehead::waiting_head(tab),
-                newer: a.index.newer_format().map(|v| {
-                    // The cache folder is a path on the host; a public visitor gets no path.
-                    let dir = if a.public() {
-                        "its cache folder".to_owned()
-                    } else {
-                        a.index.dir().display().to_string()
-                    };
-                    format!(
-                        "The history cache was written by a newer gitterrace (format {v}, this \
-                         build reads {}). It is left untouched: run the newer build, or delete \
-                         {dir} to rebuild it here.",
-                        gitterrace_index::FORMAT_VERSION,
-                    )
-                }),
-                head: crate::dochead::DocHead {
-                    title: "Indexing history".to_owned(),
-                    ..crate::dochead::DocHead::default()
-                },
-            }
-            .render()?,
-            false,
-        ))
+        Ok((pending(a, tab)?, false))
     })
     .await?;
     Ok((Html(html), served))
+}
+
+/// The page that stands in for `tab` while its data is not there yet: the index is building,
+/// or the warm-up is still rendering it. It follows the repository's state and fills in once
+/// ready. Never memoized.
+pub(crate) fn pending(a: &App, tab: &'static str) -> Result<String> {
+    let c = views::chrome(a, "stats").live(Mode::NOTICE);
+    Ok(PendingPage {
+        c,
+        state: a.state().label(),
+        page_head: crate::pagehead::waiting_head(tab),
+        newer: a.index.newer_format().map(|v| {
+            // The cache folder is a path on the host; a public visitor gets no path.
+            let dir = if a.public() {
+                "its cache folder".to_owned()
+            } else {
+                a.index.dir().display().to_string()
+            };
+            format!(
+                "The history cache was written by a newer gitterrace (format {v}, this \
+                         build reads {}). It is left untouched: run the newer build, or delete \
+                         {dir} to rebuild it here.",
+                gitterrace_index::FORMAT_VERSION,
+            )
+        }),
+        head: crate::dochead::DocHead {
+            title: "Indexing history".to_owned(),
+            ..crate::dochead::DocHead::default()
+        },
+    }
+    .render()?)
 }
 
 #[derive(serde::Serialize)]

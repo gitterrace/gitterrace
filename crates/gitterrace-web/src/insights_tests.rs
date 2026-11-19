@@ -372,3 +372,67 @@ async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
         "table sets built over one page and one API request"
     );
 }
+
+/// Guard class: a visitor queued behind a warm-up render for as long as it takes. A fake
+/// warmer renders one key and blocks until the visitor has answered, so a visitor that
+/// waits on the warmer's render lock never answers and the deadline trips. While warming,
+/// the visitor gets the pending page, which is never memoized; the warmer's page lands
+/// in the memo for the next one.
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn a_page_request_during_a_slow_warmer_answers_with_the_pending_page() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = gitterrace_testkit::Fixture::init(dir.path())
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .path()
+        .to_owned();
+    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    assert!(app.advance(crate::app::RepoState::Warming));
+    let (rendering, answered) = (
+        Arc::new(AtomicBool::new(false)),
+        Arc::new(AtomicBool::new(false)),
+    );
+    let warmer = {
+        let (app, rendering, answered) = (
+            Arc::clone(&app),
+            Arc::clone(&rendering),
+            Arc::clone(&answered),
+        );
+        tokio::spawn(async move {
+            let _warm = app.warming();
+            super::cached(&app, "slow", None, move |_, _, _| {
+                rendering.store(true, Ordering::SeqCst);
+                gitterrace_testkit::wait::until_blocking("the visitor to answer", || {
+                    answered.load(Ordering::SeqCst)
+                });
+                Data
+            })
+            .await
+            .expect("warm page")
+            .0
+        })
+    };
+    gitterrace_testkit::wait::until("the warmer to render", || {
+        let r = Arc::clone(&rendering);
+        async move { r.load(Ordering::SeqCst) }
+    })
+    .await;
+    let visitor = super::cached(&app, "slow", None, |_, _, _| Data)
+        .await
+        .expect("visitor page")
+        .0;
+    answered.store(true, Ordering::SeqCst);
+    assert!(visitor.contains("data-progress"), "{visitor}");
+    assert_eq!(warmer.await.expect("warmer"), "data");
+    app.mark_ready();
+    let next = super::cached(&app, "slow", None, |_, _, _| Data)
+        .await
+        .expect("next page");
+    assert_eq!(next.0, "data", "the pending page was memoized");
+}

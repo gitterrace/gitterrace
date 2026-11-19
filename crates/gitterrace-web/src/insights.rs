@@ -24,6 +24,10 @@ use crate::{
     views::{self, Chrome},
 };
 
+/// How long a request waits on a page the warm-up is rendering before it answers with the
+/// pending page instead.
+const WARM_WAIT: std::time::Duration = std::time::Duration::from_secs(2);
+
 #[derive(Deserialize, Default)]
 pub(crate) struct InsightsQuery {
     #[serde(flatten)]
@@ -340,7 +344,17 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     }
     // One render per cold key: a request that waited here finds the page the first one put.
     let claim = app.render_lock(&key);
-    let _held = claim.hold().await;
+    let _held = match tokio::time::timeout(WARM_WAIT, claim.hold()).await {
+        Ok(held) => held,
+        // The warm-up holds the key and may take minutes on a large history: the visitor gets
+        // the page that fills in once ready rather than waiting on it.
+        Err(_) if app.state() == crate::app::RepoState::Warming => {
+            return Ok(Html(
+                blocking(app, move |a| crate::routes::pending(a, tab)).await?,
+            ));
+        }
+        Err(_) => claim.hold().await,
+    };
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html(h));
     }
