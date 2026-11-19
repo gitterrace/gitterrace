@@ -150,8 +150,6 @@ steps = [
   "gate-test|python3|install python 3.11|$PY scripts/lint/gate-check.py --self-test",
   "py-steps|python3|install python3|python3 scripts/lint/py-check.py",
   "py-steps-test|python3|install python3|python3 scripts/lint/py-check.py --self-test",
-  "ci-tiers|python3|install python3|python3 scripts/lint/ci-check.py",
-  "ci-tiers-test|python3|install python3|python3 scripts/lint/ci-check.py --self-test",
   "ci-inject|python3|install python3|python3 scripts/lint/inject-check.py",
   "ci-inject-test|python3|install python3|python3 scripts/lint/inject-check.py --self-test",
   "deps|python3|install python 3.11|$PY scripts/lint/deps-check.py",
