@@ -9,6 +9,14 @@ pub use people::ContributorTally;
 
 pub use gitterrace_types::Period;
 
+/// Commits of one size bucket, the histogram behind the commit-size chart.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct SizeBucket {
+    /// `1`, `2-5`, `6-20`, `21-100`, `101-500`, `501-2000`, `2000+`.
+    pub label: String,
+    pub commits: usize,
+}
+
 /// What the contributors list is ordered and charted by.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Metric {
@@ -165,6 +173,11 @@ impl Insights<'_> {
     /// and the series buckets span just the range.
     pub fn rhythm_in(&self, period: Period, days: Option<(i64, i64)>) -> Rhythm {
         self.in_scope(&self.period_scope(period, days), |c| c.rhythm())
+    }
+
+    /// Commits of `period` by size (added plus removed lines over counted files).
+    pub fn commit_sizes_in(&self, period: Period) -> Vec<SizeBucket> {
+        self.in_period(period, |c| c.sizes())
     }
 
     pub fn contributors(&self, period: Period) -> ContributorReport {

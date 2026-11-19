@@ -27,7 +27,6 @@ mod releases;
 mod scope;
 mod select;
 mod shared;
-mod sizes;
 mod stats;
 
 use std::sync::{Arc, Mutex, OnceLock};
@@ -61,13 +60,12 @@ pub use lang::{language, language_key};
 pub use people::{People, Person};
 pub use period::{
     Contributor, ContributorReport, ContributorTally, Metric, Period, PeriodStats, PeriodSummary,
-    Rhythm, SeriesPoint,
+    Rhythm, SeriesPoint, SizeBucket,
 };
 pub use releases::{Cadence, Release, release_tags};
 pub use scope::{CountContext, Scope, ScopeError, ScopeParams, parse_day};
 pub use select::{OptionParams, Scoped, Selection, under};
 pub use shared::SharedTables;
-pub use sizes::SizeBucket;
 pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, LabelCount};
 
 pub(crate) use gitterrace_git::DAY;

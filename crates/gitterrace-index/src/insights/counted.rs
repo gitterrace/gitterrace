@@ -21,7 +21,7 @@ use crate::insights::{
 /// Ranks per `rows_for` call: bounds the rows in flight, not the history.
 pub const CHUNK: usize = 4096;
 
-/// Upper bounds (inclusive) of the commit size buckets, in changed lines, as `commit_sizes`.
+/// Upper bounds (inclusive) of the commit size buckets, in changed lines.
 const SIZE_EDGES: [u32; 6] = [1, 5, 20, 100, 500, 2000];
 const SIZE_LABELS: [&str; 7] = ["1", "2-5", "6-20", "21-100", "101-500", "501-2000", "2000+"];
 

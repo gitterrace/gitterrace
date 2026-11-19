@@ -345,3 +345,21 @@ fn first_time_is_judged_on_counted_commits() {
         "Ann and Cy committed before the week, a merge never counts"
     );
 }
+
+#[test]
+fn sizes_bucket_by_changed_lines() {
+    let recs = crate::insights::fixtures::chain();
+    let s = Insights::new(&recs, Options::default(), None).commit_sizes_in(Period::All);
+    let counts: Vec<usize> = s.iter().map(|b| b.commits).collect();
+    assert_eq!(counts, [1, 0, 0, 1, 1, 0, 1]);
+}
+
+/// The histogram follows the period. The chain's newest commit is day 40, so the week holds
+/// only it (3000 lines, the last bucket).
+#[test]
+fn sizes_follow_the_period() {
+    let recs = crate::insights::fixtures::chain();
+    let s = Insights::new(&recs, Options::default(), None).commit_sizes_in(Period::Week);
+    let counts: Vec<usize> = s.iter().map(|b| b.commits).collect();
+    assert_eq!(counts, [0, 0, 0, 0, 0, 0, 1]);
+}
