@@ -8,13 +8,16 @@
 # cargo features, so one clippy pass covers both feature shapes.
 #
 #   scripts/land-check.sh [--base REV] [--full] [--explain] [--paths P...] [--messages BASE]
-#                         [--self-test]
+#                         [--self-test] [--tests-only]
 #
 #   --base REV    compare against REV (default main, else HEAD~1) plus uncommitted changes
 #   --full        run `make check` instead, the whole gate
 #   --explain     print the selection and exit
 #   --paths P...  use these paths instead of asking git
 #   --messages BASE  run only the message step (subjects and the shared lints) over BASE..HEAD
+#   --tests-only  run only the tests (and the oracle when it triggers) of the touched crates.
+#                 Without --base the base is the landing base, see landing_base. The landing
+#                 gate runs this, since land.sh gives gate commands no {base}.
 set -euo pipefail
 # Config passed in through the environment (GIT_CONFIG_COUNT, as a lander sets core.hooksPath)
 # would override what the self-test and hook-test fixture repos configure themselves.
@@ -157,6 +160,44 @@ gate_commands_covered() {
   ((missing == 0))
 }
 
+# The base a landing was built on, read in the temporary clone land.sh gates in, where no ref
+# names it and gate commands get no {base}. A plan landing fetches the base last (FETCH_HEAD)
+# and rebuilds its commits on it, so FETCH_HEAD is an ancestor of HEAD. A single landing
+# fetches the sent commit last, which is not an ancestor of the rebuilt one, and HEAD^ is the
+# base. Prints nothing when neither holds, and the caller then widens to the workspace.
+landing_base() {
+  local f
+  f=$(git rev-parse -q --verify "FETCH_HEAD^{commit}" 2>/dev/null || true)
+  if [[ -n $f && $f != "$(git rev-parse HEAD)" ]] &&
+    git merge-base --is-ancestor "$f" HEAD 2>/dev/null; then
+    echo "$f"
+  else
+    git rev-parse -q --verify HEAD^ 2>/dev/null || true
+  fi
+}
+
+# The tests of the crates in the scope arguments (-p NAME... or --workspace), then the oracle
+# when its triggers are in scope. Runs in the current directory.
+run_tests() {
+  # `|| return`: set -e is off when a caller tests this function, and a red test must still fail.
+  step cargo test --no-fail-fast "$@" || return 1
+  # The output oracle: named on its own so a log shows it ran whenever the pages could move.
+  local run_oracle=0 t
+  [[ " $* " == *" --workspace "* ]] && run_oracle=1
+  while IFS= read -r t; do
+    [[ " $* " == *" $t "* ]] && run_oracle=1
+  done < <(land_cfg oracle.triggers)
+  if ((run_oracle)); then
+    step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" \
+      --test "$(land_cfg oracle.test)" || return 1
+  fi
+}
+
+step() {
+  echo "== $*"
+  "$@"
+}
+
 LINTS="$PWD/vendor/schwarzwald/kit/lint"
 
 # The message step: the shared lints over subject and body of every commit in $1..HEAD. Each
@@ -168,6 +209,10 @@ message_lints() {
     "$py" "$LINTS/$rule.py" --messages "$1" || rc=1
   done
   return "$rc"
+}
+
+empty_commit() {
+  git -C "$1" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "$2"
 }
 
 self_test() {
@@ -186,6 +231,13 @@ self_test() {
   [[ $got != *"$dep"* ]] ||
     {
       echo "self-test: a cards edit must not select git: $got" >&2
+      exit 1
+    }
+  leaf=$(land_cfg selftest.leaf)
+  got=$(printf '%s\n' "$leaf_path" | select_crates | tr '\n' ' ')
+  [[ $got == *"$leaf "* ]] ||
+    {
+      echo "self-test: an edit in $leaf_path must select the $leaf tests: $got" >&2
       exit 1
     }
   got=$(printf '%s\n' Makefile | select_crates)
@@ -266,10 +318,41 @@ self_test() {
       echo "self-test: a command of \`make lines names\` never runs in land-check" >&2
       exit 1
     }
+  # The landing base: a single landing's base is HEAD^, a plan landing's is FETCH_HEAD.
+  empty_commit "$d" "feat(x): base"
+  empty_commit "$d" "feat(x): one"
+  [[ $(cd "$d" && landing_base) == "$(git -C "$d" rev-parse HEAD^)" ]] ||
+    {
+      echo "self-test: a single landing's base is not HEAD^" >&2
+      exit 1
+    }
+  git -C "$d" rev-parse HEAD~1 >"$d/.git/FETCH_HEAD"
+  empty_commit "$d" "feat(x): two"
+  [[ $(cd "$d" && landing_base) == "$(git -C "$d" rev-parse HEAD~2)" ]] ||
+    {
+      echo "self-test: a plan landing's base is not FETCH_HEAD" >&2
+      exit 1
+    }
+  # The tests step: green on a passing crate, red on a failing one.
+  mkdir -p "$d/t/src"
+  printf '[package]\nname = "t"\nversion = "0.0.0"\nedition = "2021"\n[workspace]\n' \
+    >"$d/t/Cargo.toml"
+  printf '#[test]\nfn ok() {}\n' >"$d/t/src/lib.rs"
+  (cd "$d/t" && run_tests -p t) >/dev/null 2>&1 ||
+    {
+      echo "self-test: the tests step failed a passing crate" >&2
+      exit 1
+    }
+  printf '#[test]\nfn bad() { panic!(); }\n' >"$d/t/src/lib.rs"
+  if (cd "$d/t" && run_tests -p t) >/dev/null 2>&1; then
+    echo "self-test: the tests step passed a failing crate" >&2
+    exit 1
+  fi
   echo "land-check self-test: ok"
 }
 
 base=
+tests_only=0
 full=0
 explain=0
 given=()
@@ -298,6 +381,10 @@ while (($#)); do
     self_test
     exit 0
     ;;
+  --tests-only)
+    tests_only=1
+    shift
+    ;;
   --messages)
     hooks_wired . scripts/hooks && check_subjects "$2" && message_lints "$2"
     exit
@@ -309,11 +396,19 @@ while (($#)); do
   esac
 done
 
-hooks_wired . scripts/hooks || exit 1
+((tests_only)) || hooks_wired . scripts/hooks || exit 1
 if ((full)); then
   exec make check
 fi
 
+if [[ -z $base ]] && ((tests_only)); then
+  base=$(landing_base)
+  if [[ -z $base ]]; then
+    echo "land-check: no landing base found, testing the whole workspace" >&2
+    run_tests --workspace
+    exit 0
+  fi
+fi
 if [[ -z $base ]]; then
   base=$(git rev-parse --verify -q main || git rev-parse HEAD~1)
 fi
@@ -340,11 +435,10 @@ else
 fi
 echo "land-check: ${scope[*]:-no crate touched}"
 ((explain)) && exit 0
-
-step() {
-  echo "== $*"
-  "$@"
-}
+if ((tests_only)); then
+  if ((${#scope[@]})); then run_tests "${scope[@]}"; fi
+  exit 0
+fi
 
 step cargo fmt --all -- --check
 if ((${#scope[@]})); then
@@ -354,19 +448,10 @@ if ((${#scope[@]})); then
     command -v x86_64-w64-mingw32-gcc >/dev/null; then
     step cargo clippy "${scope[@]}" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
   fi
-  step cargo test --no-fail-fast "${scope[@]}"
   # Rustdoc as `make doc` runs it: a link to an item that only exists under cfg(test) passes
   # clippy and the tests and fails here alone.
   step env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps "${scope[@]}"
-  # The output oracle: named on its own so a log shows it ran whenever the pages could move.
-  run_oracle=0
-  [[ " ${scope[*]} " == *" --workspace "* ]] && run_oracle=1
-  while IFS= read -r t; do
-    [[ " ${scope[*]} " == *" $t "* ]] && run_oracle=1
-  done < <(land_cfg oracle.triggers)
-  if ((run_oracle)); then
-    step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" --test "$(land_cfg oracle.test)"
-  fi
+  run_tests "${scope[@]}"
 fi
 step make lines names
 step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --self-test

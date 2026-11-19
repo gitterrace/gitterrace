@@ -9,6 +9,7 @@ dependency = "gitterrace-git"
 dependency_path = "crates/gitterrace-git/src/repo.rs"
 dependent = "gitterrace-web"
 leaf_path = "crates/gitterrace-web/src/lib.rs"
+leaf = "gitterrace-web"
 
 # The output oracle: the test target in `crate` that renders every page against its golden.
 # It runs again as its own step when the selection holds a `trigger` crate or the workspace.
@@ -40,6 +41,10 @@ gate = [
   # The tree conventions (classified limits, one escaping, no shelled git): seconds, and a
   # new crate file breaks them as easily as a new step does.
   "cargo test -q -p gitterrace-testkit --test conventions",
+  # The tests of the crates the change touches and their dependents, plus the oracle when it
+  # triggers. land.sh passes no base to a gate command, so land-check finds the landing base
+  # itself (its landing_base) and takes the crate selection from select_crates.
+  "bash scripts/land-check.sh --tests-only",
   # The crates with features, built without them: the shipped build's lints (one crate pair,
   # seconds once warm), which the feature-unified workspace clippy of CI never sees.
   "make clippy-features",
@@ -64,5 +69,5 @@ messages = """git config core.hooksPath scripts/hooks \
 gc-guard = "prunes the local target dir; its self-test is a fixture of the pruner, not the tree"
 bench-guard = "builds a debug binary and runs the bench harness, minutes per landing"
 docs-check = "the gate runs its cargo xtask check; the rest are self-tests of the dev scripts"
-test = "the gate runs the golden and xtask tests; the full workspace run is CI's"
+test = "the gate runs the golden, xtask and touched-crate tests; the full workspace run is CI's"
 clippy-cross = "land-check runs the Windows target scoped to the touched crates; the workspace run is CI's"
