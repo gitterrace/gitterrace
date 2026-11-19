@@ -1,9 +1,16 @@
+use std::cell::Cell;
+
 use gitterrace_testkit::Fixture;
 
 use super::{Credit, add_footer, public_https};
 
 const MIT: &str = "MIT License\n\nCopyright (c) 2024 A\n\nPermission is hereby granted, free of \
     charge, to any person obtaining a copy\nof this software\n";
+
+thread_local! {
+    /// License blobs whose content was read on this thread.
+    pub(super) static LICENSE_READS: Cell<usize> = const { Cell::new(0) };
+}
 
 fn credit_for(
     dir: &std::path::Path,
@@ -101,4 +108,27 @@ fn only_public_hosts_become_links() {
 fn footer_goes_before_the_closing_body() {
     let out = add_footer(b"<body>m</body></html>", "<footer>f</footer>");
     assert_eq!(out, b"<body>m<footer>f</footer></body></html>");
+}
+
+#[test]
+fn oversized_license_is_never_read() {
+    let d = tempfile::tempdir().expect("tempdir");
+    let body = format!("{MIT}{}", " ".repeat(super::MAX_LICENSE + 1));
+    LICENSE_READS.with(|n| n.set(0));
+    let line = credit_for(&d.path().join("big"), Some(("LICENSE", &body)), None);
+    assert_eq!(
+        LICENSE_READS.with(Cell::get),
+        0,
+        "the oversized blob was read"
+    );
+    assert!(!line.contains("MIT"), "{line}");
+
+    let small = tempfile::tempdir().expect("tempdir");
+    let line = credit_for(&small.path().join("ok"), Some(("LICENSE", MIT)), None);
+    assert_eq!(
+        LICENSE_READS.with(Cell::get),
+        1,
+        "a normal license is read once"
+    );
+    assert!(line.contains("MIT"), "{line}");
 }

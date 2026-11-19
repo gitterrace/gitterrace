@@ -109,12 +109,22 @@ fn find_license(repo: &Repo, head: &str) -> Option<License> {
         .collect();
     names.sort();
     let file = names.into_iter().next()?;
-    let id = repo
-        .blob_bytes(head, &file)
-        .ok()
-        .filter(|b| b.len() <= MAX_LICENSE)
-        .and_then(|b| detect(&String::from_utf8_lossy(&b)));
+    let id = license_bytes(repo, head, &file).and_then(|b| detect(&String::from_utf8_lossy(&b)));
     Some(License { file, id })
+}
+
+/// The license text, or `None` when its blob header says it is over [`MAX_LICENSE`]: the
+/// size is checked before the content is read, so a huge or highly compressible blob is
+/// never inflated.
+fn license_bytes(repo: &Repo, head: &str, file: &str) -> Option<Vec<u8>> {
+    let raw = repo
+        .raw_blob(head, file, |_, size| size > MAX_LICENSE as u64)
+        .ok()?;
+    #[cfg(test)]
+    if raw.bytes.is_some() {
+        tests::LICENSE_READS.with(|n| n.set(n.get() + 1));
+    }
+    raw.bytes
 }
 
 fn is_license_name(name: &str) -> bool {
