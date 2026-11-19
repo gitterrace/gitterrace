@@ -8,7 +8,6 @@
 //! branch). Line-level series that must add up exactly (language lines over time) follow the
 //! first-parent chain instead, where merge diffs are the only way a branch's lines arrive.
 
-mod accel;
 mod axis;
 mod code;
 mod compare;
@@ -39,7 +38,6 @@ pub(crate) use gitterrace_git::days_from_civil;
 use crate::CommitRecord;
 use crate::feed::{self, CommitRange, CommitRow, FileRow, IdentId, InsightsSource, PathId, Rank};
 
-pub use accel::{Accel, NoAccel, ReducerKind, ReducerOut};
 pub use axis::{BucketUnit, MAX_BUCKETS, TimeAxis};
 pub use code::{
     Frequency, FrequencyTally, LineTotals, Rework, ReworkPoint, rework_share, rework_verdict,

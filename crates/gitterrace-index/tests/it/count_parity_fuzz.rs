@@ -1,7 +1,5 @@
 //! Parity fuzz for the one membership rule (`Scope::admits`) and the reducers over `Counted`.
 //!
-//! - Every `Accel` answer that is `Some` equals the stream (today only `NoAccel`, so the
-//!   property pins the contract before the first fast path is wired).
 //! - Per-person, per-label, per-bucket and punch/weekday/hour sums all equal the totals.
 //! - The time span only prunes: the stream equals a full scan filtered by `admits`, and a
 //!   scan over the span widened by one day each side filtered the same way.
@@ -16,8 +14,7 @@
 
 use gitterrace_index::feed::{CommitRange, FixedClock, MemorySource};
 use gitterrace_index::{
-    CommitRecord, CountContext, FileStat, Insights, Label, NoAccel, Options, Period, ReducerKind,
-    Scope, ScopeParams,
+    CommitRecord, CountContext, FileStat, Insights, Label, Options, Period, Scope, ScopeParams,
 };
 use proptest::prelude::*;
 
@@ -251,21 +248,6 @@ fn cases() -> ProptestConfig {
 
 proptest! {
     #![proptest_config(cases())]
-
-    #[test]
-    fn accel_answers_equal_the_stream(
-        gens in prop::collection::vec(gen_commit(), 0..40),
-        q in query()
-    ) {
-        let recs = history(&gens);
-        let s = scope(&q);
-        let ins = Insights::new(&recs, s.options().clone(), None);
-        let c = ins.counted(&s, cx(&recs));
-        for k in ReducerKind::ALL {
-            let got = c.reduce_kind(&NoAccel, k).expect("no read error");
-            prop_assert_eq!(got, c.stream_kind(k), "{:?}", k);
-        }
-    }
 
     #[test]
     fn every_breakdown_sums_to_the_totals(

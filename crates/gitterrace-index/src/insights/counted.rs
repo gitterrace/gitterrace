@@ -14,10 +14,9 @@ use std::ops::{Range, RangeInclusive};
 
 use crate::feed::{CommitRange, CommitRow, FileRow, Rank};
 use crate::insights::{
-    Accel, CountContext, Insights, Label, LabelBucket, LabelCount, Lines, PeriodStats, ReducerKind,
-    ReducerOut, Scope, SeriesPoint, SizeBucket, TimeAxis,
+    CountContext, Insights, Label, LabelBucket, LabelCount, Lines, PeriodStats, Scope, SeriesPoint,
+    SizeBucket, TimeAxis,
 };
-use crate::seg::SegError;
 
 /// Ranks per `rows_for` call: bounds the rows in flight, not the history.
 pub const CHUNK: usize = 4096;
@@ -34,8 +33,8 @@ pub struct Counted<'a> {
     axis: TimeAxis,
     days: RangeInclusive<i64>,
     span: Range<i64>,
-    /// True for [`Counted::before`]: the days are not the scope's own, so no accelerator
-    /// (which sees the scope only) may answer.
+    /// True for [`Counted::before`]: the days are not the scope's own, so the shared tables
+    /// (which see the scope only) may not answer.
     shifted: bool,
 }
 
@@ -168,36 +167,6 @@ impl<'a> Counted<'a> {
         }
     }
 
-    /// `kind` from `accel` when it can prove the answer, else from the stream. A read error of
-    /// the accelerator is returned, never replaced by the stream.
-    pub fn reduce_kind(
-        &self,
-        accel: &dyn Accel,
-        kind: ReducerKind,
-    ) -> Result<ReducerOut, SegError> {
-        if !self.shifted
-            && let Some(out) = accel.try_reduce(self.scope, &self.cx, kind)
-        {
-            return out;
-        }
-        Ok(self.stream_kind(kind))
-    }
-
-    /// `kind` from the stream, whatever an accelerator could say.
-    pub fn stream_kind(&self, kind: ReducerKind) -> ReducerOut {
-        match kind {
-            ReducerKind::Totals => ReducerOut::Totals(self.totals()),
-            ReducerKind::Series => ReducerOut::Series(self.series()),
-            ReducerKind::When => ReducerOut::When(Box::new(self.when())),
-            ReducerKind::PerPerson => ReducerOut::PerPerson(self.per_person()),
-            ReducerKind::PerLabel(l) => {
-                let (a, b) = self.per_label(l);
-                ReducerOut::PerLabel(a, b)
-            }
-            ReducerKind::Sizes => ReducerOut::Sizes(self.sizes()),
-        }
-    }
-
     pub fn totals(&self) -> PeriodStats {
         self.one(Totals::of(self)).finish()
     }
@@ -313,10 +282,7 @@ pub use reducers::{LabelTally, PersonTallies, PersonTally, Series, Sizes, Totals
 mod tests {
     use crate::feed::{FixedClock, MemorySource};
     use crate::insights::fixtures::{MON, chain};
-    use crate::insights::{
-        CountContext, Insights, Label, NoAccel, Options, Period, ReducerKind, ReducerOut, Scope,
-        ScopeParams,
-    };
+    use crate::insights::{CountContext, Insights, Label, Options, Period, Scope, ScopeParams};
 
     fn scope(period: &str, path: Option<&str>) -> Scope {
         let mut p = ScopeParams {
@@ -361,13 +327,6 @@ mod tests {
                 c.sizes().iter().map(|b| b.commits).sum::<usize>()
             );
             assert_eq!(t.commits as u32, c.when().by_hour.iter().sum::<u32>());
-            for k in ReducerKind::ALL {
-                assert_eq!(c.reduce_kind(&NoAccel, k).ok(), Some(c.stream_kind(k)));
-            }
-            assert!(matches!(
-                c.stream_kind(ReducerKind::Totals),
-                ReducerOut::Totals(_)
-            ));
         }
         // All four commits, a path selection keeps the three touching x.rs with their lines.
         let all = ins.counted(&scope("all", None), cx).totals();
