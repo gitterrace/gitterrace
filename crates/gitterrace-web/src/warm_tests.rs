@@ -73,7 +73,11 @@ async fn the_first_page_after_ready_is_served_from_the_warm_up() {
         a.chain_walks.load(Ordering::Relaxed),
     );
     assert!(renders > 0, "the warm-up rendered nothing before ready");
-    for page in crate::features::warm(&a.cfg(), Some(&a.name)) {
+    let periods = super::HOTSPOT_PERIODS.iter().copied();
+    for page in crate::features::warm(&a.cfg(), Some(&a.name))
+        .into_iter()
+        .chain(periods)
+    {
         let (status, body) = gitterrace_testkit::get(&router, page).await;
         assert_eq!(status, 200, "{page}: {body}");
         assert_eq!(

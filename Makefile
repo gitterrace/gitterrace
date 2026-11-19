@@ -196,7 +196,7 @@ memory-check: build
 	TEST_MEMORY_WIDE=100000 cargo test --release --no-fail-fast -p gitterrace-web \
 		--test memory_budget idle_memory_is_flat_in_tree_size
 
-## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
+## speed-check: Cold first pages on the rust and linux bench clones stay in budget (~10 min)
 speed-check: build
 	python3 scripts/bench/speed-check.py --bin $(RELEASE_BIN)
 

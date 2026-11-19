@@ -1,16 +1,17 @@
 #!/usr/bin/env python3
-"""Speed gates on the rust bench clone: fails when a cold insights page is over its gate.
+"""Speed gates on the bench clones: fails when a cold insights page is over its gate.
 
 Cold is the first request to a page on a server just started over the built index, so the
 page memo is empty and the visitor pays for the tables the page needs. Each sample is its
 own server; the gate is on the median. The 1-minute load is printed next to every timing, and
 a run above --max-load waits for a quieter machine first, as the bench does.
 
-  scripts/bench/speed-check.py --bin PATH [--repo DIR] [--runs 3] [--max-load N] [--only a,b]
+  scripts/bench/speed-check.py --bin PATH [--repos rust,linux] [--runs 3] [--max-load N]
+                               [--only a,b]
   scripts/bench/speed-check.py --self-test     # the verdict logic, no server
 
-The repository defaults to the bench clone ($GITTERRACE_BENCH_DIR/rust.git). It must be
-indexed already: the check times pages, not the index build.
+Each repository is the bench clone of that name ($GITTERRACE_BENCH_DIR/<name>.git), with its
+own gates. It must be indexed already: the check times pages, not the index build.
 """
 
 from __future__ import annotations
@@ -26,14 +27,41 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 bl = importlib.import_module("bench-lib")
 
-# Page, gate in ms. Languages is the absolute goal. Hotspots and ownership hold 1.5x the time
-# of building them in memory (docs/benchmarks.md, "Insights pages on a large history").
-GATES: dict[str, tuple[str, float]] = {
-    "languages": ("/stats/languages", 66),
-    "hotspots-all": ("/stats/hotspots?period=all", 230),
-    "hotspots-1y": ("/stats/hotspots?period=1y", 230),
-    "ownership-all": ("/stats/ownership?period=all", 115),
-    "ownership-1y": ("/stats/ownership?period=1y", 115),
+# Page and path. Every one is a page a visitor opens first after a repository turns ready.
+PAGES: dict[str, str] = {
+    "languages": "/stats/languages",
+    "hotspots-all": "/stats/hotspots?period=all",
+    "hotspots-1y": "/stats/hotspots?period=1y",
+    "hotspots-90d": "/stats/hotspots?period=90d",
+    "ownership-all": "/stats/ownership?period=all",
+    "ownership-1y": "/stats/ownership?period=1y",
+    "overview": "/",
+    "stats-overview": "/stats",
+    "contributors": "/stats/contributors",
+}
+# Repository, page, gate in ms. Languages is the absolute goal. Hotspots and ownership hold
+# 1.5x the time of building them in memory (docs/benchmarks.md, "Insights pages on a large
+# history"). The warm-up renders the rest before ready, so their gate is a memo hit's.
+WARM_HIT_MS = 300
+GATES: dict[str, dict[str, float]] = {
+    "rust": {
+        "languages": 66,
+        "hotspots-all": 230,
+        "hotspots-1y": WARM_HIT_MS,
+        "hotspots-90d": WARM_HIT_MS,
+        "ownership-all": 115,
+        "ownership-1y": 115,
+        "overview": WARM_HIT_MS,
+        "stats-overview": WARM_HIT_MS,
+        "contributors": WARM_HIT_MS,
+    },
+    "linux": {
+        "hotspots-1y": WARM_HIT_MS,
+        "hotspots-90d": WARM_HIT_MS,
+        "overview": WARM_HIT_MS,
+        "stats-overview": WARM_HIT_MS,
+        "contributors": WARM_HIT_MS,
+    },
 }
 # A page that has not answered by then is over every gate; the run moves on.
 PAGE_TIMEOUT_SECS = 900
@@ -45,13 +73,15 @@ def wait_load(limit: float) -> float:
     return load
 
 
-def verdict(samples: dict[str, list[float]]) -> list[tuple[str, float, float, bool]]:
-    """(page, median ms, gate ms, over) per page that has samples."""
+def verdict(
+    repo: str, samples: dict[str, list[float]]
+) -> list[tuple[str, float, float, bool]]:
+    """(page, median ms, gate ms, over) per page of `repo` that has samples."""
     out = []
     for name, ms in samples.items():
         if ms:
             med = statistics.median(ms)
-            gate = GATES[name][1]
+            gate = GATES[repo][name]
             out.append((name, med, gate, med > gate))
     return out
 
@@ -68,7 +98,7 @@ def measure(binary: str, repo: Path, names: list[str], runs: int, max_load: floa
                 srv.wait_ready()
                 prefix = bl.site_prefix(srv.port)
                 status, _, ms, _ = bl.get(
-                    srv.port, prefix + GATES[name][0], PAGE_TIMEOUT_SECS
+                    srv.port, prefix + PAGES[name], PAGE_TIMEOUT_SECS
                 )
             except TimeoutError:
                 status, ms = 0, PAGE_TIMEOUT_SECS * 1000.0
@@ -82,11 +112,17 @@ def measure(binary: str, repo: Path, names: list[str], runs: int, max_load: floa
 
 
 def self_test() -> int:
-    v = dict((n, (m, over)) for n, m, _, over in verdict({"languages": [70, 50, 60]}))
+    v = {n: (m, o) for n, m, _, o in verdict("rust", {"languages": [70, 50, 60]})}
     assert v == {"languages": (60, False)}, v
-    v = dict((n, over) for n, _, _, over in verdict({"hotspots-1y": [231, 240, 10]}))
-    assert v == {"hotspots-1y": True}, v
-    assert verdict({"ownership-all": []}) == []
+    v = {n: o for n, _, _, o in verdict("rust", {"hotspots-all": [231, 240, 10]})}
+    assert v == {"hotspots-all": True}, v
+    v = {n: o for n, _, _, o in verdict("linux", {"overview": [3833, 3800, 3900]})}
+    assert v == {"overview": True}, v
+    assert verdict("rust", {"ownership-all": []}) == []
+    # Every gate names a known page, and every page is gated on rust.
+    for repo, gates in GATES.items():
+        assert set(gates) <= set(PAGES), (repo, set(gates) - set(PAGES))
+    assert set(GATES["rust"]) == set(PAGES), set(PAGES) - set(GATES["rust"])
     print("speed-check self-test ok")
     return 0
 
@@ -97,7 +133,7 @@ def main() -> int:
     bench = Path(
         os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
     )
-    ap.add_argument("--repo", type=Path, default=bench / "rust.git")
+    ap.add_argument("--repos", default=",".join(GATES))
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--max-load", type=float, default=float(os.cpu_count() or 2))
     ap.add_argument("--only", default="")
@@ -109,21 +145,27 @@ def main() -> int:
         ap.error("--bin is required")
     # The server runs with the bench clone as cwd, so a relative --bin would not resolve there.
     a.bin = str(Path(a.bin).resolve())
-    if not (a.repo / "gitterrace" / "MANIFEST").exists():
-        sys.exit(f"{a.repo} has no built index: serve it once first")
-    names = [n for n in a.only.split(",") if n] or list(GATES)
-    unknown = [n for n in names if n not in GATES]
+    only = [n for n in a.only.split(",") if n]
+    unknown = [n for n in only if n not in PAGES]
     if unknown:
-        sys.exit(f"unknown gate {unknown}, known: {', '.join(GATES)}")
+        sys.exit(f"unknown page {unknown}, known: {', '.join(PAGES)}")
     over = []
-    for name, med, gate, bad in verdict(
-        measure(a.bin, a.repo, names, a.runs, a.max_load)
-    ):
-        print(
-            f"{name:14} median {med:10.1f} ms  gate {gate:5.0f} ms  {'OVER' if bad else 'ok'}"
-        )
-        if bad:
-            over.append(name)
+    for repo in [r for r in a.repos.split(",") if r]:
+        if repo not in GATES:
+            sys.exit(f"no gates for {repo}, known: {', '.join(GATES)}")
+        path = bench / f"{repo}.git"
+        if not (path / "gitterrace" / "MANIFEST").exists():
+            sys.exit(f"{path} has no built index: serve it once first")
+        names = [n for n in GATES[repo] if not only or n in only]
+        for name, med, gate, bad in verdict(
+            repo, measure(a.bin, path, names, a.runs, a.max_load)
+        ):
+            verdict_word = "OVER" if bad else "ok"
+            print(
+                f"{repo:6} {name:14} median {med:10.1f} ms  gate {gate:5.0f} ms  {verdict_word}"
+            )
+            if bad:
+                over.append(f"{repo}/{name}")
     if over:
         print(f"speed gates over: {', '.join(over)}", file=sys.stderr)
         return 1

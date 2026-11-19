@@ -83,8 +83,10 @@ runs:
 
 Languages is over its goal, and the cause is not yet known. The server renders
 these pages right after the index is ready, so most visitors get them from
-memory in a few milliseconds. `make speed-check` measures them on the rust clone
-and fails on a page over its target.
+memory in a few milliseconds. `make speed-check` measures them on the rust and
+linux clones and fails on a page over its target. The overview, statistics,
+contributors and hotspot period pages are rendered before the repository turns
+ready, so their target is a memory hit's, 300 ms.
 
 ### Commit search with the message column
 
