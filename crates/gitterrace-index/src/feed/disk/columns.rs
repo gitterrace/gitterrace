@@ -142,15 +142,10 @@ pub(super) struct Spool {
 }
 
 impl Spool {
-    pub(super) fn new(path: &Path) -> SegResult<Self> {
-        let file = std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(path)?;
+    pub(super) fn new(dir: &Path, name: &str) -> SegResult<Self> {
+        let file = crate::seg::io::create_no_follow(dir, name)?;
         Ok(Self {
-            path: path.to_path_buf(),
+            path: dir.join(name),
             file: BufWriter::new(file),
             items: 0,
         })

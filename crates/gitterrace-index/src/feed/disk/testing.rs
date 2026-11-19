@@ -24,14 +24,9 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
     bounds.extend_from_slice(cuts);
     bounds.push(recs.len());
     for (n, w) in bounds.windows(2).enumerate() {
-        let spill = dir.join(format!("spill-t{n}.gts.tmp"));
+        let spill_dir = dir.to_path_buf();
         let mut b = SegmentBuilder::new(move || {
-            std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&spill)
+            crate::seg::io::create_no_follow(&spill_dir, &format!("spill-t{n}.gts.tmp"))
         });
         b.continue_lives(std::mem::take(&mut lives));
         let mut rows = RowWriter::new(dir, n as u64 + 1)?;

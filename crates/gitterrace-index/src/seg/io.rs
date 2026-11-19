@@ -43,13 +43,20 @@ pub(crate) fn sync_dir(dir: &Path) -> io::Result<()> {
     File::open(dir)?.sync_all()
 }
 
-/// Creates or truncates `dir/name` for writing without following a link at that name: the
-/// cache folder can come from the repository, so a planted link must fail, never be written
-/// through. Every segment, order and manifest temp file opens here.
+/// Creates `dir/name` afresh for reading and writing without following a link at that name:
+/// the cache folder can come from the repository, so a planted link must fail, never be
+/// written through. An existing file is unlinked and a new inode created exclusively, so a
+/// planted hard link to another file loses its name instead of truncating that file. Every
+/// segment, order, manifest, spool and spill temp file opens here.
 pub(crate) fn create_no_follow(dir: &Path, name: &str) -> io::Result<File> {
     let path = crate::cache::cache_file(dir, name)?;
+    match fs::remove_file(&path) {
+        Ok(()) => {}
+        Err(e) if e.kind() == io::ErrorKind::NotFound => {}
+        Err(e) => return Err(e),
+    }
     let mut o = fs::OpenOptions::new();
-    o.write(true).create(true).truncate(true);
+    o.read(true).write(true).create_new(true);
     #[cfg(unix)]
     {
         use std::os::unix::fs::OpenOptionsExt;
@@ -95,6 +102,21 @@ mod tests {
         assert!(read_exact_at(&f, &mut b, 8).is_err());
         assert!(read_exact_at(&f, &mut b, u64::MAX).is_err());
         assert!(!dir.path().join("f.tmp").exists());
+        Ok(())
+    }
+
+    #[test]
+    fn temp_write_leaves_a_hard_linked_file_untouched() -> io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let sentinel = dir.path().join("sentinel");
+        fs::write(&sentinel, b"keep me")?;
+        fs::hard_link(&sentinel, dir.path().join("MANIFEST.tmp"))?;
+        fs::hard_link(&sentinel, dir.path().join("f.tmp"))?;
+        write_atomic(dir.path(), "f", b"new")?;
+        let mut f = create_no_follow(dir.path(), "MANIFEST.tmp")?;
+        io::Write::write_all(&mut f, b"overwritten")?;
+        assert_eq!(fs::read(&sentinel)?, b"keep me");
+        assert_eq!(fs::read(dir.path().join("f"))?, b"new");
         Ok(())
     }
 

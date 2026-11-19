@@ -79,15 +79,11 @@ pub struct RowWriter {
 impl RowWriter {
     pub fn new(dir: &Path, generation: u64) -> SegResult<Self> {
         let path = dir.join(format!("rows-{generation}.gts.tmp"));
-        let spool = BufWriter::new(
-            std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&path)?,
-        );
-        let cols = columns::Spool::new(&dir.join(format!("cols-{generation}.gts.tmp")))?;
+        let spool = BufWriter::new(crate::seg::io::create_no_follow(
+            dir,
+            &format!("rows-{generation}.gts.tmp"),
+        )?);
+        let cols = columns::Spool::new(dir, &format!("cols-{generation}.gts.tmp"))?;
         Ok(Self {
             path,
             spool,

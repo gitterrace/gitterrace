@@ -32,14 +32,9 @@ impl SegmentBuild {
         shallow: &[String],
     ) -> crate::seg::SegResult<Self> {
         let generation = previous.map_or(0, |m| m.generation) + 1;
-        let spill = dir.join(format!("spill-{generation}.gts.tmp"));
+        let spill_dir = dir.to_path_buf();
         let builder = crate::feed::segments::SegmentBuilder::new(move || {
-            std::fs::OpenOptions::new()
-                .read(true)
-                .write(true)
-                .create(true)
-                .truncate(true)
-                .open(&spill)
+            crate::seg::io::create_no_follow(&spill_dir, &format!("spill-{generation}.gts.tmp"))
         });
         let shallow = shallow_of(shallow)?;
         let rows = crate::feed::RowWriter::new(dir, generation)?;
@@ -211,14 +206,9 @@ pub(crate) fn append_segment<'r>(
     let g = previous.generation + 1;
     let n = store.segments.len();
     let spill = dir.join(format!("spill-{g}.gts.tmp"));
-    let spill_open = spill.clone();
+    let spill_dir = dir.to_path_buf();
     let mut builder = crate::feed::segments::SegmentBuilder::new(move || {
-        std::fs::OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .open(&spill_open)
+        crate::seg::io::create_no_follow(&spill_dir, &format!("spill-{g}.gts.tmp"))
     });
     let (paths0, idents0, labels0) = (
         strings.paths.list.len(),
