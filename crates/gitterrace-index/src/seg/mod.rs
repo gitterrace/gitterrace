@@ -39,10 +39,6 @@ pub fn hex(oid: &Oid) -> String {
     s
 }
 
-/// A commit's position inside one segment. Never compared across segments.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub struct Ordinal(pub u32);
-
 /// A commit's position in the order file: the canonical order of the whole reachable set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
 pub struct Rank(pub u32);

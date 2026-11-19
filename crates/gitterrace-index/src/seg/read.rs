@@ -108,47 +108,6 @@ impl Container {
         Ok(())
     }
 
-    /// Reads one fixed-width record by index across a section's blocks. The whole block is
-    /// read and its crc checked first, so a flipped byte is `Unreadable`, never a wrong value.
-    /// A block is at most `MAX_BLOCK`, so this costs one bounded pread.
-    pub fn record_at(
-        &self,
-        section: u16,
-        index: u32,
-        width: usize,
-        out: &mut [u8],
-    ) -> SegResult<()> {
-        let mut first = 0u32;
-        for e in self.blocks(section) {
-            if u64::from(e.items) * width as u64 != u64::from(e.len) {
-                return Err(SegError::unreadable(
-                    &self.name,
-                    e.offset,
-                    "fixed-width block length",
-                ));
-            }
-            if index < first.saturating_add(e.items) {
-                let at = (index - first) as usize * width;
-                let out = out
-                    .get_mut(..width)
-                    .ok_or_else(|| SegError::unreadable(&self.name, e.offset, "width"))?;
-                let mut buf = Vec::new();
-                let block = self.read_block(e, &mut buf)?;
-                let rec = block
-                    .get(at..at + width)
-                    .ok_or_else(|| SegError::unreadable(&self.name, e.offset, "record read"))?;
-                out.copy_from_slice(rec);
-                return Ok(());
-            }
-            first = first.saturating_add(e.items);
-        }
-        Err(SegError::unreadable(
-            &self.name,
-            0,
-            "record index past the section",
-        ))
-    }
-
     /// The first `out.len()` bytes of block `e`, by pread, crc not checked. For routing
     /// tables built at open only: every use compares the value with the block once that
     /// block is read checked (`DiskSource::rank_of`).
@@ -158,13 +117,6 @@ impl Container {
         }
         read_exact_at(&self.file, out, e.offset)
             .map_err(|_| SegError::unreadable(&self.name, e.offset, "block head read"))
-    }
-
-    /// The canonical rank of a segment-local ordinal (section `RANK`), crc checked.
-    pub fn rank(&self, ordinal: crate::seg::Ordinal) -> SegResult<Rank> {
-        let mut b = [0; 4];
-        self.record_at(crate::seg::format::section::RANK, ordinal.0, 4, &mut b)?;
-        Ok(Rank(u32::from_le_bytes(b)))
     }
 
     /// Ranks of many ordinals, in the order given. Reads each rank block it needs once (crc
@@ -364,11 +316,11 @@ mod tests {
     use std::fs;
 
     use super::*;
+    use crate::seg::fingerprint;
     use crate::seg::format::section;
     use crate::seg::manifest::Manifest;
     use crate::seg::strings::{StringDelta, write_delta};
     use crate::seg::write::{ContainerWriter, write_order};
-    use crate::seg::{Ordinal, fingerprint};
 
     /// A two-segment store: segment 0 with two paths, segment 1 with one more.
     fn build(dir: &Path) -> SegResult<Manifest> {
@@ -411,8 +363,8 @@ mod tests {
         build(dir.path())?;
         let s = Store::open(dir.path())?.ok_or_else(|| SegError::BadName("none".into()))?;
         s.check_all()?;
-        assert_eq!(s.segments[1].rank(Ordinal(1))?, Rank(3));
-        assert!(s.segments[1].rank(Ordinal(2)).is_err());
+        assert_eq!(s.segments[1].ranks(&[1])?, [Rank(3)]);
+        assert!(s.segments[1].ranks(&[2]).is_err());
         let mut buf = Vec::new();
         let e = s.segments[0].blocks(section::COMMITS)[0];
         assert_eq!(s.segments[0].read_block(&e, &mut buf)?, &[0u8; 40]);
