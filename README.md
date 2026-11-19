@@ -6,12 +6,14 @@
 </h1>
 
 <!-- BEGIN GENERATED: pitch -->
-A local, read-only git browser: code, history and insights, offline.
+A local, read-only git browser that hands findings to any tool.
 
 <!-- END GENERATED: pitch -->
 
 Code, commits, blame, branches, worktrees, stashes and insights, with no
 database, accounts or network ([why](https://gitterrace.dev/docs/why/)).
+Pass what you find to any agent, editor, tracker or script you already use, or
+read the same data over the [JSON API and the MCP server](https://gitterrace.dev/docs/api/).
 
 <!-- BEGIN GENERATED: demo -->
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
@@ -27,8 +29,8 @@ for great tools.
 
 <!-- BEGIN GENERATED: shots -->
 <picture>
-<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/overview-dark.webp">
-<img src="docs/screenshots/overview-light.webp" alt="Browse: the repository page with README, last commit, file list and key numbers.">
+<source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/send-dark.webp">
+<img src="docs/screenshots/send-light.webp" alt="Send to: marked lines with their context, ready for mail, an issue, a merge request or your task list.">
 </picture>
 
 <!-- END GENERATED: shots -->
@@ -102,13 +104,14 @@ git terrace export [out]     Write a static copy of the site to a folder, for sh
 
 <!-- BEGIN GENERATED: actions -->
 Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`,
-`search-hit`, `insight`, `page`). Examples in `docs/actions/`: `clipboard.sh`,
-`editor.sh`, `obsidian.sh`.
+`search-hit`, `insight`, `page`). Examples in `docs/actions/`: `agent.sh`,
+`clipboard.sh`, `editor.sh`, `obsidian.sh`.
 
 <!-- END GENERATED: actions -->
 
-Or send it to a tracker, notes app or mail draft. Both are off until you write
-`actions.toml` ([set up](https://gitterrace.dev/docs/actions/)).
+Or send it to a tracker, notes app or mail draft. Mail draft works out of the
+box. `git terrace init` writes `actions.toml` with the other targets, switched
+off until you enable them ([set up](https://gitterrace.dev/docs/actions/)).
 
 gitterrace binds to `127.0.0.1` and never changes your files or history
 ([security model](https://gitterrace.dev/docs/security/)). All docs:

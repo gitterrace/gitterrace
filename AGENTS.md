@@ -17,7 +17,7 @@ Shared rules: `vendor/schwarzwald/kit/rules/rules.md`. They apply here in full.
 | `gitterrace-actions` | User actions: actions.toml, the payload v1 contract and the sandboxed runner. |
 | `gitterrace-api` | JSON API (/api/v1) and the read-only MCP server, from one endpoint registry. |
 | `gitterrace-web` | axum server, askama templates, static assets and the request guard. |
-| `gitterrace` | A local, read-only git browser: code, history and insights, offline. Binary `git-terrace`. |
+| `gitterrace` | A local, read-only git browser that hands findings to any tool. Binary `git-terrace`. |
 | `gitterrace-testkit` | Test support shared by every crate: the git helper, the fixture repository builder and the request helper. Dev-dependency only. |
 
 <!-- END GENERATED: crates -->

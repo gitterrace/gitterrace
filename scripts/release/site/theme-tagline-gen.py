@@ -23,7 +23,7 @@ import re
 import sys
 from pathlib import Path
 
-TAGLINE = "A local, read-only git browser: code, history and insights, offline."
+TAGLINE = "A local, read-only git browser that hands findings to any tool."
 ROOT = Path(__file__).resolve().parents[3]
 FONT = (
     ROOT

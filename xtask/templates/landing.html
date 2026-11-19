@@ -1,11 +1,12 @@
-{#- The landing page body: the pitch, why it exists, how to start, what it looks like and
-what it does with your code. Its prose comes from docs/landing.md, each sentence once, and
+{#- The landing page body: the pitch, why it exists, what it looks like, what it does with
+your code, then how to start. Value comes before install, so a visitor sees the hand-off
+first. Its prose comes from docs/landing.md, each sentence once, and
 the rest from the code. The bar holds the Demo link, so the page does not repeat it. The
 install tabs are radio inputs and CSS, so they need no script, and with
 CSS off every command still shows. A screenshot opens as a :target overlay, also without
 script; its full-size image is a decorative copy, so the description is read once. Light
 and dark are two lazy images, one hidden by the theme, so only the shown one loads. The
-overview under the pitch is above the fold, so it loads at once: one picture whose dark
+hero shot under the pitch is above the fold, so it loads at once: one picture whose dark
 source follows the system, and the theme button points that source's media at its choice. -#}
 <div class="hero">
 <h1><img class="on-light" src="/assets/logo-light.svg" alt="{{ name }}" width="540" height="120"
@@ -13,6 +14,11 @@ loading="lazy">
 <img class="on-dark" src="/assets/logo-dark.svg" alt="" width="540" height="120"
 loading="lazy"></h1>
 <p class="lead">{{ pitch }}</p>
+<ul class="destinations" aria-label="Where a finding goes">
+{%- for d in destinations %}
+<li><a href="/{{ d.1 }}">{{ d.0 }}</a></li>
+{%- endfor %}
+</ul>
 <section class="why-row">
 <h2 id="why">Why</h2>
 <div class="story">{{ story|safe }}</div>
@@ -22,27 +28,6 @@ srcset="/assets/screenshots/{{ hero.0 }}-dark.webp">
 height="800" loading="eager" decoding="async"></picture>
 </section>
 </div>
-<section>
-<h2 id="install">Install</h2>
-<div class="tabs">
-{%- for i in install %}
-<input type="radio" name="install" id="install-{{ i.0 }}" class="tab-radio"
-{%- if loop.first %} checked{% endif %}>
-<label for="install-{{ i.0 }}" class="tab-label">{{ i.0 }}</label>
-{%- endfor %}
-{%- for i in install %}
-<div class="tab-panel" id="panel-{{ i.0 }}">{{ i.1|safe }}</div>
-{%- endfor %}
-</div>
-<p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
-{%- for r in requires %} {{ r }}.{% endfor %}</p>
-</section>
-<section>
-<h2 id="quickstart">Quickstart</h2>
-<div data-from="docs/getting-started/">{{ quickstart|safe }}</div>
-<p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
-upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
-</section>
 <section id="features">
 <h2>What it does</h2>
 <div class="shots">
@@ -72,4 +57,25 @@ width="1280" height="800" loading="lazy" decoding="async"></span></a>
 <div>{{ promises|safe }}</div>
 <p class="more"><a href="/docs/why/#compared-with">How it compares</a> with the
 tools you know.</p>
+</section>
+<section>
+<h2 id="install">Install</h2>
+<div class="tabs">
+{%- for i in install %}
+<input type="radio" name="install" id="install-{{ i.0 }}" class="tab-radio"
+{%- if loop.first %} checked{% endif %}>
+<label for="install-{{ i.0 }}" class="tab-label">{{ i.0 }}</label>
+{%- endfor %}
+{%- for i in install %}
+<div class="tab-panel" id="panel-{{ i.0 }}">{{ i.1|safe }}</div>
+{%- endfor %}
+</div>
+<p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
+{%- for r in requires %} {{ r }}.{% endfor %}</p>
+</section>
+<section>
+<h2 id="quickstart">Quickstart</h2>
+<div data-from="docs/getting-started/">{{ quickstart|safe }}</div>
+<p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
+upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
 </section>

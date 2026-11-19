@@ -10,9 +10,14 @@ We built gitterrace to read a repository before pushing it. Does the README say
 what the code does? Do the docs and diagrams render? Is the history one you
 would want to read? A code host answers only once it is public, and your editor
 shows the code, not the page a reader sees. Now agents write much of the code,
-so that reading matters more. Review what they wrote, then send each finding on
-with its context: back to an agent, or as a task or ticket. Changes, unpushed
-branches and worktrees, all in one place, on your machine.
+so that reading matters more. Review what they wrote, then pass each finding on
+with its context. Changes, unpushed branches and worktrees, all in one place,
+in your browser, on your machine.
+
+A finding is plain text with a source line, so it goes to the agent, editor,
+tracker or script you already use. Any page is a link you can paste anywhere,
+and agents can read the same data over the API or MCP without opening a
+browser.
 
 ## What it does with your code
 

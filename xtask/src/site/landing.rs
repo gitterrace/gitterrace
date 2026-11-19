@@ -25,6 +25,12 @@ const CACHE_DIR: &str = ".git/gitterrace/";
 /// `docs/screenshots/` keeps only the PNG files the README links.
 pub const SHOTS: [(&str, &str, &str); 6] = [
     (
+        "send",
+        "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
+         your task list.",
+        "Send to",
+    ),
+    (
         "overview",
         "Browse: the repository page with README, last commit, file list and key numbers.",
         "Browse",
@@ -40,12 +46,6 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
         "Blame",
     ),
     (
-        "send",
-        "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
-         your task list.",
-        "Send to",
-    ),
-    (
         "insights",
         "Hotspots: the files that change most, against how many people touch them.",
         "Hotspots",
@@ -57,8 +57,9 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
     ),
 ];
 
-/// The alt text of the overview under the pitch, the first shot without its caption word.
-const HERO_ALT: &str = "The repository page: README, last commit, file list and key numbers.";
+/// The alt text of the hero under the pitch: Send to, the hand-off that sets gitterrace apart.
+const HERO_ALT: &str =
+    "Marked lines with their context and source line, ready to send to mail, an issue or a task.";
 
 /// What the screenshots cannot show, one line each: (title, docs page, docs section whose
 /// first paragraph is the line). The text is the doc's own, so the landing page says nothing
@@ -70,6 +71,17 @@ const LINES: [(&str, &str, &str); 2] = [
         "docs/using.md",
         "Browse several repositories",
     ),
+];
+
+/// Where a finding goes, shown as a row under the pitch so "any tool" reads at a glance:
+/// (label, docs path with anchor). The site's link check fails on an anchor that is gone.
+const DESTINATIONS: [(&str, &str); 6] = [
+    ("Coding agents", "docs/actions/#hand-a-finding-to-an-agent"),
+    ("Your editor", "docs/actions/#the-starter-file"),
+    ("Issues and tasks", "docs/actions/#send-to"),
+    ("Mail", "docs/actions/#send-to"),
+    ("Scripts and webhooks", "docs/actions/#actions"),
+    ("API and MCP", "docs/api/"),
 ];
 
 #[derive(Template)]
@@ -86,6 +98,7 @@ struct Landing<'a> {
     lines: Vec<(&'a str, String, String)>,
     promises: &'a str,
     story: &'a str,
+    destinations: &'a [(&'a str, &'a str)],
 }
 
 /// The landing page's body, its h1 first. `read` reads a repository file.
@@ -143,6 +156,7 @@ pub(crate) fn body(
         lines: rows,
         promises: &md(promises, links),
         story: &md(story, links),
+        destinations: &DESTINATIONS,
     }
     .render()?;
     Ok(format!("{html}\n"))

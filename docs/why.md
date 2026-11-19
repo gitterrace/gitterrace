@@ -7,17 +7,18 @@ sees it.
 
 With agents writing much of the code, and fast, that reading is how we catch
 what nobody meant. Every finding needs a place to go: back to an agent, or as
-a task or ticket. The [tools we knew](why.md#compared-with) could show the
-code, but not send it on.
+a task or ticket. gitterrace shows the code and passes a finding on, to the
+tool you choose ([compared with](#compared-with) others).
 
 What it promises about your code, from where it listens to what it writes, is
 in the [security model](security.md).
 
 ## Reading, then sending on
 
-Send to and actions do the handing on, as a task, note, issue or hook. Unlike
-an editor's integration, targets are generic entries in a small file you own,
-any URL or command works, and the destination's own add screen asks you to
+Send to opens a task, note, issue or mail draft, and actions run a command or
+a hook. A finding is plain text ending in a source line any tool can parse.
+Unlike an editor's integration, targets are generic entries in a small file you
+own, any URL or command works, and the destination's own add screen asks you to
 confirm. gitterrace never calls the destination itself.
 
 ## Insights
@@ -38,6 +39,10 @@ beside the history.
 - A self-hosted code server: a service to run. gitterrace is one binary you
   start and stop.
 - Your editor's git view: tied to that editor. gitterrace works beside any.
+- Diff review apps: built for reviewing and commenting in the app, with
+  integrations for the agents and hosts they support. gitterrace is for reading,
+  and hands a finding to whichever target you name. Its API and MCP server let
+  other tools read the same data.
 
 It is not a host and not a replacement for git or your editor.
 

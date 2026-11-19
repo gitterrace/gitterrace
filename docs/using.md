@@ -10,7 +10,9 @@
 
 Good to know: the chip shows only while the tree has changes. Without a
 `[[send]]` target, **Copy as markdown** puts the note on the clipboard.
-[Send to and actions](actions.md) sets up targets.
+Mail draft is there from the start. `git terrace init` writes `actions.toml`
+with more targets (issues, merge requests, your editor, a webhook). Switch one
+on with `enabled = true`, and [Send to and actions](actions.md) covers the rest.
 
 ## Browse several repositories
 
