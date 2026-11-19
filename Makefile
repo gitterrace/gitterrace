@@ -240,8 +240,8 @@ bench-report:
 	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
-.PHONY: docs-gen domains changelog site deploy demo demo-deploy site-preview app-icon site-render \
-	site-shots shipped
+.PHONY: docs-gen domains changelog release-gate site deploy demo demo-deploy site-preview \
+	app-icon site-render site-shots shipped
 
 ## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
 docs-gen:
@@ -250,6 +250,15 @@ docs-gen:
 ## domains: gitterrace.dev serves and every other host redirects to it
 domains:
 	python3 scripts/release/site/site-check.py domains
+
+# Regenerates and commits the version's changelog section, tags HEAD, runs both changelog checks,
+# the release check's gate on macOS (memory included), the macOS smoke test and ci.yml full on
+# the hosted runners for the exact commit, then pushes main and the tag in one atomic push.
+# ACT=1 adds the Ubuntu jobs through act. RETAG=1 re-tags an unpublished release.
+# scripts/hooks/pre-push refuses a tag without its pass record or apart from main.
+## release-gate: Gate, tag and push a release (VERSION=x.y.z, RETAG=1 to re-tag)
+release-gate:
+	bash scripts/release/gate-run.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # Writes the section from the commits since the last tag, in place of the generated Unreleased
 # section. Needs git-cliff 2.14.2.

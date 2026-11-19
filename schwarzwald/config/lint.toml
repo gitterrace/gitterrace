@@ -153,5 +153,7 @@ steps = [
   "ci-inject-test|python3|install python3|python3 scripts/lint/inject-check.py --self-test",
   "deps|python3|install python 3.11|$PY scripts/lint/deps-check.py",
   "deps-test|python3|install python 3.11|$PY scripts/lint/deps-check.py --self-test",
+  "release-gate-test|bash|install bash|bash scripts/release/gate-run.sh --self-test",
+  "pre-push-test|python3|install python3|python3 scripts/release/push-check.py --self-test",
   "machete|cargo-machete|cargo install cargo-machete|cargo-machete",
 ]

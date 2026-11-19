@@ -118,10 +118,19 @@ on http://127.0.0.1:4343.
    After that it moves only when the policy's content does.
 2. On the release candidate commit, in a clean clone on a quiet machine,
    `make bench LARGE=1` and commit the results.
-3. `make changelog VERSION=x.y.z` writes the CHANGELOG.md section from the
-   commits, commit it. Never edit a released section by hand.
-4. Tag and push. The release workflow builds the binaries, the installer and the
-   formula.
+3. `make release-gate VERSION=x.y.z` on main: it removes any old x.y.z
+   section, writes it with `make changelog` and commits it, so a hand edit or
+   an old date never ships. It then runs both changelog checks with the tag on
+   that commit, the gate on macOS, the smoke test, and `ci.yml` with
+   `full=true` on the hosted runners for that exact commit (pushed to a temporary branch,
+   deleted after): some races show only on x86_64 runners, never in `act` on
+   an arm64 Mac. `ACT=1` adds the Ubuntu jobs through `act`. On pass it pushes
+   main and the tag in one atomic push. Never tag or push a tag by hand:
+   `scripts/hooks/pre-push` refuses a tag without a pass record naming its CI
+   run, a tag apart from a main at the same commit, and a main that edits a
+   released section apart from its tag. To re-tag an unpublished release,
+   `make release-gate VERSION=x.y.z RETAG=1`.
+4. The release workflow builds the binaries, the installer and the formula.
 5. `make deploy` (it refuses until the tag, repository and tap answer), then
    `make domains`.
 6. Refresh the live demo: `make demo demo-deploy` exports the pinned jq and

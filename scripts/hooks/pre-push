@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The release rules of a push (scripts/release/push-check.py): a v* tag needs a make
+# release-gate pass record and travels with main, and main never changes a released changelog
+# section apart from its tag. Wired by core.hooksPath scripts/hooks.
+exec python3 "$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/scripts/release/push-check.py" "$@"
