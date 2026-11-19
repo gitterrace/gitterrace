@@ -5,7 +5,8 @@
 # the release memory_budget test. --self-test: argument parsing and the toolchain pin, no docker.
 # The image is native arch (arm64 on Apple silicon). The source is mounted read-only and copied
 # into the container, since some linters write beside the files they read. Cargo's registry and
-# target/ live in named volumes, so repeat runs are incremental.
+# target/ live in named volumes, so repeat runs are incremental. The image runs as a normal
+# user: a volume made by an older, root image needs `docker volume rm` once.
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 dockerfile=$root/deploy/test/linux.Dockerfile

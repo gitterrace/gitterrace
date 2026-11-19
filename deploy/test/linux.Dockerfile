@@ -40,4 +40,9 @@ RUN pip install --break-system-packages ruff==0.17.5 \
 COPY --from=lint-tools linux-install.sh linux-pins.txt /tmp/lint-tools/
 RUN bash /tmp/lint-tools/linux-install.sh /usr/local/bin && rm -rf /tmp/lint-tools
 RUN git config --system --add safe.directory '*'
+# A normal user, as on the CI runner: Linux does not enforce RLIMIT_NPROC for root, so the
+# guards' fork-starved fallback cases cannot starve as root. The cargo home and /work/target
+# are the user's, and new named volumes take that ownership from the image.
+RUN useradd -m builder && mkdir -p /work/target /usr/local/cargo/registry && chown -R builder /usr/local/cargo /work
+USER builder
 WORKDIR /work
