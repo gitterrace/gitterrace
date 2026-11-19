@@ -124,8 +124,9 @@ never published: `bench-report --check` refuses it. The JSON keeps the commit in
 
 ## Results
 
-The newest run against its budgets. The charts and every page of each kept run
-are in [tests/bench/results](../tests/bench/results/README.md).
+The newest run against its budgets. The numbers of each kept run are in
+[tests/bench/results](../tests/bench/results/), and `make bench-report` draws
+their charts and pages there.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-18 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS

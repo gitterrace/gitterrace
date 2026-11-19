@@ -22,3 +22,7 @@ node_modules/
 
 # Local denylist of names, hosts and ids (the shared lints in vendor/schwarzwald/kit/lint)
 /.personal-denylist
+
+# Drawn from the run JSON by `make bench-report`; --check renders them in memory.
+/tests/bench/results/**/*.svg
+/tests/bench/results/**/README.md

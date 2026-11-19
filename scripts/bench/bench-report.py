@@ -2,9 +2,9 @@
 """Publish tests/bench/results: normalize the run files, render their charts, write the doc.
 
 One run is tests/bench/results/<date>-<machine>.json plus its charts in
-tests/bench/results/<date>-<machine>/
-(<metric>.svg and <metric>-dark.svg). The newest two runs are kept: the newest in full, the one
-before it as the baseline of the comparison table. The machine label comes from the CPU, never
+tests/bench/results/<date>-<machine>/ (<metric>.svg and <metric>-dark.svg), drawn from the JSON
+and untracked. The newest two runs are kept: the newest in full, the one before it as the
+baseline of the comparison table. The machine label comes from the CPU, never
 the hostname. Stdlib only, no PNG, no JS, no fonts. The charts are files, not inline SVG, since a
 markdown sanitizer strips inline <svg> and <style>, and the doc links them through <picture>.
 
@@ -458,11 +458,12 @@ def no_inline_svg() -> list[str]:
     ]
 
 
-def no_hostname(paths: list[Path]) -> list[str]:
+def no_hostname(files: list[tuple[Path, str]]) -> list[str]:
+    """Files as (path, text): a tracked one as on disk, a drawn one as rendered."""
     host = platform.node().split(".")[0].lower()
     errs: list[str] = []
-    for p in paths:
-        text = p.read_text().lower()
+    for p, text in files:
+        text = text.lower()
         if p.suffix == ".json" and '"host"' in text:
             errs.append(f"{p.relative_to(bc.ROOT)}: has a host field")
         if host and re.search(rf"\b{re.escape(host)}\b", p.name.lower() + "\n" + text):
@@ -497,13 +498,16 @@ def check(text: str, new: str) -> None:
     ]
     errs += bd.stray()
     errs += own_ids()
-    errs += no_hostname(sorted(bd.actual()) + [bc.DOC])
+    disk = [p for p in sorted(bd.actual()) if bd.tracked(p)] + [bc.DOC]
+    drawn = [(p, b) for p, b in want.items() if not bd.tracked(p)]
+    errs += no_hostname([(p, p.read_text()) for p in disk] + drawn)
     for p, body in want.items():
-        if not p.exists() or p.read_text() != body:
+        if bd.tracked(p) and (not p.exists() or p.read_text() != body):
             errs.append(f"{p.relative_to(bc.ROOT)}: stale or missing")
     errs += [
         f"{p.relative_to(bc.ROOT)}: left over from an older run"
         for p in bd.actual() - set(want)
+        if bd.tracked(p)
     ]
     pages = "\n".join(body for p, body in want.items() if p.suffix == ".md") + new
     errs += page_problems(

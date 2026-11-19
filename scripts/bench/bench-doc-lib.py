@@ -497,7 +497,7 @@ def results_readme(kept: list[Json]) -> str:
 
 def render() -> str:
     """The results block of docs/benchmarks.md: the newest run's header and its table against
-    the budgets. The charts and every page live once, in tests/bench/results/README.md."""
+    the budgets. The charts and every page are drawn into tests/bench/results, untracked."""
     runs = published()
     cur = shown(runs[-1])
     old = shown(runs[-2]) if len(runs) > 1 else None
@@ -520,6 +520,11 @@ def spliced(text: str, body: str) -> str:
 def owned(p: Path) -> bool:
     """A file this report writes: run JSON, chart SVG or README."""
     return p.suffix in (".json", ".svg") or p.name == "README.md"
+
+
+def tracked(p: Path) -> bool:
+    """A file the repository keeps: the run JSON. Charts and READMEs are drawn from it."""
+    return p.suffix == ".json"
 
 
 def actual(root: Path = bc.RESULTS) -> set[Path]:
