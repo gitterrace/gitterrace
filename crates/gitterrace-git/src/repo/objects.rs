@@ -112,11 +112,7 @@ impl Repo {
     pub fn blob_bytes(&self, rev: &str, path: &str) -> Result<Vec<u8>> {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
-        Self::blob_bytes_at(&repo, tip, path.trim_matches('/'))
-    }
-
-    fn blob_bytes_at(repo: &gix::Repository, tip: gix::ObjectId, path: &str) -> Result<Vec<u8>> {
-        let id = Self::blob_id_at(repo, tip, path)?;
+        let id = Self::blob_id_at(&repo, tip, path.trim_matches('/'))?;
         Ok(repo.find_object(id).map_err(git)?.detach().data)
     }
 
@@ -172,25 +168,16 @@ impl Repo {
         let path = path.trim_matches('/');
         let id = Self::blob_id_at(&repo, tip, path)?;
         let size = repo.find_header(id).map_err(git)?.size();
-        let (text, head) = if size > self.text_limit() {
-            (None, Vec::new())
-        } else {
-            let data = repo.find_object(id).map_err(git)?.detach().data;
-            if crate::diff::is_binary(&data) {
-                let head = head_of(&data, false);
-                (None, head)
-            } else {
-                match String::from_utf8(data) {
-                    Ok(t) => (Some(t), Vec::new()),
-                    Err(e) => (None, head_of(e.as_bytes(), false)),
-                }
-            }
-        };
-        Ok(Blob {
-            path: path.to_string(),
-            size,
-            text,
-            head,
-        })
+        let limit = self.text_limit();
+        if size > limit {
+            return Ok(Blob {
+                path: path.to_string(),
+                size,
+                text: None,
+                head: Vec::new(),
+            });
+        }
+        let data = repo.find_object(id).map_err(git)?.detach().data;
+        Ok(blob_of(path, &data, limit))
     }
 }
