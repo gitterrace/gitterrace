@@ -1,12 +1,30 @@
 //! Which repositories the CLI paths name: a repository as is, a folder searched for them.
 
+use std::io::Read;
 use std::path::{Path, PathBuf};
 
 /// A working tree (holding `.git`) or a bare repository (`HEAD`, `objects` and `refs` at its
 /// top). A bare clone has no `.git`, and searching it for repositories finds none.
+///
+/// A `.git` folder counts only once it holds `HEAD`, and a `.git` file only when it names a
+/// `gitdir:`: a clone still being written has an empty `.git` and must not be served yet.
 pub(super) fn is_repo(dir: &Path) -> bool {
-    dir.join(".git").exists()
-        || (dir.join("HEAD").is_file() && dir.join("objects").is_dir() && dir.join("refs").is_dir())
+    let git = dir.join(".git");
+    if git.is_dir() {
+        return git.join("HEAD").is_file();
+    }
+    if git.is_file() {
+        return names_gitdir(&git);
+    }
+    dir.join("HEAD").is_file() && dir.join("objects").is_dir() && dir.join("refs").is_dir()
+}
+
+/// Whether the `.git` file at `path` starts with `gitdir: `, reading at most its first line.
+fn names_gitdir(path: &Path) -> bool {
+    let mut head = [0u8; 8];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok_and(|()| &head == b"gitdir: ")
 }
 
 /// Expands the CLI paths.
@@ -72,5 +90,28 @@ fn walk(dir: &Path, depth: usize, skip: &[String], out: &mut Vec<PathBuf>) {
         } else {
             walk(&d, depth - 1, skip, out);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn half_written_clone_is_not_a_repository() -> std::io::Result<()> {
+        let dir = tempfile::tempdir()?;
+        let clone = dir.path().join("clone");
+        std::fs::create_dir_all(clone.join(".git"))?;
+        assert!(!is_repo(&clone), "an empty .git is a clone in progress");
+        std::fs::write(clone.join(".git/HEAD"), "ref: refs/heads/main\n")?;
+        assert!(is_repo(&clone), "a .git with HEAD is served");
+
+        let linked = dir.path().join("linked");
+        std::fs::create_dir(&linked)?;
+        std::fs::write(linked.join(".git"), "")?;
+        assert!(!is_repo(&linked), "an empty .git file names no gitdir");
+        std::fs::write(linked.join(".git"), "gitdir: ../clone/.git\n")?;
+        assert!(is_repo(&linked), "a gitdir file is a linked worktree");
+        Ok(())
     }
 }
