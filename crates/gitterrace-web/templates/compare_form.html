@@ -2,5 +2,8 @@
 <form class="cmp" action="{{ action }}" method="get"><input name="base" value="{{ base }}"
  placeholder="Base" aria-label="Base" required><i aria-hidden="true">…</i><input name="head"
  value="{{ head }}" placeholder="Head" aria-label="Head">
+<label class="muted" title="Compare from where head left base, like git's three dots">{#- -#}
+<input type="checkbox" name="mode" value="merge-base"
+{%- if merge %} checked{% endif %}> since fork</label>
 {#- Enter submits through this hidden default button. -#}
 <button type="submit" hidden>Compare</button></form>

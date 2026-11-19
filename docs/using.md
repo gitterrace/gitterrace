@@ -44,6 +44,16 @@ Good to know: a filtered log has no graph. A public server leaves out worktree
 HEADs. When several clones of one project are served, **Related:** links the
 log of each clone that shares a root commit.
 
+## Compare a branch
+
+1. Open a branch's log. **Since it left the default branch** opens the compare
+   page from the commit the branch forked at, like a pull request.
+2. On the compare page, **since fork** switches between that view (`A...B`)
+   and every commit in B that A lacks (`A..B`).
+
+From a terminal, `git terrace --ref main...feature` opens the same page.
+`--print` prints the address instead.
+
 ## Find commits
 
 1. Type terms into the field above the log, for example

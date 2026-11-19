@@ -26,7 +26,13 @@ use crate::{
 pub(crate) struct CompareQuery {
     base: Option<String>,
     head: Option<String>,
+    /// `merge-base` compares from where `head` left `base` (`base...head`). Anything else is
+    /// the plain range `base..head`.
+    mode: Option<String>,
 }
+
+/// The query value of three-dot mode.
+const MERGE_BASE: &str = "merge-base";
 
 struct LangRow {
     language: String,
@@ -69,6 +75,8 @@ struct CmpForm {
     action: String,
     base: String,
     head: String,
+    /// Three-dot: the range starts at the merge base.
+    merge: bool,
 }
 
 const COMPARE_LIST: usize = 200;
@@ -92,9 +100,22 @@ enum Range {
 /// The link to compare `base` with `head`, or `""` when the compare page is turned off. With
 /// no `base` the page starts from the latest tag.
 pub(crate) fn compare_href(base: Option<&str>, head: &str) -> String {
+    crate::features::href_if(
+        gitterrace_config::Feature::Compare,
+        &compare_path(base, head, false),
+    )
+}
+
+/// The compare page's path and query, with no feature switch and no repo prefix. `merge_base`
+/// asks for `base...head`, the commits `head` has since it left `base`.
+pub fn compare_path(base: Option<&str>, head: &str, merge_base: bool) -> String {
     let base = base.map_or_else(String::new, |b| format!("base={}&", enc_seg(b)));
-    let path = format!("/compare?{base}head={}", enc_seg(head));
-    crate::features::href_if(gitterrace_config::Feature::Compare, &path)
+    let mode = if merge_base {
+        format!("&mode={MERGE_BASE}")
+    } else {
+        String::new()
+    };
+    format!("/compare?{base}head={}{mode}", enc_seg(head))
 }
 
 /// The newest tag, by its commit's time: where a comparison starts when none is asked for.
@@ -115,6 +136,7 @@ pub(crate) async fn page(
         q.head.unwrap_or_else(|| "HEAD".to_owned()),
     );
     let h2 = head.clone();
+    let merge = q.mode.as_deref() == Some(MERGE_BASE);
     cached(&app, "cm", raw, move |a, r, c| {
         let c = c.active("log");
         let refs = a.repo.refs().unwrap_or_else(|e| {
@@ -148,14 +170,20 @@ pub(crate) async fn page(
         let mut result = None;
         if !b2.is_empty() {
             match (a.repo.resolve(&b2), a.repo.resolve(&h2)) {
-                (Ok(bi), Ok(hi)) => match outcome(a, r, (&b2, &h2), (&bi, &hi)) {
-                    Ok(o) => result = Some(o),
+                (Ok(bi), Ok(hi)) => match start_of(a, &bi, &hi, merge) {
+                    Ok(from) => match outcome(a, r, (&b2, &h2), (&from, &hi)) {
+                        Ok(o) => result = Some(o),
+                        Err(e) => state = Some(e),
+                    },
                     Err(e) => state = Some(e),
                 },
                 _ => error = Some("One of the revisions does not exist.".to_owned()),
             }
         }
         let said = match &result {
+            Some(r) if r.empty.is_none() && merge => {
+                format!("{} on {h2} since it left {b2}", r.said)
+            }
             Some(r) if r.empty.is_none() => format!("{} from {b2} to {h2}", r.said),
             _ if b2.is_empty() => "Pick a base to see what changed since".to_owned(),
             _ => format!("From {b2} to {h2}"),
@@ -182,6 +210,7 @@ pub(crate) async fn page(
                 action: href("/compare"),
                 base: b2,
                 head: h2,
+                merge,
             }
             .render()
             .unwrap_or_default(),
@@ -196,6 +225,25 @@ pub(crate) async fn page(
         }
     })
     .await
+}
+
+/// Where the range starts: `base` itself, or with `merge` the commit `head` left it from.
+fn start_of(a: &App, base: &str, head: &str, merge: bool) -> std::result::Result<String, Empty> {
+    if !merge {
+        return Ok(base.to_owned());
+    }
+    match a.repo.merge_base(base, head) {
+        Ok(Some(id)) => Ok(id),
+        Ok(None) => Err(Empty::new(
+            "These revisions share no history, so there is no point where one left the other.",
+        )),
+        Err(e) => {
+            tracing::warn!("compare merge base: {e}");
+            Err(Empty::new(
+                "The repository could not be read for this comparison. Try again shortly.",
+            ))
+        }
+    }
 }
 
 /// The figures, languages and commits of `base..head`, given by name and by resolved id, or

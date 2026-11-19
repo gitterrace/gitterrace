@@ -91,6 +91,7 @@ use std::{
 
 pub use crate::app::index_child;
 pub use add::TOKEN_HEADER as ADD_TOKEN_HEADER;
+pub use compare::compare_path;
 use gitterrace_config::Config;
 use gitterrace_git::Repo;
 use gitterrace_index::Index;

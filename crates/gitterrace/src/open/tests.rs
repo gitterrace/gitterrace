@@ -389,3 +389,15 @@ fn repo_reply_reads_json_and_text() {
     assert!(r.error.is_none());
     assert_eq!(r.why(), "forbidden: bad token");
 }
+
+/// Both range forms parse, the three dots are not read as two dots plus a stray dot, and an
+/// empty side is HEAD. Catches a split on `..` first.
+#[test]
+fn a_range_spec_tells_two_dots_from_three() {
+    let p = |s| crate::open::range::parse_range(s).expect("parses");
+    assert_eq!(p("a..b"), ("a".into(), "b".into(), false));
+    assert_eq!(p("a...b"), ("a".into(), "b".into(), true));
+    assert_eq!(p("v1..."), ("v1".into(), "HEAD".into(), true));
+    assert_eq!(p("..b"), ("HEAD".into(), "b".into(), false));
+    assert!(crate::open::range::parse_range("main").is_err());
+}

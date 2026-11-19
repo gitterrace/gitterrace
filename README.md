@@ -89,7 +89,7 @@ Without a target, **Copy as markdown** puts the same note on the clipboard.
 
 <!-- BEGIN GENERATED: commands -->
 ```text
-git terrace [paths]          Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public]
+git terrace [paths]          Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public --ref --print]
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents [--served]

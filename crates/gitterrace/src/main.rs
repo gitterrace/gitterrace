@@ -57,6 +57,11 @@ async fn main() -> anyhow::Result<()> {
     for w in &loaded.warnings {
         tracing::warn!("config: {w}");
     }
+    if let Some(spec) = &cli.range {
+        return tokio::task::block_in_place(|| {
+            open::run_range(spec, &path, cli.print, &loaded, cli.config.as_deref())
+        });
+    }
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {

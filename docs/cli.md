@@ -15,6 +15,12 @@ Browse a git repository in your browser, offline.
 git terrace [OPTIONS] [PATHS]... [COMMAND]
 ```
 
+- `--ref <A..B>`: Open the compare page for `A..B` (commits in B that A lacks)
+  or `A...B` (since B left A, from their merge base) in the first repository,
+  starting a server if needed. An empty side is `HEAD`. Combine with `--print`
+  to print the URL.
+- `--print`: With `--ref`: print the URL instead of opening a browser.
+
 ## Global flags
 
 - `<PATHS>...`: Repositories to serve (any path inside one), or folders to

@@ -1,6 +1,7 @@
 mod blame;
 mod changes;
 mod history;
+mod merge_base;
 mod objects;
 mod visible;
 

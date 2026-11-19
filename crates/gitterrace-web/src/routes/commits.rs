@@ -23,6 +23,8 @@ use crate::{
     views::{Chrome, CommitRow, FileStatRow},
 };
 
+mod fork;
+
 #[derive(Deserialize)]
 pub(super) struct LogQuery {
     page: Option<usize>,
@@ -134,6 +136,7 @@ pub(super) async fn log(
         let link = |n: usize| page_link(&rev_enc, n, &f, (graph, all));
         let head = log_head(&rev, &rev_enc, (graph, all), &f, &list, pg);
         let head = PageHead {
+            actions: fork::since_left(a, &rev, &id).into_iter().collect(),
             toolbar: LogFilter {
                 action: fmt::href(&base),
                 text: f.text(),

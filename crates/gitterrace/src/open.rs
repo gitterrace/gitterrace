@@ -141,11 +141,6 @@ pub(crate) fn resolve(
     })
 }
 
-#[expect(
-    clippy::print_stderr,
-    clippy::print_stdout,
-    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
-)]
 /// Runs the subcommand: resolve, find or start a server, then open or print the URL.
 pub(crate) fn run(
     input: &str,
@@ -166,6 +161,23 @@ pub(crate) fn run(
         .collect();
     let roots: Vec<PathBuf> = cfg.links.roots.iter().map(|r| expand(r)).collect();
     let target = resolve(input, &known, &roots, cfg.multi.depth, &cfg.multi.skip_dirs)?;
+    show(&target, print, loaded, config_dir)
+}
+
+#[expect(
+    clippy::print_stderr,
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result or diagnostic, not a log line"
+)]
+/// Starts or finds the server for `target.clone`, then opens or prints its page.
+pub(super) fn show(
+    target: &Target,
+    print: bool,
+    loaded: &gitterrace_config::Loaded,
+    config_dir: Option<&Path>,
+) -> anyhow::Result<()> {
+    let cfg = &loaded.config;
+    let state = gitterrace_web::state_dir();
     if let Some(n) = &target.note {
         eprintln!("gitterrace: {n}");
     }
@@ -577,6 +589,9 @@ fn browse(url: &str) -> anyhow::Result<()> {
     anyhow::ensure!(ok, "{opener} could not open {url}");
     Ok(())
 }
+
+pub(crate) use range::run_range;
+mod range;
 
 #[cfg(test)]
 mod error_tests;

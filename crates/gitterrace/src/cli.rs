@@ -6,6 +6,10 @@ use clap::{Parser, Subcommand};
 
 /// Browse a git repository in your browser, offline.
 #[derive(Parser)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each bool is its own command line switch"
+)]
 #[command(version = option_env!("GITTERRACE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
 pub(crate) struct Cli {
     /// Repositories to serve (any path inside one), or folders to search two levels deep.
@@ -29,6 +33,14 @@ pub(crate) struct Cli {
     /// that is not loopback. Overrides `server.is_public`.
     #[arg(long, global = true)]
     pub(crate) public: bool,
+    /// Open the compare page for `A..B` (commits in B that A lacks) or `A...B` (since B left A,
+    /// from their merge base) in the first repository, starting a server if needed. An empty
+    /// side is `HEAD`. Combine with `--print` to print the URL.
+    #[arg(long = "ref", value_name = "A..B")]
+    pub(crate) range: Option<String>,
+    /// With `--ref`: print the URL instead of opening a browser.
+    #[arg(long, requires = "range")]
+    pub(crate) print: bool,
     #[command(subcommand)]
     pub(crate) command: Option<Command>,
 }
