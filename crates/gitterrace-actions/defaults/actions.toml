@@ -109,6 +109,51 @@ kinds   = ["line", "hunk", "commit", "blame", "page"]
 command = ["tendir", "add", "--notes", "{markdown}", "--", "{title}"]
 key     = "n"
 
+# Hands the selection to Claude Code in a new terminal, in the repository. Needs `agent.sh`
+# from docs/actions and `claude` on PATH.
+[[action]]
+id      = "claude"
+label   = "Ask Claude Code"
+enabled = false
+kinds   = ["line", "file", "hunk", "commit", "blame", "search-hit", "insight"]
+command = ["~/.config/gitterrace/agent.sh", "claude"]
+stdin   = "markdown"
+cwd     = "repo"
+
+# Hands the selection to Codex CLI in a new terminal, in the repository. Needs `agent.sh` from
+# docs/actions and `codex` on PATH.
+[[action]]
+id      = "codex"
+label   = "Ask Codex"
+enabled = false
+kinds   = ["line", "file", "hunk", "commit", "blame", "search-hit", "insight"]
+command = ["~/.config/gitterrace/agent.sh", "codex"]
+stdin   = "markdown"
+cwd     = "repo"
+
+# Hands the selection to Kiro CLI in a new terminal, in the repository. Needs `agent.sh` from
+# docs/actions and `kiro-cli` on PATH.
+[[action]]
+id      = "kiro"
+label   = "Ask Kiro"
+enabled = false
+kinds   = ["line", "file", "hunk", "commit", "blame", "search-hit", "insight"]
+command = ["~/.config/gitterrace/agent.sh", "kiro"]
+stdin   = "markdown"
+cwd     = "repo"
+
+# Hands the selection to Gemini CLI in a new terminal, in the repository. Needs `agent.sh`
+# from docs/actions and `gemini` on PATH. Any other agent works the same way: pass its
+# command to `agent.sh` instead.
+[[action]]
+id      = "gemini"
+label   = "Ask Gemini"
+enabled = false
+kinds   = ["line", "file", "hunk", "commit", "blame", "search-hit", "insight"]
+command = ["~/.config/gitterrace/agent.sh", "gemini"]
+stdin   = "markdown"
+cwd     = "repo"
+
 # Posts the payload as JSON to a webhook of yours. Set `url` in `vars`.
 [[action]]
 id      = "webhook"

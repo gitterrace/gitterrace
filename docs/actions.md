@@ -70,6 +70,10 @@ Switch on the ones you use (`enabled = true`) and fill in their `vars`.
 | `copy` | action | no | Copies the selection as markdown on any system |  |
 | `edit` | action | no | Opens the file at the selected line in your editor |  |
 | `tendir-add` | action | no | Adds a task with the tendir command line tool |  |
+| `claude` | action | no | Hands the selection to Claude Code in a new terminal, in the... |  |
+| `codex` | action | no | Hands the selection to Codex CLI in a new terminal, in the repository |  |
+| `kiro` | action | no | Hands the selection to Kiro CLI in a new terminal, in the repository |  |
+| `gemini` | action | no | Hands the selection to Gemini CLI in a new terminal, in the... |  |
 | `webhook` | action | no | Posts the payload as JSON to a webhook of yours | `url` |
 
 A cell ending in `...` is cut short. The whole text of every entry is in the
@@ -143,6 +147,22 @@ label   = "Search the web"
 kinds   = ["line", "commit"]
 command = ["open", "https://duckduckgo.com/?q={title:url}"]
 ```
+
+### Hand a finding to an agent
+
+The starter file has one entry per coding agent: `claude` (Claude Code),
+`codex` (Codex CLI), `kiro` (Kiro CLI) and `gemini` (Gemini CLI). Each runs
+[`agent.sh`](actions/agent.sh), which opens a new terminal in the repository
+and starts the agent with the note as its first prompt, source line included.
+The agent starts interactive, so you see what it does before it does it.
+
+1. Copy `agent.sh` to `~/.config/gitterrace/` and make it executable.
+2. In `actions.toml`, set `enabled = true` on the agent you use.
+3. Mark lines, press `.` and pick **Ask Claude Code** (or your agent).
+
+For any other agent, pass its command instead of the name:
+`command = ["~/.config/gitterrace/agent.sh", "aider --message"]`. It gets the
+note as its last argument.
 
 ### Windows
 
@@ -325,6 +345,7 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 <!-- BEGIN GENERATED: scripts -->
 | Script | Does | Needs |
 | --- | --- | --- |
+| [`agent.sh`](actions/agent.sh) | Hand the selection to a coding agent in a new terminal. | (all OSes): the agent on PATH: claude, codex, kiro-cli, gemini or any command that takes a prompt last. A terminal: Terminal on macOS, $TERMINAL or xterm on Linux. |
 | [`clipboard.sh`](actions/clipboard.sh) | Copy the selection as markdown, on any OS. | (first present wins): macOS: pbcopy (built in); Linux Wayland: wl-copy (wl-clipboard); Linux X11: xclip or xsel; WSL: clip.exe (built in); Windows: a POSIX sh is needed. On native Windows use command = ["clip.exe"] instead |
 | [`editor.sh`](actions/editor.sh) | Open a file at a line in the editor, on any OS. | (all OSes): an editor. Picks $VISUAL, then $EDITOR, then the first of code, zed, zeditor found, then vi. Line jump is known for code, vim/nvim/vi, nano, emacs, subl, zed/zeditor and hx. Any other editor opens the file without a line. |
 | [`obsidian.sh`](actions/obsidian.sh) | Append the selection to today's Obsidian daily note. | (all OSes): jq (brew install jq, apt install jq). date and mkdir are POSIX. |
