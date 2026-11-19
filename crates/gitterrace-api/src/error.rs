@@ -9,6 +9,9 @@ use axum::response::{IntoResponse, Response};
 pub enum ApiError {
     #[error("{0}")]
     BadRequest(String),
+    /// The read shows this machine, which a public server never does.
+    #[error("{0} is not served on a public server")]
+    Forbidden(&'static str),
     #[error(transparent)]
     Git(#[from] gitterrace_git::Error),
     #[error("index: {0}")]
@@ -34,6 +37,11 @@ pub enum ApiError {
 /// `OpenAPI` schema are rendered from this list.
 pub const ERROR_CODES: &[(&str, u16, &str)] = &[
     ("bad_request", 400, "a parameter is missing or invalid"),
+    (
+        "forbidden",
+        403,
+        "the read is not served on a public server",
+    ),
     ("rev_not_found", 404, "the revision does not exist"),
     (
         "path_not_found",
@@ -75,6 +83,7 @@ impl ApiError {
             Self::Git(
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
             ) => StatusCode::NOT_FOUND,
+            Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::NeedsReindex { .. } => StatusCode::CONFLICT,
             Self::Unreadable(_) | Self::NewerCache(_) => StatusCode::SERVICE_UNAVAILABLE,
             Self::Git(_) | Self::Index(_) | Self::Task(_) => StatusCode::INTERNAL_SERVER_ERROR,
@@ -84,6 +93,7 @@ impl ApiError {
     pub const fn code(&self) -> &'static str {
         match self {
             Self::BadRequest(_) => "bad_request",
+            Self::Forbidden(_) => "forbidden",
             Self::Git(gitterrace_git::Error::RevNotFound(_)) => "rev_not_found",
             Self::Git(gitterrace_git::Error::PathNotFound(_)) => "path_not_found",
             Self::Git(_) => "git",
@@ -143,6 +153,7 @@ mod tests {
     fn every_error_is_in_the_documented_codes() {
         let all = [
             ApiError::BadRequest(String::new()),
+            ApiError::Forbidden("x"),
             ApiError::Git(gitterrace_git::Error::RevNotFound(String::new())),
             ApiError::Git(gitterrace_git::Error::PathNotFound(String::new())),
             ApiError::Git(gitterrace_git::Error::NotARepo(String::new())),

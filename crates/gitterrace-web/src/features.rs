@@ -22,11 +22,12 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
     (Feature::Search, &["/search"]),
     (Feature::Raw, &["/raw/{rev}/{*path}"]),
     (Feature::History, &["/history/{*path}"]),
-    (Feature::Compare, &["/compare"]),
+    (Feature::Compare, &["/compare", "/api/v1/compare"]),
     (
         Feature::Worktree,
         &[
             "/worktree",
+            "/api/v1/worktree",
             "/worktree/diff/{*path}",
             "/worktree/raw/{*path}",
             "/worktree/blob/{*path}",

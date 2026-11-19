@@ -14,7 +14,10 @@ mod commit;
 #[cfg(test)]
 mod tests;
 
-pub use commit::{CommitResponse, DiffHunk, DiffLine, FileItem, LogCommit, LogResponse};
+pub use commit::{
+    CommitResponse, CompareResponse, DiffHunk, DiffLine, FileItem, LogCommit, LogResponse,
+    WorktreeResponse,
+};
 
 /// Who did something and when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]

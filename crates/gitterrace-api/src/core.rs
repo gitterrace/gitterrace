@@ -1,6 +1,7 @@
 //! Transport-neutral reads. Both the HTTP router and the MCP tools call these,
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
+mod diffs;
 mod page_tables;
 mod rebuild;
 mod settings;
@@ -25,6 +26,11 @@ use crate::error::ApiError;
 use crate::{insights, wire};
 
 const DEFAULT_REV: &str = "HEAD";
+
+/// Whether `file` is `dir` or inside it.
+fn under(file: &str, dir: &str) -> bool {
+    file == dir || file.strip_prefix(dir).is_some_and(|r| r.starts_with('/'))
+}
 
 /// Counting options the configuration sets for the repository named `name`: `insights.*` plus
 /// `[repo.NAME] exclude`.
@@ -354,7 +360,7 @@ impl ApiState {
         let detail = self.repo.commit(&id)?;
         let most = self.settings().caps.diff_lines;
         let cap = max_lines.map_or(most, |m| m.min(most));
-        let (mut files, truncated) = wire::files(&detail, diff, cap);
+        let (mut files, truncated) = wire::files(&detail.files, diff, cap);
         for f in &mut files {
             (f.permalink, f.link) = self.links(&id, Some(&f.path), None);
         }
@@ -372,6 +378,11 @@ impl ApiState {
             subject: s.subject.clone(),
             truncated,
         })
+    }
+
+    fn diff_cap(&self, asked: Option<usize>) -> usize {
+        let most = self.settings().caps.diff_lines;
+        asked.map_or(most, |m| m.min(most))
     }
 
     pub fn tree(&self, rev: Option<&str>, path: Option<&str>) -> Result<TreeResponse, ApiError> {

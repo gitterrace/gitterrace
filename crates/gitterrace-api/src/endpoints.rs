@@ -3,8 +3,9 @@
 
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
-    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, IndexResponse, InsightList,
-    LogResponse, RefsResponse, RepoResponse, TreeResponse,
+    BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
+    IndexResponse, InsightList, LogResponse, RefsResponse, RepoResponse, TreeResponse,
+    WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings, json_schema};
 use serde::Serialize;
@@ -207,6 +208,45 @@ pub const ENDPOINTS: &[Endpoint] = &[
         ],
         schema: of::<CommitResponse>,
         route: || get(http::commit),
+    },
+    Endpoint {
+        path: "/compare",
+        summary: "Files that differ between two revisions, with diffs.",
+        params: &[
+            req("base", "string", "Revision to compare from."),
+            p("head", "string", "Revision to compare to, default `HEAD`."),
+            p("path", "string", "Only files at or under this path."),
+            p(
+                "three_dot",
+                "boolean",
+                "`true` compares from the merge base of `base` and `head`, like `base...head`.",
+            ),
+            p(
+                "max_lines",
+                "integer",
+                "Most diff lines, at most `api.diff_lines`.",
+            ),
+        ],
+        schema: of::<CompareResponse>,
+        route: || get(http::compare),
+    },
+    Endpoint {
+        path: "/worktree",
+        summary: "Uncommitted changes against HEAD. Refused on a public server.",
+        params: &[
+            p(
+                "scope",
+                "string",
+                "`all` (default), `staged` or `unstaged`.",
+            ),
+            p(
+                "max_lines",
+                "integer",
+                "Most diff lines, at most `api.diff_lines`.",
+            ),
+        ],
+        schema: of::<WorktreeResponse>,
+        route: || get(http::worktree),
     },
     Endpoint {
         path: "/tree",

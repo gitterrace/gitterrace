@@ -15,6 +15,7 @@ The API of each repository lives at `/r/{name}/api/v1`.
 | Status | `code` | Meaning |
 |---|---|---|
 | 400 | `bad_request` | a parameter is missing or invalid |
+| 403 | `forbidden` | the read is not served on a public server |
 | 404 | `rev_not_found` | the revision does not exist |
 | 404 | `path_not_found` | the path does not exist at the revision |
 | 409 | `needs_reindex` | the revision is too far from the indexed branch to answer without a reindex |
@@ -40,6 +41,8 @@ each cap.
 | `GET /refs` |  | refs |
 | `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
 | `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
+| `GET /compare` | `base`, `head`, `path`, `three_dot`, `max_lines` | additions, base, deletions, files, from, head, path, three_dot, truncated |
+| `GET /worktree` | `scope`, `max_lines` | additions, deletions, files, scope, truncated |
 | `GET /tree` | `rev`, `path` | commit, entries, path, rev |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
@@ -59,6 +62,20 @@ each cap.
 `/commits/{id}`: One commit with its diff.
 
 - `diff` (boolean): Include hunks, default `true`.
+- `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
+
+`/compare`: Files that differ between two revisions, with diffs.
+
+- `base` (string, required): Revision to compare from.
+- `head` (string): Revision to compare to, default `HEAD`.
+- `path` (string): Only files at or under this path.
+- `three_dot` (boolean): `true` compares from the merge base of `base` and
+  `head`, like `base...head`.
+- `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
+
+`/worktree`: Uncommitted changes against HEAD. Refused on a public server.
+
+- `scope` (string): `all` (default), `staged` or `unstaged`.
 - `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
 
 `/tree`: One directory level.
@@ -169,6 +186,12 @@ so to the model.
   changed each line. Use to find who to ask about, or which commit introduced, a
   line. Follow up with `show_commit` on the commit id. Parameters: `path`
   (string), `repo?` (string), `rev?` (string).
+- `compare`: Files that differ between two revisions with their diffs (`files`,
+  additions, deletions, hunks capped by `max_lines`, `truncated` says when cut).
+  `three_dot` compares from the merge base, like a pull request. Use to review a
+  branch or the span between two tags. Parameters: `base` (string), `head?`
+  (string), `max_lines?` (integer), `path?` (string), `repo?` (string),
+  `three_dot?` (boolean).
 - `contributors`: Contributors (identities merged, bots left out) with commits,
   lines, first and last commit and active days, most active first, plus
   `bus_factor` (the fewest people who made half of all commits). Use for
@@ -206,5 +229,17 @@ so to the model.
   says when cut). Use after `log` or `blame` to learn what a change did.
   Parameters: `diff?` (boolean), `id` (string), `max_lines?` (integer), `repo?`
   (string).
+- `worktree_diff`: Uncommitted changes against HEAD with their diffs, `scope`
+  `staged`, `unstaged` or `all`. Reads this machine's working tree, so it is
+  refused on a public server. Use to review work in progress before it is
+  committed. Parameters: `max_lines?` (integer), `repo?` (string), `scope?`
+  (string).
 
 A trailing `?` marks an optional parameter.
+
+Prompts are ready-made instructions an agent can load. They read nothing
+themselves and tell the agent which tools to call.
+
+- `review_change`: Review a change: the steps to order its files by risk with
+  `compare` or `worktree_diff`, `hotspots`, ownership, `blame` and `read_file`.
+  Arguments: `base?`, `head?`, `repo?`, `worktree?`.

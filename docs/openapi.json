@@ -215,6 +215,61 @@
         ],
         "type": "object"
       },
+      "CompareResponse": {
+        "description": "`GET /compare`: the files that differ between two revisions.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "base": {
+            "type": "string"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileItem"
+            },
+            "type": "array"
+          },
+          "from": {
+            "description": "The commit the head was compared from: `base`, or the merge base of `base` and `head`\nfor a three-dot compare.",
+            "type": "string"
+          },
+          "head": {
+            "type": "string"
+          },
+          "path": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "three_dot": {
+            "type": "boolean"
+          },
+          "truncated": {
+            "description": "The diff was cut at the line cap.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "additions",
+          "base",
+          "deletions",
+          "files",
+          "from",
+          "head",
+          "three_dot",
+          "truncated"
+        ],
+        "type": "object"
+      },
       "ContributorItem": {
         "description": "One person with identities merged.",
         "properties": {
@@ -399,6 +454,7 @@
               "code": {
                 "enum": [
                   "bad_request",
+                  "forbidden",
                   "rev_not_found",
                   "path_not_found",
                   "needs_reindex",
@@ -876,6 +932,43 @@
           "rev"
         ],
         "type": "object"
+      },
+      "WorktreeResponse": {
+        "description": "`GET /worktree`: uncommitted changes against HEAD.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/FileItem"
+            },
+            "type": "array"
+          },
+          "scope": {
+            "description": "`all`, `staged` or `unstaged`.",
+            "type": "string"
+          },
+          "truncated": {
+            "description": "The diff was cut at the line cap.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "additions",
+          "deletions",
+          "files",
+          "scope",
+          "truncated"
+        ],
+        "type": "object"
       }
     }
   },
@@ -916,6 +1009,9 @@
             "description": "Not modified (`If-None-Match` matched the `ETag`)."
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -979,6 +1075,9 @@
             "description": "Not modified (`If-None-Match` matched the `ETag`)."
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -1062,6 +1161,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1134,6 +1236,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1148,6 +1253,99 @@
           }
         },
         "summary": "One commit with its diff."
+      }
+    },
+    "/compare": {
+      "get": {
+        "operationId": "compare",
+        "parameters": [
+          {
+            "description": "Revision to compare from.",
+            "in": "query",
+            "name": "base",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Revision to compare to, default `HEAD`.",
+            "in": "query",
+            "name": "head",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Only files at or under this path.",
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "`true` compares from the merge base of `base` and `head`, like `base...head`.",
+            "in": "query",
+            "name": "three_dot",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "description": "Most diff lines, at most `api.diff_lines`.",
+            "in": "query",
+            "name": "max_lines",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompareResponse"
+                }
+              }
+            },
+            "description": "additions, base, deletions, files, from, head, path, three_dot, truncated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Files that differ between two revisions, with diffs."
       }
     },
     "/contributors": {
@@ -1260,6 +1458,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1302,6 +1503,9 @@
             "description": "Not modified (`If-None-Match` matched the `ETag`)."
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -1481,6 +1685,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1562,6 +1769,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1606,6 +1816,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1648,6 +1861,9 @@
             "description": "Not modified (`If-None-Match` matched the `ETag`)."
           },
           "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
             "$ref": "#/components/responses/Error"
           },
           "404": {
@@ -1713,6 +1929,9 @@
           "400": {
             "$ref": "#/components/responses/Error"
           },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
           "404": {
             "$ref": "#/components/responses/Error"
           },
@@ -1727,6 +1946,72 @@
           }
         },
         "summary": "One directory level."
+      }
+    },
+    "/worktree": {
+      "get": {
+        "operationId": "worktree",
+        "parameters": [
+          {
+            "description": "`all` (default), `staged` or `unstaged`.",
+            "in": "query",
+            "name": "scope",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Most diff lines, at most `api.diff_lines`.",
+            "in": "query",
+            "name": "max_lines",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorktreeResponse"
+                }
+              }
+            },
+            "description": "additions, deletions, files, scope, truncated",
+            "headers": {
+              "ETag": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified (`If-None-Match` matched the `ETag`)."
+          },
+          "400": {
+            "$ref": "#/components/responses/Error"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error"
+          },
+          "500": {
+            "$ref": "#/components/responses/Error"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error"
+          }
+        },
+        "summary": "Uncommitted changes against HEAD. Refused on a public server."
       }
     }
   },

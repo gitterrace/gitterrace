@@ -248,3 +248,31 @@ fn unknown_tool_arguments_are_refused() {
     let ok = serde_json::json!({ "query": "path:src" });
     assert!(serde_json::from_value::<super::HotspotArgs>(ok).is_ok());
 }
+
+/// The prompt is listed and names the tools it tells the agent to call, whichever form.
+#[test]
+fn review_prompt_names_the_tools_of_each_form() {
+    let listed = McpServer::prompt_router().list_all();
+    assert!(listed.iter().any(|p| p.name == "review_change"));
+    let range = crate::mcp::prompts::review_text(&crate::mcp::prompts::ReviewArgs {
+        base: Some("v1".into()),
+        ..crate::mcp::prompts::ReviewArgs::default()
+    });
+    let tree = crate::mcp::prompts::review_text(&crate::mcp::prompts::ReviewArgs {
+        worktree: Some(true),
+        ..crate::mcp::prompts::ReviewArgs::default()
+    });
+    for (text, first) in [(&range, "compare"), (&tree, "worktree_diff")] {
+        for tool in [
+            first,
+            "hotspots",
+            "contributors",
+            "blame",
+            "read_file",
+            "untrusted",
+        ] {
+            assert!(text.contains(tool), "{tool}");
+        }
+    }
+    assert!(range.contains("`v1`"));
+}

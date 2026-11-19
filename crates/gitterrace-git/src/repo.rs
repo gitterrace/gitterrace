@@ -1,5 +1,6 @@
 mod blame;
 mod changes;
+mod compare;
 mod history;
 mod merge_base;
 mod objects;
@@ -155,6 +156,11 @@ impl Repo {
     /// it held any. A server calls this when nobody browses; the next full id walks again.
     pub fn clear_visible(&self) -> bool {
         self.visible.lock().is_ok_and(|mut v| v.clear())
+    }
+
+    /// Whether [`Repo::restrict_to_committed`] is in force: a public server's handle.
+    pub fn is_committed_only(&self) -> bool {
+        self.committed_only.load(Ordering::Relaxed)
     }
 
     /// [`Repo::restrict_to_committed`] as a builder.

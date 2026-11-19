@@ -1,5 +1,6 @@
 mod hunks;
 mod stream;
+mod tree;
 
 use gix::bstr::ByteSlice;
 use gix::diff::blob::{Algorithm, Diff, InternedInput};
@@ -10,6 +11,7 @@ use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, Result};
 
 pub(crate) use hunks::build_hunks;
 pub(crate) use stream::{Window, stream};
+pub(crate) use tree::tree_changes;
 
 #[cfg(test)]
 thread_local! {
@@ -20,8 +22,6 @@ thread_local! {
 
 /// Same probe window as git: a NUL in the first 8000 bytes marks a blob binary.
 const BINARY_PROBE: usize = 8000;
-/// Blob buffers a worker's diff cache keeps between commits; see `changes_with`.
-const KEEP_BLOB_BUFFERS: usize = 64;
 /// Rename limit of a merge commit's diff against its first parent, as git's
 /// `diff.renameLimit`: with more than this many added times deleted files, only renames with
 /// identical content are paired, and an edited rename stays a delete plus an add. A merge of a
@@ -228,34 +228,11 @@ pub(crate) fn raw_changes(
     TREE_DIFFS.with(|n| n.set(n.get() + 1));
     let new_tree = commit.tree().map_err(git)?;
     let old_tree = first_parent_tree(repo, commit)?;
-    let empty = repo.empty_tree();
-    let old = old_tree.as_ref().unwrap_or(&empty);
     let mut rewrites = gix::diff::Rewrites::default();
     if renames == Renames::Index && commit.parent_ids().nth(1).is_some() {
         rewrites.limit = MERGE_RENAME_LIMIT;
     }
-    let opts = gix::diff::Options::default().with_rewrites(Some(rewrites));
-    let mut raw = Vec::new();
-    let diffed = gix::diff::tree_with_rewrites(
-        gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),
-        gix::objs::TreeRefIter::from_bytes(&new_tree.data, new_tree.id.kind()),
-        cache,
-        &mut gix::diff::tree::State::default(),
-        &repo.objects,
-        |change| {
-            raw.push(change.into_owned());
-            Ok(std::ops::ControlFlow::Continue(()))
-        },
-        opts.into(),
-    );
-    // Keeping the buffers saves an allocation per blob on the next commit, but after a mass
-    // rename the free list holds one buffer per compared blob (thousands, megabytes each) and
-    // only halves per commit. Ten workers holding that cost hundreds of MB of peak memory.
-    if cache.clear_resource_cache_keep_allocation() > KEEP_BLOB_BUFFERS {
-        cache.clear_resource_cache();
-    }
-    diffed.map_err(git)?;
-    Ok(raw)
+    tree_changes(repo, old_tree.as_ref(), &new_tree, cache, rewrites)
 }
 
 /// Tree of the first parent, `None` for a root. A shallow clone's boundary commit is a root

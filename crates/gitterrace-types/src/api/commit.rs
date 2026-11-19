@@ -63,6 +63,35 @@ pub struct FileItem {
     pub permalink: Option<String>,
 }
 
+/// `GET /compare`: the files that differ between two revisions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct CompareResponse {
+    pub additions: u64,
+    pub base: String,
+    pub deletions: u64,
+    pub files: Vec<FileItem>,
+    /// The commit the head was compared from: `base`, or the merge base of `base` and `head`
+    /// for a three-dot compare.
+    pub from: String,
+    pub head: String,
+    pub path: Option<String>,
+    pub three_dot: bool,
+    /// The diff was cut at the line cap.
+    pub truncated: bool,
+}
+
+/// `GET /worktree`: uncommitted changes against HEAD.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct WorktreeResponse {
+    pub additions: u64,
+    pub deletions: u64,
+    pub files: Vec<FileItem>,
+    /// `all`, `staged` or `unstaged`.
+    pub scope: String,
+    /// The diff was cut at the line cap.
+    pub truncated: bool,
+}
+
 /// `GET /commits/{id}`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct CommitResponse {

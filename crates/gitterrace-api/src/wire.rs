@@ -1,7 +1,7 @@
 //! Maps the git reads onto the response types of `gitterrace_types::api`. The git types carry
 //! internal fields (modes, rewrite counts) the API never shows, so the mapping is explicit.
 
-use gitterrace_git::{BlameLine, CommitDetail, CommitSummary, FileDiff, RefInfo, TreeEntry};
+use gitterrace_git::{BlameLine, CommitSummary, FileDiff, RefInfo, TreeEntry};
 use gitterrace_index::Contributor;
 use gitterrace_types::api::{
     BlameItem, ContributorItem, DiffHunk, DiffLine, FileItem, LogCommit, RefItem, TreeItem,
@@ -22,11 +22,10 @@ pub(crate) fn log_commit(c: &CommitSummary) -> LogCommit {
 
 /// The files of `d`. Hunks are included when `diff` is set, and cut off after `max_lines` diff
 /// lines in total. The flag says whether anything was cut.
-pub(crate) fn files(d: &CommitDetail, diff: bool, max_lines: usize) -> (Vec<FileItem>, bool) {
+pub(crate) fn files(list: &[FileDiff], diff: bool, max_lines: usize) -> (Vec<FileItem>, bool) {
     let mut budget = max_lines;
     let mut truncated = false;
-    let items = d
-        .files
+    let items = list
         .iter()
         .map(|f| file_item(f, diff, &mut budget, &mut truncated))
         .collect();

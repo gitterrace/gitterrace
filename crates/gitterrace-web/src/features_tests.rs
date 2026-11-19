@@ -433,6 +433,8 @@ const TOOL_ROUTES: &[(&str, &str)] = &[
     ("repo_overview", "/api/v1/repo"),
     ("log", "/api/v1/log"),
     ("show_commit", "/api/v1/commits/{id}"),
+    ("compare", "/api/v1/compare"),
+    ("worktree_diff", "/api/v1/worktree"),
     ("read_file", "/api/v1/blob"),
     ("list_tree", "/api/v1/tree"),
     ("blame", "/api/v1/blame"),

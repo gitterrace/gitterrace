@@ -116,7 +116,36 @@ pub fn render() -> Out {
         let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
     }
     s.push_str("\nA trailing `?` marks an optional parameter.\n");
+    s.push_str(&prompts_section());
     Out::file(PATH, s)
+}
+
+/// The MCP prompts, from the prompt registry.
+fn prompts_section() -> String {
+    let mut s = String::from(
+        "\nPrompts are ready-made instructions an agent can load. They read nothing \
+         themselves and tell the agent which tools to call.\n\n",
+    );
+    for p in McpServer::prompt_docs() {
+        let params = p
+            .params
+            .iter()
+            .map(|a| {
+                let opt = if a.required { "" } else { "?" };
+                format!("`{}{opt}`", a.name)
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let args = if params.is_empty() {
+            String::new()
+        } else {
+            format!(" Arguments: {params}.")
+        };
+        let desc = p.description.replace('\n', " ").trim_end().to_owned();
+        let item = format!("`{}`: {desc}{args}", p.name);
+        let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
+    }
+    s
 }
 
 /// The commit filter every insight reads as `q`, from the keyword registry.

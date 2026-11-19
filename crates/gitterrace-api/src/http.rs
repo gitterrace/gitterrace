@@ -5,8 +5,9 @@ use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
-    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, EndpointDoc, IndexResponse,
-    InsightList, InsightRow, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
+    BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
+    EndpointDoc, IndexResponse, InsightList, InsightRow, LogResponse, ParamDoc, RefsResponse,
+    RepoResponse, TreeResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -207,6 +208,52 @@ pub(crate) async fn commit(
 ) -> Reply<CommitResponse> {
     blocking(&s, move |s| {
         s.commit(&id, q.diff.unwrap_or(true), q.max_lines)
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct CompareQuery {
+    base: Option<String>,
+    head: Option<String>,
+    path: Option<String>,
+    three_dot: Option<bool>,
+    max_lines: Option<usize>,
+}
+
+pub(crate) async fn compare(
+    State(s): State<ApiState>,
+    Query(q): Query<CompareQuery>,
+) -> Reply<CompareResponse> {
+    let base = q
+        .base
+        .filter(|b| !b.is_empty())
+        .ok_or_else(|| ApiError::BadRequest("missing query parameter: base".into()))?;
+    let head = q.head.unwrap_or_else(|| "HEAD".to_owned());
+    blocking(&s, move |s| {
+        s.compare(
+            &base,
+            &head,
+            q.path.as_deref(),
+            q.three_dot.unwrap_or(false),
+            q.max_lines,
+        )
+    })
+    .await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct WorktreeQuery {
+    scope: Option<String>,
+    max_lines: Option<usize>,
+}
+
+pub(crate) async fn worktree(
+    State(s): State<ApiState>,
+    Query(q): Query<WorktreeQuery>,
+) -> Reply<WorktreeResponse> {
+    blocking(&s, move |s| {
+        s.worktree_diff(q.scope.as_deref().unwrap_or("all"), q.max_lines)
     })
     .await
 }
