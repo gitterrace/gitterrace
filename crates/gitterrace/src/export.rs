@@ -394,7 +394,8 @@ async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<String>
     Ok(prefixes)
 }
 
-/// Polls the progress endpoint so insights pages are exported built, not "indexing".
+/// Polls the progress endpoint so insights pages are exported built, not "indexing". A failed
+/// build is not tried again until HEAD moves, so waiting out the bound would only hide it.
 async fn wait_for_index(
     router: &Router,
     prefix: &str,
@@ -406,11 +407,9 @@ async fn wait_for_index(
     ));
     for _ in 0..3_600 {
         let (_, _, body) = fetch(router, &format!("{prefix}/api/progress")).await?;
-        let ready = serde_json::from_slice::<serde_json::Value>(&body)
-            .ok()
-            .and_then(|v| v.get("ready")?.as_bool())
-            .unwrap_or(false);
-        if ready {
+        let v = serde_json::from_slice::<serde_json::Value>(&body).unwrap_or_default();
+        if v["ready"] == true || v["state"] == "failed" {
+            anyhow::ensure!(v["ready"] == true, "the cache for {name} failed to build");
             return Ok(());
         }
         tokio::time::sleep(std::time::Duration::from_millis(250)).await;

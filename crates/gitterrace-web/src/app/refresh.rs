@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::app::events::{POLL_FALLBACK, Scope, Watch};
-use crate::app::{App, blocking};
+use crate::app::{App, RepoState, blocking};
 use crate::live::Change;
 
 impl App {
@@ -271,6 +271,7 @@ async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
 async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     let a = Arc::clone(app);
     let spec = rev.to_owned();
+    app.advance(RepoState::Indexing);
     let run = tokio::task::spawn_blocking(move || {
         crate::app::child::update(&a, &spec)?;
         // Every page's chrome shows the repo id, which walks the whole history once per
@@ -286,14 +287,22 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
         Ok(Err(e)) if gitterrace_index::feed::SourceError::of(&e).is_some() => {
             tracing::warn!("cache unreadable while updating {rev}, rebuilding: {e}");
             if let Err(e) = app.unreadable_now() {
+                app.advance(RepoState::Failed);
                 tracing::warn!("rebuilding the unreadable cache failed: {e}");
             }
             return;
         }
-        Ok(Err(e)) => return tracing::warn!("index update for {rev} failed: {e}"),
-        Err(e) => return tracing::warn!("index task failed: {e}"),
+        Ok(Err(e)) => {
+            app.advance(RepoState::Failed);
+            return tracing::warn!("index update for {rev} failed: {e}");
+        }
+        Err(e) => {
+            app.advance(RepoState::Failed);
+            return tracing::warn!("index task failed: {e}");
+        }
     }
     let Some(head) = warm else { return };
+    app.advance(RepoState::Warming);
     // The tables the per-file pages share and the languages chain, built before ready: the
     // first page after ready reads them instead of racing their build (which doubled
     // hotspots on rust, and walked the chain twice for languages).

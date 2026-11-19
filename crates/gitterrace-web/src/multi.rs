@@ -436,6 +436,12 @@ impl Served {
         v
     }
 
+    /// The insights state of its app, `None` until its router is built: a repository is
+    /// served at once, its app only on first use or an addition.
+    fn insights_state(&self) -> Option<crate::app::RepoState> {
+        self.app.lock().ok()?.upgrade().map(|a| a.state())
+    }
+
     /// The dirty answer when one inside the bound is at hand, without scanning: what the home
     /// page renders at once, leaving the rest to `/_dirty`.
     fn known_dirty(&self) -> Option<bool> {

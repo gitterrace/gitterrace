@@ -181,7 +181,7 @@ impl App {
         // be served from the rebuilt cache, whose generation is the same.
         self.clear_memo();
         self.index.rebuild()?;
-        self.ready.store(false, Ordering::Release);
+        self.state.set(crate::app::RepoState::Queued);
         // HEAD did not move, so the loop would not rebuild it on its own.
         self.rebuild.store(true, Ordering::Release);
         self.wake.notify_one();

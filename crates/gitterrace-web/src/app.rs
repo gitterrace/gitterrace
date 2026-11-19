@@ -33,11 +33,13 @@ mod history;
 mod memo;
 mod records;
 mod refresh;
+mod state;
 mod touched;
 
 pub use child::index_child;
 pub(crate) use history::PathLog;
 pub(crate) use refresh::{keep_index_fresh_supervised, on_refreshed, release_when_idle};
+pub(crate) use state::RepoState;
 
 /// What every repository of one server shares: settings, job cap and the shutdown signal.
 #[derive(Clone)]
@@ -330,7 +332,8 @@ pub(crate) struct App {
     pub(crate) index_child: Mutex<Option<std::process::Child>>,
     /// Held for a whole child update, so at most one child per repository runs (child.rs).
     pub(crate) index_run: Mutex<()>,
-    ready: AtomicBool,
+    /// Queued, indexing, warming, ready or failed, see `state.rs`.
+    state: state::StateCell,
     /// Last time a page read the insights source, see [`App::release_idle`].
     records_used: Mutex<Instant>,
     /// Warm-up jobs running. Their reads are not a visitor's, so they do not keep the caches.
@@ -399,7 +402,7 @@ impl App {
             progress: Mutex::new(Progress::default()),
             index_child: Mutex::new(None),
             index_run: Mutex::new(()),
-            ready: AtomicBool::new(false),
+            state: state::StateCell::default(),
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
             releases: AtomicU64::new(0),
@@ -554,15 +557,6 @@ impl App {
 
     pub(crate) fn progress(&self) -> Progress {
         self.progress.lock().map(|g| *g).unwrap_or_default()
-    }
-
-    /// True once one full pass over HEAD finished, so records can be trusted.
-    pub(crate) fn ready(&self) -> bool {
-        self.ready.load(Ordering::Acquire)
-    }
-
-    pub(crate) fn mark_ready(&self) {
-        self.ready.store(true, Ordering::Release);
     }
 }
 

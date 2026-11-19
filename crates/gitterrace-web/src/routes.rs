@@ -361,6 +361,8 @@ struct PendingPage {
     page_head: crate::pagehead::PageHead,
     /// Set when a newer build owns the cache: this one leaves it alone instead of indexing.
     newer: Option<String>,
+    /// The repository's state as the page is rendered; the script follows it from there.
+    state: &'static str,
     head: crate::dochead::DocHead,
 }
 
@@ -391,6 +393,7 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
         Ok((
             PendingPage {
                 c,
+                state: a.state().label(),
                 page_head: crate::pagehead::waiting_head(tab),
                 newer: a.index.newer_format().map(|v| {
                     // The cache folder is a path on the host; a public visitor gets no path.
@@ -423,6 +426,9 @@ pub(crate) async fn with_records<T: Template + Send + 'static>(
 struct ProgressBody {
     done: usize,
     total: usize,
+    /// Queued, indexing, warming, ready or failed.
+    state: crate::app::RepoState,
+    /// `state` is ready: kept for the readers that only wait for it.
     ready: bool,
     /// Idle releases so far, see `App::release_idle`.
     releases: u64,
@@ -436,12 +442,14 @@ struct ProgressBody {
 async fn progress(State(app): Shared) -> Json<ProgressBody> {
     let p = app.progress();
     let (phases, phase) = app.index.phases();
+    let state = app.state();
     Json(ProgressBody {
         phases,
         phase,
         done: p.done,
         total: p.total,
-        ready: app.ready(),
+        state,
+        ready: state == crate::app::RepoState::Ready,
         releases: app.releases(),
     })
 }

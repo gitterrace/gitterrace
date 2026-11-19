@@ -63,6 +63,8 @@ struct IndexRow {
     /// Uncommitted work in the working tree: `None` where the tree is not shown, else whether
     /// the chip shows at once; a row without a fresh answer starts hidden and `home.js` fills it.
     dirty: Option<bool>,
+    /// The insights state while it is not ready (queued, indexing, warming, failed).
+    state: Option<&'static str>,
 }
 
 /// Bucket counts as a polyline across a 90x20 box, scaled to `max`.
@@ -144,12 +146,16 @@ pub(super) async fn index(
         let live = follows_list(&table).then(|| table.env.home_version());
         let served = table.snapshot();
         let reads = in_order(&served, |s| {
-            (s.recent(now), show_tree.then(|| s.known_dirty()))
+            (
+                s.recent(now),
+                show_tree.then(|| s.known_dirty()),
+                s.insights_state(),
+            )
         });
         let rows: Vec<IndexRow> = served
             .iter()
             .zip(reads)
-            .map(|(s, (r, dirty))| {
+            .map(|(s, (r, dirty, state))| {
                 let href = format!("/r/{}/", s.name);
                 let c = r.last.as_ref();
                 let counts = &r.series.counts;
@@ -168,6 +174,9 @@ pub(super) async fn index(
                     today: today_line(r.today, c, now),
                     commits_today: r.today,
                     dirty: dirty.map(|d| d.unwrap_or(false)),
+                    state: state
+                        .filter(|s| *s != crate::app::RepoState::Ready)
+                        .map(crate::app::RepoState::label),
                     tip: if counts.is_empty() {
                         "No commits yet.".to_owned()
                     } else {

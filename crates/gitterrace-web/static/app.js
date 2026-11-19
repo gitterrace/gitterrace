@@ -105,6 +105,8 @@
         if (bar) bar.value = pct;
         var t = b.querySelector(".pct");
         if (t) t.textContent = pct + "%";
+        var s = b.querySelector(".badge.state");
+        if (s && p.state) s.textContent = p.state;
       });
       if (p.ready) {
         clearInterval(timer);
