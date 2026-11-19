@@ -42,9 +42,7 @@ HARNESS = ["~/.claude", "~/.codex", "~/.cursor", "~/.config/opencode", "~/.pi"]
 
 
 def bench_dir() -> Path:
-    return Path(
-        os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
-    )
+    return Path(os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench"))
 
 
 def bench_dirs() -> list[Path]:
@@ -108,9 +106,7 @@ def excluded(d: Path, stop: Path | None = None) -> bool:
 def exclude(d: Path) -> None:
     d.mkdir(parents=True, exist_ok=True)
     if SYSTEM == "Windows":
-        subprocess.run(
-            ["attrib", "+I", str(d), "/S", "/D"], check=False, capture_output=True
-        )
+        subprocess.run(["attrib", "+I", str(d), "/S", "/D"], check=False, capture_output=True)
         subprocess.run(["attrib", "+I", str(d)], check=False, capture_output=True)
         return
     if MARKER:
@@ -127,9 +123,7 @@ def exclude(d: Path) -> None:
                 )
                 break
         else:
-            at = next(
-                (i + 1 for i, line in enumerate(lines) if line == "[General]"), None
-            )
+            at = next((i + 1 for i, line in enumerate(lines) if line == "[General]"), None)
             if at is None:
                 lines = ["[General]", f"exclude folders={new}", *lines]
             else:
@@ -197,10 +191,7 @@ def self_test() -> int:
             check=False,
         )
         refuses = r.returncode != 0 and "not excluded" in r.stderr
-        print(
-            ("ok   " if refuses else "FAIL ")
-            + "bench preflight refuses an unmarked bench dir"
-        )
+        print(("ok   " if refuses else "FAIL ") + "bench preflight refuses an unmarked bench dir")
         exclude(bench)
         exclude(Path(t) / "tgt")
         r = subprocess.run(
@@ -210,10 +201,7 @@ def self_test() -> int:
             text=True,
             check=False,
         )
-        print(
-            ("ok   " if r.returncode == 0 else "FAIL ")
-            + "bench preflight passes once excluded"
-        )
+        print(("ok   " if r.returncode == 0 else "FAIL ") + "bench preflight passes once excluded")
         ok = ok and refuses and r.returncode == 0
     return 0 if ok else 1
 
@@ -243,9 +231,7 @@ def main() -> int:
             exclude(d)
         dirs = missing(dirs)
         if dirs:
-            print(
-                "could not exclude:\n  " + "\n  ".join(map(str, dirs)), file=sys.stderr
-            )
+            print("could not exclude:\n  " + "\n  ".join(map(str, dirs)), file=sys.stderr)
             return 1
         print(f"search indexing excluded for {len(expected())} dirs")
         print(hint())

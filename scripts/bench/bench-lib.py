@@ -113,18 +113,14 @@ def scrub_own(v: Any, own: set[str]) -> Any:
         return [scrub_own(x, own) for x in v]
     if isinstance(v, str):
         return OWN_HEX.sub(
-            lambda m: (
-                "HEAD" if any(o.startswith(m.group(0)) for o in own) else m.group(0)
-            ),
+            lambda m: "HEAD" if any(o.startswith(m.group(0)) for o in own) else m.group(0),
             v,
         )
     return v
 
 
 def run(cmd: list[str], cwd: str | Path | None = None, check: bool = True) -> str:
-    return subprocess.run(
-        cmd, cwd=cwd, check=check, capture_output=True, text=True
-    ).stdout
+    return subprocess.run(cmd, cwd=cwd, check=check, capture_output=True, text=True).stdout
 
 
 def free_gb(path: str | Path) -> float:
@@ -325,9 +321,7 @@ class Server:
                 c.request("GET", f"{prefix}/api/progress")
                 r = c.getresponse()
                 if r.status != 200:
-                    raise RuntimeError(
-                        f"{prefix}/api/progress answered HTTP {r.status}"
-                    )
+                    raise RuntimeError(f"{prefix}/api/progress answered HTTP {r.status}")
                 body = json.loads(r.read())
                 c.close()
                 step = body.get("phase") or step
@@ -357,9 +351,7 @@ def ensure_clone(repo: Json, base: Path, logdir: Path) -> Path:
     A local repo is measured at its HEAD and has no pin: a sha there would only go stale."""
     if repo.get("local"):
         if "sha" in repo:
-            sys.exit(
-                f"{repo['name']} is local, measured at HEAD: drop its sha from the corpus"
-            )
+            sys.exit(f"{repo['name']} is local, measured at HEAD: drop its sha from the corpus")
         return (ROOT / repo["local"]).resolve()
     sha, dest = repo["sha"], Path(base) / f"{repo['name']}.git"
     mark = dest / "bench-ready"
@@ -389,18 +381,12 @@ def discover(repo_dir: str | Path, rev: str) -> Json:
     A larger file would make /blob and /blame answer with the refusal page."""
     limit = text_limit_bytes()
     files = []
-    for line in run(["git", "ls-tree", "-r", "-l", "-z", rev], cwd=repo_dir).split(
-        "\0"
-    ):
+    for line in run(["git", "ls-tree", "-r", "-l", "-z", rev], cwd=repo_dir).split("\0"):
         if "\t" not in line:
             continue
         meta, path = line.split("\t", 1)
         size = meta.split()[-1]
-        if (
-            size.isdigit()
-            and int(size) <= limit
-            and Path(path).suffix.lower() not in TEXT_BAD
-        ):
+        if size.isdigit() and int(size) <= limit and Path(path).suffix.lower() not in TEXT_BAD:
             files.append((int(size), path))
     files.sort(reverse=True)
     deep = max(
@@ -490,11 +476,7 @@ def ready_recorded_test() -> None:
         for i in ({"secs": 5.0}, {"secs": 5.0, "ready_secs": 4.0})
         if not ready_recorded(run(i), "t")
     ]
-    if (
-        ready_recorded(run(good), "t")
-        or ready_recorded(run({"secs": 1}, 3), "t")
-        or bad
-    ):
+    if ready_recorded(run(good), "t") or ready_recorded(run({"secs": 1}, 3), "t") or bad:
         sys.exit(f"bench self-test failed: ready guard passed {bad or 'a good run'}")
 
 

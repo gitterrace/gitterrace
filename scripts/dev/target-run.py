@@ -208,9 +208,7 @@ def cargo_quiet() -> bool:
 
 
 def bench_dir() -> Path:
-    return Path(
-        os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
-    )
+    return Path(os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench"))
 
 
 def bench_report() -> str | None:
@@ -231,9 +229,7 @@ def bench_remove(d: Path, dry_run: bool) -> str:
     return f"removed {d} ({held})"
 
 
-def run(
-    target: Path, days: float, dry_run: bool, quiet: Callable[[], bool] = cargo_quiet
-) -> str:
+def run(target: Path, days: float, dry_run: bool, quiet: Callable[[], bool] = cargo_quiet) -> str:
     if not quiet():
         return "SKIP cargo or rustc is running, target/ not pruned"
     cutoff = time.time() - days * DAY
@@ -244,9 +240,7 @@ def run(
             busy.append(str(p.relative_to(target)))
     prune_scratch(target, cutoff, tally)
     verb = "would remove" if dry_run else "removed"
-    msg = (
-        f"OK {verb} {tally.count} entries, {human(tally.bytes)} (unused for {days:g}d)"
-    )
+    msg = f"OK {verb} {tally.count} entries, {human(tally.bytes)} (unused for {days:g}d)"
     if busy:
         msg += "\nbusy, left alone: " + " ".join(busy)
     return msg
@@ -335,9 +329,7 @@ def self_test() -> int:
 
         run(target, 7, False, quiet=yes)
         got = deps()
-        want = sorted(
-            ["unhashed.d", f"libcrate-{new_h}.rlib", f"crate-{new_h}.x.rcgu.o"]
-        )
+        want = sorted(["unhashed.d", f"libcrate-{new_h}.rlib", f"crate-{new_h}.x.rcgu.o"])
         if got != want:
             fail.append(
                 f"deps after prune {got}, want {want} (an old artefact of a live unit must stay)"

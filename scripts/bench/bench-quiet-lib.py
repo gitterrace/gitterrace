@@ -145,9 +145,7 @@ def busy_background():
     return seen
 
 
-def quiet(
-    phase: str, loads: Json, wait: bool = True, sampler: Any | None = None
-) -> None:
+def quiet(phase: str, loads: Json, wait: bool = True, sampler: Any | None = None) -> None:
     """Wait until the machine is quiet, then record the load the phase starts under."""
     if sampler:
         sampler.pause()

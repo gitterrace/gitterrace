@@ -35,9 +35,7 @@ PAINT = re.compile(
 )
 # Where markup names a button's classes.
 MARKUP = [
-    re.compile(
-        r"<button\s[^<>\"]*(?:\\?\"[^\"\\]*\\?\"[^<>\"]*)*?class=\\?\"([^\"\\]*)"
-    ),
+    re.compile(r"<button\s[^<>\"]*(?:\\?\"[^\"\\]*\\?\"[^<>\"]*)*?class=\\?\"([^\"\\]*)"),
     re.compile(r"el\(\s*\"button\"\s*,\s*\"([^\"]*)\""),
     re.compile(r"class=\\?\"([^\"\\]*\bbtn\b[^\"\\]*)"),
 ]
@@ -65,9 +63,7 @@ def markup_classes(patterns: list[re.Pattern[str]]) -> set[str]:
         text = f.read_text(errors="replace")
         for rx in patterns:
             for m in rx.finditer(text):
-                found.update(
-                    c for c in m.group(1).split() if re.fullmatch(r"[\w-]+", c)
-                )
+                found.update(c for c in m.group(1).split() if re.fullmatch(r"[\w-]+", c))
     return found
 
 
@@ -167,9 +163,7 @@ def problems(
         owned = [p for p in props if PICKER_OWNED.match(p)]
         for sel in split_top(head, ","):
             if painted and paints_button(sel, classes):
-                bad.append(
-                    f"{name}: {sel.strip()} sets {', '.join(painted)} on a button"
-                )
+                bad.append(f"{name}: {sel.strip()} sets {', '.join(painted)} on a button")
             if owned and targets_select(sel, set(picks)):
                 bad.append(f"{name}: {sel.strip()} sets {', '.join(owned)} on a picker")
     return bad

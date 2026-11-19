@@ -79,9 +79,7 @@ SRC_DIRS = ("crates/*/src", "xtask/src")
 TEMPLATES = "crates/gitterrace-web/templates"
 STEM = re.compile(r"^_?[a-z][a-z0-9_]*$")
 # R5: `-lib` marks a library imported by other scripts, not a command.
-SCRIPT = re.compile(
-    r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$"
-)
+SCRIPT = re.compile(r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$")
 HEADER = ("//", "#", '"""')
 MAKE_TARGET = re.compile(r"^[a-z]+(-[a-z]+)?$")
 
@@ -115,9 +113,7 @@ def check_modules() -> list[str]:
         if f.name == "types.rs":
             text = f.read_text()
             if "#[template" in text or "fn page" in text:
-                bad.append(
-                    f"{rel}: types.rs holds a page, name the module for its route (R2)"
-                )
+                bad.append(f"{rel}: types.rs holds a page, name the module for its route (R2)")
     return bad
 
 
@@ -137,9 +133,7 @@ def check_templates() -> list[str]:
                     f"{f.relative_to(ROOT)}: page template {m.group(1)} has a partial's `_` (R3)"
                 )
         if f.suffix == ".html":
-            for m in re.finditer(
-                r'\{%-?\s*(?:include|import|extends)\s+"([^"]+)"', f.read_text()
-            ):
+            for m in re.finditer(r'\{%-?\s*(?:include|import|extends)\s+"([^"]+)"', f.read_text()):
                 if not m.group(1).startswith("_"):
                     bad.append(
                         f"{f.relative_to(ROOT)}: {m.group(1)} is used as a partial, name it _{m.group(1)} (R3)"
@@ -157,9 +151,7 @@ def check_templates() -> list[str]:
             )
         for i in sorted(ids):
             if i != snake and (i.endswith("_" + snake) or i.startswith(snake + "_")):
-                bad.append(
-                    f"/stats/{seg}: insight `{i}` names the same thing differently (R4)"
-                )
+                bad.append(f"/stats/{seg}: insight `{i}` names the same thing differently (R4)")
     return bad
 
 
@@ -189,9 +181,7 @@ def check_headers() -> list[str]:
     files += sorted((ROOT / "xtask/src").glob("*.rs"))
     for f in files:
         if not first_line(f).startswith(HEADER):
-            bad.append(
-                f"{f.relative_to(ROOT)}: first line is not a header comment (R5)"
-            )
+            bad.append(f"{f.relative_to(ROOT)}: first line is not a header comment (R5)")
     return bad
 
 
@@ -206,9 +196,7 @@ def check_generators() -> list[str]:
         body = text.split("#[cfg(test)]")[0]
         for path in sorted(set(re.findall(r'"((?:[\w.-]+/)*[A-Z\w.-]+\.md)"', body))):
             if path not in head:
-                bad.append(
-                    f"xtask/src/{f.name}: header does not name {path}, which it writes (R6)"
-                )
+                bad.append(f"xtask/src/{f.name}: header does not name {path}, which it writes (R6)")
     return bad
 
 
@@ -282,18 +270,14 @@ def self_test() -> int:
 
 
 # A Rust version written into a build file: `+1.98`, `toolchain: "1.98"`, `channel = "1.98.0"`.
-TOOLCHAIN_LITERAL = re.compile(
-    r"(?:\+|toolchain:\s*[\"']?|channel\s*=\s*\")(1\.\d+(?:\.\d+)?)"
-)
+TOOLCHAIN_LITERAL = re.compile(r"(?:\+|toolchain:\s*[\"']?|channel\s*=\s*\")(1\.\d+(?:\.\d+)?)")
 
 
 def check_toolchain() -> list[str]:
     """One compiler pin: rust-toolchain.toml. The Makefile and workflows read it, never repeat
     it, so a bump cannot leave one of them on the old compiler. The only other version allowed
     is the MSRV job's, and it must be the workspace `rust-version`."""
-    msrv = re.search(
-        r'^rust-version\s*=\s*"([^"]+)"', (ROOT / "Cargo.toml").read_text(), re.M
-    )
+    msrv = re.search(r'^rust-version\s*=\s*"([^"]+)"', (ROOT / "Cargo.toml").read_text(), re.M)
     allowed = {msrv.group(1)} if msrv else set()
     files = [ROOT / "Makefile", *sorted((ROOT / ".github/workflows").glob("*.yml"))]
     bad = []

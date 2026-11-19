@@ -65,9 +65,7 @@ def duplicates(root: Path, cfg: dict[str, Any]) -> list[str]:
         text = p.read_text(encoding="utf-8")
         for name in DEF.findall(text):
             if name in shared and (rel, name) not in allowed:
-                problems.append(
-                    f"{rel}: defines {name}, which {cfg['types_src']} already exports"
-                )
+                problems.append(f"{rel}: defines {name}, which {cfg['types_src']} already exports")
         for m in cfg["defining_macros"]:
             for name in re.findall(MACRO_DEF.format(m=re.escape(m)), text):
                 if name in shared and (rel, name) not in allowed:
@@ -75,9 +73,7 @@ def duplicates(root: Path, cfg: dict[str, Any]) -> list[str]:
                         f"{rel}: defines {name}, which {cfg['types_src']} already exports"
                     )
         if alias.search(text):
-            problems.append(
-                f"{rel}: renames a shared type with `as`, which hides where it lives"
-            )
+            problems.append(f"{rel}: renames a shared type with `as`, which hides where it lives")
     return problems
 
 
@@ -88,11 +84,7 @@ def untyped(schema: object, doc: dict[str, Any], depth: int = 0) -> str | None:
     if "$ref" in schema:
         name = schema["$ref"].rsplit("/", 1)[-1]
         target = doc.get("components", {}).get("schemas", {}).get(name)
-        return (
-            None
-            if target is None and name == "Error"
-            else untyped(target, doc, depth + 1)
-        )
+        return None if target is None and name == "Error" else untyped(target, doc, depth + 1)
     if schema.get("type") != "object":
         return "not an object"
     props = schema.get("properties") or {}
@@ -118,9 +110,7 @@ def openapi(root: Path, cfg: dict[str, Any]) -> list[str]:
                 continue
             why = untyped(schema, doc)
             if why:
-                problems.append(
-                    f"{spec['file']}: {verb.upper()} {path} 200 response: {why}"
-                )
+                problems.append(f"{spec['file']}: {verb.upper()} {path} 200 response: {why}")
     return problems
 
 
@@ -214,9 +204,7 @@ def main() -> int:
     args = sys.argv[1:]
     if "--self-test" in args:
         return self_test()
-    cfg_path = (
-        Path(args[args.index("--config") + 1]) if "--config" in args else DEFAULT_CONFIG
-    )
+    cfg_path = Path(args[args.index("--config") + 1]) if "--config" in args else DEFAULT_CONFIG
     root = Path(args[args.index("--root") + 1]) if "--root" in args else HERE.parent
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     bad = problems_in(root, cfg)

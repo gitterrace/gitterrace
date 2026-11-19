@@ -110,12 +110,10 @@ def csp_problems(where: str, csp: str, html: str | list[str]) -> list[str]:
     pages = [html] if isinstance(html, str) else html
     want = set().union(*(script_hashes(p) for p in pages))
     bad = [
-        f"{where}: script-src lacks {h}, the inline script changed"
-        for h in sorted(want - listed)
+        f"{where}: script-src lacks {h}, the inline script changed" for h in sorted(want - listed)
     ]
     bad += [
-        f"{where}: script-src lists {h}, which no inline script has"
-        for h in sorted(listed - want)
+        f"{where}: script-src lists {h}, which no inline script has" for h in sorted(listed - want)
     ]
     # Inline styles are harmless next to scripts: only script-src must refuse unsafe-inline.
     if m and "'unsafe-inline'" in m.group(1):
@@ -137,25 +135,19 @@ def csp(directory: str | None = None) -> list[str]:
     else:
         # The site is build output, so a fresh clone has none: build it from the tree as it is.
         # `xtask site` writes only target/site, never a tracked file. A failed build fails here.
-        subprocess.run(
-            ["cargo", "xtask", "site"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL
-        )
+        subprocess.run(["cargo", "xtask", "site"], cwd=ROOT, check=True, stdout=subprocess.DEVNULL)
         d = ROOT / "target" / "site"
     # The `/*` policy covers every page, so its hashes answer for the scripts of all of them:
     # a script only the docs pages carry is still one the policy must list.
     # An export names a folder for a repository file, so ICU-license.html can be a folder.
     pages = sorted(p for p in d.rglob("*.html") if p.is_file())
     htmls = [p.read_text() for p in pages]
-    bad = csp_problems(
-        f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls
-    )
+    bad = csp_problems(f"{d}/_headers", headers_csp((d / "_headers").read_text()), htmls)
     for p, html in zip(pages, htmls):
         for meta in META_CSP.findall(html):
             bad += csp_problems(f"{p} meta CSP", meta, html)
     n = len(set().union(*(script_hashes(h) for h in htmls)))
-    print(
-        f"  [{'x' if bad else '+'}] {n} inline script(s) on {len(pages)} pages in {d} match"
-    )
+    print(f"  [{'x' if bad else '+'}] {n} inline script(s) on {len(pages)} pages in {d} match")
     return bad
 
 
@@ -194,9 +186,7 @@ def footer_problems(where: str, html: str) -> list[str]:
         bad.append(f"{where}: the footer links a page twice")
     project, _, legal = foot.partition('<nav aria-label="Legal"')
     if "/legal/" in project or "/legal/" not in legal:
-        bad.append(
-            f"{where}: the legal links are not the footer's last nav, on the right"
-        )
+        bad.append(f"{where}: the legal links are not the footer's last nav, on the right")
     if not re.search(r'<a class="version"[^>]*>[^<]*</a>\s*</nav>\s*$', project):
         bad.append(f"{where}: the version is not the last link of the project nav")
     if 'class="edit"' in foot and not re.search(
@@ -217,9 +207,7 @@ def links(directory: str | None = None) -> list[str]:
         bad += footer_problems(str(p.relative_to(d)), html)
     if not edits:
         bad.append(f"{d}: no docs page carries an Edit link")
-    print(
-        f"  [{'x' if bad else '+'}] links and footer of {len(pages)} docs pages in {d}"
-    )
+    print(f"  [{'x' if bad else '+'}] links and footer of {len(pages)} docs pages in {d}")
     return bad
 
 
@@ -248,9 +236,7 @@ def release() -> list[str]:
     ]
     for url, what in checks:
         status, _, _ = fetch(url, "HEAD")
-        print(
-            f"  [{'+' if status == 200 else 'x'}] {what}: {url} ({status or 'no answer'})"
-        )
+        print(f"  [{'+' if status == 200 else 'x'}] {what}: {url} ({status or 'no answer'})")
         if status != 200:
             bad.append(f"{what} does not answer at {url}")
     return bad + installer(f"{repo}/releases/download/v{version}/{INSTALLER}")
@@ -261,15 +247,11 @@ def installer(url: str) -> list[str]:
     change that dropped `checksum` would still ship a script, one that verifies nothing."""
     status, _, text = fetch_following(url)
     good = status == 200 and CHECKSUM in text
-    print(
-        f"  [{'+' if good else 'x'}] installer checks digests: {url} ({status or 'no answer'})"
-    )
+    print(f"  [{'+' if good else 'x'}] installer checks digests: {url} ({status or 'no answer'})")
     if status != 200:
         return [f"shell installer does not answer at {url}"]
     if CHECKSUM not in text:
-        return [
-            f"shell installer at {url} has no {CHECKSUM}, so it verifies no download"
-        ]
+        return [f"shell installer at {url} has no {CHECKSUM}, so it verifies no download"]
     return []
 
 
@@ -288,9 +270,7 @@ def sitemap_pages() -> list[str]:
     """The body of every page the live sitemap lists, the home page aside."""
     _, _, xml = fetch(f"https://{CANONICAL}/sitemap.xml", body=True)
     urls = re.findall(r"<loc>(https://[^<]+)</loc>", xml)
-    return [
-        fetch(u, body=True)[2] for u in urls if u.rstrip("/") != f"https://{CANONICAL}"
-    ]
+    return [fetch(u, body=True)[2] for u in urls if u.rstrip("/") != f"https://{CANONICAL}"]
 
 
 def domains() -> list[str]:
@@ -314,9 +294,7 @@ def domains() -> list[str]:
         bad.append(f"https://{CANONICAL}/ answered {status or 'nothing'}")
     bad += wrong
     status, _, _ = fetch(f"https://{CANONICAL}/no-such-page")
-    print(
-        f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})"
-    )
+    print(f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})")
     if status != 404:
         bad.append(f"unknown path answered {status or 'nothing'}, want 404")
     for host in REDIRECTS:
@@ -345,8 +323,7 @@ def links_self_test() -> bool:
     ver = '<a class="version" href="/v">v1</a>'
     lic = '<a href="/l">MIT license</a>'
     good = (
-        f'<footer><nav aria-label="Project">{first}\n{edit}\n{lic}\n{ver}\n</nav>\n'
-        f"{legal}</footer>"
+        f'<footer><nav aria-label="Project">{first}\n{edit}\n{lic}\n{ver}\n</nav>\n{legal}</footer>'
     )
     ok = (
         not css_problems(base + ".pager a{color:var(--fg)}")
@@ -380,9 +357,7 @@ def self_test() -> int:
         for answer, red in cases:
             fetch = lambda *_a, answer=answer, **_k: answer  # noqa: E731
             if bool(installer("https://example.dev/i.sh")) != red:
-                print(
-                    f"self-test: {answer[0]} {answer[2]!r} should be {'red' if red else 'green'}"
-                )
+                print(f"self-test: {answer[0]} {answer[2]!r} should be {'red' if red else 'green'}")
                 good = False
     finally:
         fetch = real
@@ -401,9 +376,7 @@ def self_test() -> int:
         (f"script-src {h}", "<p>home</p>", True),
     ]:
         if bool(csp_problems("t", policy, page)) != red:
-            print(
-                f"self-test: {policy!r} on {page!r} should be {'red' if red else 'green'}"
-            )
+            print(f"self-test: {policy!r} on {page!r} should be {'red' if red else 'green'}")
             good = False
     good = links_self_test() and good
     print("self-test", "ok" if good else "FAILED")

@@ -56,9 +56,7 @@ def scan(text: str, name: str) -> list[str]:
     out = []
     for m in HEAD.finditer(text):
         attrs = m.group(1)
-        if not re.search(r"#\[(?:\w+::)?test\b", attrs) or not re.search(
-            r"#\[ignore\b", attrs
-        ):
+        if not re.search(r"#\[(?:\w+::)?test\b", attrs) or not re.search(r"#\[ignore\b", attrs):
             continue
         body = strip_comments(body_at(text, m.end())).strip()
         if STUB.match(body):

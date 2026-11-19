@@ -74,13 +74,9 @@ def recorded(root: Path) -> int:
 def check(root: Path) -> list[str]:
     have, allowed = count(root), recorded(root)
     if have > allowed:
-        return [
-            f"{have} `super::` paths outside tests, {allowed} allowed: use crate:: paths"
-        ]
+        return [f"{have} `super::` paths outside tests, {allowed} allowed: use crate:: paths"]
     if have < allowed:
-        return [
-            f"{have} `super::` paths now, {REGISTRY} {KEY} says {allowed}: lower it to {have}"
-        ]
+        return [f"{have} `super::` paths now, {REGISTRY} {KEY} says {allowed}: lower it to {have}"]
     return []
 
 
@@ -91,9 +87,7 @@ def self_test() -> int:
         (t / "crates" / "a" / "src").mkdir(parents=True)
         (t / "xtask").mkdir()
         src = t / "crates" / "a" / "src" / "lib.rs"
-        src.write_text(
-            "fn f() { super::g(); }\n#[cfg(test)]\nmod tests {\n    use super::*;\n}\n"
-        )
+        src.write_text("fn f() { super::g(); }\n#[cfg(test)]\nmod tests {\n    use super::*;\n}\n")
         (t / REGISTRY).write_text(json.dumps({KEY: {"outside_tests": 1}}))
         ok = check(t) == []
         src.write_text(src.read_text() + "m! {\n    use super::x;\n}\n")

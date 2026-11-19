@@ -64,9 +64,7 @@ def self_test() -> int:
             )
             got = problems(d)
         if bool(got) != red:
-            print(
-                f"py-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
-            )
+            print(f"py-check self-test: case {i} {'passed' if red else 'failed'}: {got}")
             return 1
     print("py-check self-test: ok")
     return 0

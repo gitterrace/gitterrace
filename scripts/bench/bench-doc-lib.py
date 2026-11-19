@@ -27,9 +27,7 @@ def slowest_page(b: Json) -> str:
 
 
 def spread(key: str, b: Json) -> str:
-    return (
-        f" ({bc.num(key, b['min'])} to {bc.num(key, b['max'])})" if "min" in b else ""
-    )
+    return f" ({bc.num(key, b['min'])} to {bc.num(key, b['max'])})" if "min" in b else ""
 
 
 def samples_note(r: Json) -> str:
@@ -128,9 +126,7 @@ HELD = "withheld (load)"
 def export_failure(e: Json) -> str:
     """Why an export did not finish. The cap is a documented limit, any other error a failure.
     A run that kept no reason says only that it failed, never which."""
-    return (
-        CAPPED_EXPORT if "stopped at the cap" in e.get("error", "") else FAILED_EXPORT
-    )
+    return CAPPED_EXPORT if "stopped at the cap" in e.get("error", "") else FAILED_EXPORT
 
 
 def export_cell(r: Json) -> str:
@@ -298,9 +294,8 @@ def block(cur: Json, old: Json | None, d: str) -> str:
         L += comparison(cur, old)
     for n, r in cur["repos"].items():
         prev = (old or {}).get("repos", {}).get(n)
-        head = (
-            "| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |"
-            + (" Previous warm |" if prev else "")
+        head = "| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |" + (
+            " Previous warm |" if prev else ""
         )
         L += [
             f"<details><summary>{n}: every page</summary>",
@@ -439,23 +434,18 @@ def results_table(cur: Json, old: Json | None) -> list[str]:
                     why = export_failure(r["export"])
                     status = "capped" if why == CAPPED_EXPORT else "failed"
                     L.append(
-                        f"| {n} | {bc.SHORT[k]} | {why} | - | {status} |"
-                        + (" - |" if old else "")
+                        f"| {n} | {bc.SHORT[k]} | {why} | - | {status} |" + (" - |" if old else "")
                     )
                 continue
             p = prev.get(k)
             ch = change(k, p["value"], b["value"]) if p else "new in this run"
             L.append(
                 f"| {n} | {bc.SHORT[k]} | {bc.fmt(k, b['value'])}{spread(k, b)} | "
-                f"{b['limit']} {bc.METRICS[k][1]} | {b['status']} |"
-                + (f" {ch} |" if old else "")
+                f"{b['limit']} {bc.METRICS[k][1]} | {b['status']} |" + (f" {ch} |" if old else "")
             )
     for n in cur.get("held", {}):
         for k in HEADLINE:
-            L.append(
-                f"| {n} | {bc.SHORT[k]} | {HELD} | - | withheld |"
-                + (" - |" if old else "")
-            )
+            L.append(f"| {n} | {bc.SHORT[k]} | {HELD} | - | withheld |" + (" - |" if old else ""))
     return L
 
 

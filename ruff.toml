@@ -2,6 +2,9 @@ extend = "vendor/schwarzwald/kit/configs/ruff-base.toml"
 # The synced kit carries its own checks.
 extend-exclude = ["vendor/schwarzwald/kit"]
 
+# The width every file here is held to (CONV-FILE-LENGTH).
+line-length = 100
+
 [lint]
 # On top of the base: E7, pyupgrade (UP), simplify (SIM) and ruff's own (RUF). RUF005 only
 # prefers [*a, b] over a + [b], churn without a bug behind it.

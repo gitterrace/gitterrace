@@ -103,9 +103,7 @@ def problems(repo: Path, remote: str, lines: list[str]) -> list[str]:
                 f" push: git push --atomic {remote} main {tag}"
             )
         elif main != commit:
-            bad.append(
-                f"{tag}: points at {commit[:12]}, not at the main pushed with it"
-            )
+            bad.append(f"{tag}: points at {commit[:12]}, not at the main pushed with it")
     if main is not None:
         _, text = git(repo, "show", f"{main}:CHANGELOG.md")
         version, section = top_section(text)
@@ -113,19 +111,13 @@ def problems(repo: Path, remote: str, lines: list[str]) -> list[str]:
             ref = f"refs/tags/v{version}"
             if ref in pushed:
                 if (peel(repo, pushed[ref]) or pushed[ref]) != main:
-                    bad.append(
-                        f"main: v{version} is pushed with it but does not point at it"
-                    )
+                    bad.append(f"main: v{version} is pushed with it but does not point at it")
             else:
                 for where, commit in (
                     ("local", peel(repo, ref)),
                     (remote, remote_ref(repo, remote, ref)),
                 ):
-                    if (
-                        commit
-                        and commit != main
-                        and section_at(repo, commit, version) != section
-                    ):
+                    if commit and commit != main and section_at(repo, commit, version) != section:
                         bad.append(
                             f"main: CHANGELOG section {version} differs from the {where} tag"
                             f" v{version} ({commit[:12]}); re-tag with make release-gate"
@@ -165,9 +157,7 @@ def self_test() -> int:
             lines = [f"x {sha} {ref} {'0' * 40}" for ref, sha in refs]
             got = problems(repo, "origin", lines)
             if bool(got) != want_red:
-                fails.append(
-                    f"{name}: want {'red' if want_red else 'green'}, got {got}"
-                )
+                fails.append(f"{name}: want {'red' if want_red else 'green'}, got {got}")
 
         def record(sha: str, ci: str = "https://ci/run/1") -> None:
             record_dir(repo).mkdir(exist_ok=True)

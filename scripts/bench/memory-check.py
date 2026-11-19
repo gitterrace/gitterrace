@@ -30,9 +30,7 @@ SLACK_MB = 25
 
 
 def bench():
-    spec = importlib.util.spec_from_file_location(
-        "bench_lib", ROOT / "scripts/bench/bench-lib.py"
-    )
+    spec = importlib.util.spec_from_file_location("bench_lib", ROOT / "scripts/bench/bench-lib.py")
     if spec is None or spec.loader is None:
         sys.exit("cannot load scripts/bench/bench-lib.py")
     mod = importlib.util.module_from_spec(spec)
@@ -78,9 +76,7 @@ def assert_zero_decay(binary: str) -> None:
         sys.exit(f"{binary} does not run with zero page decay: {out.stdout.strip()!r}")
 
 
-def measure(
-    br: Any, binary: str, repo: Path, logdir: Path
-) -> tuple[float, float | None]:
+def measure(br: Any, binary: str, repo: Path, logdir: Path) -> tuple[float, float | None]:
     srv = br.Server(binary, repo, logdir)
     try:
         srv.wait_ready()

@@ -44,9 +44,7 @@ def installs(script: str) -> set[str]:
 
 def wanted(runner: str, steps: str) -> set[str]:
     """The tools make lint runs: `run <name> <tool>` lines and each product step's tool."""
-    tools = set(
-        re.findall(r"(?:^\s*|[;&|]\s*|then\s+)run\s+[\w-]+\s+([\w.-]+)\s", runner, re.M)
-    )
+    tools = set(re.findall(r"(?:^\s*|[;&|]\s*|then\s+)run\s+[\w-]+\s+([\w.-]+)\s", runner, re.M))
     tools = {t for t in tools if not t.startswith("$")}
     for step in tomllib.loads(steps).get("run", {}).get("steps", []):
         tools.add(step.split("|")[1])
@@ -63,15 +61,9 @@ def problems(script: str, runner: str, steps: str, ci: str) -> list[str]:
         mine = re.search(rf"^{var}=([\d.]+)$", script, re.M)
         theirs = re.search(rx, ci)
         if not mine or not theirs:
-            bad.append(
-                f"{var}: no pin in {SCRIPT}"
-                if not mine
-                else f"{var}: not pinned in {CI}"
-            )
+            bad.append(f"{var}: no pin in {SCRIPT}" if not mine else f"{var}: not pinned in {CI}")
         elif mine.group(1) != theirs.group(1):
-            bad.append(
-                f"{var} is {mine.group(1)} in {SCRIPT} but {theirs.group(1)} in {CI}"
-            )
+            bad.append(f"{var} is {mine.group(1)} in {SCRIPT} but {theirs.group(1)} in {CI}")
     return bad
 
 

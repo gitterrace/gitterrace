@@ -53,9 +53,7 @@ def status_words(text: str, name: str) -> list[str]:
         if SKIP.match(line):
             continue
         if any(p.search(line) for p in PATTERNS):
-            out.append(
-                f"{name}:{i}: status facts run together, add a comma: {line.strip()[:90]}"
-            )
+            out.append(f"{name}:{i}: status facts run together, add a comma: {line.strip()[:90]}")
     return out
 
 
@@ -70,9 +68,7 @@ def history_comments(text: str, name: str) -> list[str]:
             continue
         m = HISTORY.search(line[at:])
         if m and f"{name}:{i}" not in ALLOW:
-            out.append(
-                f"{name}:{i}: comment looks back ('{m.group(0)}'), say what holds now"
-            )
+            out.append(f"{name}:{i}: comment looks back ('{m.group(0)}'), say what holds now")
     return out
 
 
@@ -137,19 +133,13 @@ def files() -> list[str]:
         text=True,
         check=True,
     )
-    return [
-        f
-        for f in r.stdout.split("\n")
-        if f and not any(x in f for x in EXCLUDE) and f != SELF
-    ]
+    return [f for f in r.stdout.split("\n") if f and not any(x in f for x in EXCLUDE) and f != SELF]
 
 
 def self_test() -> int:
     for rule, name, text, red in CASES:
         if bool(RULES[rule][1](text, name)) != red:
-            print(
-                f"text-check self-test: {rule} {'passed' if red else 'failed'}: {text}"
-            )
+            print(f"text-check self-test: {rule} {'passed' if red else 'failed'}: {text}")
             return 1
     print("text-check self-test: ok")
     return 0

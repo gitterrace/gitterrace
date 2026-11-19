@@ -126,9 +126,7 @@ def bbox(d: str) -> tuple[float, float, float, float]:
             xs += v[0::2]
             ys += v[1::2]
     if not xs or not ys or re.search(r"[a-z]", d.replace("e-", "")):
-        raise SystemExit(
-            "header layout changed: the wordmark is not absolute M L H V Q Z"
-        )
+        raise SystemExit("header layout changed: the wordmark is not absolute M L H V Q Z")
     return min(xs), min(ys), max(xs), max(ys)
 
 
@@ -218,9 +216,7 @@ def build(header: str) -> dict[str, str]:
     # The mark draws paths of its own (the tread), so count the text outside the group.
     paths = PATHS.findall(MARK_GROUP.sub("", header))
     if not mark or len(paths) != 3:
-        raise SystemExit(
-            "header layout changed: expected the mark group and 3 text paths"
-        )
+        raise SystemExit("header layout changed: expected the mark group and 3 text paths")
     git, terrace = (find(r'fill="(#[0-9a-f]{6})"', p).group(1) for p in paths[:2])
     if contrast(git, terrace) < MIN_SPLIT:
         raise SystemExit(
@@ -290,16 +286,13 @@ def main() -> int:
     if LISTING:
         return 0
     for s in stale:
-        print(
-            f"{s}: does not match the README header; run scripts/release/site/theme-logo-gen.py"
-        )
+        print(f"{s}: does not match the README header; run scripts/release/site/theme-logo-gen.py")
     # Every template that writes its own <head> takes the icon from that include, so a new
     # page shell cannot ship without a favicon.
     bare = [
         t.relative_to(ROOT)
         for t in sorted(tpl.parent.glob("*.html"))
-        if "<head>" in t.read_text()
-        and '{% include "_favicon.html" %}' not in t.read_text()
+        if "<head>" in t.read_text() and '{% include "_favicon.html" %}' not in t.read_text()
     ]
     for t in bare:
         print(f'{t}: has a <head> without {{% include "_favicon.html" %}}')
@@ -311,9 +304,7 @@ def main() -> int:
         if 'class="brand"' in p.read_text() and not WORDMARK.search(p.read_text())
     ]
     for p in plain:
-        print(
-            f'{p}: its header brand has no <svg class="wordmark">, so it shows a text name'
-        )
+        print(f'{p}: its header brand has no <svg class="wordmark">, so it shows a text name')
     for d in drift:
         print(d)
     return 1 if stale or bare or drift or plain else 0

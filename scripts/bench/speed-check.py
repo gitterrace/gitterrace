@@ -73,9 +73,7 @@ def wait_load(limit: float) -> float:
     return load
 
 
-def verdict(
-    repo: str, samples: dict[str, list[float]]
-) -> list[tuple[str, float, float, bool]]:
+def verdict(repo: str, samples: dict[str, list[float]]) -> list[tuple[str, float, float, bool]]:
     """(page, median ms, gate ms, over) per page of `repo` that has samples."""
     out = []
     for name, ms in samples.items():
@@ -97,9 +95,7 @@ def measure(binary: str, repo: Path, names: list[str], runs: int, max_load: floa
             try:
                 srv.wait_ready()
                 prefix = bl.site_prefix(srv.port)
-                status, _, ms, _ = bl.get(
-                    srv.port, prefix + PAGES[name], PAGE_TIMEOUT_SECS
-                )
+                status, _, ms, _ = bl.get(srv.port, prefix + PAGES[name], PAGE_TIMEOUT_SECS)
             except TimeoutError:
                 status, ms = 0, PAGE_TIMEOUT_SECS * 1000.0
             finally:
@@ -130,9 +126,7 @@ def self_test() -> int:
 def main() -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     ap.add_argument("--bin")
-    bench = Path(
-        os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
-    )
+    bench = Path(os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench"))
     ap.add_argument("--repos", default=",".join(GATES))
     ap.add_argument("--runs", type=int, default=3)
     ap.add_argument("--max-load", type=float, default=float(os.cpu_count() or 2))
@@ -157,13 +151,9 @@ def main() -> int:
         if not (path / "gitterrace" / "MANIFEST").exists():
             sys.exit(f"{path} has no built index: serve it once first")
         names = [n for n in GATES[repo] if not only or n in only]
-        for name, med, gate, bad in verdict(
-            repo, measure(a.bin, path, names, a.runs, a.max_load)
-        ):
+        for name, med, gate, bad in verdict(repo, measure(a.bin, path, names, a.runs, a.max_load)):
             verdict_word = "OVER" if bad else "ok"
-            print(
-                f"{repo:6} {name:14} median {med:10.1f} ms  gate {gate:5.0f} ms  {verdict_word}"
-            )
+            print(f"{repo:6} {name:14} median {med:10.1f} ms  gate {gate:5.0f} ms  {verdict_word}")
             if bad:
                 over.append(f"{repo}/{name}")
     if over:

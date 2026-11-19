@@ -111,9 +111,7 @@ def report(before: Path, after: Path) -> int:
     if not errors:
         cov, _ = read_lcov(after)
         lines = sum(len(v) for v in cov.values())
-        print(
-            f"coverage-check: ok, {lines} covered lines kept, branches per crate not lower"
-        )
+        print(f"coverage-check: ok, {lines} covered lines kept, branches per crate not lower")
     return 1 if errors else 0
 
 
@@ -140,13 +138,9 @@ def self_test() -> int:
                 d = Path(tmp, name, side)
                 (d / "mutants.out").mkdir(parents=True)
                 (d / "lcov.info").write_text(text)
-                (d / "tests-start.tsv").write_text(
-                    "crates/gitterrace-web/src/a.rs\t5\n"
-                )
+                (d / "tests-start.tsv").write_text("crates/gitterrace-web/src/a.rs\t5\n")
                 (d / "mutants.out" / "caught.txt").write_text("")
-                (d / "mutants.out" / mf).write_text(
-                    "src/a.rs:1:1: replace f -> bool with true\n"
-                )
+                (d / "mutants.out" / mf).write_text("src/a.rs:1:1: replace f -> bool with true\n")
                 sides.append(d)
             got = 1 if compare(*sides) else 0
             if got != want:

@@ -46,9 +46,7 @@ def hexv(tok: Json, name: str) -> str:
 def mix(fg: str, bg: str, share: float) -> str:
     a = [int(fg[i : i + 2], 16) for i in (1, 3, 5)]
     b = [int(bg[i : i + 2], 16) for i in (1, 3, 5)]
-    return "#" + "".join(
-        f"{round(x * share + y * (1 - share)):02x}" for x, y in zip(a, b)
-    )
+    return "#" + "".join(f"{round(x * share + y * (1 - share)):02x}" for x, y in zip(a, b))
 
 
 def luminance(c: str) -> float:
@@ -71,8 +69,7 @@ def contrast(a: str, b: str) -> float:
 PAGE_SURFACES = ["n-1", "n-2", "n-3", "header", "raised"]
 TEXT = ["n-6", "n-7", "n-9", "info", "accent", "add", "del", "warn"]
 SYNTAX = [
-    f"syn-{r}"
-    for r in ("comment", "keyword", "string", "constant", "entity", "tag", "param")
+    f"syn-{r}" for r in ("comment", "keyword", "string", "constant", "entity", "tag", "param")
 ]
 ROW_SURFACES = ["add-bg", "del-bg", "warn-bg", "accent-soft"]
 PAIRS: list[tuple[str, str, float]] = (
@@ -119,14 +116,10 @@ def colours(tokens: Json, mode: str) -> dict[str, str]:
         "scrim": SCRIM,
         "accent": h("accent-ink"),
         "accent-fg": h("accent-ink"),
-        "accent-soft": mix(
-            h("accent-ink"), h("surfaces.bg"), tokens["shares"]["selected-row"]
-        ),
+        "accent-soft": mix(h("accent-ink"), h("surfaces.bg"), tokens["shares"]["selected-row"]),
         "ring": h("accent-ink") + RING_ALPHA[mode],
         # Text on an accent fill: whichever of white and the page ink reads better.
-        "on-accent": max(
-            ("#ffffff", h("surfaces.bg")), key=lambda c: contrast(c, h("accent-ink"))
-        ),
+        "on-accent": max(("#ffffff", h("surfaces.bg")), key=lambda c: contrast(c, h("accent-ink"))),
         "add": h("positive"),
         "add-bg": h("code.add-row"),
         "add-hl": h("code.add-word"),
@@ -152,8 +145,7 @@ def palette(light: dict[str, str], dark: dict[str, str]) -> str:
     both = {**light, "shadow-2": SHADOW["light"]}
     other = {**dark, "shadow-2": SHADOW["dark"]}
     items = [
-        f"--{k}:{v};" if v == other[k] else f"--{k}:{pair(v, other[k])};"
-        for k, v in both.items()
+        f"--{k}:{v};" if v == other[k] else f"--{k}:{pair(v, other[k])};" for k, v in both.items()
     ]
     rows = [" ".join(items[i : i + 6]) for i in range(0, len(items), 6)]
     return ":root{\n" + "\n".join(rows) + "\n}"
@@ -186,9 +178,7 @@ def fonts(design: Json) -> list[str]:
     ]
 
     def stack(k: str) -> str:
-        return ",".join(
-            f'"{x}"' if " " in x else x for x in [f[k]["web"]] + f[k]["fallback"]
-        )
+        return ",".join(f'"{x}"' if " " in x else x for x in [f[k]["web"]] + f[k]["fallback"])
 
     lines.append(
         f':root{{--font-title:{stack("title")};--font-body:{stack("body")};--font-mono:{stack("mono")},"SF Mono",Consolas,monospace;}}'

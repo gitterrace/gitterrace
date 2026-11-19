@@ -45,9 +45,7 @@ def problems(text: str, generated: str, version: str | None) -> list[str]:
     _, have = top(text)
     _, want = top(generated)
     if have != want:
-        out.append(
-            f"[{version}] differs from git-cliff; run make changelog, never edit it"
-        )
+        out.append(f"[{version}] differs from git-cliff; run make changelog, never edit it")
     return out
 
 
@@ -87,9 +85,7 @@ def main(argv: list[str]) -> int:
     # git-cliff reads the release from the commits since the last tag: a copy without that
     # history (a fixture repository, a shallow clone) has nothing to compare against.
     if not any(tagged(v) for v in HEAD.findall(text) if v != version):
-        print(
-            "changelog-check: no earlier release tag in this history, nothing to compare"
-        )
+        print("changelog-check: no earlier release tag in this history, nothing to compare")
         return 0
     if not shutil.which("git-cliff"):
         print("FAIL changelog-check: git-cliff is not installed", file=sys.stderr)

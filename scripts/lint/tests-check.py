@@ -66,11 +66,7 @@ def problems(root: Path) -> list[str]:
         if p is None:
             out.append(f"{rel}: no parent module file found")
             continue
-        m = (
-            found[1]
-            if found
-            else re.search(DECL.format(name=re.escape(f.stem)), p.read_text())
-        )
+        m = found[1] if found else re.search(DECL.format(name=re.escape(f.stem)), p.read_text())
         if m is None:
             out.append(f"{rel}: {p.relative_to(root)} does not declare `mod {f.stem};`")
         elif not test_only(m.group(1)):

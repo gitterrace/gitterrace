@@ -106,9 +106,7 @@ def self_test() -> int:
     for i, (text, red) in enumerate(cases):
         got = problems_in(f"case{i}", text)
         if bool(got) != red:
-            print(
-                f"inject-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
-            )
+            print(f"inject-check self-test: case {i} {'passed' if red else 'failed'}: {got}")
             good = False
     print("inject-check self-test:", "ok" if good else "FAILED")
     return 0 if good else 1
@@ -117,16 +115,12 @@ def self_test() -> int:
 def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
-    repo = (
-        Path(sys.argv[sys.argv.index("--repo") + 1]) if "--repo" in sys.argv else ROOT
-    )
+    repo = Path(sys.argv[sys.argv.index("--repo") + 1]) if "--repo" in sys.argv else ROOT
     bad = problems(repo)
     for b in bad:
         print(f"inject-check: {b}", file=sys.stderr)
     if not bad:
-        print(
-            f"inject-check: {len(files(repo))} workflow files splice no outside data into run:"
-        )
+        print(f"inject-check: {len(files(repo))} workflow files splice no outside data into run:")
     return 1 if bad else 0
 
 

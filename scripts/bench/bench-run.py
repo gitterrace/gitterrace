@@ -61,15 +61,9 @@ def bench_repo(
     print(f"== {name} ({repo['class']}) @ {repo.get('sha', 'HEAD')[:10]}", flush=True)
     rev = repo["sha"] if not repo.get("local") else "HEAD"
     probe = bl.discover(repo_dir, rev)
-    probe.update(
-        {k: repo[k] for k in ("blob", "blame", "deep_tree", "commit") if k in repo}
-    )
+    probe.update({k: repo[k] for k in ("blob", "blame", "deep_tree", "commit") if k in repo})
     # The cache lives under the git dir: .git/gitterrace, or ./gitterrace in a bare clone.
-    cache = (
-        Path(repo_dir)
-        / (".git" if (Path(repo_dir) / ".git").exists() else "")
-        / "gitterrace"
-    )
+    cache = Path(repo_dir) / (".git" if (Path(repo_dir) / ".git").exists() else "") / "gitterrace"
     shutil.rmtree(cache, ignore_errors=True)
     # One untimed read warms the OS cache so cold means the first request, not the disk.
     bl.run(["git", "rev-list", "--count", rev], cwd=repo_dir)
@@ -141,9 +135,7 @@ def bench_phases(
             )
         rss_warm = bl.rss_mb(srv.pid)
         bq.quiet("pages", loads, wait, sampler)
-        res["pages"] = bq.measure_pages(
-            srv.port, bl.pages(probe, repo.get("search", "fn")), runs
-        )
+        res["pages"] = bq.measure_pages(srv.port, bl.pages(probe, repo.get("search", "fn")), runs)
         res["memory"] = {
             "rss_after_index_mb": rss_warm,
             "rss_after_pages_mb": bl.rss_mb(srv.pid),
@@ -390,17 +382,14 @@ def machine(binary: str) -> Json:
         cpu = bl.run(["sysctl", "-n", "machdep.cpu.brand_string"]).strip()
     except (OSError, subprocess.CalledProcessError):
         for line in (
-            Path("/proc/cpuinfo").read_text().splitlines()
-            if Path("/proc/cpuinfo").exists()
-            else []
+            Path("/proc/cpuinfo").read_text().splitlines() if Path("/proc/cpuinfo").exists() else []
         ):
             if line.startswith("model name"):
                 cpu = line.split(":", 1)[1].strip()
                 break
     return {
         # A neutral label from the CPU, never platform.node(): results are published.
-        "label": re.sub(r"[^a-z0-9]+", "-", cpu.lower()).strip("-")
-        or platform.machine(),
+        "label": re.sub(r"[^a-z0-9]+", "-", cpu.lower()).strip("-") or platform.machine(),
         "os": os_name(),
         "disk": disk_name(),
         "arch": platform.machine(),
@@ -458,21 +447,15 @@ def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    ap.add_argument(
-        "--repos", help="comma list of corpus names (default: all but opt-in)"
-    )
+    ap.add_argument("--repos", help="comma list of corpus names (default: all but opt-in)")
     ap.add_argument(
         "--large", action="store_true", help="include opt-in repos (also BENCH_LARGE=1)"
     )
-    ap.add_argument(
-        "--fetch-only", action="store_true", help="clone and backfill, time nothing"
-    )
+    ap.add_argument("--fetch-only", action="store_true", help="clone and backfill, time nothing")
     ap.add_argument("--runs", type=int, default=bq.FULL_RUNS)
     ap.add_argument("--idle-secs", type=int, default=bq.FULL_IDLE_SECS)
     ap.add_argument("--bin", default=str(bl.ROOT / "target/release/git-terrace"))
-    ap.add_argument(
-        "--synthetic", action="store_true", help="tiny generated repo, one run (guard)"
-    )
+    ap.add_argument("--synthetic", action="store_true", help="tiny generated repo, one run (guard)")
     ap.add_argument(
         "--preflight",
         action="store_true",
@@ -488,9 +471,7 @@ def main():
     if not Path(a.bin).exists():
         sys.exit(f"no binary at {a.bin}, run `make build` (release) first")
     corpus = bl.parse_toml((bl.ROOT / "tests/bench/corpus.toml").read_text())
-    base = Path(
-        os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
-    )
+    base = Path(os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench"))
     base.mkdir(parents=True, exist_ok=True)
     logdir = Path(tempfile.mkdtemp(prefix="gt-bench-"))
     todo = []
@@ -502,14 +483,10 @@ def main():
         large = a.large or os.environ.get("BENCH_LARGE") == "1"
         want = a.repos.split(",") if a.repos else None
         for r in corpus["repo"]:
-            if (want and r["name"] not in want) or (
-                not want and r.get("opt_in") and not large
-            ):
+            if (want and r["name"] not in want) or (not want and r.get("opt_in") and not large):
                 continue
             if r.get("opt_in") and not large:
-                sys.exit(
-                    f"{r['name']} is opt-in: set BENCH_LARGE=1 (about {r.get('need_gb')} GB)"
-                )
+                sys.exit(f"{r['name']} is opt-in: set BENCH_LARGE=1 (about {r.get('need_gb')} GB)")
             todo.append((r, bl.ensure_clone(r, base, logdir)))
     if a.fetch_only:
         print("fetched: " + ", ".join(r["name"] for r, _ in todo))
@@ -527,9 +504,7 @@ def main():
     over, fails = [], []
     # Only a full run is published and repeats the cold phases. A smoke run (fewer runs, shorter
     # idle) samples once and stays in the cache.
-    full = (
-        not a.synthetic and a.runs == bq.FULL_RUNS and a.idle_secs == bq.FULL_IDLE_SECS
-    )
+    full = not a.synthetic and a.runs == bq.FULL_RUNS and a.idle_secs == bq.FULL_IDLE_SECS
     for repo, d in todo:
         res = bench_repo(
             repo,
@@ -551,13 +526,7 @@ def main():
         ]
         result["repos"][repo["name"]] = res
         assert not a.synthetic or res["export"]["commits"] == 10, "bound not recorded"
-    out_dir = (
-        logdir
-        if a.synthetic
-        else bl.ROOT / "tests/bench/results"
-        if full
-        else base / "runs"
-    )
+    out_dir = logdir if a.synthetic else bl.ROOT / "tests/bench/results" if full else base / "runs"
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"{datetime.date.today()}-{result['machine']['label']}.json"
     # Repos can run in separate passes on one day (control last, after a history rewrite).

@@ -63,9 +63,7 @@ def changed(rng: str | None) -> list[str]:
 
 def selected(files: list[str]) -> list[tuple[str, list[str]]]:
     def hits(keys: tuple[str, ...]) -> bool:
-        return not keys or any(
-            f.endswith(k) or f.startswith(k) for f in files for k in keys
-        )
+        return not keys or any(f.endswith(k) or f.startswith(k) for f in files for k in keys)
 
     return [(name, cmd) for name, cmd, keys in GATES if hits(keys)]
 
@@ -87,9 +85,7 @@ def prod_removals(path: str, removed: list[int], old: str) -> list[int]:
     removed = [n for n in removed if 0 < n <= len(lines) and lines[n - 1].strip()]
     if not path.endswith(".rs"):
         return removed
-    cut = next(
-        (i + 1 for i, s in enumerate(lines) if s.strip() == "#[cfg(test)]"), None
-    )
+    cut = next((i + 1 for i, s in enumerate(lines) if s.strip() == "#[cfg(test)]"), None)
     return removed if cut is None else [n for n in removed if n < cut]
 
 
@@ -119,9 +115,7 @@ def test_commits_removing_product(rng: str) -> list[str]:
             code, old = run(["git", "show", f"{sha}~:{path}"])
             bad = prod_removals(path, removed, old) if code == 0 else []
             if bad:
-                hits.append(
-                    f"{sha[:9]} {path}: {len(bad)} product line(s) from line {bad[0]}"
-                )
+                hits.append(f"{sha[:9]} {path}: {len(bad)} product line(s) from line {bad[0]}")
     return hits
 
 
@@ -133,9 +127,7 @@ def self_test() -> int:
     ok = ok and not prod_removals("scripts/x.py", [1], "x\n")
     diff = "--- a/crates/x/src/a.rs\n+++ b/crates/x/src/a.rs\n@@ -2,2 +1,0 @@\n-x\n-y\n"
     ok = ok and removed_lines(diff) == {"crates/x/src/a.rs": [2, 3]}
-    ok = (
-        ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-button") == 1
-    )
+    ok = ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-button") == 1
     ok = ok and "css-button" not in [n for n, _ in selected(["crates/a/src/x.rs"])]
     print("commits-check self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
@@ -143,9 +135,7 @@ def self_test() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=(__doc__ or "").split("\n")[0])
-    ap.add_argument(
-        "--range", help="A..B, the commits to accept; default: the working tree"
-    )
+    ap.add_argument("--range", help="A..B, the commits to accept; default: the working tree")
     ap.add_argument("--self-test", action="store_true")
     a = ap.parse_args()
     if a.self_test:
@@ -174,10 +164,7 @@ def main() -> int:
         fails += bool(hits)
         base, _, tip = a.range.partition("..")
         # land-check reads messages over BASE..HEAD, so it speaks for the range only at HEAD.
-        if (
-            run(["git", "rev-parse", tip or "HEAD"])[1]
-            == run(["git", "rev-parse", "HEAD"])[1]
-        ):
+        if run(["git", "rev-parse", tip or "HEAD"])[1] == run(["git", "rev-parse", "HEAD"])[1]:
             code, out = run(["bash", "scripts/land-check.sh", "--messages", base])
             if code:
                 print(out)
@@ -185,9 +172,7 @@ def main() -> int:
             fails += bool(code)
         else:
             print(f"SKIP messages: check out {tip} to run them")
-    print(
-        "Judgement is not checked here: read the diff for comments that earn their place."
-    )
+    print("Judgement is not checked here: read the diff for comments that earn their place.")
     return 1 if fails else 0
 
 

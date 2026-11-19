@@ -132,8 +132,7 @@ def self_test() -> int:
         )
         red = blind_rules(t / "rules", t / "tests") == ["item-only"]
         (t / "rules" / "item-only.yml").write_text(
-            "id: item-only\nlanguage: rust\nseverity: error\nmessage: m\n"
-            "rule:\n  regex: 'a: u8'\n"
+            "id: item-only\nlanguage: rust\nseverity: error\nmessage: m\nrule:\n  regex: 'a: u8'\n"
         )
         green = blind_rules(t / "rules", t / "tests") == []
         # A python without PyYAML runs the whole check: a module named yaml that refuses to

@@ -93,9 +93,7 @@ def corpus() -> list[tuple[str, str, str]]:
     repos = corpus_repos()
     for r in repos:
         if not r.get("url") or not r.get("why"):
-            sys.exit(
-                f"tests/bench/corpus.toml: repo {r.get('name')} needs a url and a why"
-            )
+            sys.exit(f"tests/bench/corpus.toml: repo {r.get('name')} needs a url and a why")
         if r.get("local") and r.get("sha"):
             sys.exit(
                 f"tests/bench/corpus.toml: {r['name']} is local, measured at HEAD: drop its sha"
@@ -143,8 +141,7 @@ def normalize(run: Json) -> Json:
     order = [r["name"] for r in corpus_repos()]
     repos = run["repos"]
     run["repos"] = {
-        n: repos[n]
-        for n in sorted(repos, key=lambda n: (order.index(n) if n in order else 99, n))
+        n: repos[n] for n in sorted(repos, key=lambda n: (order.index(n) if n in order else 99, n))
     }
     return rounded(run)
 
@@ -203,13 +200,9 @@ def chart(key: str, repos: Json, scheme: str, prev: Json | None = None) -> str |
     if not rows:
         return None
     before = {
-        n: r["budget"][key]["value"]
-        for n, r in (prev or {}).items()
-        if key in r.get("budget", {})
+        n: r["budget"][key]["value"] for n, r in (prev or {}).items() if key in r.get("budget", {})
     }
-    top = (
-        max(max(b["value"], b["limit"], before.get(n, 0)) for n, b in rows) * 1.08 or 1
-    )
+    top = max(max(b["value"], b["limit"], before.get(n, 0)) for n, b in rows) * 1.08 or 1
     lx, bx, bw, rh, pad = 8, 84, 380, 34, 30
     w, h = 640, pad + rh * len(rows) + 22
     font = f'fill="{ink}" font-family="sans-serif"'
@@ -321,8 +314,5 @@ def slowest_page_test(br: Any) -> None:
         sys.exit(f"bench-report self-test failed: the slowest page reads {got}")
     other = {**res, "pages": {"blame": pg(5), "diff": pg(70)}}
     table = by_page({"repos": {"a": res, "b": other}})
-    if (
-        "| blame | 90 ms | 5 ms |" not in table
-        or "| diff | 10 ms | 70 ms |" not in table
-    ):
+    if "| blame | 90 ms | 5 ms |" not in table or "| diff | 10 ms | 70 ms |" not in table:
         sys.exit(f"bench-report self-test failed: per-page rows {table}")

@@ -124,9 +124,7 @@ def scan(root: str):
         for base, dirs, names in os.walk(os.path.join(root, top)):
             dirs[:] = [d for d in dirs if d not in CONF["skip_dirs"]]
             files += [
-                os.path.join(base, n)
-                for n in names
-                if n.endswith(tuple(CONF["caller_exts"]))
+                os.path.join(base, n) for n in names if n.endswith(tuple(CONF["caller_exts"]))
             ]
     srcs = item_dirs(root)
     prod, test = defaultdict(int), defaultdict(int)

@@ -70,9 +70,7 @@ def gate_test() -> None:
             res[top][leaf] = 100
             got = br.judge(res, {"c": {key: 50}}).get(key, {}).get("status")
             if got != "over":
-                sys.exit(
-                    f"bench-report self-test failed: {hot} over budget reads {got}"
-                )
+                sys.exit(f"bench-report self-test failed: {hot} over budget reads {got}")
 
 
 # What the memory gate reads, see bench-chart-lib SOURCES.
@@ -115,9 +113,7 @@ def memory_measure_test() -> None:
             )
             try:
                 if p.stdout is None or not p.stdout.readline().startswith("ready"):
-                    sys.exit(
-                        "bench-report self-test failed: memory child did not start"
-                    )
+                    sys.exit("bench-report self-test failed: memory child did not start")
                 got.append(bl.footprint_mb(p.pid) or 0.0)
             finally:
                 p.kill()
@@ -140,9 +136,9 @@ def self_test() -> None:
         bad.write_bytes(b"\x00\x80\xff not utf-8")
         (Path(d) / "a.json").write_text("{}")
         got = bd.stray(Path(d))
-        if got != [
-            f"unexpected file: {bad.relative_to(Path(d).parent.parent)}"
-        ] or bd.actual(Path(d)) != {Path(d) / "a.json"}:
+        if got != [f"unexpected file: {bad.relative_to(Path(d).parent.parent)}"] or bd.actual(
+            Path(d)
+        ) != {Path(d) / "a.json"}:
             sys.exit(f"bench-report self-test failed: {got}")
     loud_test()
     own_load_test()
@@ -163,16 +159,10 @@ def self_test() -> None:
 TRACKER_ID = re.compile(r"\b(?=[0-9a-f]*[0-9])(?=[0-9a-f]*[a-f])[0-9a-f]{6}\b")
 
 
-def page_problems(
-    text: str, repos: list[str], files: set[str], dates: set[str]
-) -> list[str]:
+def page_problems(text: str, repos: list[str], files: set[str], dates: set[str]) -> list[str]:
     """What is wrong with generated results pages: a measured repo missing from the table, a
     results date or file named that is not kept, or a tracker id in the text."""
-    errs = [
-        f"{n} is in the run but not in the table"
-        for n in repos
-        if f"| {n} |" not in text
-    ]
+    errs = [f"{n} is in the run but not in the table" for n in repos if f"| {n} |" not in text]
     errs += [
         f"names the results of {d}, which are not kept"
         for d in sorted(set(re.findall(r"\b20\d\d-\d\d-\d\d\b", text)) - dates)
@@ -181,9 +171,7 @@ def page_problems(
         f"names {f}, which is not in tests/bench/results"
         for f in sorted(set(re.findall(r"[\w-]+\.json", text)) - files)
     ]
-    errs += [
-        f"tracker id {m} in the text" for m in sorted(set(TRACKER_ID.findall(text)))
-    ]
+    errs += [f"tracker id {m} in the text" for m in sorted(set(TRACKER_ID.findall(text)))]
     return errs
 
 
@@ -207,12 +195,8 @@ def commit_test() -> None:
     if bd.version(dirty).count("1161f1d") != 1:
         sys.exit("bench-report self-test failed: the doc version dropped the commit")
     if bd.version({"gitterrace": "gitterrace v0.1.0"}) != "gitterrace v0.1.0":
-        sys.exit(
-            "bench-report self-test failed: a run with no commit must render plain"
-        )
-    if bd.commit_errors(
-        {**run, "when": "2026-11-03T10:00:00", "machine": {"gitterrace": "x"}}
-    ):
+        sys.exit("bench-report self-test failed: a run with no commit must render plain")
+    if bd.commit_errors({**run, "when": "2026-11-03T10:00:00", "machine": {"gitterrace": "x"}}):
         sys.exit("bench-report self-test failed: a run before COMMIT_FROM was refused")
 
 
@@ -240,15 +224,9 @@ def page_test() -> None:
     ]:
         if not any(want in e for e in page_problems(tweak, names, files, dates)):
             sys.exit(f"bench-report self-test failed: {label} passed the page guard")
-    withheld = bd.shown(
-        {**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}}
-    )
-    if not withheld["held"] or any(
-        n not in bd.results_readme([withheld]) for n in names
-    ):
-        sys.exit(
-            "bench-report self-test failed: a withheld repo vanished from the table"
-        )
+    withheld = bd.shown({**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}})
+    if not withheld["held"] or any(n not in bd.results_readme([withheld]) for n in names):
+        sys.exit("bench-report self-test failed: a withheld repo vanished from the table")
 
 
 def _loud(r: Json) -> Json:
@@ -272,9 +250,7 @@ def own_load_test() -> None:
     ]
     own, other = bq.split_cores(rows, 10)
     if (round(own, 2), round(other, 2)) != (2.05, 0.3):
-        sys.exit(
-            f"bench-report self-test failed: own pid tree counted as load {own} {other}"
-        )
+        sys.exit(f"bench-report self-test failed: own pid tree counted as load {own} {other}")
 
 
 def wrap_test() -> None:
@@ -299,12 +275,8 @@ def loud_test() -> None:
             load["sampled"] = {"index": {"max": peak, "mean": 2.0, "n": 3}}
         return {"load": load}
 
-    view = bd.shown(
-        {"repos": {"quiet": repo(4.9), "loud": repo(41.0), "old": repo(None)}}
-    )
-    if list(view["repos"]) != ["quiet", "old"] or view["withheld"] != {
-        "loud": ["index"]
-    }:
+    view = bd.shown({"repos": {"quiet": repo(4.9), "loud": repo(41.0), "old": repo(None)}})
+    if list(view["repos"]) != ["quiet", "old"] or view["withheld"] != {"loud": ["index"]}:
         sys.exit(f"bench-report self-test failed: loud phase published: {view}")
     if bd.QUIET_NOTE not in "".join(bd.withheld_lines(view)):
         sys.exit("bench-report self-test failed: withheld repo not named")
@@ -330,12 +302,8 @@ def export_test() -> None:
         or bd.export_cell({"export": {**capped, "commits": 100}}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": capped}) != bd.CAPPED_EXPORT
         or bd.export_cell({"export": broken}) != bd.FAILED_EXPORT
-        or "1 run"
-        not in bd.export_cell(
-            {"cold_samples": 5, "export": {**good, "samples": [12.3]}}
-        )
-        or "1 run"
-        in bd.export_cell({"cold_samples": 5, "export": {**good, "samples": [1, 2]}})
+        or "1 run" not in bd.export_cell({"cold_samples": 5, "export": {**good, "samples": [12.3]}})
+        or "1 run" in bd.export_cell({"cold_samples": 5, "export": {**good, "samples": [1, 2]}})
     ):
         sys.exit(f"bench-report self-test failed: export cell {got}")
 
@@ -365,9 +333,7 @@ def footprint_test() -> None:
     }
     bad = [m for m in (missing, early) if not footprint(run(m))]
     if footprint(run(good)) or footprint(old) or bad:
-        sys.exit(
-            f"bench-report self-test failed: footprint guard passed {bad or 'a good run'}"
-        )
+        sys.exit(f"bench-report self-test failed: footprint guard passed {bad or 'a good run'}")
 
 
 # Guards -------------------------------------------------------------------------------------
@@ -375,9 +341,7 @@ def footprint_test() -> None:
 
 def pins() -> list[str]:
     """A clone that exists must hold its pin. Clones are optional, so a missing one passes."""
-    base = Path(
-        os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench")
-    )
+    base = Path(os.environ.get("GITTERRACE_BENCH_DIR", Path.home() / ".cache/gitterrace-bench"))
     errs: list[str] = []
     for r in bc.corpus_repos():
         d = base / f"{r['name']}.git"
@@ -399,11 +363,7 @@ def newest_ok(run: Json) -> list[str]:
     errs: list[str] = bd.commit_errors(run)
     m = run["machine"]
     c = m.get("commit")
-    if (
-        isinstance(c, str)
-        and c != bd.PENDING
-        and not any(s.startswith(c) for s in own_commits())
-    ):
+    if isinstance(c, str) and c != bd.PENDING and not any(s.startswith(c) for s in own_commits()):
         errs.append(f"{bc.run_name(run)}: machine.commit {c} is not in this history")
     if (m.get("dirty") or "dirty" in m.get("gitterrace", "")) and not run.get("note"):
         errs.append(f"{bc.run_name(run)}: measured a -dirty build")
@@ -430,18 +390,13 @@ def footprint(run: Json) -> list[str]:
             if m.get(key) is None:
                 errs.append(f"{bc.run_name(run)}: {n} recorded no memory.{key}")
         if m.get("footprint_releases", 0) < 1:
-            errs.append(
-                f"{bc.run_name(run)}: {n} read its footprint before an idle release"
-            )
+            errs.append(f"{bc.run_name(run)}: {n} read its footprint before an idle release")
     return errs
 
 
 def cold_samples(run: Json) -> list[str]:
     """Cold metrics need COLD_SAMPLES samples, or the count corpus.toml allows for the repo."""
-    allowed = {
-        r["name"]: int(r.get("cold_samples", bc.COLD_SAMPLES))
-        for r in bc.corpus_repos()
-    }
+    allowed = {r["name"]: int(r.get("cold_samples", bc.COLD_SAMPLES)) for r in bc.corpus_repos()}
     return [
         f"{bc.run_name(run)}: {n} has {r.get('cold_samples', 1)} cold sample(s), "
         f"needs {allowed.get(n, bc.COLD_SAMPLES)}"

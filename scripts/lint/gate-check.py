@@ -92,18 +92,14 @@ def static_problems(makefile: str, steps: list[str]) -> list[str]:
 
 
 def gated(gate: list[str]) -> set[str]:
-    return {
-        t for cmd in gate for m in MAKE_CMD.finditer(cmd) for t in m.group(1).split()
-    }
+    return {t for cmd in gate for m in MAKE_CMD.finditer(cmd) for t in m.group(1).split()}
 
 
 def landing_problems(repo: Path) -> list[str]:
     steps = check_steps((repo / "Makefile").read_text())
     if not steps:
         return ["Makefile: no `check:` target with prerequisites"]
-    landing = tomllib.loads((repo / "schwarzwald/config/land.toml").read_text())[
-        "landing"
-    ]
+    landing = tomllib.loads((repo / "schwarzwald/config/land.toml").read_text())["landing"]
     bad = static_problems((repo / "Makefile").read_text(), steps)
     run = gated(landing.get("gate", []))
     skip: dict[str, str] = landing.get("skip", {})
@@ -161,9 +157,7 @@ def tier_problems(repo: Path) -> list[str]:
     calls = [
         j
         for j, body in ci.items()
-        if re.search(
-            r"^    uses: \./\.github/workflows/lint-and-test\.yml\s*$", body, re.M
-        )
+        if re.search(r"^    uses: \./\.github/workflows/lint-and-test\.yml\s*$", body, re.M)
     ]
     # A job that runs on the schedule alone and only decides whether the nightly run goes ahead
     # tests nothing, so it cannot dodge a tier.
@@ -195,18 +189,12 @@ def tier_problems(repo: Path) -> list[str]:
             continue
         rj, os_ = COVERS[j]
         if rj not in release or os_ not in release[rj]:
-            bad.append(
-                f"release-check.yml: job {rj} does not run {os_}, which covers {j}"
-            )
+            bad.append(f"release-check.yml: job {rj} does not run {os_}, which covers {j}")
     for j in COVERS:
         if j not in tiers:
-            bad.append(
-                f"scripts/lint/gate-check.py COVERS names {j}, not a lint-and-test.yml job"
-            )
+            bad.append(f"scripts/lint/gate-check.py COVERS names {j}, not a lint-and-test.yml job")
     for j, body in release.items():
-        if "make check" in body and not re.search(
-            r"^\s+fetch-depth: 0\s*$", body, re.M
-        ):
+        if "make check" in body and not re.search(r"^\s+fetch-depth: 0\s*$", body, re.M):
             bad.append(
                 f"release-check.yml: job {j} runs make check on a shallow checkout; "
                 f"add fetch-depth: 0 to its checkout"
@@ -293,17 +281,11 @@ def cliff_problems(repo: Path) -> list[str]:
     found = re.findall(r"git-cliff/releases/download/v([0-9.]+)/", listed)
     bad = []
     if want not in found:
-        bad.append(
-            f"lint-tools action installs no git-cliff {want}, the pin in lint.toml"
-        )
+        bad.append(f"lint-tools action installs no git-cliff {want}, the pin in lint.toml")
     if set(found) - {want}:
-        bad.append(
-            f"lint-tools action: git-cliff {sorted(set(found) - {want})} is not {want}"
-        )
+        bad.append(f"lint-tools action: git-cliff {sorted(set(found) - {want})} is not {want}")
     if len(found) < 2:
-        bad.append(
-            "lint-tools action: git-cliff needs a pinned download on macOS and Linux"
-        )
+        bad.append("lint-tools action: git-cliff needs a pinned download on macOS and Linux")
     if not re.search(r"git-cliff[^\n]*\n[^\n]*\n?[^\n]*(sha256sum|shasum)", text):
         bad.append("lint-tools action: git-cliff download is not digest-checked")
     return bad
@@ -369,9 +351,7 @@ GATE = (
 def tier_fixture(d: Path, ci: str, tiers: str, rel: str, tools: str = "") -> Path:
     if tools:
         (d / "schwarzwald/config").mkdir(parents=True)
-        (d / "schwarzwald/config/lint.toml").write_text(
-            '[changelog]\ngit_cliff = "2.14.2"\n'
-        )
+        (d / "schwarzwald/config/lint.toml").write_text('[changelog]\ngit_cliff = "2.14.2"\n')
         (d / ".github/actions/lint-tools").mkdir(parents=True)
         (d / ".github/actions/lint-tools/action.yml").write_text(tools)
     (d / WF).mkdir(parents=True)
@@ -386,9 +366,7 @@ def tier_fixture(d: Path, ci: str, tiers: str, rel: str, tools: str = "") -> Pat
 
 def shell_self_test() -> int:
     if not shutil.which("shellcheck"):
-        print(
-            "gate-check self-test: shellcheck not installed, action shell cases skipped"
-        )
+        print("gate-check self-test: shellcheck not installed, action shell cases skipped")
         return 0
     ok = "runs:\n  steps:\n    - run: |\n        # The tool release\n        echo hi\n"
     for body, red in (
@@ -507,9 +485,7 @@ def self_test() -> int:
         results.append((got, c[3]))
     for i, (got, red) in enumerate(results):
         if bool(got) != red:
-            print(
-                f"gate-check self-test: case {i} {'passed' if red else 'failed'}: {got}"
-            )
+            print(f"gate-check self-test: case {i} {'passed' if red else 'failed'}: {got}")
             return 1
     if shell_self_test():
         return 1
@@ -524,9 +500,7 @@ def problems(repo: Path) -> list[str]:
 def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
-    repo = (
-        Path(sys.argv[sys.argv.index("--repo") + 1]) if "--repo" in sys.argv else ROOT
-    )
+    repo = Path(sys.argv[sys.argv.index("--repo") + 1]) if "--repo" in sys.argv else ROOT
     bad = problems(repo)
     for b in bad:
         print(f"gate-check: {b}", file=sys.stderr)
