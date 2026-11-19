@@ -74,6 +74,7 @@ mod symbols;
 #[cfg(test)]
 mod symbols_wiring_tests;
 mod views;
+mod warm;
 mod when;
 #[cfg(test)]
 mod wiring_fs_tests;
@@ -188,7 +189,7 @@ fn repo_router_tasks(
     app.actions = live;
     let app = Arc::new(app);
     env.register(&app);
-    let mut tasks = vec![
+    let tasks = vec![
         tokio::spawn(app::keep_index_fresh_supervised(Arc::clone(&app))).abort_handle(),
         tokio::spawn(app::release_when_idle(
             Arc::downgrade(&app),
@@ -217,7 +218,6 @@ fn repo_router_tasks(
     } else {
         pages
     };
-    tasks.push(tokio::spawn(prewarm(Arc::clone(&app), pages.clone())).abort_handle());
     Ok((pages, tasks, Arc::downgrade(&app)))
 }
 
@@ -233,7 +233,7 @@ fn bind_error(addr: SocketAddr, e: &io::Error) -> io::Error {
     io::Error::new(e.kind(), format!("cannot listen on {addr}: {e}{hint}"))
 }
 
-/// Unfiltered pages rendered in the background whenever HEAD moves.
+/// Unfiltered pages rendered whenever HEAD moves, before the repository turns ready.
 ///
 /// Each costs 40-90 ms to
 /// build on a 14k-commit repo, then a few ms from the memo, so no visitor pays the build.
@@ -260,41 +260,6 @@ pub const OUTLINE_JS: &str = include_str!("../static/outline.js");
 /// [`WARM_PAGES`] without the pages `cfg` switches off, for `export` to seed its crawl from.
 pub fn warm_pages(cfg: &Config) -> Vec<&'static str> {
     features::warm(cfg, None)
-}
-
-/// Opens the insights source for HEAD each time the index moves, then renders the unfiltered
-/// pages once, so the first visit to any of them is served from the memo. Sleeps between moves.
-async fn prewarm(app: Arc<App>, pages: axum::Router) {
-    use tower::ServiceExt;
-    let by = Arc::clone(&app);
-    app::on_refreshed(app, move || {
-        let (app, pages) = (Arc::clone(&by), pages.clone());
-        async move {
-            // The warm-up is no visitor: what it opens goes one idle period after it started.
-            let _warm = app.warming();
-            let ready = app::blocking(&app, |a| {
-                let head = a.repo.resolve("HEAD")?;
-                Ok(a.source(&head)?.is_some())
-            })
-            .await
-            .unwrap_or(false);
-            if !ready {
-                return;
-            }
-            let cfg = app.cfg();
-            for path in features::warm(&cfg, Some(&app.name)) {
-                // Internal requests skip the Host and cross-site guard, which wraps the outer
-                // router; a failed warm-up only means the first visitor builds the page.
-                if let Ok(req) = axum::http::Request::get(path).body(axum::body::Body::empty()) {
-                    let _warm = pages.clone().oneshot(req).await;
-                }
-            }
-            if cfg.feature_on(gitterrace_config::Feature::Blame, Some(&app.name)) {
-                routes::prewarm_blame(app).await;
-            }
-        }
-    })
-    .await;
 }
 
 fn guarded(router: axum::Router, gate: guard::Gate) -> axum::Router {

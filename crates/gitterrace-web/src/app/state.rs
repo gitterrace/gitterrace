@@ -78,6 +78,18 @@ impl StateCell {
             .is_ok()
     }
 
+    /// Warming to ready, and nothing else. Returns whether it moved.
+    fn finish_warming(&self) -> bool {
+        self.now
+            .compare_exchange(
+                RepoState::Warming.code(),
+                RepoState::Ready.code(),
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            )
+            .is_ok()
+    }
+
     /// Moves to `to` from any state: ready once the warm-up is done, queued again when the
     /// cache is rebuilt.
     pub(crate) fn set(&self, to: RepoState) {
@@ -87,6 +99,7 @@ impl StateCell {
 
 impl App {
     /// True once one full pass over HEAD and its warm-up finished, so records can be trusted.
+    #[cfg(test)]
     pub(crate) fn ready(&self) -> bool {
         self.state.get() == RepoState::Ready
     }
@@ -100,8 +113,22 @@ impl App {
         self.state.advance(to)
     }
 
+    /// Ready at once, for tests that build the index by hand.
+    #[cfg(test)]
     pub(crate) fn mark_ready(&self) {
         self.state.set(RepoState::Ready);
+    }
+
+    /// Ready once the warm-up is done, but only from warming: a rebuild that put the
+    /// repository back to queued meanwhile keeps it there.
+    pub(crate) fn finish_warming(&self) -> bool {
+        self.state.finish_warming()
+    }
+
+    /// Whether insights pages may read the index: it holds HEAD, so the warm-up renders
+    /// them, and a visitor while it runs gets the same page.
+    pub(crate) fn insights_open(&self) -> bool {
+        matches!(self.state.get(), RepoState::Warming | RepoState::Ready)
     }
 }
 
@@ -134,6 +161,15 @@ mod tests {
         assert_eq!(c.get(), RepoState::Ready);
         c.set(RepoState::Queued);
         assert_eq!(c.get(), RepoState::Queued);
+        c.finish_warming();
+        assert_eq!(
+            c.get(),
+            RepoState::Queued,
+            "a rebuild during the warm-up stays queued"
+        );
+        assert!(c.advance(RepoState::Warming));
+        c.finish_warming();
+        assert_eq!(c.get(), RepoState::Ready);
     }
 
     /// Guard class: any path that reports ready before the index holds HEAD, whether a

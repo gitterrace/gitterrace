@@ -29,10 +29,9 @@ impl App {
 
     fn open_source(&self, head: &str) -> Result<Option<crate::insights::CheckedSrc>> {
         self.check_unreadable()?;
-        // Ready first: the warm-up keeps HEAD's source before the index is marked ready, and a
-        // page served from it then would say ready while every other revision still gets the
-        // indexing page.
-        if !self.ready() {
+        // Open once the index holds HEAD (warming or ready): before that a page served from a
+        // partial set would show numbers the finished build changes.
+        if !self.insights_open() {
             self.demand();
             return Ok(None);
         }
@@ -202,7 +201,7 @@ impl App {
         {
             return Some(*n);
         }
-        if !self.ready() || self.index.newer_format().is_some() {
+        if !self.insights_open() || self.index.newer_format().is_some() {
             return None;
         }
         match self.index.source_for(&self.repo, head, head) {

@@ -39,7 +39,7 @@ mod touched;
 pub use child::index_child;
 pub(crate) use history::PathLog;
 pub(crate) use jobs::blocking;
-pub(crate) use refresh::{keep_index_fresh_supervised, on_refreshed, release_when_idle};
+pub(crate) use refresh::{keep_index_fresh_supervised, release_when_idle};
 pub(crate) use state::RepoState;
 
 /// What every repository of one server shares: settings, job cap and the shutdown signal.
@@ -324,8 +324,6 @@ pub(crate) struct App {
     version: AtomicU64,
     /// Wakes the refresher: a revision was queued, the index is needed, or a tab started.
     pub(crate) wake: Notify,
-    /// Tells the warm-up that the index moved.
-    refreshed: Notify,
     /// A page that needs the index was asked for, see `index.build_on_start`.
     demanded: AtomicBool,
     /// Set when the cache was deleted while serving: the loop rebuilds HEAD even if unmoved.
@@ -362,6 +360,9 @@ pub(crate) struct App {
     /// Working tree scans finished so far, counted once the result is recorded: a test that
     /// sees the count move knows the baseline is in place, and can tell idle from busy.
     pub(crate) wt_scans: AtomicU64,
+    /// Insights pages rendered rather than served from the memo, for the warm-up's guard.
+    #[cfg(test)]
+    pub(crate) renders: AtomicU64,
     /// Languages chain walks this app ran: the tests count work per page with it.
     pub(crate) chain_walks: AtomicU64,
     /// The part of `wt_scans` run on the poll timer, while the tree watch was still starting or
@@ -403,7 +404,6 @@ impl App {
             _stop_tx: Arc::clone(&env.stop),
             version: AtomicU64::new(0),
             wake: Notify::new(),
-            refreshed: Notify::new(),
             demanded: AtomicBool::new(false),
             rebuild: AtomicBool::new(false),
             key: name.clone(),
@@ -423,6 +423,8 @@ impl App {
             dirty: Mutex::new(None),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
             wt_scans: AtomicU64::new(0),
+            #[cfg(test)]
+            renders: AtomicU64::new(0),
             chain_walks: AtomicU64::new(0),
             wt_polled: AtomicU64::new(0),
             wt_rendered: Mutex::new(None),

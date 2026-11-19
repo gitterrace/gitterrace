@@ -344,6 +344,9 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
     if let Some(h) = app.memo_get(&key) {
         return Ok(Html(h));
     }
+    #[cfg(test)]
+    app.renders
+        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let (html, served) = with_records(app, tab, build).await?;
     if served {
         app.memo_put(key, &html.0);

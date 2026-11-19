@@ -272,14 +272,7 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     let a = Arc::clone(app);
     let spec = rev.to_owned();
     app.advance(RepoState::Indexing);
-    let run = tokio::task::spawn_blocking(move || {
-        crate::app::child::update(&a, &spec)?;
-        // Every page's chrome shows the repo id, which walks the whole history once per
-        // process: walk it here, before ready, not inside the first page.
-        a.repo.id();
-        std::io::Result::Ok(())
-    })
-    .await;
+    let run = tokio::task::spawn_blocking(move || crate::app::child::update(&a, &spec)).await;
     match run {
         Ok(Ok(())) => {}
         // A damaged cache met while updating: the loop sleeps until an event, so start the
@@ -303,30 +296,14 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
     }
     let Some(head) = warm else { return };
     app.advance(RepoState::Warming);
-    // The tables the per-file pages share and the languages chain, built before ready: the
-    // first page after ready reads them instead of racing their build (which doubled
-    // hotspots on rust, and walked the chain twice for languages).
-    let (a, h) = (Arc::clone(app), head.to_owned());
-    let _ = tokio::task::spawn_blocking(move || {
-        let _warm = a.warming();
-        crate::insights::warm_shared(&a, &h);
-    })
-    .await;
-    app.mark_ready();
-    app.warm_related();
-    app.refreshed.notify_one();
-}
-
-/// Waits for the index to move, then runs `warm` once per move.
-pub(crate) async fn on_refreshed<F, Fut>(app: Arc<App>, mut warm: F)
-where
-    F: FnMut() -> Fut,
-    Fut: std::future::Future<Output = ()>,
-{
-    loop {
-        app.refreshed.notified().await;
-        warm().await;
+    // Every warmer runs before ready: the first page after ready reads what they built
+    // instead of racing their build (which doubled hotspots on rust, and walked the chain
+    // twice for languages). A HEAD move of a ready repository warms the same way.
+    crate::warm::run(app, head).await;
+    if !app.finish_warming() {
+        tracing::debug!("{}: rebuilt while warming, stays queued", app.name);
     }
+    app.warm_related();
 }
 
 /// Releases the record sets of an app nobody browses, see [`App::release_idle`]. Checks a few
