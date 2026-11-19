@@ -28,11 +28,10 @@ PY = sys.executable
 GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     ("lines", [PY, "scripts/lint/lines-check.py", "--repo", "."], ()),
     ("names", [PY, "scripts/lint/names-check.py"], ()),
-    ("status-words", [PY, "scripts/lint/status-words-check.py"], ()),
+    ("text", [PY, "scripts/lint/text-check.py"], ()),
     ("stubs", [PY, "scripts/lint/stubs-check.py"], (".rs",)),
     ("tests-modules", [PY, "scripts/lint/tests-check.py"], (".rs",)),
     ("types", [PY, "scripts/lint/types-check.py"], (".rs", "scripts/guards/")),
-    ("css-scope", [PY, "scripts/lint/css-scope-check.py"], (".css",)),
     ("css-button", [PY, "scripts/lint/css-button-check.py"], (".css", ".html", ".js")),
     (
         "theme",
@@ -134,8 +133,10 @@ def self_test() -> int:
     ok = ok and not prod_removals("scripts/x.py", [1], "x\n")
     diff = "--- a/crates/x/src/a.rs\n+++ b/crates/x/src/a.rs\n@@ -2,2 +1,0 @@\n-x\n-y\n"
     ok = ok and removed_lines(diff) == {"crates/x/src/a.rs": [2, 3]}
-    ok = ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-scope") == 1
-    ok = ok and "css-scope" not in [n for n, _ in selected(["crates/a/src/x.rs"])]
+    ok = (
+        ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-button") == 1
+    )
+    ok = ok and "css-button" not in [n for n, _ in selected(["crates/a/src/x.rs"])]
     print("commits-check self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

@@ -146,7 +146,7 @@ names:
 # section about to be tagged is exactly what git-cliff makes
 lines:
 	python3 scripts/lint/lines-check.py --repo .
-	python3 scripts/lint/status-words-check.py
+	python3 scripts/lint/text-check.py --self-test && python3 scripts/lint/text-check.py
 	python3 scripts/lint/stubs-check.py --self-test && python3 scripts/lint/stubs-check.py
 	python3 scripts/lint/types-check.py --self-test && python3 scripts/lint/types-check.py
 	python3 scripts/dev/keep-report.py --self-test
