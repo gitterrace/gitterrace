@@ -42,9 +42,13 @@ fn a_piped_export_prints_phases_and_the_count_as_plain_lines() {
     assert!(!err.contains('\x1b') && !err.contains('\r'), "{err:?}");
     assert!(err.contains("building the cache for /"), "{err}");
     assert!(err.contains("writing pages ("), "{err}");
+    // Any m:ss time: a loaded machine can take a minute, which is not what this checks.
     assert!(
-        err.lines()
-            .any(|l| l.starts_with("wrote ") && l.contains(" pages (0:")),
+        err.lines().any(|l| l.starts_with("wrote ")
+            && l.split_once(" pages (")
+                .and_then(|(_, t)| t.strip_suffix(')'))
+                .and_then(|t| t.split_once(':'))
+                .is_some_and(|(m, s)| m.parse::<u64>().is_ok() && s.len() == 2)),
         "{err}"
     );
 }
