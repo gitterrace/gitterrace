@@ -20,7 +20,9 @@ async fn until_api_answers(
         let u = format!("{prefix}/api/v1/repo");
         let (status, retry) = api(router, &u).await;
         match status {
-            200 => return (Some(t0.elapsed()), errors),
+            200 => {
+                return (Some(t0.elapsed()), errors);
+            }
             503 if retry.is_some() => {}
             // The body names the error code: a CI log has no other way to show which one.
             s => {
@@ -61,9 +63,10 @@ fn corrupt(cache: &std::path::Path) {
     }
 }
 
-/// How long the API may answer 503 after its cache went bad. The fixture answers again after
-/// 80 to 210 ms on a machine at load 130 to 280, so this is fifty times the slowest seen.
-const REBUILT_WITHIN: std::time::Duration = std::time::Duration::from_secs(10);
+/// How long the API may answer 503 after its cache went bad. These tests guard recovery, not
+/// speed: a 10 s bound failed once in a landing gate at load 15, so the wait is the shared
+/// hang deadline and the time taken goes to stderr for the log.
+const REBUILT_WITHIN: std::time::Duration = wait::DEADLINE;
 
 /// Segments corrupted under a running server: never a 500, a 503 with `Retry-After` while the
 /// cache is rebuilt, then 200 again, asked through the API alone. The API hands the failure to
@@ -284,13 +287,13 @@ fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         };
         // The server's own startup update must be done (it removes and rewrites `tip`),
         // or its late write would look like a write after the newer build took over.
-        for _ in 0..100 {
-            if cache.join("tip").exists() {
-                break;
-            }
-            wait::pause(std::time::Duration::from_millis(50)).await;
-        }
-        wait::pause(std::time::Duration::from_millis(500)).await;
+        // Waited for, not slept on: a fixed half second lost to a loaded runner.
+        gitterrace_testkit::oracle::ready(&router).await;
+        wait::until("the startup update wrote tip", || {
+            let tip = cache.join("tip");
+            async move { tip.exists() }
+        })
+        .await;
         // A newer build owns the cache and made it read-only.
         let newer = gitterrace_index::FORMAT_VERSION
             .parse::<u64>()
