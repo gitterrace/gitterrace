@@ -16,39 +16,12 @@ const RAW: [&str; 4] = ["pre", "script", "style", "textarea"];
 /// Table parts, between which a newline is whitespace the table drops.
 const TABLE: [&str; 6] = ["table", "thead", "tbody", "tr", "th", "td"];
 /// Block-level tags: a newline before one renders as nothing.
+#[rustfmt::skip]
 const BLOCK: [&str; 32] = [
-    "li",
-    "p",
-    "div",
-    "section",
-    "nav",
-    "ol",
-    "ul",
-    "dl",
-    "dt",
-    "dd",
-    "meta",
-    "link",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "details",
-    "summary",
-    "figure",
-    "figcaption",
-    "footer",
-    "header",
-    "main",
-    "blockquote",
-    "table",
-    "tr",
-    "td",
-    "th",
-    "thead",
-    "tbody",
+    "li", "p", "div", "section", "nav", "ol", "ul", "dl",
+    "dt", "dd", "meta", "link", "h1", "h2", "h3", "h4",
+    "h5", "h6", "details", "summary", "figure", "figcaption", "footer", "header",
+    "main", "blockquote", "table", "tr", "td", "th", "thead", "tbody",
 ];
 /// Attributes whose value is prose, where a newline reads as the space it replaces.
 const TEXT_ATTRS: [&str; 4] = ["alt", "content", "title", "aria-label"];
