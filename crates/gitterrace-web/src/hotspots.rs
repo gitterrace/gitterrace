@@ -114,7 +114,7 @@ pub(crate) async fn page(
         };
         let empty = set.stream().next().is_none();
         let jump = crate::markdown::outline_menu(
-            &crate::sections::jumps(&[
+            &crate::markdown::section_jumps(&[
                 ("hotspot-map", "Frequency against size", !empty),
                 ("hotspot-files", "Hotspots", !empty),
                 ("coupled", "Coupled files", !patterns.is_empty()),

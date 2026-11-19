@@ -14,7 +14,6 @@ mod commit_types;
 mod compare;
 #[cfg(test)]
 mod crawl_tests;
-mod delta;
 mod dochead;
 mod empty;
 mod error;
@@ -54,7 +53,6 @@ mod related;
 mod reload;
 mod routes;
 mod search;
-mod sections;
 #[cfg(test)]
 mod security_class_tests;
 mod seg;
@@ -251,7 +249,7 @@ pub const WARM_PAGES: [&str; 6] = [
 /// heading, linked as given, in page order. Empty below three headings.
 pub fn outline_rail(headings: &[(&str, &str)]) -> String {
     let shown: Vec<_> = headings.iter().map(|(id, t)| (*id, *t, true)).collect();
-    markdown::outline_rail(&sections::jumps(&shown))
+    markdown::outline_rail(&markdown::section_jumps(&shown))
 }
 
 /// The script behind the outline: the active heading's item is marked as the page scrolls.

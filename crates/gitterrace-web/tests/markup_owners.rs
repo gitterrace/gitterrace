@@ -38,10 +38,10 @@ const RULES: &[Rule] = &[
         green: &["{% call avatars::avatar(p.hue, p.initial) %}{% endcall %}"],
     },
     Rule {
-        name: "+a -d line delta, _delta.html and delta.rs",
+        name: "+a -d line delta, _delta.html and fmt.rs",
         dirs: &["templates", "src", "static"],
         exts: &["html", "rs", "js"],
-        owners: &["_delta.html", "delta.rs"],
+        owners: &["_delta.html", "fmt.rs"],
         find: deltas,
         red: &[
             "<b class=\"add\">+{{ a }}</b> <b class=\"del\">-{{ d }}</b>",

@@ -232,7 +232,7 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
             let _ = write!(
                 out,
                 "<span class=\"counts\">{}</span></header>",
-                crate::delta::line_delta(f.additions, f.deletions)
+                crate::fmt::line_delta(f.additions, f.deletions)
             );
         }
         out.push_str(&file_body(r, src, i, f, &mut used));

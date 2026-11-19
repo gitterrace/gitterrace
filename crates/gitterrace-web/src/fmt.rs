@@ -332,6 +332,15 @@ pub(crate) fn file_link(path: &str) -> String {
     }
 }
 
+/// The `+a -d` markup of lines added and removed, as `_delta.html` writes it.
+pub(crate) fn line_delta(add: impl std::fmt::Display, del: impl std::fmt::Display) -> String {
+    format!(
+        "<b class=\"add\">+{}</b> <b class=\"del\">-{}</b>",
+        thousands(add),
+        thousands(del)
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use crate::fmt::{
@@ -433,5 +442,13 @@ mod tests {
         assert_eq!(day(-62_135_596_800), "0001-01-01");
         assert_eq!(day(253_402_300_799), "9999-12-31");
         assert_eq!(day(253_402_300_800), UNKNOWN_DATE);
+    }
+
+    #[test]
+    fn writes_both_counts_grouped() {
+        assert_eq!(
+            super::line_delta(1200, 3),
+            "<b class=\"add\">+1,200</b> <b class=\"del\">-3</b>"
+        );
     }
 }

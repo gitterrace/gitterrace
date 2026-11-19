@@ -287,7 +287,7 @@ pub(crate) async fn page(
             String::new()
         };
         fb.jump = crate::markdown::outline_menu(
-            &crate::sections::jumps(&[
+            &crate::markdown::section_jumps(&[
                 ("activity-counts", "Counts", true),
                 ("activity-series", "Over time", true),
                 ("activity-hours", "When commits happen", true),
