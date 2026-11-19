@@ -96,6 +96,15 @@ and Windows run weekly, on demand and for every tag.
   HOME and PATH) build and smoke-test the binary, and `linux-run.sh --full` or
   `macos-run.sh --full` runs `make check` there. Those two exit 2 on a bad
   argument.
+- `make coverage-check BASE=<parent> REV=<commit>` if the change only moves or
+  merges tests. It fails when a product line covered at `BASE` is uncovered at
+  `REV`, a crate's branch percentage drops or a caught mutant is missed. Set
+  `MUTANTS_PKG` and `MUTANTS_FILES` (src globs) to add cargo-mutants on the
+  files whose tests moved. Install once with
+  `cargo install cargo-llvm-cov cargo-mutants` and
+  `rustup toolchain install nightly --component llvm-tools-preview`: branch
+  coverage is nightly-only on the pinned compiler, so both sides run on the
+  same `NIGHTLY` (default `nightly`). Not part of `make check`.
 
 ## Releasing (maintainers)
 

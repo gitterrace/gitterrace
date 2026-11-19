@@ -184,7 +184,7 @@ bench-guard:
 
 ##@ Slow checks, not in check
 .PHONY: counting-parity memory-check speed-check browser-deps browser-check browser-reap \
-	docker-check
+	docker-check coverage-check
 
 # Red until every page reads one Counted.
 ## counting-parity: Count parity fuzz, pages against reducers
@@ -200,6 +200,15 @@ memory-check: build
 ## speed-check: Cold insights pages on the rust bench clone stay in budget (about 10 minutes)
 speed-check: build
 	python3 scripts/bench/speed-check.py --bin $(RELEASE_BIN)
+
+# BASE and REV default to HEAD~1 and HEAD. MUTANTS_PKG and MUTANTS_FILES (src globs) add
+# cargo-mutants on the files whose tests moved.
+## coverage-check: A test-only change keeps covered lines, branch %, caught mutants (hours)
+coverage-check:
+	python3 scripts/verify/coverage-check.py --self-test
+	bash scripts/verify/coverage-run.sh $(or $(BASE),HEAD~1) target/coverage/before
+	bash scripts/verify/coverage-run.sh $(or $(REV),HEAD) target/coverage/after
+	python3 scripts/verify/coverage-check.py target/coverage/before target/coverage/after
 
 ## browser-deps: Install the pinned browser check deps and their Playwright browsers
 browser-deps:
