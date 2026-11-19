@@ -9,6 +9,7 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 dockerfile=$root/deploy/test/linux.Dockerfile
+tools=$root/.github/actions/lint-tools
 
 # Prints the mode for the arguments, or fails on an unknown one.
 parse_args() {
@@ -49,6 +50,19 @@ self_test() {
   if [ -z "$want" ] || [ "$want" != "$got" ]; then
     fail "deploy/test/linux.Dockerfile pins '$got', rust-toolchain.toml pins '$want'"
   fi
+  # A lint tool CI pins by digest never comes from apt here or in make deps: apt's lags, so
+  # the container and CI would lint one tree differently.
+  local f t apt
+  for f in "$dockerfile" "$root/scripts/dev/deps-run.sh"; do
+    # The install lines with their backslash continuations joined.
+    apt=$(sed -e ':a' -e '/\\$/N; s/\\\n//; ta' "$f" | grep 'apt-get install' || true)
+    while read -r _ t _; do
+      t=${t%%.*}
+      ! grep -Eq "[[:space:]]$t([[:space:]]|$)" <<<"$apt" ||
+        fail "${f#"$root"/} installs $t from apt, not from linux-pins.txt"
+    done < <(grep -v '^#' "$tools/linux-pins.txt")
+  done
+  grep -q 'linux-install.sh' "$dockerfile" || fail "the image does not run linux-install.sh"
   echo "linux-run self-test: ok (toolchain $want)"
 }
 
@@ -67,7 +81,8 @@ docker info >/dev/null 2>&1 || {
   exit 1
 }
 
-docker build -q -t gitterrace-linux -f "$dockerfile" "$root/deploy/test" >/dev/null
+docker build -q -t gitterrace-linux -f "$dockerfile" --build-context "lint-tools=$tools" \
+  "$root/deploy/test" >/dev/null
 run=(docker run --rm
   -v "$root:/src:ro"
   -v gitterrace-linux-cargo:/usr/local/cargo/registry

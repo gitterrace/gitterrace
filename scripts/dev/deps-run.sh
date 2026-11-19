@@ -101,29 +101,17 @@ elif [ "$os" = Linux ]; then
     exit 1
   }
   sudo apt-get update -q
-  sudo apt-get install -y -q shellcheck shfmt python3 python3-pip curl unzip nodejs npm
+  sudo apt-get install -y -q python3 python3-pip curl unzip xz-utils nodejs npm
   have rustup || {
     note "rustup: install it from https://rustup.rs, then run make deps again"
     exit 1
   }
   have typos || cargo install typos-cli --version "$TYPOS_VERSION" --locked
-  if ! have vale || ! have gitleaks || ! have actionlint || ! have ast-grep; then
-    # The same pinned, digest-checked downloads CI uses, read from its action so the two agree.
+  if ! have vale || ! have gitleaks || ! have actionlint || ! have ast-grep ||
+    ! have shellcheck || ! have shfmt || ! have git-cliff; then
+    # The pinned, digest-checked downloads CI uses, by the script its action runs.
     bin="$HOME/.local/bin"
-    dl=$(mktemp -d)
-    mkdir -p "$bin"
-    # shellcheck disable=SC2016 # the action's text holds a literal $dl
-    sed -n 's/^ *curl -fsSL -o "$dl\/\([^"]*\)" \(https:[^ ]*\)$/\1 \2/p' \
-      .github/actions/lint-tools/action.yml | while read -r name url; do
-      curl -fsSL -o "$dl/$name" "$url"
-    done
-    sed -n '/<<.SUMS.$/,/^ *SUMS$/p' .github/actions/lint-tools/action.yml | sed '1d;$d' |
-      sed 's/^ *//' | (cd "$dl" && sha256sum -c -)
-    tar -xzf "$dl/vale.tar.gz" -C "$bin" vale
-    tar -xzf "$dl/gitleaks.tar.gz" -C "$bin" gitleaks
-    tar -xzf "$dl/actionlint.tar.gz" -C "$bin" actionlint
-    unzip -q -o "$dl/ast-grep.zip" ast-grep -d "$bin"
-    rm -rf "$dl"
+    bash .github/actions/lint-tools/linux-install.sh "$bin"
     PATH="$bin:$PATH"
     note "installed into $bin: put it on your PATH"
   fi

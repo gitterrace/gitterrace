@@ -202,7 +202,10 @@ def cliff_problems(repo: Path) -> list[str]:
     if not m or not m.group(1):
         return []
     want, text = m.group(1), tools.read_text()
-    found = re.findall(r"git-cliff/releases/download/v([0-9.]+)/", text)
+    # Linux pins live beside the action, one digest per line, so each is digest-checked.
+    pins = tools.parent / "linux-pins.txt"
+    listed = text + (pins.read_text() if pins.exists() else "")
+    found = re.findall(r"git-cliff/releases/download/v([0-9.]+)/", listed)
     bad = []
     if want not in found:
         bad.append(

@@ -1,6 +1,6 @@
 # The tools `make lint` runs, pinned: cargo installs at a version, the rest digest-checked
-# release archives. Linux takes shellcheck and shfmt from apt, and node ships on both runners
-# for markdownlint-cli2. git-cliff is at the version lint.toml names.
+# release archives (Linux: linux-pins.txt, shared with make deps and the test image). Node
+# ships on both runners for markdownlint-cli2. git-cliff is at the version lint.toml names.
 name: Lint tools
 description: Install the tools make lint runs
 runs:
@@ -40,7 +40,7 @@ runs:
             '56affdd8de5527894dca6dc3d7e0a99a873b0f004d7aabc30ae407d3f48b0a79  shellcheck.tar.xz' \
             'b7c872db63553ccffc7253aba3ed7d4885a27d83f1ba567b1138c6315a5847e5  shfmt' \
             'a0be97e237d440d34c5e508ec21d070b2c85cbb8be48a46a56f9a4e8bd247f05  git-cliff.tar.gz' \
-            | (cd "$dl" && shasum -a 256 -c -)
+            | (cd "$dl" && if command -v sha256sum >/dev/null; then sha256sum -c -; else shasum -a 256 -c -; fi)
           tar -xzf "$dl/vale.tar.gz" -C "$bin" vale
           tar -xzf "$dl/gitleaks.tar.gz" -C "$bin" gitleaks
           tar -xzf "$dl/actionlint.tar.gz" -C "$bin" actionlint
@@ -50,37 +50,9 @@ runs:
           install -m 0755 "$dl/shfmt" "$bin/shfmt"
           echo "$bin" >> "$GITHUB_PATH"
         else
-          sudo apt-get update
-          # The shellcheck release, at the version macOS gets: apt's lags and flags
-          # other lines, so the two gates would disagree on one tree.
-          sudo apt-get install -y shfmt
           cargo install typos-cli --version 1.52.2 --locked
-          # Pinned release archives, each checked by digest before it is unpacked: a failed
-          # fetch, digest or unpack fails the step, so a missing or altered tool is red.
-          bin="$HOME/.local/bin"
-          dl="$RUNNER_TEMP/lint-tools"
-          mkdir -p "$bin" "$dl"
-          curl -fsSL -o "$dl/vale.tar.gz" https://github.com/vale-cli/vale/releases/download/v3.26.0/vale_3.26.0_Linux_64-bit.tar.gz
-          curl -fsSL -o "$dl/gitleaks.tar.gz" https://github.com/gitleaks/gitleaks/releases/download/v8.30.1/gitleaks_8.30.1_linux_x64.tar.gz
-          curl -fsSL -o "$dl/actionlint.tar.gz" https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz
-          curl -fsSL -o "$dl/git-cliff.tar.gz" https://github.com/orhun/git-cliff/releases/download/v2.14.2/git-cliff-2.14.2-x86_64-unknown-linux-gnu.tar.gz
-          curl -fsSL -o "$dl/ast-grep.zip" https://github.com/ast-grep/ast-grep/releases/download/0.51.2/app-x86_64-unknown-linux-gnu.zip
-          curl -fsSL -o "$dl/shellcheck.tar.xz" https://github.com/koalaman/shellcheck/releases/download/v0.11.0/shellcheck-v0.11.0.linux.x86_64.tar.xz
-          # One digest per line, no heredoc: YAML keeps the indent, so a SUMS end marker
-          # would never match and the step would not parse.
-          printf '%s\n' \
-            '22aa69a556558e4a9dfc63c17030777383d8d3c48dcdfad655fa98e839d666ed  vale.tar.gz' \
-            '551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb  gitleaks.tar.gz' \
-            '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  actionlint.tar.gz' \
-            '40604c21c38d4c7581c56bdddeef277c56bf3c0113620aa96e78ae87e82366df  ast-grep.zip' \
-            '24f397c733add5390fdceee3a2088588ab0d5f944ce00d34cb7029b888cf2db4  git-cliff.tar.gz' \
-            '8c3be12b05d5c177a04c29e3c78ce89ac86f1595681cab149b65b97c4e227198  shellcheck.tar.xz' \
-            | (cd "$dl" && sha256sum -c -)
-          tar -xzf "$dl/vale.tar.gz" -C "$bin" vale
-          tar -xzf "$dl/gitleaks.tar.gz" -C "$bin" gitleaks
-          tar -xzf "$dl/actionlint.tar.gz" -C "$bin" actionlint
-          tar -xzf "$dl/git-cliff.tar.gz" -C "$bin" --strip-components=1 git-cliff-2.14.2/git-cliff
-          tar -xJf "$dl/shellcheck.tar.xz" -C "$bin" --strip-components=1 shellcheck-v0.11.0/shellcheck
-          unzip -q -o "$dl/ast-grep.zip" ast-grep -d "$bin"
+          # The pinned release assets of linux-pins.txt, digest-checked before unpacking. The
+          # same script installs them for make deps and the Linux test image.
+          bash "$GITHUB_ACTION_PATH/linux-install.sh" "$HOME/.local/bin"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
         fi
