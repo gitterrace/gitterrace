@@ -468,6 +468,7 @@ struct WorktreePage {
     files: Vec<WorktreeFileRow>,
     diff: String,
     clean: bool,
+    empty: &'static str,
     tabs: Vec<crate::worktree_scope::Tab>,
     adds: String,
     dels: String,
@@ -521,6 +522,7 @@ async fn worktree(
             head: crate::pagehead::worktree_head(files.len(), adds.into(), dels.into()),
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
+            empty: crate::worktree_scope::empty_text(scope),
             tabs,
             diff: views::diff_html_with(
                 &views::Render::of(a),

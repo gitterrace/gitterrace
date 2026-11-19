@@ -52,9 +52,30 @@ pub(crate) fn tabs(current: Scope, counts: ScopeCounts) -> Vec<Tab> {
     .collect()
 }
 
+/// What an empty tab says: the whole tree is clean only on All. An empty Staged tab still
+/// has unstaged work, and the reverse.
+pub(crate) const fn empty_text(scope: Scope) -> &'static str {
+    match scope {
+        Scope::All => "The working tree is clean.",
+        Scope::Staged => "Nothing is staged.",
+        Scope::Unstaged => "Nothing is unstaged.",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Only All may call the tree clean: an empty Staged tab still has unstaged work. Catches
+    /// one message shared by every scope.
+    #[test]
+    fn only_the_all_tab_calls_an_empty_tree_clean() {
+        assert!(empty_text(Scope::All).contains("clean"));
+        for s in [Scope::Staged, Scope::Unstaged] {
+            assert!(!empty_text(s).contains("clean"), "{s:?}");
+        }
+        assert_ne!(empty_text(Scope::Staged), empty_text(Scope::Unstaged));
+    }
 
     #[test]
     fn unknown_scope_values_fall_back_to_all() {
