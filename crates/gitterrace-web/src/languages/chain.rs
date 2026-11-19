@@ -7,6 +7,7 @@
 //! commit list.
 
 mod build;
+mod state;
 
 use std::collections::{BTreeSet, HashMap};
 use std::sync::Arc;
@@ -16,6 +17,8 @@ use gitterrace_index::feed::{FileRow, InsightsSource, PathId, Rank};
 
 use crate::languages::{COMMIT_LIST, Held, TOP, View, shown};
 
+pub(crate) use state::{State, key as state_key};
+
 /// Commits per row batch: bounded, and large enough that a batch read stays sequential.
 const CHUNK: usize = 4096;
 /// Most marks a skeleton holds, whatever the history length.
@@ -24,7 +27,7 @@ const MARKS: usize = 2048;
 const MIN_GAP: usize = 64;
 
 /// One chain position as the page reads it.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Point {
     id: String,
     time: i64,
@@ -37,6 +40,7 @@ pub(crate) struct Point {
 }
 
 /// The state after one commit, from which older positions are walked.
+#[derive(Clone, Debug, PartialEq)]
 struct Mark {
     rank: Rank,
     lines: Vec<i64>,
@@ -101,6 +105,32 @@ fn rows_newest_first(
         while let Some((r, files)) = batch.pop() {
             each(r, &files);
         }
+    }
+}
+
+/// Streams the rows of `ranks` (oldest first, ascending) in bounded batches.
+fn rows_oldest_first(
+    src: &dyn InsightsSource,
+    ranks: &[Rank],
+    mut each: impl FnMut(Rank, &[FileRow]),
+) {
+    for chunk in ranks.chunks(CHUNK) {
+        for (r, files) in src.rows_for(chunk.to_vec()) {
+            each(r, &files);
+        }
+    }
+}
+
+/// The view of the whole chain: the positions the unranged page reads.
+const fn unranged() -> View {
+    View {
+        time: false,
+        share: false,
+        range: None,
+        picked: false,
+        period: gitterrace_index::Period::All,
+        dflt: gitterrace_index::Period::All,
+        held: Held::Commits,
     }
 }
 
@@ -394,13 +424,9 @@ pub(super) fn first_from(
 /// commit before the range and before the last ten, and the trend samples.
 fn wanted(n: usize, range: Option<(usize, usize)>) -> BTreeSet<usize> {
     let view = View {
-        time: false,
-        share: false,
         range,
         picked: range.is_some(),
-        period: gitterrace_index::Period::All,
-        dflt: gitterrace_index::Period::All,
-        held: Held::Commits,
+        ..unranged()
     };
     let mut w: BTreeSet<usize> = shown(n, view).into_iter().collect();
     if n == 0 {

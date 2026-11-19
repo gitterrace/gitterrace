@@ -5,7 +5,7 @@ use gitterrace_index::feed::{self, InsightsSource, MemorySource, Rank};
 use gitterrace_index::{CommitRecord, FileStat, Options, PathFilter};
 
 use super::build::Tally;
-use super::{Fold, Skeleton, walk, wanted};
+use super::{Fold, Skeleton, State, walk, wanted};
 use crate::languages::{Held, View};
 
 /// A linear history of `n` commits over a handful of languages, with deletions, a lock file
@@ -103,7 +103,7 @@ fn views_match_the_full_chain() {
     let src = MemorySource::new(&recs);
     let f = filter();
     let want = reference(&src, &f);
-    let sk = Arc::new(Skeleton::build(&src, &f));
+    let sk = Arc::new(Skeleton::build(&src, &f).0);
     let n = sk.len();
     assert_eq!(n, 1500);
     assert!(sk.gap < n, "the fixture spans several mark gaps");
@@ -149,8 +149,8 @@ fn skeleton_size_is_flat_in_history_length() {
     let f = filter();
     let small = history(2_000);
     let large = history(200_000);
-    let a = Skeleton::build(&MemorySource::new(&small), &f).bytes();
-    let b = Skeleton::build(&MemorySource::new(&large), &f).bytes();
+    let a = Skeleton::build(&MemorySource::new(&small), &f).0.bytes();
+    let b = Skeleton::build(&MemorySource::new(&large), &f).0.bytes();
     assert!(b < 512 * 1024, "skeleton holds {b} bytes at 200k commits");
     assert!(b < a * 4, "skeleton grew from {a} to {b} bytes");
 }
@@ -324,7 +324,7 @@ fn the_chain_walk_reads_each_record_a_bounded_number_of_times() {
             "{records} record reads walking {n} commits"
         );
         // The whole skeleton too: its walk, its marks and its kept positions.
-        let sk = Skeleton::build(&src, &filter());
+        let sk = Skeleton::build(&src, &filter()).0;
         let (lookups, records) = src.take();
         assert_eq!(sk.len(), want.len());
         assert_eq!(lookups, 0, "oid lookups building over {n} commits");
@@ -342,7 +342,7 @@ fn views_match_the_full_chain_across_merges() {
     let src = MemorySource::new(&recs);
     let f = filter();
     let want = reference(&src, &f);
-    let sk = Arc::new(Skeleton::build(&src, &f));
+    let sk = Arc::new(Skeleton::build(&src, &f).0);
     let n = sk.len();
     assert_eq!(n, chain_by_lookup(&src).len());
     for range in [None, Some((70, 90)), Some((10, n - 200)), Some((0, n - 1))] {
@@ -361,4 +361,98 @@ fn views_match_the_full_chain_across_merges() {
             assert_eq!(ch.id(i), want.ids[i], "id at {i} for {range:?}");
         }
     }
+}
+
+/// The two skeletons hold the same marks, positions and languages.
+fn same(a: &Skeleton, b: &Skeleton, what: &str) {
+    assert_eq!(a.n, b.n, "{what}: length");
+    assert_eq!(a.gap, b.gap, "{what}: gap");
+    assert_eq!(a.langs, b.langs, "{what}: languages");
+    assert_eq!(a.marks, b.marks, "{what}: marks");
+    assert_eq!(a.fixed, b.fixed, "{what}: positions");
+}
+
+/// Guard class: for every warmer that extends a saved state, extending the state of tip A to
+/// tip B equals a build from nothing at B. Run through a saved and reloaded state, over a
+/// short extension, one that crosses a mark gap, none at all, and the chain growing past the
+/// size where the gap doubles. Red when the restored tally, the kept checkpoints or the
+/// positions below the old tip differ from a fresh pass.
+#[test]
+fn extending_a_saved_state_equals_a_fresh_build() {
+    let f = filter();
+    for (a, b) in [
+        (1, 2),
+        (10, 40),
+        (500, 1500),
+        (1500, 1500),
+        (131_000, 131_300),
+    ] {
+        let recs = history(b);
+        let at_b = MemorySource::new(&recs);
+        let at_a = MemorySource::new(&recs[..a]);
+        let (_, saved) = Skeleton::build(&at_a, &f);
+        let saved = State::decode(&saved.encode()).expect("a saved state reads back");
+        let (extended, state) =
+            Skeleton::extend(&at_b, &f, &saved).expect("A is on the chain of B");
+        let (fresh, fresh_state) = Skeleton::build(&at_b, &f);
+        same(&extended, &fresh, &format!("{a} to {b}"));
+        assert_eq!(state, fresh_state, "{a} to {b}: the state to extend next");
+    }
+}
+
+/// Guard class: a state that does not fit is refused, never used. A tip that is not on the
+/// chain (another branch, a rewritten history) and a gap that is no divisor of the new one
+/// both give `None`, so the caller builds from nothing.
+#[test]
+fn a_state_off_this_chain_is_refused() {
+    let f = filter();
+    let recs = history(300);
+    let src = MemorySource::new(&recs);
+    let (_, mut state) = Skeleton::build(&MemorySource::new(&recs[..100]), &f);
+    state.tip = "f".repeat(40);
+    assert!(
+        Skeleton::extend(&src, &f, &state).is_none(),
+        "a foreign tip"
+    );
+    let (_, mut state) = Skeleton::build(&MemorySource::new(&recs[..100]), &f);
+    state.gap = 96;
+    assert!(
+        Skeleton::extend(&src, &f, &state).is_none(),
+        "a gap that does not divide"
+    );
+}
+
+/// Guard class: the reader of a state file bounds itself by the file. Any prefix or flipped
+/// byte of a good state reads as none or as a state that still adds up, and a count past what
+/// the file holds is refused before it is allocated.
+#[test]
+fn a_damaged_state_never_decodes_into_nonsense() {
+    let recs = history(300);
+    let (_, state) = Skeleton::build(&MemorySource::new(&recs), &filter());
+    let bytes = state.encode();
+    assert_eq!(State::decode(&bytes).as_ref(), Some(&state));
+    for cut in 0..bytes.len() {
+        assert!(State::decode(&bytes[..cut]).is_none(), "cut at {cut}");
+    }
+    let mut huge = bytes;
+    huge[..8].copy_from_slice(&u64::MAX.to_le_bytes());
+    assert!(State::decode(&huge).is_none(), "an absurd length");
+}
+
+/// Guard class: the key follows everything the totals depend on. Another rule set, another
+/// ignore file or other ignore text is another key, and the order of the pairs is kept.
+#[test]
+fn the_state_key_follows_the_rules_and_the_ignore_files() {
+    let ig = |p: &str, t: &str| vec![(p.to_owned(), t.to_owned())];
+    let k = |rules: &str, i: &[(String, String)]| super::state::key(rules, i);
+    let base = k("r", &ig(".gitignore", "*.o\n"));
+    assert_eq!(base, k("r", &ig(".gitignore", "*.o\n")));
+    assert_ne!(base, k("s", &ig(".gitignore", "*.o\n")));
+    assert_ne!(base, k("r", &ig(".gitignore", "*.a\n")));
+    assert_ne!(base, k("r", &ig("d/.gitignore", "*.o\n")));
+    assert_ne!(
+        k("r", &ig("ab", "c")),
+        k("r", &ig("a", "bc")),
+        "no run-together"
+    );
 }

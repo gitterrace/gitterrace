@@ -1,11 +1,11 @@
 //! Languages page: lines of code per language along the first-parent history, a brush that
 //! selects a commit range, and the range card the server renders from `?from&to`.
 
-mod chain;
+pub(crate) mod chain;
 mod render;
 mod view;
 
-pub(crate) use chain::Skeleton;
+pub(crate) use chain::{Skeleton, state_key};
 
 use std::collections::HashMap;
 use std::sync::Arc;

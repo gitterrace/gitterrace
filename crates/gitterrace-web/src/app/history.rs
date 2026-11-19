@@ -75,7 +75,7 @@ impl App {
         }
         self.chain_walks
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        let s = Arc::new(crate::languages::Skeleton::build(src, filter));
+        let s = Arc::new(self.build_chain(head, src, filter));
         // Built over a read that failed: the caller refuses it, and a rebuild keeps the
         // generation, so a kept copy would be served over the clean cache.
         if src.failure().is_none()
@@ -84,6 +84,40 @@ impl App {
             *g = Some((key, Arc::clone(&s)));
         }
         s
+    }
+
+    /// The skeleton from the state an earlier build saved, reading only the commits since,
+    /// else from nothing; the state of this build is saved for the next one. A state that is
+    /// missing, damaged or for other rules is no state, so the result is the same either way.
+    fn build_chain(
+        &self,
+        head: &str,
+        src: &dyn gitterrace_index::feed::InsightsSource,
+        filter: &gitterrace_index::PathFilter,
+    ) -> crate::languages::Skeleton {
+        use crate::languages::chain::State;
+        use crate::languages::{Skeleton, state_key};
+        let file = gitterrace_index::StateFile::Chain;
+        let key = state_key(
+            &format!("{:?}", gitterrace_index::Options::default()),
+            &self.ignore_files(head).unwrap_or_default(),
+        );
+        let prev = self
+            .index
+            .load_state(file, key)
+            .and_then(|b| State::decode(&b));
+        let (sk, state) = prev
+            .as_ref()
+            .and_then(|p| Skeleton::extend(src, filter, p))
+            .unwrap_or_else(|| Skeleton::build(src, filter));
+        // A build over a read that failed is refused by the caller: its state is not kept.
+        if src.failure().is_none()
+            && prev.as_ref() != Some(&state)
+            && let Err(e) = self.index.save_state(file, key, &state.encode())
+        {
+            tracing::debug!("{}: chain state not saved: {e}", self.name);
+        }
+        sk
     }
 
     /// Line count of every file in `head`, built once per head. Reading the line cache,
@@ -111,18 +145,24 @@ impl App {
     /// The ignore rules committed at `commit`. The files are found once per commit; the walk
     /// that finds them costs as much as everything else an insights page does.
     pub(crate) fn ignore_set(&self, commit: &str) -> Option<gitterrace_git::IgnoreSet> {
+        let found = self.ignore_files(commit)?;
+        Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()))
+    }
+
+    /// `(path, text)` of the ignore files committed at `commit`, found once per commit.
+    pub(crate) fn ignore_files(&self, commit: &str) -> Option<Arc<Vec<(String, String)>>> {
         if let Ok(g) = self.caches.ignores.lock()
             && let Some((id, found)) = g.as_ref()
             && id == commit
         {
-            return Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()));
+            return Some(Arc::clone(found));
         }
         let found = gitterrace_git::IgnoreSet::files_at(&self.repo, commit).ok()?;
         let found = Arc::new(found);
         if let Ok(mut g) = self.caches.ignores.lock() {
             *g = Some((commit.to_owned(), Arc::clone(&found)));
         }
-        Some(gitterrace_git::IgnoreSet::from_files(found.iter().cloned()))
+        Some(found)
     }
 
     /// All-history totals of `commit` with `opts`, both populations, computed once per index

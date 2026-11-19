@@ -314,6 +314,36 @@ fn the_sweep_removes_only_files_not_live() -> io::Result<()> {
     Ok(())
 }
 
+/// Guard class: a crash's leftover temp file of any persisted state goes at the next open,
+/// while the state itself and a temp file young enough to be a live write stay. Red when the
+/// sweep skips temp names, or when a state file is not a listed cache file and goes as foreign.
+#[test]
+fn a_crashed_state_write_is_cleaned_at_the_next_open() -> io::Result<()> {
+    let tmp = tempfile::tempdir()?;
+    let dir = tmp.path().join("gitterrace");
+    fs::create_dir(&dir)?;
+    fs::write(dir.join(VERSION_FILE), format!("{}\n", version_stamp()))?;
+    fs::write(dir.join(LOCK_FILE), "")?;
+    let state = crate::warm_state::CHAIN_STATE_FILE;
+    fs::write(dir.join(state), "kept")?;
+    let young = format!(".{state}.1.2.tmp");
+    let old = format!(".{state}.9.9.tmp");
+    fs::write(dir.join(&young), "x")?;
+    let aged = fs::File::create(dir.join(&old))?;
+    aged.set_modified(std::time::UNIX_EPOCH)?;
+    drop(aged);
+    assert_eq!(ensure_dir(&dir)?, None);
+    let mut want = vec![
+        young,
+        state.to_owned(),
+        VERSION_FILE.to_owned(),
+        LOCK_FILE.to_owned(),
+    ];
+    want.sort();
+    assert_eq!(names(&dir)?, want);
+    Ok(())
+}
+
 /// A cache folder this process cannot write is refused, so the index goes to the user cache,
 /// and the user-cache folder for one git dir is one stable folder, a different one for another.
 #[cfg(unix)]

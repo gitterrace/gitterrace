@@ -18,6 +18,7 @@ mod source;
 mod store;
 mod tip;
 mod update;
+mod warm_state;
 
 use std::collections::HashSet;
 use std::io;
@@ -35,10 +36,11 @@ pub use phases::PhaseTime;
 pub use select::Selected;
 pub use source::CommitSource;
 pub use store::FORMAT_VERSION;
+pub use warm_state::StateFile;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 5] = [
+pub const CACHE_FILES: [(&str, &str); 6] = [
     (
         store::VERSION_FILE,
         "The cache format, `v` and the number. A mismatch deletes the cache and rebuilds it. The \
@@ -63,6 +65,11 @@ pub const CACHE_FILES: [(&str, &str); 5] = [
         insights::CACHE_FILE,
         "Line counts per blob id for the language chart. A blob never changes, so the counts never \
         go stale.",
+    ),
+    (
+        warm_state::CHAIN_STATE_FILE,
+        "Languages chain totals, checkpointed every 64 commits; a newer tip walks only new \
+        commits. Read only whole, under its rules key.",
     ),
 ];
 
@@ -339,6 +346,21 @@ impl Index {
 
     pub fn dir(&self) -> &std::path::Path {
         &self.dir
+    }
+
+    /// The warm-up state saved under `key`, `None` when there is none that is whole and for
+    /// that key. The caller builds from scratch then.
+    pub fn load_state(&self, file: StateFile, key: u64) -> Option<Vec<u8>> {
+        warm_state::load(&self.dir, file, key)
+    }
+
+    /// Saves warm-up state whole. Refused for a cache of a newer build, as every write is.
+    ///
+    /// # Errors
+    /// When the cache belongs to a newer build or the write fails; the old state stays.
+    pub fn save_state(&self, file: StateFile, key: u64, payload: &[u8]) -> io::Result<()> {
+        store::check_writable(&self.dir)?;
+        warm_state::save(&self.dir, file, key, payload)
     }
 
     /// Changes whenever the segment set does (a build, an append, a merge, a wipe and
