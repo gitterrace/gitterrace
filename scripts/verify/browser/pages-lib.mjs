@@ -177,11 +177,16 @@ async function mermaid() {
 async function chip() {
   writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
   // The server reuses its "worktree differs" answer for DIRTY_TTL (2 s, app.rs), and an earlier
-  // check may have just read a clean tree: wait it out so the page renders the new state.
-  await new Promise((ok) => setTimeout(ok, 2600));
+  // check may have just read a clean tree: reload until the page shows the dirty tree, bounded
+  // by the rescan, instead of betting a fixed pause covers the TTL on a loaded runner.
   const b = await launch(pw, 'chromium');
   for (const scheme of ['light', 'dark']) {
     const p = await openPage(b, srv.base + '/', { scheme, height: 120 });
+    const end = Date.now() + WATCH_BOUND_MS;
+    while (await p.$eval('#wtchip', (d) => d.hidden).catch(() => true) && Date.now() < end) {
+      await p.waitForTimeout(200);
+      await p.reload({ waitUntil: 'load' });
+    }
     const anim = await p.$eval('#wtchip .dot', (d) => getComputedStyle(d).animationName).catch(() => 'no chip');
     const hidden = await p.$eval('#wtchip', (d) => d.hidden).catch(() => 'no chip');
     if (anim === 'no chip' || hidden) r.fail(`chip ${scheme}: chip missing or hidden on a dirty tree`);
@@ -231,7 +236,10 @@ async function chords() {
   await p.goto(srv.base + '/', { waitUntil: 'load' });
   await p.keyboard.press('a');
   await p.keyboard.press('x');
-  await new Promise((ok) => setTimeout(ok, 800));
+  // Waits for the marker itself: a fixed pause lost to a slow action runner.
+  for (const end = Date.now() + 10000; !existsSync(marker) && Date.now() < end;) {
+    await p.waitForTimeout(100);
+  }
   if (existsSync(marker)) r.ok('chords: a then x opens the action'); else r.fail('chords: a then x did not run the action');
   await p.keyboard.press('?');
   const sheet = await p.$eval('.help, .ov', (n) => n.textContent).catch(() => '');
