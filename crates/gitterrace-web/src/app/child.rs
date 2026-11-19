@@ -169,12 +169,15 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
     // exits on its closed stdin and stays a zombie nobody reaps.
     let _one = app.index_run.lock().map_err(|_| halted())?;
     let cfg = app.cfg();
+    // The scheduler sets the workers the build starts with and sends the changes after.
+    let (start, _lease, budgets) = app.env.sched.enter();
     let mut cmd = Command::new(std::env::current_exe()?);
     cmd.args(std::env::args_os().skip(1))
         .env(CHILD_VAR, app.index.dir())
         .env(REV_VAR, rev)
         .env(GIT_VAR, app.repo.git_dir())
         .env(THREADS_VAR, cfg.index.threads.to_string())
+        .env(BUDGET_VAR, start.to_string())
         .env(
             MESSAGES_VAR,
             if app.index.message_index() { "1" } else { "0" },
@@ -190,8 +193,12 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
             return Err(halted());
         }
         let mut child = cmd.spawn()?;
-        // The stdin stays with the handle until the child is reaped: its closing is what
-        // stops a child whose server died.
+        // The stdin goes to the thread that forwards budgets, which ends with the lease. It
+        // closes with the child or with this process, which is what stops a child whose
+        // server died.
+        if let Some(stdin) = child.stdin.take() {
+            forward(stdin, budgets);
+        }
         let out = child
             .stdout
             .take()
@@ -238,6 +245,26 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         return Err(io::Error::other(format!("index child exited: {status}")));
     }
     Ok(())
+}
+
+/// Sends each budget of `budgets` to the child as a [`BUDGET_LINE`] line, until the build's
+/// lease ends or the child's stdin breaks.
+fn forward(mut stdin: std::process::ChildStdin, budgets: std::sync::mpsc::Receiver<usize>) {
+    let spawned = std::thread::Builder::new()
+        .name("index-budget".into())
+        .spawn(move || {
+            for n in budgets {
+                if writeln!(stdin, "{BUDGET_LINE} {n}")
+                    .and_then(|()| stdin.flush())
+                    .is_err()
+                {
+                    return;
+                }
+            }
+        });
+    if let Err(e) = spawned {
+        tracing::warn!("index budget thread not started: {e}");
+    }
 }
 
 fn halted() -> io::Error {

@@ -33,6 +33,7 @@ mod jobs;
 mod memo;
 mod records;
 mod refresh;
+mod sched;
 mod state;
 mod touched;
 
@@ -83,6 +84,8 @@ pub(crate) struct Env {
     /// holds its share until the body is sent.
     pub(crate) raw_budget: Arc<Semaphore>,
     raw_budget_cap: Arc<Mutex<usize>>,
+    /// The worker budget of the index builds, from the machine's load.
+    sched: Arc<sched::Scheduler>,
 }
 
 /// The live `actions.toml`, swapped whole on reload.
@@ -154,6 +157,7 @@ impl Env {
             related: crate::related::Peers::default(),
             raw_budget: Arc::new(Semaphore::new(raw)),
             raw_budget_cap: Arc::new(Mutex::new(raw)),
+            sched: sched::Scheduler::system(),
         }
     }
 
