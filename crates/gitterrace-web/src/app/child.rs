@@ -130,6 +130,10 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
     if !CHILDREN.load(Ordering::Relaxed) {
         return app.index.update(&app.repo, rev, &|p| app.set_progress(p));
     }
+    // One child per repository at a time: a second spawn would replace the first in the slot,
+    // and `App::halt` would then kill only the second while the first, its handle dropped,
+    // exits on its closed stdin and stays a zombie nobody reaps.
+    let _one = app.index_run.lock().map_err(|_| halted())?;
     let cfg = app.cfg();
     let mut cmd = Command::new(std::env::current_exe()?);
     cmd.args(std::env::args_os().skip(1))

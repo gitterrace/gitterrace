@@ -328,6 +328,8 @@ pub(crate) struct App {
     pub(crate) progress: Mutex<Progress>,
     /// The index child running now, so `App::halt` (child.rs) can end it.
     pub(crate) index_child: Mutex<Option<std::process::Child>>,
+    /// Held for a whole child update, so at most one child per repository runs (child.rs).
+    pub(crate) index_run: Mutex<()>,
     ready: AtomicBool,
     /// Last time a page read the insights source, see [`App::release_idle`].
     records_used: Mutex<Instant>,
@@ -396,6 +398,7 @@ impl App {
             actions: None,
             progress: Mutex::new(Progress::default()),
             index_child: Mutex::new(None),
+            index_run: Mutex::new(()),
             ready: AtomicBool::new(false),
             records_used: Mutex::new(Instant::now()),
             warming: std::sync::atomic::AtomicUsize::new(0),
