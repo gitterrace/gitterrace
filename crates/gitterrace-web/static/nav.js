@@ -161,8 +161,6 @@
   }
   window.gtKeysOff = keysOff;
   window.gtTyping = typing;
-  function toast(msg) { window.gtToast(msg); }
-  function copy(text, done, btn) { return window.gtCopy(text, done, btn); }
 
   // Search is a button. Opening it takes the whole bar. Escape, or focus leaving it empty,
   // folds it again. Returns false when there is no search box, so "/" falls through.
@@ -343,7 +341,7 @@
     if (["tree", "blob", "blame", "log", "raw"].indexOf(parts[1]) >= 0 && parts.length > 2) parts[2] = commit;
     var path = B + parts.join("/");
     history.replaceState(null, "", path + location.search + location.hash);
-    copy(location.href, "Permalink copied");
+    window.gtCopy(location.href, "Permalink copied");
   }
 
   // ---- list navigation ----------------------------------------------------
@@ -531,7 +529,7 @@
     b.setAttribute("data-tip", "Copy file contents");
     b.addEventListener("click", function () {
       var cells = card.querySelectorAll(".src .l, td.c");
-      copy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file", b);
+      window.gtCopy(Array.prototype.map.call(cells, function (c) { return c.textContent; }).join("\n") + "\n", "Copied file", b);
     });
     card.style.position = "relative";
     card.appendChild(b);
@@ -544,7 +542,7 @@
     b.addEventListener("click", function () {
       var c = pre.cloneNode(true);
       Array.prototype.forEach.call(c.querySelectorAll(".copy"), function (x) { x.remove(); });
-      copy(c.textContent, "Copied", b);
+      window.gtCopy(c.textContent, "Copied", b);
     });
     pre.style.position = "relative";
     pre.appendChild(b);
@@ -552,7 +550,7 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest && e.target.closest("[data-copy],[data-copy-url]");
     if (!t) return;
-    if (t.dataset.copy) copy(t.dataset.copy, "Copied sha", t);
+    if (t.dataset.copy) window.gtCopy(t.dataset.copy, "Copied sha", t);
     else {
       var parts = local(location.pathname).split("/");
       if (commit && parts.length > 2) parts[2] = commit;
@@ -560,10 +558,10 @@
       var rm = document.querySelector('meta[name="gt-repo"]');
       if (rm && rm.dataset.link === "gitterrace" && rm.dataset.id && commit && parts[1] === "blob") {
         var hash = /^#L\d+(-L\d+)?$/.test(location.hash) ? location.hash : "";
-        copy("gitterrace://" + rm.dataset.id + "/" + commit + "/" + parts.slice(3).join("/") + hash, "Permalink copied", t);
+        window.gtCopy("gitterrace://" + rm.dataset.id + "/" + commit + "/" + parts.slice(3).join("/") + hash, "Permalink copied", t);
         return;
       }
-      copy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied", t);
+      window.gtCopy(location.origin + B + parts.join("/") + location.search + location.hash, "Permalink copied", t);
     }
   });
 

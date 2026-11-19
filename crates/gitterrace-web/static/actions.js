@@ -30,13 +30,7 @@
   // A mark shorter than this many characters carries a line or two of context with it.
   var SHORT = 20;
 
-  function el(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
-  }
-  function toast(msg, sticky) { window.gtToast(msg, sticky); }
+  var el = window.gtNav.el, toast = window.gtToast;
   function copy(text, done) { return window.gtCopy(text, done, menuOpener); }
   function local() { var p = location.pathname; return B && p.indexOf(B + "/") === 0 ? p.slice(B.length) : p; }
   function encPath(p) { return p.split("/").map(encodeURIComponent).join("/"); }

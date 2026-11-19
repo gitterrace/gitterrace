@@ -5,6 +5,7 @@
 (function () {
   "use strict";
   if (typeof document === "undefined") { module.exports = { enc: enc, fill: fill, sourceLine: sourceLine, titleOf: titleOf }; return; }
+  var el = window.gtNav.el;
   var meta = document.querySelector('meta[name="gt-base"]');
   var B = meta ? meta.content : "";
   var KEY = "gitterrace-send-target";
@@ -23,12 +24,6 @@
   }
   function fill(parts, vals) {
     return parts.map(function (p) { return "lit" in p ? p.lit : enc(vals[p.ph] || ""); }).join("");
-  }
-  function el(tag, cls, text) {
-    var e = document.createElement(tag);
-    if (cls) e.className = cls;
-    if (text != null) e.textContent = text;
-    return e;
   }
   function range(l) { return l ? "L" + l.start + (l.end !== l.start ? "-L" + l.end : "") : ""; }
   // Mirrors the Rust source_line(): the last, machine-read line of every note.

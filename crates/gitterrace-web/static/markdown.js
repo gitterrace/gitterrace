@@ -4,7 +4,6 @@
   // This script's own URL, read while it runs: the diagram library lives beside it.
   var HERE = document.currentScript ? document.currentScript.src : location.href;
   var root = document.documentElement;
-  function base() { var m = document.querySelector('meta[name="gt-base"]'); return m ? m.content : ""; }
   // A README <picture> picks its source by the OS colour scheme. When the page theme is
   // forced, rewrite each source's query so the image follows the page instead.
   var sources = Array.prototype.slice.call(document.querySelectorAll(".markdown-body picture source[media]"));
