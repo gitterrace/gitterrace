@@ -1,0 +1,45 @@
+# No comment in .rs, .py, .js/.mjs or .sh points at a design doc section. One rule per
+# language, since the comment node kinds differ.
+id: no-design-pointer-rust
+language: rust
+severity: error
+message: A comment points at a design doc section.
+note: 'Sections move and the pointer rots: say the reason in the comment itself.'
+ignores: [static/vendor/**, vendor/schwarzwald/kit/**]
+rule:
+  all:
+    - {any: [{kind: line_comment}, {kind: block_comment}]}
+    - regex: '§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)'
+---
+id: no-design-pointer-python
+language: python
+severity: error
+message: A comment points at a design doc section.
+note: 'Sections move and the pointer rots: say the reason in the comment itself.'
+ignores: [static/vendor/**, vendor/schwarzwald/kit/**]
+rule:
+  all:
+    - {kind: comment}
+    - regex: '§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)'
+---
+id: no-design-pointer-javascript
+language: javascript
+severity: error
+message: A comment points at a design doc section.
+note: 'Sections move and the pointer rots: say the reason in the comment itself.'
+ignores: [static/vendor/**, vendor/schwarzwald/kit/**]
+rule:
+  all:
+    - {kind: comment}
+    - regex: '§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)'
+---
+id: no-design-pointer-bash
+language: bash
+severity: error
+message: A comment points at a design doc section.
+note: 'Sections move and the pointer rots: say the reason in the comment itself.'
+ignores: [static/vendor/**, vendor/schwarzwald/kit/**]
+rule:
+  all:
+    - {kind: comment}
+    - regex: '§|\b[Ss]ection \d+\.\d+|\bdesign (doc|section)'

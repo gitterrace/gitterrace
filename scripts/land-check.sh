@@ -254,7 +254,7 @@ self_test() {
       exit 1
     }
   # Today's script, before it called the targets: it copied three commands and lost two.
-  printf '%s\n' 'step python3 scripts/lint/width-check.py' \
+  printf '%s\n' 'step python3 scripts/lint/lines-check.py --repo .' \
     'step python3 scripts/lint/status-words-check.py' \
     'step python3 scripts/lint/names-check.py' >"$d/copied.sh"
   if gate_commands_covered "$d/copied.sh"; then

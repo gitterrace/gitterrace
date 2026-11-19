@@ -1,0 +1,5 @@
+id: no-design-pointer-javascript
+valid:
+  - 'const u = "https://x/#design doc";'
+invalid:
+  - '// see design doc 4'

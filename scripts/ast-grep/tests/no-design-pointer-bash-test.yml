@@ -1,0 +1,5 @@
+id: no-design-pointer-bash
+valid:
+  - 'echo "design doc"'
+invalid:
+  - '# design section 4'

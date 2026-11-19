@@ -1,0 +1,5 @@
+id: no-design-pointer-python
+valid:
+  - 's = "design doc"'
+invalid:
+  - '# per section 3.2'

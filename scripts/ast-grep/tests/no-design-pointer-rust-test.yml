@@ -1,0 +1,9 @@
+id: no-design-pointer-rust
+valid:
+  - '// the dashboard'
+  - '#[derive(Debug)] struct S;'
+  - 'let s = "design doc";'
+invalid:
+  - '// see design doc 4'
+  - '/* per section 3.2 */'
+  - '// § 4'

@@ -27,7 +27,6 @@ PY = sys.executable
 # (gate, command, the suffixes or path prefixes that select it; empty selects on any change)
 GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     ("lines", [PY, "scripts/lint/lines-check.py", "--repo", "."], ()),
-    ("width", [PY, "scripts/lint/width-check.py"], ()),
     ("names", [PY, "scripts/lint/names-check.py"], ()),
     ("status-words", [PY, "scripts/lint/status-words-check.py"], ()),
     ("stubs", [PY, "scripts/lint/stubs-check.py"], (".rs",)),
