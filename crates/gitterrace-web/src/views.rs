@@ -20,7 +20,7 @@ pub(crate) use crate::views::code::{
     blame_first, blame_rows, clear_code_memo, code, code_first, code_tail_html,
 };
 pub(crate) use crate::views::diff::{
-    DiffSource, MediaFacts, diff_fragment, diff_html_with, worktree_fragment,
+    DiffSource, MediaFacts, diff_fragment, diff_html_with, worktree_fragment, worktree_generated,
 };
 
 /// The settings a rendered fragment depends on, read once per request from the config.

@@ -166,3 +166,38 @@ async fn worktree_raw_holds_the_raw_budget_until_a_body_is_sent() {
         "every share comes back"
     );
 }
+
+/// A file `.gitattributes` at HEAD marks generated folds on the working tree page as on a
+/// commit page, and an uncommitted edit to `.gitattributes` moves no fold.
+#[tokio::test]
+async fn generated_files_fold_in_the_working_tree_by_the_attributes_at_head() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join(".gitattributes"), "gen.json linguist-generated\n").expect("write");
+    std::fs::write(p.join("gen.json"), "{}\n").expect("write");
+    std::fs::write(p.join("hand.rs"), "fn a() {}\n").expect("write");
+    gitterrace_testkit::git(&p, &["add", "."]);
+    gitterrace_testkit::git(&p, &["commit", "-qm", "feat: generated"]);
+    std::fs::write(p.join("gen.json"), "{\"a\": 1}\n").expect("write");
+    std::fs::write(p.join("hand.rs"), "fn b() {}\n").expect("write");
+    // Uncommitted: marks hand.rs and unmarks gen.json, and neither may take effect.
+    std::fs::write(p.join(".gitattributes"), "hand.rs linguist-generated\n").expect("write");
+    let r = router(&p, Config::default());
+    let (_, page) = get(&r, "/worktree").await;
+    let sect = |path: &str| {
+        let at = page
+            .find(&format!("data-path=\"{path}\""))
+            .unwrap_or_else(|| panic!("{path} section"));
+        page[at..at + page[at..].find("</section>").expect("end")].to_owned()
+    };
+    let generated = sect("gen.json");
+    assert!(generated.contains("class=\"tag\">Generated"), "{generated}");
+    assert!(
+        generated.contains("data-load-diff=\"/r/r/worktree/diff/gen.json\""),
+        "{generated}"
+    );
+    assert!(!generated.contains("\"a\": 1"), "{generated}");
+    let hand = sect("hand.rs");
+    assert!(!hand.contains("Generated"), "{hand}");
+    assert!(hand.contains("class=\"diffwrap\""), "{hand}");
+}

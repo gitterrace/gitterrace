@@ -515,7 +515,13 @@ async fn worktree(State(app): Shared) -> Result<Html<String>> {
             head: crate::pagehead::worktree_head(files.len(), adds.into(), dels.into()),
             c: views::chrome(a, "files").live(Mode::WORKTREE),
             clean: files.is_empty(),
-            diff: views::diff_html_with(&views::Render::of(a), views::DiffSource::Worktree, &files),
+            diff: views::diff_html_with(
+                &views::Render::of(a),
+                views::DiffSource::Worktree {
+                    generated: &views::worktree_generated(&a.repo, &files),
+                },
+                &files,
+            ),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),

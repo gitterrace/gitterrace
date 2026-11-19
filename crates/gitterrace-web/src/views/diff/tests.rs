@@ -134,7 +134,9 @@ fn the_working_tree_folds_too_and_loads_by_path() {
     let files: Vec<FileDiff> = (0..60).map(|i| file(&format!("d/f {i}.rs"), 3)).collect();
     let html = diff_html_with(
         &crate::views::Render::fold(400),
-        DiffSource::Worktree,
+        DiffSource::Worktree {
+            generated: &std::collections::HashSet::new(),
+        },
         &files,
     );
     assert!(
