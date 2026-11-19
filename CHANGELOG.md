@@ -7,7 +7,7 @@ All notable changes are listed here. The format follows
 <!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
 
-## [0.1.1] - 2026-11-18
+## [0.1.1] - 2026-11-19
 
 ### Added
 
@@ -40,6 +40,7 @@ All notable changes are listed here. The format follows
 - index: never make a deleted .git again for the cache
 - web: a repository taken off while its router builds keeps nothing running
 - web: stop index writes of a repository taken off
+- web: one index child per repository at a time, so a removal stops them all
 
 ### Performance
 
