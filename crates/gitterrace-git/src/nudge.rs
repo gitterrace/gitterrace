@@ -202,11 +202,24 @@ fn add_tree(
 /// The debounce loop. Owns the OS watcher so new directories can be registered as they appear.
 fn run<W: Watcher>(
     cfg: &NudgeConfig,
-    mut watch: Option<W>,
-    mut watched: usize,
+    watch: Option<W>,
+    watched: usize,
     rx: &Receiver<Msg>,
     on_nudge: &impl Fn(Nudge),
 ) {
+    run_decided(cfg, watch, watched, rx, &|n, _| on_nudge(n));
+}
+
+/// [`run`], telling the callback when each nudge was decided. A test reads the spacing from
+/// these instants: a callback stamping its own clock measures thread scheduling, not the rule.
+fn run_decided<W: Watcher>(
+    cfg: &NudgeConfig,
+    mut watch: Option<W>,
+    mut watched: usize,
+    rx: &Receiver<Msg>,
+    on_decided: &impl Fn(Nudge, Instant),
+) {
+    let on_nudge = &|n: Nudge| on_decided(n, Instant::now());
     let mut first: Option<Instant> = None;
     let mut last = Instant::now();
     let mut rescan_at = Instant::now() + cfg.rescan;
@@ -255,7 +268,7 @@ fn run<W: Watcher>(
             owed = false;
             nudged = Some(now);
             rescan_at = now + cfg.rescan;
-            on_nudge(Nudge::Look);
+            on_decided(Nudge::Look, now);
         }
     }
 }

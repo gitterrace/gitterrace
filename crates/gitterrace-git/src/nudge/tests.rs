@@ -228,20 +228,23 @@ fn a_burst_of_writes_is_one_or_a_few_nudges() {
 #[test]
 fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
     // Fed by hand, no OS stream: an overloaded machine sends a drop notice with every
-    // batch, and each one nudging at once was a scan storm. The gap between nudges is
-    // read from their own timestamps, so machine speed cannot change the verdict.
+    // batch, and each one nudging at once was a scan storm. The gap between nudges is read
+    // from the instants they were decided, not from when the callback ran: a late-scheduled
+    // callback followed by an on-time one would show a gap the rule never made.
     let dir = tempfile::tempdir().expect("tmp");
     let c = cfg(dir.path(), Duration::from_secs(60), false);
     let max_delay = c.max_delay;
     let (tx, rx) = mpsc::channel();
     let stamps = Arc::new(std::sync::Mutex::new(Vec::<Instant>::new()));
     let sink = Arc::clone(&stamps);
-    let on_nudge = move |_| {
+    let on_decided = move |_, at| {
         sink.lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(Instant::now());
+            .push(at);
     };
-    let t = std::thread::spawn(move || run::<notify::NullWatcher>(&c, None, 0, &rx, &on_nudge));
+    let t = std::thread::spawn(move || {
+        run_decided::<notify::NullWatcher>(&c, None, 0, &rx, &on_decided);
+    });
     let rescan = || notify::Event::new(EventKind::Other).set_flag(notify::event::Flag::Rescan);
     let storm_end = Instant::now() + max_delay * 3;
     let mut sent = 0;
