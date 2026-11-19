@@ -1105,6 +1105,7 @@ dependencies = [
  "axum",
  "gitterrace-config",
  "http-body-util",
+ "tempfile",
  "tokio",
  "tower",
 ]

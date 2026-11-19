@@ -45,9 +45,61 @@ fn walk(dir: &Path, exts: &[&str], out: &mut Vec<PathBuf>) {
     }
 }
 
+/// Files whose product part `found` flags, as `path: finding`.
+///
+/// Scans `root`'s `dirs` for files with one of `exts` (any when empty). Files named in
+/// `owners` (the one place the markup may live) and `*tests.rs` are skipped.
+#[must_use]
+pub fn outside_owners(
+    root: &Path,
+    dirs: &[&str],
+    exts: &[&str],
+    owners: &[&str],
+    found: impl Fn(&str) -> Vec<String>,
+) -> Vec<String> {
+    let mut bad = Vec::new();
+    for p in files_in(root, dirs, exts) {
+        let name = p
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        if owners.contains(&name.as_str()) || name.ends_with("tests.rs") {
+            continue;
+        }
+        let Ok(text) = fs::read_to_string(&p) else {
+            continue;
+        };
+        for f in found(product(&text)) {
+            bad.push(format!("{}: {f}", p.display()));
+        }
+    }
+    bad
+}
+
 /// The product part of `text`: everything before its first `#[cfg(test)]`, so a test module
 /// that spells markup back is not counted as product code.
 #[must_use]
 pub fn product(text: &str) -> &str {
     text.split("#[cfg(test)]").next().unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn markup_outside_its_owner_is_reported_and_the_owner_is_not() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let t = dir.path().join("t");
+        std::fs::create_dir_all(&t).expect("dir");
+        std::fs::write(t.join("own.html"), "X").expect("w");
+        std::fs::write(t.join("page.html"), "X").expect("w");
+        std::fs::write(t.join("a.rs"), "fn a() {}\n#[cfg(test)]\nX").expect("w");
+        let found = |c: &str| {
+            c.contains('X')
+                .then(|| "X".to_owned())
+                .into_iter()
+                .collect()
+        };
+        let bad = super::outside_owners(dir.path(), &["t"], &[], &["own.html"], found);
+        assert_eq!(bad, [format!("{}: X", t.join("page.html").display())]);
+    }
 }

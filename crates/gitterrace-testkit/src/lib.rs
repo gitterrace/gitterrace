@@ -11,6 +11,7 @@ pub mod matrix;
 pub mod oracle;
 mod renames;
 pub mod scan;
+mod shared;
 pub mod synthetic;
 pub mod wait;
 mod web;
@@ -23,6 +24,7 @@ use std::sync::OnceLock;
 pub use fixture::{Adversarial, FAR_FUTURE, Fixture};
 pub use gitterrace_config::DEFAULT_ADDR;
 pub use renames::{MergeWithAuthor, RenameChain};
+pub use shared::Shared;
 pub use web::{base, duplicate_ids, get, page, repeated_header_destinations};
 
 /// The port of [`DEFAULT_ADDR`], for tests that build a `Host` or `Origin` from it.
