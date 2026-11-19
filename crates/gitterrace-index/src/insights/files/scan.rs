@@ -1,8 +1,9 @@
 //! The many-path touch read without a tip file: one pass over the kept commits' file rows.
 
+use rustc_hash::FxHashMap as FastMap;
+
 use crate::feed::{CommitRange, CommitRow, PathId, Rank};
 use crate::insights::Insights;
-use crate::insights::fasthash::FastMap;
 use crate::insights::files::TouchRaw;
 
 impl Insights<'_> {

@@ -22,6 +22,7 @@ gitterrace-config.workspace = true
 gitterrace-git.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+rustc-hash = { version = "2", default-features = false, features = ["std"] }
 crc32fast = "1.5"
 thiserror.workspace = true
 zstd = { version = "0.14", default-features = false }

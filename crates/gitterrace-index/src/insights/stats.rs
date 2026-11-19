@@ -2,8 +2,9 @@
 //! here they count non-merge commits by people who count under the options, over the files the
 //! path filter keeps, inside the period's window.
 
+use rustc_hash::FxHashMap as FastMap;
+
 use crate::feed::{CommitRow, InsightsSource, PathId, Rank};
-use crate::insights::fasthash::FastMap;
 use crate::insights::{Counted, Insights, Item, Period, Reducer, Scope, ScopeParams, Selection};
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]

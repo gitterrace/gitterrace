@@ -3,9 +3,9 @@
 use std::collections::BTreeMap;
 
 use gitterrace_git::civil_from_days;
+use rustc_hash::FxHashMap as FastMap;
 
 use crate::feed::{PathId, local_day_of};
-use crate::insights::fasthash::FastMap;
 use crate::insights::files::{
     AgeBucket, AgeReport, COUPLING_MAX_FILES, Coupling, DirOwnership, Hotspot, HotspotReport,
     Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,

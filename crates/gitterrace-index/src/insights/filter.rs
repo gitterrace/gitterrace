@@ -3,9 +3,9 @@
 use std::sync::Mutex;
 
 use gitterrace_git::IgnoreSet;
+use rustc_hash::FxHashMap as FastMap;
 
 use crate::insights::Options;
-use crate::insights::fasthash::FastMap;
 
 /// Lock files and minified output: generated, not written.
 const GENERATED: [&str; 10] = [

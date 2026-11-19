@@ -7,9 +7,9 @@
 use std::collections::BTreeMap;
 
 use gitterrace_git::DAY;
+use rustc_hash::FxHashMap as FastMap;
 
 use crate::CommitRecord;
-use crate::insights::fasthash::FastMap;
 use crate::seg::bounds::{Cursor, MAX_BLOCK, put_varint, unzigzag, zigzag};
 use crate::seg::canon::Lives;
 use crate::seg::format::section;

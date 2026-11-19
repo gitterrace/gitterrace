@@ -1091,6 +1091,7 @@ dependencies = [
  "gitterrace-types",
  "libc",
  "proptest",
+ "rustc-hash",
  "rustix",
  "serde",
  "serde_json",

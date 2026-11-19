@@ -1,10 +1,10 @@
 //! The reducers that fold a [`Counted`] stream: totals, series, tallies and size buckets.
 
+use rustc_hash::{FxHashMap as FastMap, FxHashSet as FastSet};
 use std::collections::{BTreeSet, HashMap};
 
 use crate::feed::{InsightsSource, LabelId, PathId};
 use crate::insights::counted::{Counted, Item, Reducer, SIZE_EDGES, SIZE_LABELS};
-use crate::insights::fasthash::{FastMap, FastSet};
 use crate::insights::{
     Label, LabelBucket, LabelCount, PeriodStats, Selection, SeriesPoint, SizeBucket, TimeAxis,
     weekday,

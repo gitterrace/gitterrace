@@ -1,9 +1,9 @@
 //! Contributors over a [`Counted`] set: rows, lines, active days and the per-bucket series of
 //! every person the scope counts. Bots follow the options like every other count.
 
+use rustc_hash::FxHashMap as FastMap;
 use std::collections::BTreeSet;
 
-use crate::insights::fasthash::FastMap;
 use crate::insights::{
     Contributor, ContributorReport, Counted, Item, Metric, Period, Reducer, Scope, ScopeParams,
     TimeAxis,

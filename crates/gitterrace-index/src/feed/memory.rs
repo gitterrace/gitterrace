@@ -3,6 +3,7 @@
 //! tables are built once on first use. Aggregates are folded per call (this side has the
 //! records resident anyway, its memory is not the goal).
 
+use rustc_hash::FxHashMap as FastMap;
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock};
@@ -12,7 +13,6 @@ use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
     PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
 };
-use crate::insights::fasthash::FastMap;
 use crate::insights::{local_day, under};
 
 /// Interned strings and per-record ids, in first-use order over the records.

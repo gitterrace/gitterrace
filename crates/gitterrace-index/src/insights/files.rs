@@ -1,10 +1,10 @@
 mod reports;
 mod scan;
 
+use rustc_hash::FxHashMap as FastMap;
 use std::collections::HashSet;
 
 use crate::feed::{CommitRange, CommitRow, InsightsSource, PathId, Posting, Rank, RenameEdge};
-use crate::insights::fasthash::FastMap;
 use crate::insights::{Counted, Insights};
 
 /// Most files in one commit that still say something about coupling; bigger commits are
