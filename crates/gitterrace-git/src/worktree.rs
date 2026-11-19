@@ -3,6 +3,7 @@
 //! This is the only module that reads the worktree. It never writes: no index refresh, no lock
 //! files. Files may change or vanish while we read, so every per-file failure skips that file.
 
+mod beneath;
 #[cfg(test)]
 mod limit_tests;
 mod pair;
@@ -14,6 +15,7 @@ use gix::bstr::ByteSlice;
 use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
 use crate::error::git;
+use crate::worktree::beneath::{open_beneath, read_bounded};
 use crate::{Blob, ChangeKind, FileDiff, Repo, Result};
 
 /// Changed files the view lists by default (`limits.worktree_files`): untracked trees can be
@@ -379,28 +381,13 @@ fn read_worktree(work: &Path, rel: &str, big: u64) -> Read {
     if meta.len() > big {
         return Read::Big;
     }
-    match read_nofollow(&full) {
-        Ok(d) => Read::data(d),
+    match open_beneath(work, rel).and_then(|f| read_bounded(&f, big)) {
+        Ok(Some(d)) => Read::data(d),
+        // Grew past the limit after the size check above.
+        Ok(None) => Read::Big,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Read::Missing,
         Err(_) => Read::Skip,
     }
-}
-
-/// Reads a file whose final component must not be a symlink. The check above and the read
-/// are two steps, so a link swapped in between is refused by the open itself. On Windows the
-/// reparse point opens as itself, and the handle check refuses anything but a regular file.
-fn read_nofollow(path: &Path) -> std::io::Result<Vec<u8>> {
-    use std::io::Read as _;
-
-    let mut opts = std::fs::OpenOptions::new();
-    opts.read(true);
-    let f = crate::atomic::no_follow(&mut opts).open(path)?;
-    if !f.metadata()?.is_file() {
-        return Err(crate::refused(path));
-    }
-    let mut buf = Vec::new();
-    (&f).read_to_end(&mut buf)?;
-    Ok(buf)
 }
 
 fn file_diff(path: String, kind: ChangeKind, old: &[u8], new: &[u8], big: bool) -> FileDiff {
@@ -560,35 +547,5 @@ mod tests {
             .flat_map(|h| &h.lines)
             .any(|l| l.text.contains("secret"));
         assert!(!leaked, "{d:?}");
-    }
-
-    #[test]
-    #[cfg(unix)]
-    fn a_symlink_as_the_final_component_is_refused_not_followed() {
-        let outside = tempfile::tempdir().expect("tempdir");
-        let secret = outside.path().join("secret.txt");
-        std::fs::write(&secret, "secret\n").expect("write");
-        let dir = tempfile::tempdir().expect("tempdir");
-        let work = dir.path().canonicalize().expect("canon");
-        std::os::unix::fs::symlink(&secret, work.join("link.png")).expect("link");
-        let err = super::read_nofollow(&work.join("link.png")).expect_err("a link is refused");
-        assert_eq!(err.raw_os_error(), Some(libc::ELOOP));
-    }
-
-    #[test]
-    #[cfg(windows)]
-    fn read_nofollow_refuses_reparse_point() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let target = dir.path().join("target");
-        std::fs::create_dir(&target).expect("mkdir");
-        let at = dir.path().join("j");
-        let made = std::process::Command::new("cmd")
-            .args(["/c", "mklink", "/J"])
-            .arg(&at)
-            .arg(&target)
-            .status()
-            .expect("mklink");
-        assert!(made.success(), "mklink /J");
-        assert!(super::read_nofollow(&at).is_err());
     }
 }

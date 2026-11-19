@@ -1073,6 +1073,7 @@ dependencies = [
  "gix",
  "libc",
  "notify",
+ "rustix",
  "tempfile",
  "thiserror",
 ]
