@@ -5,8 +5,6 @@ mod actions;
 mod activity;
 mod add;
 mod app;
-#[cfg(test)]
-mod asset_wiring_tests;
 mod bounded;
 mod caches;
 mod charts;
@@ -14,6 +12,8 @@ mod charttip;
 mod commit_line;
 mod commit_types;
 mod compare;
+#[cfg(test)]
+mod crawl_tests;
 mod delta;
 mod dochead;
 mod empty;

@@ -306,59 +306,6 @@ async fn a_refused_actions_file_is_in_the_first_paint() {
     assert!(strip.contains("actions.toml not loaded"), "{strip}");
 }
 
-/// Every page shell the server writes carries the favicon: the repository pages, the
-/// multi-repository index and the pages built as strings (errors, the `/go` miss). A shell
-/// with its own `<head>` that skips the shared include shows a blank tab icon.
-#[tokio::test]
-async fn every_page_shell_has_the_favicon() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let a = repo(dir.path(), "a");
-    let b = repo(dir.path(), "b");
-    let icon = crate::fmt::FAVICON.trim();
-    let one = router(&a, Config::default());
-    let many = crate::multi_router(vec![a, b]).expect("multi");
-    for (r, path) in [
-        (&one, "/r/a/"),
-        (&one, "/r/a/blob/HEAD/no-such-file"),
-        (&one, "/r/a/no-such-page"),
-        (&one, "/no-such-page"),
-        (&many, "/"),
-        (&many, "/r/a/"),
-        (&many, "/r/a/no-such-page"),
-        (&many, "/r/no-such-repo/"),
-        (&many, "/no-such-page"),
-        (&many, "/go/nope/abc"),
-    ] {
-        let (_, html) = gitterrace_testkit::get(r, path).await;
-        assert!(html.contains(icon), "{path} has no favicon");
-        // Stylesheets and scripts are the server's, not a repository's: one URL each, cached
-        // once across every repository, never under `/r/NAME/`.
-        for (at, _) in html.match_indices("/static/") {
-            let before = &html[..at];
-            assert!(
-                before.ends_with('"') || before.ends_with('\'') || before.ends_with('='),
-                "{path} loads an asset under a prefix: {}",
-                &html[at.saturating_sub(30)..at + 20]
-            );
-        }
-    }
-}
-
-/// Hovers are `data-tip` handled by one script, never a native `title=` that shows late and
-/// unstyled. Truncated subjects are the only place `title` stays.
-#[tokio::test]
-async fn hovers_use_the_shared_tip() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let p = repo(dir.path(), "r");
-    let r = router(&p, Config::default());
-    let (_, body) = get(&r, "/refs").await;
-    assert!(body.contains("data-tip="), "the page has a tip");
-    assert!(
-        body.contains("/static/tip.js"),
-        "a page with a tip loads tip.js"
-    );
-}
-
 /// `links.style` decides what Copy permalink copies: the page tells the scripts which form.
 #[tokio::test]
 async fn links_style_switches_copy_permalink() {
