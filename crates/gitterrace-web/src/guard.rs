@@ -18,7 +18,7 @@ use axum::{
 /// `_base.html` and `repos.html`; the `inline_scripts_are_hashed` test fails when a template
 /// changes without this. Styles allow `unsafe-inline` for one reason: mermaid writes its
 /// diagram styles at runtime and cannot be given a hash. The app's own markup carries no
-/// style attribute (`no_inline_style` test), and a style cannot run code.
+/// style attribute (`markup_owners` and `shared_markup_pages` tests), and a style cannot run code.
 pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
     script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
