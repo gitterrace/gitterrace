@@ -156,16 +156,21 @@ def normalize(run: Json) -> Json:
 
 
 def dumps(run: Json) -> str:
-    """Sorted keys inside each repo, corpus order for the repos map itself."""
-    repos = run["repos"]
-    body = {k: v for k, v in run.items() if k != "repos"}
-    text = json.dumps({**body, "repos": {}}, indent=1, sort_keys=True)
-    inner = ",\n".join(
-        f" {json.dumps(n)}: "
-        + json.dumps(r, indent=1, sort_keys=True).replace("\n", "\n ")
-        for n, r in repos.items()
-    )
-    return text.replace('"repos": {}', '"repos": {\n' + inner + "\n }") + "\n"
+    """Sorted keys, corpus order for the repos map, one line per metric (objects four levels
+    down stay on one line), so a run is a few hundred lines and still diffs per metric."""
+
+    def emit(v: Any, depth: int, keep_order: bool = False) -> str:
+        if depth >= 4 or not isinstance(v, dict) or not v:
+            return json.dumps(v, sort_keys=True)
+        pad = " " * (depth + 1)
+        items = v.items() if keep_order else sorted(v.items())
+        body = ",\n".join(
+            f"{pad}{json.dumps(k)}: {emit(x, depth + 1, depth == 0 and k == 'repos')}"
+            for k, x in items
+        )
+        return "{\n" + body + "\n" + " " * depth + "}"
+
+    return emit(run, 0) + "\n"
 
 
 def run_name(run: Json) -> str:
