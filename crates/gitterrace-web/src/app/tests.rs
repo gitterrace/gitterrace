@@ -1,7 +1,7 @@
 //! Tests for the shared state: memo keys, caches, idle release and the refresher.
 
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use gitterrace_testkit::git;
 
@@ -313,11 +313,19 @@ fn an_idle_release_empties_blame_and_highlighted_code() {
 }
 
 /// Warm-up work alone never postpones the release: a server that only warmed itself is
-/// idle. A visitor's read does postpone it.
+/// idle. A visitor's read does postpone it. The last use is set back by a day instead of
+/// waited for, so no scheduling delay moves either answer.
 #[test]
 fn warm_up_reads_do_not_delay_the_release() {
+    const IDLE: Duration = Duration::from_secs(3600);
     let (_dir, app, head) = one_commit_app();
-    gitterrace_testkit::wait::pause_blocking(Duration::from_millis(30));
+    let set_back = || {
+        let past = Instant::now()
+            .checked_sub(Duration::from_hours(24))
+            .expect("a clock past one day");
+        *app.records_used.lock().expect("lock") = past;
+    };
+    set_back();
     {
         let _warm = app.warming();
         let src = app
@@ -328,16 +336,17 @@ fn warm_up_reads_do_not_delay_the_release() {
         app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     }
     assert!(
-        app.release_idle(Duration::from_millis(20)),
+        app.release_idle(IDLE),
         "the warm-up kept the caches as if a visitor had read them"
     );
+    set_back();
     let _ = app
         .source(&head)
         .expect("source")
         .expect("ready")
         .unchecked();
     assert!(
-        !app.release_idle(Duration::from_millis(20)),
+        !app.release_idle(IDLE),
         "a visitor's read did not count as use"
     );
 }
