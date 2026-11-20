@@ -11,17 +11,12 @@ use anyhow::{Context as _, Result};
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
 use crate::site::docs::page_path;
-use crate::site::{SITE_DIR, attrs, guards};
+use crate::site::{SITE_DIR, attrs, guards, has_ext};
 
 /// Files in the built site that no generator writes but that belong there: the link preview
 /// PNG files, which `make site-render` adds before a deploy.
 fn made_elsewhere(path: &str) -> bool {
     path.strip_prefix("assets/").is_some_and(|f| !f.contains('/') && has_ext(f, "png"))
-}
-
-/// Whether `path` ends in `.ext`, in any case.
-fn has_ext(path: &str, ext: &str) -> bool {
-    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 /// The built site: every file by its path under the site dir, with the text of each HTML page.

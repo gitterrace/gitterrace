@@ -16,7 +16,7 @@ use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::frame::{Body, Site, page};
 use crate::site::outline_script;
-use crate::site::{at, changelog, diagram, docnav};
+use crate::site::{at, attrs, changelog, diagram, docnav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
 /// The first line of a document written whole by `cargo xtask generate`.
@@ -86,26 +86,12 @@ pub(super) fn stem(path: &str) -> &str {
     name.strip_suffix(".md").unwrap_or(name)
 }
 
-/// The slug of a heading, by the rule the app and the repository host use: lowercase, keep
-/// letters, digits, `-` and `_`, spaces to `-`. So "Code age and releases" is
-/// `code-age-and-releases` and "HTTP (/api/v1)" is `http-apiv1`, wherever the page is read.
-pub fn slug(heading: &str) -> String {
-    heading
-        .trim()
-        .chars()
-        .filter_map(|c| match c {
-            ' ' => Some('-'),
-            c if c == '-' || c == '_' || c.is_alphanumeric() => Some(c),
-            _ => None,
-        })
-        .flat_map(char::to_lowercase)
-        .collect()
-}
+pub use crate::docs_index::slug;
 
 /// Fails when two elements of one page share an id, so a link cannot mean two places.
 pub fn check_unique_ids(path: &str, html: &str) -> Result<()> {
     let mut seen = std::collections::BTreeSet::new();
-    for id in html.split(" id=\"").skip(1).filter_map(|r| r.split_once('"').map(|v| v.0)) {
+    for id in attrs(html, "id") {
         if !seen.insert(id) {
             anyhow::bail!("{path}: more than one heading has the id {id}");
         }

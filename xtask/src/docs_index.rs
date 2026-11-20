@@ -254,7 +254,10 @@ pub fn anchors(text: &str) -> BTreeSet<String> {
     out
 }
 
-fn slug(text: &str) -> String {
+/// The slug of a heading, by the rule the app and the repository host use: lowercase, keep
+/// letters, digits, `-` and `_`, spaces to `-`. So "Code age and releases" is
+/// `code-age-and-releases` and "HTTP (/api/v1)" is `http-apiv1`, wherever the page is read.
+pub fn slug(text: &str) -> String {
     text.trim()
         .chars()
         .filter_map(|c| match c {

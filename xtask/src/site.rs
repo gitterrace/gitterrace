@@ -205,6 +205,7 @@ fn sums(outs: &[Out]) -> std::collections::BTreeMap<String, String> {
     sums
 }
 
+/// Whether `path` ends in `.ext`, in any case.
 fn has_ext(path: &str, ext: &str) -> bool {
     Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
