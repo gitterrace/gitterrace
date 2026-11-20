@@ -69,3 +69,10 @@ fn the_tree_matches_the_headers() {
     let stale = apply(&root, outs(&root).expect("outs"), Mode::Check).expect("check");
     assert!(stale.is_empty(), "stale: {stale:?}");
 }
+
+#[test]
+fn a_word_wider_than_the_line_is_cut_before_a_command_and_short_words_are_kept() {
+    assert_eq!(split_long("m1.5-2l3q-1-1", 6), vec!["m1.5-2", "l3q-1", "-1"]);
+    assert_eq!(split_long("abc", 6), vec!["abc"]);
+    assert_eq!(split_long("m1.5-2l3q-1-1", 6).concat(), "m1.5-2l3q-1-1");
+}

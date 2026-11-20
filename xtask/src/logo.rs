@@ -368,12 +368,32 @@ fn token_drift(re: &Re, header: &str, theme: &str, tokens: &str) -> Result<Vec<S
     Ok(bad)
 }
 
+/// A word wider than `width`, cut before command letters and minus signs, where SVG data reads
+/// the same with a space. Other words come back whole.
+fn split_long(word: &str, width: usize) -> Vec<&str> {
+    if word.len() <= width {
+        return vec![word];
+    }
+    let mut parts = Vec::new();
+    let (mut from, mut last) = (0, 0);
+    let ends = word.char_indices().skip(1).filter(|(_, c)| c.is_ascii_alphabetic() || *c == '-');
+    for at in ends.map(|(i, _)| i).chain([word.len()]) {
+        if at - from > width && last > from {
+            parts.push(&word[from..last]);
+            from = last;
+        }
+        last = at;
+    }
+    parts.push(&word[from..]);
+    parts
+}
+
 /// `svg` broken at spaces into lines at most `width` wide, for the site's templates, whose
 /// built pages are held to that width. A newline in a path's data reads as a space.
 fn wrap(svg: &str, width: usize) -> String {
     let mut lines: Vec<String> = Vec::new();
     let mut line = String::new();
-    for word in svg.split(' ') {
+    for word in svg.split(' ').flat_map(|w| split_long(w, width)) {
         if !line.is_empty() && line.chars().count() + 1 + word.chars().count() > width {
             lines.push(std::mem::take(&mut line));
             word.clone_into(&mut line);
