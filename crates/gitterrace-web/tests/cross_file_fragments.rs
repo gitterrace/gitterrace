@@ -1,21 +1,26 @@
 //! A link to a fragment of another file keeps the plain fragment, and so does a same-page link:
 //! heading ids are the plain slug, so `#intro` lands without any script.
 
-use gitterrace_testkit::{Fixture, page};
+use gitterrace_testkit::{git, git_at, page};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn cross_file_fragments_stay_plain() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = Fixture::init(dir.path())
-        .at("2024-01-01T00:00:00+00:00")
-        .write(
-            "docs/guide.md",
-            "# Intro\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
-             [c](./sub/page.md#a-b) [d](#intro)\n",
-        )
-        .commit("docs");
-    let sha = f.git(&["rev-parse", "HEAD"]);
-    let router = gitterrace_web::app_router(f.path()).expect("router");
+    let p = dir.path();
+    let d = "2024-01-01T00:00:00+00:00";
+    git_at(p, d, &["init", "-q", "-b", "main"]);
+    std::fs::create_dir_all(p.join("docs")).expect("mkdir");
+    std::fs::write(
+        p.join("docs/guide.md"),
+        "# Intro\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
+         [c](./sub/page.md#a-b) [d](#intro)\n",
+    )
+    .expect("write");
+    git_at(p, d, &["add", "docs"]);
+    git_at(p, d, &["commit", "-q", "-m", "docs"]);
+    let sha = git(p, &["rev-parse", "HEAD"]);
+
+    let router = gitterrace_web::app_router(p).expect("router");
     let (status, body) = page(&router, &format!("/blob/{sha}/docs/guide.md")).await;
     assert_eq!(status, 200, "{body}");
     for want in [
