@@ -69,7 +69,7 @@ fn oids(names: &[&str]) -> Vec<String> {
 }
 
 /// A source whose commits each touch their own paths, shareable across threads.
-struct Paths {
+pub(crate) struct Paths {
     ids: Vec<String>,
     tag: &'static str,
     fail: std::sync::Mutex<std::collections::HashSet<String>>,
@@ -77,7 +77,7 @@ struct Paths {
 }
 
 impl Paths {
-    fn new(tag: &'static str, n: usize) -> Self {
+    pub(crate) fn new(tag: &'static str, n: usize) -> Self {
         Self {
             ids: (0..n).map(|i| format!("{tag}{i:039x}")).collect(),
             tag,

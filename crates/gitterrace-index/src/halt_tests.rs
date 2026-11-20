@@ -3,37 +3,8 @@
 use std::cell::Cell;
 use std::io;
 
+use crate::tests::Paths;
 use crate::{CommitRecord, CommitSource, Index};
-
-/// A source whose commits each touch their own path.
-struct Paths {
-    ids: Vec<String>,
-    tag: &'static str,
-}
-
-impl Paths {
-    fn new(tag: &'static str, n: usize) -> Self {
-        Self { ids: (0..n).map(|i| format!("{tag}{i:039x}")).collect(), tag }
-    }
-}
-
-impl CommitSource for Paths {
-    fn rev_list(&self, _rev: &str) -> io::Result<Vec<String>> {
-        Ok(self.ids.clone())
-    }
-
-    fn record(&self, id: &str) -> io::Result<CommitRecord> {
-        Ok(CommitRecord {
-            id: id.to_owned(),
-            files: vec![crate::FileStat {
-                path: format!("{}/{id}.rs", self.tag).into(),
-                additions: 1,
-                ..crate::FileStat::default()
-            }],
-            ..CommitRecord::default()
-        })
-    }
-}
 
 /// A source that halts `idx` while it reads its `at`th record, as a stop arriving mid-batch.
 struct HaltAt<'a> {
