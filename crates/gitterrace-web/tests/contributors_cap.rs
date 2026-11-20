@@ -1,23 +1,19 @@
 //! The contributors page renders the top rows and links to the full list; its KPI and the API
 //! still count everyone.
 
-use gitterrace_testkit::{git, page as get};
+use gitterrace_testkit::{Fixture, page as get};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn contributors_page_caps_rows_and_links_to_all() {
     let root = tempfile::tempdir().expect("tmp");
-    let path = root.path();
-    git(path, &["init", "-q", "-b", "main"]);
+    let mut f = Fixture::init(root.path());
     for i in 0..105 {
-        std::fs::write(path.join("f.txt"), format!("{i}\n")).expect("write");
-        git(path, &["add", "."]);
-        let (name, email) = (format!("user.name=P{i}"), format!("user.email=p{i}@e.x"));
-        git(
-            path,
-            &["-c", &name, "-c", &email, "commit", "-q", "-m", "feat: x"],
-        );
+        f = f.write("f.txt", &format!("{i}\n"));
+        f.git(&["add", "."]);
+        let author = format!("P{i} <p{i}@e.x>");
+        f.git(&["commit", "-q", "--author", &author, "-m", "feat: x"]);
     }
-    let router = gitterrace_web::app_router(path).expect("router");
+    let router = gitterrace_web::app_router(root.path()).expect("router");
     let page = gitterrace_testkit::wait::page_until(
         &router,
         "/stats/contributors",

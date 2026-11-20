@@ -1,36 +1,22 @@
 //! A period that holds no commit of the first-parent line says so and still draws the chart.
 
-use gitterrace_testkit::{git, git_at, page as get};
+use gitterrace_testkit::{Fixture, page as get};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn an_empty_period_shows_the_empty_card_and_the_chart() {
     let root = tempfile::tempdir().expect("tmp");
-    let p = root.path().join("repo");
-    std::fs::create_dir_all(&p).expect("dir");
-    git(&p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.rs"), "fn main() {}\n").expect("w");
-    git(&p, &["add", "."]);
-    git_at(
-        &p,
-        "2020-01-01T12:00:00+00:00",
-        &["commit", "-q", "-m", "feat: old"],
-    );
-    git(&p, &["checkout", "-q", "-b", "side"]);
-    std::fs::write(p.join("b.rs"), "fn b() {}\n").expect("w");
-    git(&p, &["add", "."]);
-    git_at(
-        &p,
-        "2026-11-01T12:00:00+00:00",
-        &["commit", "-q", "-m", "feat: new"],
-    );
-    git(&p, &["checkout", "-q", "main"]);
-    git_at(
-        &p,
-        "2020-01-02T12:00:00+00:00",
-        &["merge", "-q", "--no-ff", "side", "-m", "feat: merge"],
-    );
-
-    let router = gitterrace_web::app_router(&p).expect("router");
+    let f = Fixture::init(&root.path().join("repo"))
+        .at("2020-01-01T12:00:00+00:00")
+        .write("a.rs", "fn main() {}\n")
+        .commit("feat: old")
+        .branch("side")
+        .at("2026-11-01T12:00:00+00:00")
+        .write("b.rs", "fn b() {}\n")
+        .commit("feat: new")
+        .checkout("main")
+        .at("2020-01-02T12:00:00+00:00");
+    f.git(&["merge", "-q", "--no-ff", "side", "-m", "feat: merge"]);
+    let router = gitterrace_web::app_router(f.path()).expect("router");
     let body = gitterrace_testkit::wait::page_until(
         &router,
         "/stats/languages?period=1w",
