@@ -33,7 +33,7 @@
     "crates/gitterrace-web/templates/_path.html": 1,
     "crates/gitterrace-web/templates/_table.html": 1,
     "crates/gitterrace-web/templates/_tabs.html": 1,
-    "crates/gitterrace-web/templates/blob.html": 2,
+    "crates/gitterrace-web/templates/blob.html": 1,
     "crates/gitterrace-web/templates/commit.html": 4,
     "crates/gitterrace-web/templates/commit_line.html": 1,
     "crates/gitterrace-web/templates/commit_types_section.html": 9,

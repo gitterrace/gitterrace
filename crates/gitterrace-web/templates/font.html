@@ -1,0 +1,13 @@
+{#- A font blob's facts and sample (filetype/font.rs). Every string is escaped. -#}
+<div class="font-preview">
+<dl class="font-facts"><dt>Family</dt><dd>{{ f.family }}</dd>
+<dt>Styles</dt><dd>{{ f.styles }}</dd>
+<dt>Glyphs</dt><dd>{{ glyphs }}</dd>
+{%- if !f.axes.is_empty() %}<dt>Axes</dt><dd>{{ f.axes }}</dd>{% endif %}</dl>
+{%- if let Some(s) = src %}
+<div class="font-sample" data-font-src="{{ s }}" hidden>
+<p class="font-big">The quick brown fox jumps over the lazy dog</p>
+<p class="font-mid">ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz</p>
+<p class="font-small">0123456789 &amp;?!@#%()[]{}</p>
+</div>{% endif %}
+</div>

@@ -1157,6 +1157,7 @@ dependencies = [
  "ammonia",
  "askama",
  "axum",
+ "brotli-decompressor",
  "calamine",
  "cap",
  "csv",
@@ -1179,6 +1180,7 @@ dependencies = [
  "rustix",
  "serde",
  "serde_json",
+ "skrifa",
  "syntect",
  "tar",
  "tempfile",
@@ -1190,6 +1192,7 @@ dependencies = [
  "tower-http",
  "tracing",
  "two-face",
+ "wuff",
  "zip",
 ]
 

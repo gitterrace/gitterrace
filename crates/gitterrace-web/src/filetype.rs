@@ -4,6 +4,7 @@
 //! submodules render the formats that are previewed instead.
 
 pub(crate) mod archive;
+pub(crate) mod font;
 pub(crate) mod sheet;
 pub(crate) mod table;
 
@@ -97,7 +98,7 @@ pub(crate) fn describe(path: &str, head: &[u8]) -> &'static str {
 
 /// Whether the blob view reads `path`'s bytes: an archive or a workbook it previews.
 pub(crate) fn wants_bytes(path: &str) -> bool {
-    self::archive::kind(path).is_some() || self::sheet::is_sheet(path)
+    self::archive::kind(path).is_some() || self::sheet::is_sheet(path) || self::font::is_font(path)
 }
 
 /// An archive's entry list. Past `limits.preview_mb` `bytes` is empty and nothing lists.

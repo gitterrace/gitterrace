@@ -168,6 +168,8 @@ struct BlobPage {
     media: Option<String>,
     /// An archive's entry list (`filetype::archive::html`, escaped there).
     archive: Option<String>,
+    /// A font's facts and sample (`filetype::font::html`, escaped there).
+    font: Option<String>,
     too_large: bool,
     raw_href: String,
     /// The format of a binary blob the page does not preview; empty otherwise.
@@ -312,6 +314,8 @@ fn blob_page(
     let doc = doc.or_else(|| markdown::notebook::doc(text?, &path, rev, views::Render::of(a)));
     let table = crate::filetype::table_html(&path, text.filter(|_| doc.is_none()), bytes);
     let archive = crate::filetype::archive_html(&path, bytes);
+    let (raw_href, chrome) = blob_links(a, at, &path);
+    let font = crate::filetype::font::html(&path, bytes, &raw_href);
     let symbols = match (&doc, text, media.is_some()) {
         (None, Some(t), false) => {
             crate::symbols::outline(&path, t, views::Render::of(a).blob_lines, named)
@@ -358,7 +362,6 @@ fn blob_page(
         ..DocHead::default()
     });
     let rendered = doc.map(|d| d.html).or(table);
-    let (raw_href, chrome) = blob_links(a, at, &path);
     BlobPage {
         c: Chrome {
             md: rendered.is_some(),
@@ -377,6 +380,7 @@ fn blob_page(
         cut_note: format!("Truncated after {} lines.", a.cfg().limits.blob_lines),
         media,
         archive,
+        font,
         too_large,
     }
 }

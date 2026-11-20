@@ -13,3 +13,14 @@
 .media-after{position:absolute;inset:0;clip-path:inset(0 0 0 var(--cut,50%))}.media-after img{width:100%;height:100%;object-fit:contain}
 .media-cut{display:flex;align-items:center;gap:var(--space-3);margin-top:var(--space-3);font-size:var(--text-sm)}.media-cut input{flex:1;min-width:0}
 .media-side{margin:0;min-width:0}.media-side figcaption{font-size:var(--text-sm);margin-bottom:var(--space-2)}
+.font-preview{padding:var(--space-4)}
+.font-facts{display:grid;grid-template-columns:max-content 1fr;
+  gap:var(--space-2) var(--space-4);margin:0 0 var(--space-4)}
+.font-facts dt{color:var(--muted)}
+.font-facts dd{margin:0;overflow-wrap:anywhere}
+.font-sample{border:var(--border);border-radius:var(--radius);padding:var(--space-4);
+  overflow-wrap:anywhere}
+.font-sample p{margin:0 0 var(--space-3)}
+.font-big{font-size:2rem;line-height:1.2}
+.font-mid{font-size:1.25rem}
+.font-small{font-size:1rem}

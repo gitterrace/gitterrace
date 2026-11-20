@@ -39,6 +39,11 @@ calamine = { version = "0.38", default-features = false }
 quick-xml = { version = "0.42", default-features = false }
 zip = { version = "9", default-features = false }
 tar = { version = "0.4", default-features = false }
+# Font previews: skrifa reads the tables, wuff unpacks woff and woff2 through decoders this
+# crate bounds itself (filetype/font.rs), so it takes no decoder of its own.
+skrifa = "0.50.0"
+wuff = { version = "0.2.10", default-features = false }
+brotli-decompressor = { version = "6.2", default-features = false, features = ["std"] }
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 tower.workspace = true
 tower-http.workspace = true

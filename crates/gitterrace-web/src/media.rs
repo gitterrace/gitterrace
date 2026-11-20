@@ -52,6 +52,10 @@ pub(crate) fn content_type(path: &str) -> &'static str {
         "m4a" => "audio/mp4",
         "ogg" | "oga" => "audio/ogg",
         "wav" => "audio/wav",
+        "ttf" => "font/ttf",
+        "otf" => "font/otf",
+        "woff" => "font/woff",
+        "woff2" => "font/woff2",
         _ => "text/plain; charset=utf-8",
     }
 }
