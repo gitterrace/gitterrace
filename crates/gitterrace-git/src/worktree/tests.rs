@@ -1,4 +1,4 @@
-use gitterrace_testkit::git;
+use gitterrace_testkit::{Fixture, git};
 
 use crate::{ChangeKind, Repo, worktree_diff};
 
@@ -52,10 +52,7 @@ fn shows_staged_unstaged_untracked_and_deleted() {
 fn signature_moves_on_edit_and_new_file_only() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "1\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-qm", "init"]);
+    let _ = Fixture::init(p).write("a.txt", "1\n").commit("init");
     let repo = Repo::discover(p).expect("repo");
     let sig = || crate::worktree_signature(&repo).expect("sig");
     let clean = sig();
@@ -76,10 +73,7 @@ fn large_file_listed_without_reading_it() {
     use std::os::unix::fs::PermissionsExt;
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "a\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-qm", "init"]);
+    let _ = Fixture::init(p).write("a.txt", "a\n").commit("init");
     // Unreadable, so any read fails and the file would be skipped: listing it proves
     // the size cap ran on metadata alone.
     let big = p.join("dump.sql");

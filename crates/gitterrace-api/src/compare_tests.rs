@@ -1,4 +1,4 @@
-use gitterrace_testkit::git;
+use gitterrace_testkit::{Fixture, git};
 
 use axum::http::StatusCode;
 
@@ -48,10 +48,7 @@ fn compare_path_keeps_only_files_under_it() {
 fn compare_stays_bounded_and_refuses_hostile_revs() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "1\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "one"]);
+    let _ = Fixture::init(p).write("a.txt", "1\n").commit("one");
     let big = "x\n".repeat(gitterrace_config::Api::default().diff_lines + 10);
     std::fs::write(p.join("big.txt"), big).expect("write");
     git(p, &["add", "."]);

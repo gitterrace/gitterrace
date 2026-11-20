@@ -1,14 +1,11 @@
 //! `limits.worktree_files` and `limits.worktree_diff_kb` reach the Uncommitted view.
 
-use gitterrace_testkit::git;
+use gitterrace_testkit::{Fixture, git};
 
 use crate::{Repo, worktree_diff};
 
 fn dirty_repo(p: &std::path::Path) -> Repo {
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "a\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-qm", "init"]);
+    let _ = Fixture::init(p).write("a.txt", "a\n").commit("init");
     for i in 0..5 {
         std::fs::write(p.join(format!("n{i}.txt")), "x\n".repeat(600)).expect("write");
     }

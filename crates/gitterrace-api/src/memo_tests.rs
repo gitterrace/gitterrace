@@ -1,16 +1,15 @@
 //! The head tree is read once per commit: later insight requests walk no tree.
 
-use gitterrace_testkit::git;
+use gitterrace_testkit::Fixture;
 
 use crate::{ApiState, Params};
 
 fn state(dir: &std::path::Path) -> ApiState {
-    git(dir, &["init", "-q", "-b", "main"]);
-    std::fs::write(dir.join(".gitignore"), "skip.txt\n").expect("write");
-    std::fs::write(dir.join("a.txt"), "one\ntwo\n").expect("write");
-    std::fs::write(dir.join("skip.txt"), "x\n").expect("write");
-    git(dir, &["add", "."]);
-    git(dir, &["commit", "-q", "-m", "first"]);
+    let _ = Fixture::init(dir)
+        .write(".gitignore", "skip.txt\n")
+        .write("a.txt", "one\ntwo\n")
+        .write("skip.txt", "x\n")
+        .commit("first");
     let s = ApiState::open(dir).expect("open");
     s.refresh_index().expect("index");
     s

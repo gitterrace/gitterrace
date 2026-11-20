@@ -1,5 +1,5 @@
 use gitterrace_config::{Config, parse};
-use gitterrace_testkit::git;
+use gitterrace_testkit::{Fixture, git};
 
 use super::McpServer;
 use crate::{ApiError, ApiState};
@@ -7,10 +7,7 @@ use crate::{ApiError, ApiState};
 fn server(config: &str) -> (tempfile::TempDir, McpServer) {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "one\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "feat(core): first"]);
+    let _ = Fixture::init(p).write("a.txt", "one\n").commit("feat(core): first");
     let state = ApiState::open(p).expect("open");
     let cfg: Config = parse(config).expect("parse").config;
     (dir, McpServer::new(state).with_config(&cfg))

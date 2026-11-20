@@ -35,7 +35,7 @@ fn too_long(what: &str) -> ApiError {
 
 #[cfg(test)]
 mod tests {
-    use gitterrace_testkit::git;
+    use gitterrace_testkit::Fixture;
 
     use super::*;
     use crate::ApiState;
@@ -47,10 +47,7 @@ mod tests {
     fn state() -> (tempfile::TempDir, ApiState) {
         let dir = tempfile::tempdir().expect("tmp");
         let p = dir.path();
-        git(p, &["init", "-q", "-b", "main"]);
-        std::fs::write(p.join("a.txt"), "one\n").expect("write");
-        git(p, &["add", "."]);
-        git(p, &["commit", "-q", "-m", "first"]);
+        let _ = Fixture::init(p).write("a.txt", "one\n").commit("first");
         let s = ApiState::open(p).expect("open");
         (dir, s)
     }
