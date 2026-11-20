@@ -67,6 +67,25 @@ Install any tool it reports as missing.
 
 ## Testing
 
+Each layer owns one kind of claim, so a behavior is asserted once, in the
+cheapest layer that can see it. A test that repeats a claim another layer owns
+is a cut, not coverage.
+
+| Layer | Where | Owns |
+| --- | --- | --- |
+| Unit | `mod tests` in the file | one function's logic: edge cases, error paths, tables of inputs |
+| Integration | `crates/*/tests/` | crate-boundary behavior over a fixture repo: one behavior per file |
+| Oracle | `crates/gitterrace-index/tests/`, `equivalence*` | the cache agrees with a direct git read, on hostile and large inputs |
+| Golden | `crates/gitterrace-web/tests/golden/` | rendered markup, byte for byte: the place that owns HTML shape |
+| Conventions | `crates/gitterrace-testkit/tests/conventions.rs`, `crates/gitterrace-web/tests/conventions.rs` | tree-wide rules (links, limits, plurals, routes) as one scan each |
+| Browser | `scripts/verify/browser/` | what only a real browser sees: layout, focus, scripts, overlap |
+| Bench | `scripts/bench/`, `make speed-check` | time and memory budgets, never correctness |
+
+- A page's markup is asserted by the golden file, so an integration test does
+  not grep the same HTML. It asserts the number or the link the page computes.
+- Logic reached through a page is tested at the unit layer, and the page test
+  checks only the wiring.
+
 - Unit tests sit in one `#[cfg(test)] mod tests` at the bottom of the file they
   test, or in a `tests.rs` file declared under `#[cfg(test)]`. Platform or topic
   variants nest inside it (`#[cfg(unix)] mod unix`), never as a second top-level
@@ -76,6 +95,10 @@ Install any tool it reports as missing.
 - Integration tests live in each crate's `tests/`, one behavior per file.
 - Two tests hitting the same branch with trivially different inputs become one
   table-driven test. A test that cannot fail is deleted.
+- A test-only change that merges or drops tests carries its proof:
+  `make coverage-check BASE=<before> REV=<after>` (with `MUTANTS_PKG` and
+  `MUTANTS_FILES` for the files whose tests moved) shows no covered line,
+  branch percentage or caught mutant lost.
 
 `scripts/lint/test-layout-check.py` enforces the first and third rules, with a
 red and a green case in its self test.
