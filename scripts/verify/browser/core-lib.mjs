@@ -92,7 +92,7 @@ async function calmHeader() {
       if (m.chip.weight >= 600) bad.push(`chip weight ${m.chip.weight}`);
     }
     if (m.dx > 0.5) bad.push(`search moves ${m.dx.toFixed(1)} px when the chip toggles`);
-    bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: quiet, search steady`);
+    r.verdict(where, bad, `quiet, search steady`, ', ');
   });
   sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
 }
@@ -138,9 +138,7 @@ async function tabsOneLine() {
       if (m.over && !m.fade) bad.push('tabs overflow with no edge fade');
       if (m.page) bad.push('the page scrolls sideways');
     }
-    bad.length
-      ? r.fail(`${where}: ${bad.join(', ')}`)
-      : r.ok(`${where}: one row${m.over ? ', scrolls with a fade' : ''}`);
+    r.verdict(where, bad, `one row${m.over ? ', scrolls with a fade' : ''}`, ', ');
   });
 }
 // Segmented controls never break across lines: on every insights page and a document, at 360
@@ -194,9 +192,7 @@ async function segOneRow() {
       if (c.out) bad.push(`${c.name}: wider than the page`);
     }
     if (path.startsWith('/stats') && !m.length) bad.push('no segmented control');
-    bad.length
-      ? r.fail(`${where}: ${bad.join(', ')}`)
-      : r.ok(`${where}: ${m.length} controls, one row or a select`);
+    r.verdict(where, bad, `${m.length} controls, one row or a select`, ', ');
   });
 }
 // Tab levels: a page's own tabs never share the header nav's type, and every insights page is
@@ -231,9 +227,7 @@ async function tabLevels() {
       }
       if (look.more) bad.push('the tab row still hides tabs behind More');
       if (look.on !== 'Ownership') bad.push(`open tab reads "${look.on}" on Ownership`);
-      bad.length
-        ? r.fail(`${where}: ${bad.join(', ')}`)
-        : r.ok(`${where}: two tab levels, every tab in the row`);
+      r.verdict(where, bad, `two tab levels, every tab in the row`, ', ');
       await p.close();
     }
     await b.close();
@@ -289,9 +283,7 @@ async function periodSteady() {
         if (!at[2].chip) bad.push('the path filter shows no chip');
         if (at.some((a) => !a.below)) bad.push('the chips row sits above the counting line');
       }
-      bad.length
-        ? r.fail(`${where}: ${bad.join(', ')}`)
-        : r.ok(`${where}: the control stays at ${at[0].x},${at[0].y}`);
+      r.verdict(where, bad, `the control stays at ${at[0].x},${at[0].y}`, ', ');
     }
     await b.close();
   }
@@ -379,7 +371,7 @@ async function stickyHeads() {
     }
     const held =
       'file header pinned and handed over, #L120 clear of the head, path and tabs held';
-    bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: ${held}`);
+    r.verdict(where, bad, `${held}`, ', ');
     if (arg('--shots')) {
       mkdirSync(arg('--shots'), { recursive: true });
       await p.screenshot({

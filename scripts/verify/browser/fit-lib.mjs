@@ -129,7 +129,7 @@ export function checks(env) {
           });
           const bad = await p.evaluate(fn);
           const where = `${label} ${name} ${width} ${kind}`;
-          if (bad.length) r.fail(`${where}: ${bad.join('; ')}`); else r.ok(where);
+          r.verdict(where, bad);
         }
         await p.close();
       }

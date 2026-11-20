@@ -76,7 +76,7 @@
     "scripts/verify/browser/diff-lib.mjs": 25,
     "scripts/verify/browser/graph-lib.mjs": 6,
     "scripts/verify/browser/heads-lib.mjs": 6,
-    "scripts/verify/browser/layout-lib.mjs": 9,
+    "scripts/verify/browser/layout-lib.mjs": 7,
     "scripts/lib/browser-lib.mjs": 11,
     "scripts/verify/browser/outline-lib.mjs": 4,
     "scripts/verify/browser/pages-lib.mjs": 36,

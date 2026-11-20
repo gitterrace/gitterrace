@@ -260,7 +260,7 @@ async function exportFromDisk() {
         const n = await p.evaluate(() => document.body.innerText.length);
         if (n < 100 || !p.url().startsWith('file:')) bad.push(`a followed link shows ${n} characters at ${p.url()}`);
       }
-      bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: forwards, styled, a link opens a second page, no server form shows, no script error (${pages.length} form pages)`);
+      r.verdict(where, bad, `forwards, styled, a link opens a second page, no server form shows, no script error (${pages.length} form pages)`, ', ');
     } catch (e) { r.fail(`${where}: ${String(e.message).split('\n')[0]}`); } finally { await b.close(); }
   }
   rmSync(join(out, '..'), { recursive: true, force: true });

@@ -135,7 +135,7 @@ export function checks({ srv, r, browsers, context }) {
             const off = got != null && Math.abs(got - want) > 1;
             if (off) bad.push(`${k} gap ${got}px, want ${want}`);
           }
-          if (bad.length) r.fail(`${where}: ${bad.join('; ')}`); else r.ok(where);
+          r.verdict(where, bad);
         }
       }
       await b.close();

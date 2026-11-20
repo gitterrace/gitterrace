@@ -133,7 +133,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
         await p.waitForTimeout(100);
         const top = await p.evaluate((s) => document.querySelector(s)?.hasAttribute('data-stuck'), v.head);
         if (top) bad.push('closing line shown before any scroll');
-        if (bad.length) r.fail(`${where}: ${bad.join('; ')}`); else r.ok(where);
+        r.verdict(where, bad);
         await p.close();
       }
       await b.close();

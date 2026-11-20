@@ -32,7 +32,7 @@ async function inlineControls() {
       if (tops.size > 1) bad.push(`tops ${m.map((c) => `${c.what} ${c.top}`).join(', ')}`);
       const buttons = m.filter((c) => c.what !== 'sha');
       if (new Set(buttons.map((c) => c.bg)).size > 1) bad.push(`button fills ${buttons.map((c) => `${c.what} ${c.bg}`).join(', ')}`);
-      bad.length ? r.fail(`${where}: ${bad.join('; ')}`) : r.ok(`${where}: ${m.length} controls, one size on one line`);
+      r.verdict(where, bad, `${m.length} controls, one size on one line`);
       await p.close();
     }
     await b.close();
@@ -104,7 +104,7 @@ async function pathCells() {
         return out.slice(0, 3);
       });
       const where = `path-cells ${name} ${width} ${path}`;
-      bad.length ? r.fail(`${where}: ${bad.join('; ')}`) : r.ok(`${where}: paths break only after a slash`);
+      r.verdict(where, bad, `paths break only after a slash`);
       await p.close();
     }
     await b.close();
