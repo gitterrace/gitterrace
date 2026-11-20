@@ -149,7 +149,7 @@ fn upstream_said(u: &gitterrace_git::Upstream) -> String {
 }
 
 /// The working tree's head: what differs from HEAD, read from disk.
-pub(crate) fn worktree_head(files: usize, adds: u64, dels: u64) -> PageHead {
+pub(crate) fn worktree_head(files: usize, adds: u64, dels: u64, tabs: Vec<Tab>) -> PageHead {
     let said = if files == 0 {
         "Clean: nothing differs from HEAD".to_owned()
     } else {
@@ -162,6 +162,7 @@ pub(crate) fn worktree_head(files: usize, adds: u64, dels: u64) -> PageHead {
     };
     PageHead {
         qualifier: "vs HEAD".to_owned(),
+        tabs,
         ..PageHead::new("Working tree", Tagline::of(&said))
     }
 }

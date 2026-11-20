@@ -230,3 +230,19 @@ async fn worktree_scope_tabs_filter_files_and_keep_scope_in_links() {
         "{un}"
     );
 }
+
+/// The scope tabs sit in the page head: one tab row on the page, the current scope marked.
+#[tokio::test]
+async fn the_working_tree_page_has_one_tab_row_in_its_head() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    std::fs::write(p.join("small.txt"), "changed now\n").expect("write");
+    let r = router(&p, Config::default());
+    let (_, body) = get(&r, "/worktree").await;
+    assert_eq!(body.matches("<nav class=\"tabs\"").count(), 1, "{body}");
+    assert!(
+        body.contains("Staged (0)") && body.contains("Unstaged (1)"),
+        "{body}"
+    );
+    assert!(body.contains("aria-current=\"page\""), "{body}");
+}
