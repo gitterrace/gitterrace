@@ -194,10 +194,10 @@ oracle_extra() {
 # directory.
 run_tests() {
   # `|| return`: set -e is off when a caller tests this function, and a red test must still fail.
-  step cargo test --no-fail-fast "$@" || return 1
+  test_step cargo test --no-fail-fast "$@" || return 1
   # The output oracle: named on its own only when the suite left it out.
   if oracle_extra "$@"; then
-    step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" \
+    test_step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" \
       --test "$(land_cfg oracle.test)" || return 1
   fi
 }
@@ -207,13 +207,33 @@ run_tests() {
 conventions_step() {
   [[ " $* " == *" --workspace "* ]] && return 0
   [[ " $* " == *" -p $(land_cfg conventions.crate) "* ]] && return 0
-  step cargo test --no-fail-fast -p "$(land_cfg conventions.crate)" \
+  test_step cargo test --no-fail-fast -p "$(land_cfg conventions.crate)" \
     --test "$(land_cfg conventions.test)"
 }
 
 step() {
   echo "== $*"
   "$@"
+}
+
+# `step` for a test target: the output goes to a file as well, and a red target prints what
+# its failing binaries said (each `failures:` section, panic text included) after the run, so
+# a gate log that keeps only the tail still shows why. The whole output stays in the file.
+test_step() {
+  local log rc
+  echo "== $*"
+  log=$(mktemp "${TMPDIR:-/tmp}/land-check-tests.XXXXXX")
+  "$@" 2>&1 | tee "$log"
+  rc=${PIPESTATUS[0]}
+  if ((rc)); then
+    echo "== FAILED: $* (exit $rc); the failures, panic text included:" >&2
+    awk '/^failures:$/ {on=1} /^test result:/ {on=0} on' "$log" >&2
+    grep -E '^(error(\[.*\])?:|test result: FAILED)' "$log" >&2 || true
+    echo "== full output of the failed target: $log" >&2
+  else
+    rm -f "$log"
+  fi
+  return "$rc"
 }
 
 LINTS="$PWD/vendor/schwarzwald/kit/lint"
@@ -370,7 +390,7 @@ self_test() {
   # The conventions run once: left to a suite of their crate, run on their own otherwise.
   local ran
   ran=$(
-    step() { echo ran; }
+    test_step() { echo ran; }
     conventions_step -p "$(land_cfg selftest.leaf)"
   )
   [[ -n $ran ]] ||
@@ -379,7 +399,7 @@ self_test() {
       exit 1
     }
   ran=$(
-    step() { echo ran; }
+    test_step() { echo ran; }
     conventions_step -p "$(land_cfg conventions.crate)"
   )
   [[ -z $ran ]] ||
@@ -400,6 +420,14 @@ self_test() {
   printf '#[test]\nfn bad() { panic!(); }\n' >"$d/t/src/lib.rs"
   if (cd "$d/t" && run_tests -p t) >/dev/null 2>&1; then
     echo "self-test: the tests step passed a failing crate" >&2
+    exit 1
+  fi
+  # A red target shows its panic text in the log, not only that it failed.
+  printf '#[test]\nfn bad() { panic!("marker-panic-text"); }\n' >"$d/t/src/lib.rs"
+  # Captured, not piped into grep: pipefail would fail the pipeline on the red run itself.
+  shown=$( (cd "$d/t" && run_tests -p t 2>&1 >/dev/null) || true)
+  if [[ $shown != *marker-panic-text* ]]; then
+    echo "self-test: a failed test target did not show its panic text" >&2
     exit 1
   fi
   echo "land-check self-test: ok"
