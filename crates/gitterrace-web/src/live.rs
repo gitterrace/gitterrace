@@ -14,7 +14,7 @@ use axum::{
 };
 use futures_util::stream;
 use serde::{Deserialize, Serialize};
-use tokio::sync::{OwnedSemaphorePermit, broadcast, watch};
+use tokio::sync::{broadcast, watch};
 
 use crate::app::{App, Env};
 
@@ -136,32 +136,60 @@ fn everything(v: u64) -> Event {
     change_event(&Bare { kinds: &ALL, v: v.to_string() })
 }
 
-struct Stream {
-    rx: broadcast::Receiver<Arc<Change>>,
-    stop: watch::Receiver<bool>,
-    app: Arc<App>,
-    first: Option<Event>,
-    _slot: OwnedSemaphorePermit,
-    _wt: Option<WorktreeWatch>,
+/// The 503 for a stream past its slot limit.
+fn too_many() -> Response {
+    (
+        StatusCode::SERVICE_UNAVAILABLE,
+        [(header::RETRY_AFTER, "30")],
+        "too many open pages for live updates\n",
+    )
+        .into_response()
 }
 
-struct HomeStream {
+/// Streams `first`, then every change from `rx`. A receiver that lagged gets `lagged()`, since
+/// one notice stands for the ones missed. `keep` is released when the stream drops.
+fn sse(
     rx: broadcast::Receiver<Arc<Change>>,
     stop: watch::Receiver<bool>,
-    env: Env,
     first: Option<Event>,
-    _slot: OwnedSemaphorePermit,
+    lagged: impl Fn() -> Event + Send + Sync + 'static,
+    keep: impl Send + 'static,
+) -> Response {
+    let body = stream::unfold(
+        (rx, stop, first, keep, Arc::new(lagged)),
+        |(mut rx, mut stop, first, keep, lagged)| async move {
+            let mut first = first;
+            let out = if let Some(e) = first.take() {
+                Some(e)
+            } else {
+                loop {
+                    tokio::select! {
+                        got = rx.recv() => match got {
+                            Ok(c) => break Some(event(&c)),
+                            Err(broadcast::error::RecvError::Lagged(_)) => break Some(lagged()),
+                            Err(broadcast::error::RecvError::Closed) => break None,
+                        },
+                        gone = stop.changed() => {
+                            if gone.is_err() || *stop.borrow() {
+                                break None;
+                            }
+                        }
+                    }
+                }
+            };
+            out.map(|e| (Ok::<_, Infallible>(e), (rx, stop, first, keep, lagged)))
+        },
+    );
+    let mut res =
+        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
+    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
+    res
 }
 
 /// `GET /events`: one stream per tab. Refused with 503 past `server.live_streams`.
 pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQuery>) -> Response {
     let Ok(slot) = Arc::clone(&app.streams).try_acquire_owned() else {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            [(header::RETRY_AFTER, "30")],
-            "too many open pages for live updates\n",
-        )
-            .into_response();
+        return too_many();
     };
     let rx = app.changes.subscribe();
     app.wake.notify_one();
@@ -169,40 +197,10 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
     // reconnect after a pause.
     let now = app.version();
     let behind = q.v.and_then(|v| v.parse::<u64>().ok()).is_some_and(|v| v != now);
-    let state = Stream {
-        rx,
-        stop: app.stop.clone(),
-        first: behind.then(|| everything(now)),
-        _wt: (q.wt.as_deref() == Some("1")).then(|| WorktreeWatch::new(&app)),
-        app,
-        _slot: slot,
-    };
-    let body = stream::unfold(state, |mut s| async move {
-        if let Some(e) = s.first.take() {
-            return Some((Ok::<_, Infallible>(e), s));
-        }
-        loop {
-            tokio::select! {
-                got = s.rx.recv() => match got {
-                    Ok(c) => return Some((Ok(event(&c)), s)),
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        let v = s.app.version();
-                        return Some((Ok(everything(v)), s));
-                    }
-                    Err(broadcast::error::RecvError::Closed) => return None,
-                },
-                gone = s.stop.changed() => {
-                    if gone.is_err() || *s.stop.borrow() {
-                        return None;
-                    }
-                }
-            }
-        }
-    });
-    let mut res =
-        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
-    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
-    res
+    let wt = (q.wt.as_deref() == Some("1")).then(|| WorktreeWatch::new(&app));
+    let stop = app.stop.clone();
+    let first = behind.then(|| everything(now));
+    sse(rx, stop, first, move || everything(app.version()), (slot, wt))
 }
 
 /// `GET /events` beside the repositories home: the same `change` stream, carrying only the
@@ -210,49 +208,13 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
 /// `server.live_streams`.
 pub(crate) fn home_events(env: &Env, q: &EventsQuery) -> Response {
     let Ok(slot) = Arc::clone(&env.home_streams).try_acquire_owned() else {
-        return (
-            StatusCode::SERVICE_UNAVAILABLE,
-            [(header::RETRY_AFTER, "30")],
-            "too many open pages for live updates\n",
-        )
-            .into_response();
+        return too_many();
     };
     let rx = env.home.subscribe();
     // A home rendered before the newest list change missed it, which also covers a reconnect.
     let now = env.home_version();
     let behind = q.v.as_deref().and_then(|v| v.parse::<u64>().ok()).is_some_and(|v| v != now);
-    let state = HomeStream {
-        rx,
-        stop: env.stopping(),
-        first: behind.then(|| event(&Change::repos(now))),
-        env: env.clone(),
-        _slot: slot,
-    };
-    let body = stream::unfold(state, |mut s| async move {
-        if let Some(e) = s.first.take() {
-            return Some((Ok::<_, Infallible>(e), s));
-        }
-        loop {
-            tokio::select! {
-                got = s.rx.recv() => match got {
-                    Ok(c) => return Some((Ok(event(&c)), s)),
-                    // Every notice says the same thing: one stands for the ones missed.
-                    Err(broadcast::error::RecvError::Lagged(_)) => {
-                        let v = s.env.home_version();
-                        return Some((Ok(event(&Change::repos(v))), s));
-                    }
-                    Err(broadcast::error::RecvError::Closed) => return None,
-                },
-                gone = s.stop.changed() => {
-                    if gone.is_err() || *s.stop.borrow() {
-                        return None;
-                    }
-                }
-            }
-        }
-    });
-    let mut res =
-        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
-    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
-    res
+    let first = behind.then(|| event(&Change::repos(now)));
+    let env = env.clone();
+    sse(rx, env.stopping(), first, move || event(&Change::repos(env.home_version())), slot)
 }
