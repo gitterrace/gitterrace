@@ -92,6 +92,9 @@ fn files_past_the_page_budget_fold_lazily_and_link_their_body() {
     // A file over its own limit folds without data-lazy: it waits for a click.
     let big = diff_html(&crate::views::Render::fold(400), "abc", None, &[file("big.rs", 401)]);
     assert!(big.contains("data-load-diff") && !big.contains("data-lazy"), "{big}");
+    assert!(big.contains("data-load-diff=\"/diff/abc/0\"") && !big.contains("<div class=\"add\""));
+    let at_limit = diff_html(&crate::views::Render::fold(401), "abc", None, &[file("big.rs", 401)]);
+    assert!(!at_limit.contains("data-load-diff"), "a file within the limit stays open");
 }
 
 #[test]

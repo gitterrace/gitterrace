@@ -1,11 +1,9 @@
-use crate::views::diff::diff_html;
-use crate::views::{Render, code_html, code_html_first, code_tail_html, crumbs};
+use crate::views::{code_html, code_html_first, code_tail_html, crumbs};
 
 /// The default limits with a 32 MiB code cache.
 fn cache() -> crate::views::Render {
     crate::views::Render::test(32 << 20)
 }
-use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
 #[test]
 fn crumbs_link_prefixes() {
@@ -96,40 +94,6 @@ fn code_lines_carry_their_number() {
     assert!(h.contains("id=\"L101\" class=\"l\" data-n=\"101\""));
     assert!(h.contains("id=\"L250\""));
     assert!(!h.contains("style="));
-}
-
-#[test]
-fn huge_diffs_fold_behind_a_load_button() {
-    use gitterrace_git::{CodeCounts, Hunk, HunkLine};
-    let lines = |n: usize| {
-        (0..n)
-            .map(|i| HunkLine {
-                kind: LineKind::Added,
-                old_no: None,
-                new_no: Some(i as u32 + 1),
-                text: "x".into(),
-            })
-            .collect::<Vec<_>>()
-    };
-    let file = |n: usize| FileDiff {
-        path: "a.rs".into(),
-        old_path: None,
-        kind: ChangeKind::Modified,
-        binary: false,
-        additions: n as u32,
-        deletions: 0,
-        hunks: vec![Hunk { header: "@@".into(), lines: lines(n) }],
-        lines: n as u32,
-        rewritten: 0,
-        code: CodeCounts::default(),
-        modes: None,
-    };
-    let small = diff_html(&Render::fold(400), "abc", None, &[file(10)]);
-    assert!(!small.contains("data-load-diff"));
-    let big = diff_html(&Render::fold(400), "abc", None, &[file(401)]);
-    assert!(!diff_html(&Render::fold(500), "abc", None, &[file(401)]).contains("data-load-diff"));
-    assert!(big.contains("data-load-diff=\"/diff/abc/0\""));
-    assert!(!big.contains("<div class=\"add\""));
 }
 
 #[test]
