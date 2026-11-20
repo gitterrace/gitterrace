@@ -73,6 +73,10 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   `bash vendor/schwarzwald/kit/tools/clone.sh <label>` (shared rules, Commits). The
   gate for a squashed commit here is
   `scripts/land-check.sh --base <main>`.
+- Pushing main: `make act-check` first. It runs `ci.yml` through `act` on a
+  clean clone of main, and `scripts/hooks/pre-push` refuses a main without
+  that pass (or a `make release-gate` one). A red run is fixed on main before
+  anything is pushed.
 - Accepting commits written without a build:
   `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the
   files and diffstat and runs the cargo-free gates those file types need,

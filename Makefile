@@ -183,7 +183,7 @@ bench-guard:
 
 ##@ Slow checks, not in check
 .PHONY: counting-parity memory-check speed-check browser-deps browser-check browser-reap \
-	docker-check coverage-check
+	docker-check coverage-check act-check
 
 # Red until every page reads one Counted.
 ## counting-parity: Count parity fuzz, pages against reducers
@@ -225,6 +225,11 @@ browser-reap:
 ## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
 docker-check:
 	bash scripts/verify/docker-check.sh
+
+# scripts/hooks/pre-push refuses to push main at a commit without this pass (or a release-gate one).
+## act-check: ci.yml's push jobs through act on a clean clone of REV (default main), needs docker
+act-check:
+	bash scripts/verify/act-check.sh $(or $(REV),main)
 
 ##@ Bench
 .PHONY: bench bench-report

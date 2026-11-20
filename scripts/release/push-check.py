@@ -11,6 +11,9 @@ A push is refused when it would make CI read a changelog its tag does not match:
    remote) whose text differs from that section at the tag, unless the same push moves the tag
    to the pushed main commit. That covers both an edit of a released section and main moving
    past its tag with section edits.
+4. main at a commit with no pass record: `make act-check` (.git/act-pass/<sha>, ci.yml's push
+   jobs through act) or `make release-gate` (hosted CI). Main stays green only if what lands
+   on it ran CI first.
 Deletes always pass: re-tagging deletes the remote tag first (make release-gate RETAG=1).
 
   scripts/hooks/pre-push <remote> <url> < refs     the hook
@@ -70,9 +73,9 @@ def remote_ref(repo: Path, remote: str, ref: str) -> str | None:
     return rows.get(f"{ref}^{{}}") or rows.get(ref)
 
 
-def record_dir(repo: Path) -> Path:
+def record_dir(repo: Path, name: str = "release-gate") -> Path:
     _, common = git(repo, "rev-parse", "--git-common-dir")
-    return (repo / common / "release-gate").resolve()
+    return (repo / common / name).resolve()
 
 
 def problems(repo: Path, remote: str, lines: list[str]) -> list[str]:
@@ -105,6 +108,11 @@ def problems(repo: Path, remote: str, lines: list[str]) -> list[str]:
         elif main != commit:
             bad.append(f"{tag}: points at {commit[:12]}, not at the main pushed with it")
     if main is not None:
+        if not any((record_dir(repo, d) / main).is_file() for d in ("act-pass", "release-gate")):
+            bad.append(
+                f"main: {main[:12]} has no CI pass record,"
+                " run make act-check (or make release-gate)"
+            )
         _, text = git(repo, "show", f"{main}:CHANGELOG.md")
         version, section = top_section(text)
         if version is not None:
@@ -165,6 +173,11 @@ def self_test() -> int:
 
         released = "# Changelog\n\n## [1.0.0]\n\n- a\n"
         a = commit(released)
+        check("main without a CI pass record", True, (MAIN, a))
+        record_dir(repo, "act-pass").mkdir()
+        (record_dir(repo, "act-pass") / a).write_text("t\n")
+        check("main with an act pass record", False, (MAIN, a))
+        (record_dir(repo, "act-pass") / a).unlink()
         git(repo, "tag", "v1.0.0")
         check("tag without a pass record", True, (MAIN, a), ("refs/tags/v1.0.0", a))
         record(a, ci="")
@@ -211,6 +224,7 @@ def self_test() -> int:
         git(repo, "add", "other")
         git(repo, "commit", "-qm", "d")
         d = git(repo, "rev-parse", "HEAD")[1]
+        (record_dir(repo, "act-pass") / d).write_text("t\n")
         check("main past its tag, section unchanged", False, (MAIN, d))
         e = commit(released + "\n- fixed by hand\n- again\n")
         check("main past its tag with section edits", True, (MAIN, e))

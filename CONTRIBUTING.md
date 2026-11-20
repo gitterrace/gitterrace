@@ -106,6 +106,15 @@ and Windows run weekly, on demand and for every tag.
   coverage is nightly-only on the pinned compiler, so both sides run on the
   same `NIGHTLY` (default `nightly`). Not part of `make check`.
 
+## Pushing main
+
+Main stays green on the hosted runners, so what is pushed has run CI first.
+`make act-check` runs `ci.yml`'s push jobs through `act` (needs Docker) on a
+clean clone of main and records the pass in `.git/act-pass/<sha>`.
+`scripts/hooks/pre-push` refuses to push main at a commit without that record
+or a `make release-gate` one. Run it after the last land, never before it:
+the record names one commit.
+
 ## Releasing (maintainers)
 
 gitterrace.dev ships from a maintainer's machine with `make deploy`, with no
