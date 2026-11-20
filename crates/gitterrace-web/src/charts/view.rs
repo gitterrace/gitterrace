@@ -217,7 +217,6 @@ pub(crate) struct Heatmap {
     pub(crate) fig: Fig,
     pub(crate) w: usize,
     pub(crate) h: usize,
-    pub(crate) side: usize,
     pub(crate) hours: Vec<(usize, String)>,
     pub(crate) rows: Vec<HeatRow>,
 }

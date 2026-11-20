@@ -456,7 +456,6 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> Heatmap {
         fig: text::heatmap("Commits by weekday and hour", cells),
         w: LEFT + 24 * CELL,
         h: TOP + 7 * CELL,
-        side: CELL - 4,
         hours: (0..24).step_by(3).map(|hour| (LEFT + hour * CELL, format!("{hour:02}"))).collect(),
         rows,
     }
