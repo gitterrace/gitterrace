@@ -19,6 +19,8 @@ fn export(quiet: bool) -> (String, String) {
         .arg("--config")
         .arg(dir.path().join("cfg"))
         .env("HOME", dir.path())
+        // A saturated machine pauses the index build by design: the test is about the lines.
+        .env("TEST_INDEX_LOAD", "0")
         .env("XDG_CACHE_HOME", dir.path().join("cache"));
     if quiet {
         cmd.arg("--quiet");

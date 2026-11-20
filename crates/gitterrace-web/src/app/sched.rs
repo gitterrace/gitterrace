@@ -28,6 +28,11 @@ const POLL: Duration = Duration::from_secs(5);
 /// How long the sampler outlives the last build.
 const IDLE: Duration = Duration::from_secs(30);
 
+/// Set by a test that runs the real server: the load in percent, read instead of the machine's.
+/// A build under a saturated machine pauses by design, which a test of the build itself must
+/// not depend on.
+const LOAD_VAR: &str = "TEST_INDEX_LOAD";
+
 /// The machine's load in percent of its cores, `None` where it cannot be read.
 type Load = dyn Fn() -> Option<u32> + Send + Sync;
 
@@ -197,6 +202,9 @@ impl Drop for Lease {
 /// Load of the last minute in percent of the cores: `/proc/loadavg`, else the `vm.loadavg`
 /// sysctl of the BSDs and macOS.
 fn system_load() -> Option<u32> {
+    if let Some(fixed) = std::env::var(LOAD_VAR).ok().and_then(|v| v.parse().ok()) {
+        return Some(fixed);
+    }
     let text = std::fs::read_to_string("/proc/loadavg").ok().or_else(|| {
         let out = std::process::Command::new("sysctl")
             .args(["-n", "vm.loadavg"])

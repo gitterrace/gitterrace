@@ -9,6 +9,9 @@
 use std::os::unix::ffi::OsStrExt;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
+/// Pins the load the server's scheduler reads, in percent of the cores.
+const LOAD_VAR: &str = "TEST_INDEX_LOAD";
+
 /// Index worker threads started in this process.
 static WORKERS: AtomicUsize = AtomicUsize::new(0);
 
@@ -22,8 +25,23 @@ fn count(on: bool) {
 /// `Index::update` or a build step moved out of the child, starts a worker here.
 #[tokio::test(flavor = "multi_thread")]
 async fn the_server_builds_its_index_without_a_worker_of_its_own() {
-    gitterrace_git::set_worker_hook(count);
     gitterrace_web::index_child();
+    // The server pauses a build while the machine is saturated, which stalled this test at
+    // done 0 on a loaded runner. Run again with the load pinned: the variable is the marker.
+    if std::env::var_os(LOAD_VAR).is_none() {
+        let status = std::process::Command::new(std::env::current_exe().expect("exe"))
+            .args([
+                "the_server_builds_its_index_without_a_worker_of_its_own",
+                "--exact",
+                "--nocapture",
+            ])
+            .env(LOAD_VAR, "0")
+            .status()
+            .expect("spawn");
+        assert!(status.success(), "inner run: {status}");
+        return;
+    }
+    gitterrace_git::set_worker_hook(count);
     let dir = tempfile::tempdir().expect("tmp");
     let p = gitterrace_testkit::Fixture::init(&dir.path().join("r"))
         .write("a.txt", "one\n")
