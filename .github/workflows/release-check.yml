@@ -32,13 +32,10 @@ jobs:
           # The history lints refuse a shallow clone and the changelog check reads the tags.
           fetch-depth: 0
           fetch-tags: true
-      - id: pin
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+      # As on CI's Linux job: make check cross-checks Windows (clippy-cross).
+      - uses: ./.github/actions/rust
         with:
-          toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
-          # As on CI's Linux job: make check cross-checks Windows (clippy-cross).
           targets: x86_64-pc-windows-gnu
       - uses: ./.github/actions/lint-tools
       # The package lists first: act's runner image ships without them.
@@ -56,11 +53,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - id: pin
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        with:
-          toolchain: ${{ steps.pin.outputs.channel }}
+      - uses: ./.github/actions/rust
       - run: make test-memory
 
   # The advisory and MSRV checks run on the release commit itself: this workflow is a needs of
@@ -103,12 +96,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - id: pin
-        shell: bash
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        with:
-          toolchain: ${{ steps.pin.outputs.channel }}
+      - uses: ./.github/actions/rust
       # Every test binary runs even after one fails, so a red release lists all it found.
       - run: cargo test --locked --workspace --no-fail-fast
       # The binary dist ships is built with this profile; the smoke test runs it, so a build

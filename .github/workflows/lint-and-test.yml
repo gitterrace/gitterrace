@@ -43,24 +43,12 @@ jobs:
         run: git show "origin/${BASE}:schwarzwald/config/lint.toml" >schwarzwald/config/lint.toml
       # The toolchain is pinned once, in rust-toolchain.toml: a floating `stable`
       # turns every new clippy lint into a red build nobody caused.
-      - id: pin
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        id: toolchain
+      # make check cross-checks Windows (clippy-cross); Linux is this runner's host.
+      - uses: ./.github/actions/rust
         with:
-          toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
-          # make check cross-checks Windows (clippy-cross); Linux is this runner's host.
           targets: x86_64-pc-windows-gnu
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+          cache: cargo
       - uses: ./.github/actions/lint-tools
       # The package lists first: act's runner image ships without them.
       - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
@@ -142,21 +130,9 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - id: pin
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        id: toolchain
+      - uses: ./.github/actions/rust
         with:
-          toolchain: ${{ steps.pin.outputs.channel }}
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-memory-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-memory-${{ steps.toolchain.outputs.cachekey }}-
+          cache: cargo-memory
       - run: make test-memory
 
   # Full tier from here on.
@@ -171,22 +147,10 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
-      - id: pin
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        id: toolchain
+      - uses: ./.github/actions/rust
         with:
-          toolchain: ${{ steps.pin.outputs.channel }}
           components: clippy, rustfmt
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+          cache: cargo
       - uses: ./.github/actions/lint-tools
       # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
       # The static steps (theme, names, fmt) read files and do not depend on the OS: the Ubuntu
@@ -203,22 +167,9 @@ jobs:
     timeout-minutes: 40
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - id: pin
-        shell: bash
-        run: echo "channel=$(sed -n 's/^channel *= *"\(.*\)"/\1/p' rust-toolchain.toml)" >> "$GITHUB_OUTPUT"
-      - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        id: toolchain
+      - uses: ./.github/actions/rust
         with:
-          toolchain: ${{ steps.pin.outputs.channel }}
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
+          cache: cargo
       - run: cargo build --locked -p gitterrace
       # Every test binary runs even after one fails, so one run lists every Windows failure.
       - run: cargo test --locked --workspace --no-fail-fast
