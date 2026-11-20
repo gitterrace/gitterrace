@@ -517,8 +517,23 @@ else
 fi
 echo "land-check: ${scope[*]:-no crate touched}"
 ((explain)) && exit 0
+# The Windows target of `make clippy-cross`, scoped: test-only code that is dead there fails.
+# Both paths run it, since the landing gate calls --tests-only and land.toml skips the
+# workspace clippy-cross on that promise.
+windows_step() {
+  if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu &&
+    command -v x86_64-w64-mingw32-gcc >/dev/null; then
+    step cargo clippy "$@" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
+  else
+    echo "land-check: no x86_64-pc-windows-gnu target or mingw, the Windows clippy is CI's"
+  fi
+}
+
 if ((tests_only)); then
-  if ((${#scope[@]})); then run_tests "${scope[@]}" || exit 1; fi
+  if ((${#scope[@]})); then
+    windows_step "${scope[@]}" || exit 1
+    run_tests "${scope[@]}" || exit 1
+  fi
   conventions_step ${scope[@]+"${scope[@]}"}
   exit 0
 fi
@@ -526,11 +541,7 @@ fi
 step cargo fmt --all -- --check
 if ((${#scope[@]})); then
   step cargo clippy "${scope[@]}" --all-targets -- -D warnings
-  # The Windows target of `make clippy-cross`, scoped: test-only code that is dead there fails.
-  if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu &&
-    command -v x86_64-w64-mingw32-gcc >/dev/null; then
-    step cargo clippy "${scope[@]}" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
-  fi
+  windows_step "${scope[@]}"
   # Rustdoc as `make doc` runs it: a link to an item that only exists under cfg(test) passes
   # clippy and the tests and fails here alone.
   step env RUSTDOCFLAGS="-D warnings" cargo doc --no-deps "${scope[@]}"
