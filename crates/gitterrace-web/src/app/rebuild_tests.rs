@@ -21,11 +21,7 @@ fn a_block_corrupted_while_serving_rebuilds_the_cache() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let cache = app.index.dir().to_path_buf();
     let seg = std::fs::read_dir(&cache)
         .expect("ls")

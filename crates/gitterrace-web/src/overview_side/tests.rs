@@ -51,11 +51,7 @@ fn fixture_with(env: &crate::app::Env) -> (tempfile::TempDir, App) {
 fn shows_now_recent_churn_loose_ends_and_languages() {
     let (_d, app) = fixture();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let s = build(&app, &head, &*src, app.dirty(), fmt::now());
     assert_eq!(s.branch, "main");
     assert!(s.dirty, "the edited a.rs makes the tree dirty");
@@ -79,11 +75,7 @@ fn shows_now_recent_churn_loose_ends_and_languages() {
 fn old_commits_fall_out_of_today_and_churn() {
     let (_d, app) = fixture();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let s = build(&app, &head, &*src, false, fmt::now() + 200 * DAY);
     assert_eq!((s.today, s.week), (0, 0));
     assert!(s.hot.is_empty());
@@ -94,11 +86,7 @@ fn old_commits_fall_out_of_today_and_churn() {
 fn sidebar_is_built_once_per_tip_and_dirty_flag() {
     let (_d, app) = fixture();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let first = html(&app, &head, &*src);
     let n = builds();
     assert_eq!(html(&app, &head, &*src), first);
@@ -135,11 +123,7 @@ fn display_sidebar_picks_and_orders_the_sections_and_a_reload_applies() {
     let app = std::sync::Arc::new(app);
     env.register(&app);
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     assert_eq!(
         headings(&html(&app, &head, &*src)),
         ["Now", "Loose ends", "Recent", "Churn", "Languages"]
@@ -181,11 +165,7 @@ fn a_two_day_repository_draws_no_leading_empty_buckets() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     // 2024-03-10T00:00:00Z, the frozen test clock.
     let html = build(&app, &head, &*src, false, 1_710_028_800)
         .render()
@@ -264,11 +244,7 @@ fn both_sparklines_count_the_same_commits() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let until = at + DAY;
     for from in [at - 15 * DAY, 0] {
         let (rows, start) = spark_times(&*src, from, until);

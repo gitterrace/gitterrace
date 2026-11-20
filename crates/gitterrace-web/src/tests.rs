@@ -553,6 +553,17 @@ pub(crate) fn ready_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
     app
 }
 
+/// The ready source of `head` without the read check, for tests that probe it call by call.
+pub(crate) fn unchecked_src(
+    app: &App,
+    head: &str,
+) -> Arc<dyn gitterrace_index::feed::InsightsSource> {
+    app.source(head)
+        .expect("source")
+        .expect("ready")
+        .unchecked()
+}
+
 pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {
     Fixture::standard(&root.join(name)).path().to_owned()
 }

@@ -29,11 +29,7 @@ async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
         .expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let src = app
-        .source(&head)
-        .expect("source")
-        .expect("ready")
-        .unchecked();
+    let src = crate::tests::unchecked_src(&app, &head);
     let files = app.head_lines(&head);
     assert_eq!(
         super::files::blame_warm_list(&files, &*src, 5),
