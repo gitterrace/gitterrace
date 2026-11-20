@@ -12,6 +12,11 @@ xtask = "run -q -p xtask --"
 # Both are build settings, read when jemalloc is compiled: builds from this repository (make
 # install, the release builds) get them, `cargo install --git` does not.
 [env]
+# Every test that builds an index pins the load its scheduler reads to 0: on a saturated
+# machine a build waits for the load to fall, which turned a busy test run into timeouts. Cargo
+# sets this only for what it starts (tests, cargo run); an installed binary reads the real load.
+# The scheduler's own tests inject their load and never read this.
+TEST_INDEX_LOAD = "0"
 JEMALLOC_SYS_WITH_MALLOC_CONF = "narenas:1,tcache:false"
 # aarch64 Linux kernels run 64 KB pages, and jemalloc packs small classes into slabs of up to 7
 # pages: one object left in a class pins 448 KB. After a release some 40 classes hold a few
