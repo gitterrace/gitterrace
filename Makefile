@@ -18,7 +18,7 @@ MEMORY_TEST := cargo test --release --no-fail-fast -p gitterrace-web --test memo
 unexport MAKEFLAGS MFLAGS
 
 ##@ Build and run
-.PHONY: deps setup build install preview
+.PHONY: deps setup build install preview size
 
 ## deps: Install Rust and every tool the gate runs, at CI's versions (BROWSERS=1 adds browsers)
 deps:
@@ -141,6 +141,11 @@ send-vectors:
 names:
 	python3 scripts/lint/names-check.py --self-test
 	python3 scripts/lint/names-check.py
+
+# size: Line count per area and kind, against the 100k target
+size:
+	python3 scripts/dev/size-report.py --self-test
+	python3 scripts/dev/size-report.py
 
 # lines: Source files stay under 600 lines, comments carry no process labels, and a release
 # section about to be tagged is exactly what git-cliff makes
