@@ -165,9 +165,18 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
     (repo, values)
 }
 
-/// Waits until the insights pages show data instead of the indexing progress.
+/// Waits until the repository is READY, warm-up done.
+///
+/// Pages open while it still warms, and the warm-up writes the cache (the languages
+/// state) until the end, so a test that changes the cache after only the pages answered raced
+/// that write.
 pub async fn ready(router: &Router) {
     ready_at(router, "HEAD").await;
+    crate::wait::until_moving(crate::wait::deadline(), "/api/progress ready", || async {
+        let (_, body) = crate::page(router, "/api/progress").await;
+        (body.contains("\"ready\":true"), body)
+    })
+    .await;
 }
 
 /// Waits until the insights of `rev` show data instead of the indexing progress: a revision other

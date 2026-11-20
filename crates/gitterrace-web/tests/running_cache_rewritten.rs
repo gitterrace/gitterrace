@@ -428,3 +428,32 @@ async fn a_repository_initialized_again_under_a_running_server_recovers() {
         assert!(s < 500, "{p} -> {s} after the reset");
     }
 }
+
+/// `oracle::ready` returns only once the warm-up is done, so nothing writes the cache after
+/// it: a test that edits the cache next cannot race the warm-up's last write (the languages
+/// state came after the pages answered). Red when `ready` waits for the pages alone: the
+/// state is still warming then, and the cache listing moves.
+#[tokio::test(flavor = "multi_thread")]
+async fn nothing_writes_the_cache_once_ready_returns() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (repo, router, prefix) = built(tmp.path()).await;
+    gitterrace_testkit::oracle::ready(&router).await;
+    let (_, body) = get(&router, &format!("{prefix}/api/progress")).await;
+    assert!(body.contains("\"ready\":true"), "not ready: {body}");
+    let listing = || {
+        let mut v: Vec<_> = std::fs::read_dir(repo.join(".git/gitterrace"))
+            .expect("dir")
+            .flatten()
+            .map(|e| (e.file_name(), e.metadata().map_or(0, |m| m.len())))
+            .collect();
+        v.sort();
+        v
+    };
+    let before = listing();
+    for p in ["/stats", "/stats/languages", "/log/HEAD"] {
+        let (s, _) = get(&router, &format!("{prefix}{p}")).await;
+        assert!(s < 500, "{p} -> {s}");
+    }
+    wait::pause(std::time::Duration::from_millis(300)).await;
+    assert_eq!(before, listing(), "the cache changed after ready");
+}
