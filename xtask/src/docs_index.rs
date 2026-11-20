@@ -1,7 +1,5 @@
-//! `docs/README.md`, the documentation index, and the checks that keep every document honest:
-//! each one listed in the index, every relative link and anchor resolving, and every config key
-//! and command-line flag a document names existing in the schema or the clap definition, and
-//! every repository path in a code span existing.
+//! `docs/README.md`, the documentation index, and the checks that keep documents honest: each
+//! listed, links and anchors resolving, config keys, flags and code-span paths existing.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::Write as _;
@@ -76,6 +74,21 @@ const DOCS: &[(&str, Kind, &str)] = &[
         "docs/actions.md",
         Kind::Guide,
         "Send a selection to another app, or run your own program on it",
+    ),
+    (
+        "docs/skills/review.md",
+        Kind::Guide,
+        "A skill to review a change",
+    ),
+    (
+        "docs/skills/history.md",
+        Kind::Guide,
+        "A skill to explore history",
+    ),
+    (
+        "docs/skills/hotspots.md",
+        Kind::Guide,
+        "A skill to find hotspots",
     ),
     (
         "docs/online.md",
@@ -155,9 +168,8 @@ const DOCS: &[(&str, Kind, &str)] = &[
     ),
 ];
 
-/// The documents the site publishes: every kind but the project's own files, as repo path,
-/// the heading of its group and what it covers, in index order. The README is the landing
-/// page's own source and has raw HTML for its header, so it is not a page of its own.
+/// The documents the site publishes (not the project's files): repo path, group heading and
+/// what it covers, in index order. The README is the landing page's source, not a page.
 pub fn on_site() -> Vec<(&'static str, &'static str, &'static str)> {
     Kind::ALL
         .iter()
@@ -214,8 +226,7 @@ fn relative(path: &str) -> String {
         .map_or_else(|| format!("../{path}"), str::to_owned)
 }
 
-/// Every problem the documents have: unlisted documents, broken links or anchors, unknown keys
-/// or flags. Empty when all is well.
+/// Every problem the documents have: unlisted, broken links, unknown keys or flags.
 pub fn check(root: &Path) -> Result<Vec<String>> {
     let docs = documents(root)?;
     let mut bad = registry_problems(&docs, DOCS.iter().map(|d| d.0));
@@ -242,8 +253,7 @@ pub fn check(root: &Path) -> Result<Vec<String>> {
     Ok(bad)
 }
 
-/// Both directions of the registry: a document on disk that is not listed, and a listed
-/// document that is not on disk.
+/// Both directions of the registry: an unlisted document, and a listed one not on disk.
 fn registry_problems<'a>(docs: &[String], listed: impl Iterator<Item = &'a str>) -> Vec<String> {
     let listed: BTreeSet<&str> = listed.collect();
     let mut bad = Vec::new();
