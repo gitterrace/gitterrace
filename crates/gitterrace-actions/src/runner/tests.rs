@@ -280,14 +280,7 @@ fn timeout_kills_the_whole_group() {
         .parse()
         .expect("int");
     // The kernel reaps the signalled group soon after, on a loaded runner later.
-    let alive = || {
-        std::process::Command::new("kill")
-            .args(["-0", &pid.to_string()])
-            .status()
-            .expect("kill")
-            .success()
-    };
-    gitterrace_testkit::wait::until_blocking(&format!("grandchild {pid} reaped"), || !alive());
+    gitterrace_testkit::wait::process_gone_blocking("the grandchild is reaped", &pid.to_string());
 }
 
 #[test]

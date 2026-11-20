@@ -258,14 +258,14 @@ mod tests {
         let (tx, rx) = std::sync::mpsc::channel();
         super::retire(Some(Spy(tx)));
         let on = rx
-            .recv_timeout(gitterrace_testkit::wait::DEADLINE)
+            .recv_timeout(gitterrace_testkit::wait::deadline())
             .expect("the retired value was dropped");
         assert_ne!(on, std::thread::current().id(), "dropped on the caller");
     }
 
     /// Whether `w`'s watcher finished starting and is up.
     async fn up(w: &Watch) -> bool {
-        gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, || async {
+        gitterrace_testkit::wait::within(gitterrace_testkit::wait::deadline(), || async {
             w.run.as_ref().is_some_and(|r| r.running()) && !w.polling()
         })
         .await

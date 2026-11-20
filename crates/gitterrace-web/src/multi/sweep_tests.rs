@@ -122,7 +122,7 @@ fn the_watch_sees_repository_entries_but_not_their_contents() {
 /// deadline, keeping what it read in `seen`.
 async fn notices(events: &mut axum::body::Body, seen: &mut String, n: usize) {
     use http_body_util::BodyExt;
-    let got = tokio::time::timeout(wait::DEADLINE, async {
+    let got = tokio::time::timeout(wait::deadline(), async {
         while seen.matches("\"repos\"").count() < n {
             match events.frame().await {
                 Some(Ok(f)) => {

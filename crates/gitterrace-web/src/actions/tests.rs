@@ -1,6 +1,5 @@
 use gitterrace_testkit::git;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 use axum::{body::Body, http::Request};
 use http_body_util::BodyExt;
@@ -303,14 +302,7 @@ async fn run_route_security_table() {
     let pid = std::fs::read_to_string(cfg.path().join("grandchild.pid")).expect("pid");
     // The group was signalled; the kernel reaps the grandchild soon after, well before its
     // own 30 s sleep would end it.
-    let alive = || {
-        Command::new("kill")
-            .args(["-0", pid.trim()])
-            .status()
-            .expect("kill")
-            .success()
-    };
-    gitterrace_testkit::wait::until("the grandchild is reaped", || async { !alive() }).await;
+    gitterrace_testkit::wait::process_gone_blocking("the grandchild is reaped", &pid);
 
     // 17. the 5th concurrent run is refused.
     let mut runs = Vec::new();
@@ -328,7 +320,7 @@ async fn run_route_security_table() {
         ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id))
             || runs.iter().any(tokio::task::JoinHandle::is_finished)
     };
-    gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, settled).await;
+    gitterrace_testkit::wait::within(gitterrace_testkit::wait::deadline(), settled).await;
     if let Some(i) = runs.iter().position(tokio::task::JoinHandle::is_finished) {
         let s = runs.swap_remove(i).await.expect("join");
         std::fs::write(cfg.path().join("release"), "").expect("release");

@@ -247,7 +247,7 @@ async fn assert_indexed(router: &Router, name: &str) {
     let last = std::sync::Mutex::new(String::new());
     let url = format!("/r/{name}/api/progress");
     // Indexing on a loaded runner took longer than any fixed budget: await ready itself.
-    let ready = gitterrace_testkit::wait::within(gitterrace_testkit::wait::DEADLINE, || {
+    let ready = gitterrace_testkit::wait::within(gitterrace_testkit::wait::deadline(), || {
         let (url, last) = (&url, &last);
         async move {
             let body = gitterrace_testkit::get(router, url).await.1;

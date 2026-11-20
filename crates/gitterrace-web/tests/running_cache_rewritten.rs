@@ -66,7 +66,9 @@ fn corrupt(cache: &std::path::Path) {
 /// How long the API may answer 503 after its cache went bad. These tests guard recovery, not
 /// speed: a 10 s bound failed once in a landing gate at load 15, so the wait is the shared
 /// hang deadline and the time taken goes to stderr for the log.
-const REBUILT_WITHIN: std::time::Duration = wait::DEADLINE;
+fn rebuilt_within() -> std::time::Duration {
+    wait::deadline()
+}
 
 /// Segments corrupted under a running server: never a 500, a 503 with `Retry-After` while the
 /// cache is rebuilt, then 200 again, asked through the API alone. The API hands the failure to
@@ -82,7 +84,7 @@ fn a_running_server_rebuilds_a_cache_corrupted_underneath_for_the_api_too() {
         let (s, _) = api(&router, &format!("{prefix}/api/v1/repo")).await;
         assert_eq!(s, 200, "the API answers before the corruption");
         corrupt(&cache);
-        let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+        let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
         assert!(
             errors.is_empty(),
             "while rebuilding:\n{}",
@@ -218,7 +220,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             let errors = std::sync::Mutex::new(Vec::new());
             let mut round = 0;
             // Each round asks the pages, so a page may meet the damage and start the rebuild.
-            let healed = wait::within(wait::DEADLINE, || {
+            let healed = wait::within(wait::deadline(), || {
                 round += 1;
                 let (router, prefix, cache, damaged, errors) =
                     (&router, &prefix, &cache, &damaged, &errors);
@@ -421,7 +423,7 @@ fn a_repository_initialized_again_under_a_running_server_recovers() {
             .write("again.txt", "x\n")
             .commit("feat: start over");
         assert_eq!(again.path(), repo, "the same folder, a new history");
-        let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+        let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
         assert!(
             errors.is_empty(),
             "while rebuilding:\n{}",

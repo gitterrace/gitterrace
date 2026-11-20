@@ -144,7 +144,7 @@ async fn a_removed_repository_stops_indexing() {
     let (r, secret) = server(vec![a, b.clone()], cfg);
     let cache = b.join(".git/gitterrace");
     // Let its first index build land.
-    let w = gitterrace_testkit::wait::DEADLINE;
+    let w = gitterrace_testkit::wait::deadline();
     let landed = gitterrace_testkit::wait::within(w, || async { !snapshot(&cache).is_empty() });
     assert!(landed.await, "indexed while served");
     gitterrace_testkit::wait::pause(Duration::from_millis(500)).await;
