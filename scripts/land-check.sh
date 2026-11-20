@@ -176,18 +176,27 @@ landing_base() {
   fi
 }
 
+# Whether the oracle needs a step of its own for the scope arguments: a trigger crate is in
+# scope, and the suite just run did not already include the oracle's crate (a whole-workspace
+# or `-p` run of that crate runs every one of its test targets, equivalence_pages among them).
+oracle_extra() {
+  local triggered=0 t
+  [[ " $* " == *" --workspace "* ]] && return 1
+  [[ " $* " == *" -p $(land_cfg oracle.crate) "* ]] && return 1
+  while IFS= read -r t; do
+    [[ " $* " == *" $t "* ]] && triggered=1
+  done < <(land_cfg oracle.triggers)
+  ((triggered))
+}
+
 # The tests of the crates in the scope arguments (-p NAME... or --workspace), then the oracle
-# when its triggers are in scope. Runs in the current directory.
+# when its triggers are in scope and the suite above did not run it. Runs in the current
+# directory.
 run_tests() {
   # `|| return`: set -e is off when a caller tests this function, and a red test must still fail.
   step cargo test --no-fail-fast "$@" || return 1
-  # The output oracle: named on its own so a log shows it ran whenever the pages could move.
-  local run_oracle=0 t
-  [[ " $* " == *" --workspace "* ]] && run_oracle=1
-  while IFS= read -r t; do
-    [[ " $* " == *" $t "* ]] && run_oracle=1
-  done < <(land_cfg oracle.triggers)
-  if ((run_oracle)); then
+  # The output oracle: named on its own only when the suite left it out.
+  if oracle_extra "$@"; then
     step cargo test --no-fail-fast -p "$(land_cfg oracle.crate)" \
       --test "$(land_cfg oracle.test)" || return 1
   fi
@@ -331,6 +340,22 @@ self_test() {
   [[ $(cd "$d" && landing_base) == "$(git -C "$d" rev-parse HEAD~2)" ]] ||
     {
       echo "self-test: a plan landing's base is not FETCH_HEAD" >&2
+      exit 1
+    }
+  # The oracle runs on its own only when its crate is not already in the suite.
+  oracle_extra -p "$(land_cfg oracle.crate)" -p x &&
+    {
+      echo "self-test: the oracle reran although its crate's suite ran it" >&2
+      exit 1
+    }
+  oracle_extra --workspace &&
+    {
+      echo "self-test: the oracle reran after a workspace suite" >&2
+      exit 1
+    }
+  oracle_extra -p "$(land_cfg selftest.dependency)" -p "$(land_cfg oracle.triggers | tail -1)" ||
+    {
+      echo "self-test: the oracle is skipped though its crate was not tested" >&2
       exit 1
     }
   # The tests step: green on a passing crate, red on a failing one.
