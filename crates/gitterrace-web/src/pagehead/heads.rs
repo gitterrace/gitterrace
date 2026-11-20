@@ -47,12 +47,10 @@ pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize, compare: String) -> Pa
     }
 }
 
-/// The head of an insights tab while the history index is built.
 pub(crate) fn waiting_head(tab: &str) -> PageHead {
     insights_head(tab, Tagline::of("Waiting for the history index."), String::new())
 }
 
-/// Which view of one file a page shows, for its tab row.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum FileView {
     File,
@@ -130,7 +128,6 @@ fn upstream_said(u: &gitterrace_git::Upstream) -> String {
     }
 }
 
-/// The working tree's head: what differs from HEAD, read from disk.
 pub(crate) fn worktree_head(files: usize, adds: u64, dels: u64, tabs: Vec<Tab>) -> PageHead {
     let said = if files == 0 {
         "Clean: nothing differs from HEAD".to_owned()

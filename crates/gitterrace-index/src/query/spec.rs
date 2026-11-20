@@ -1,7 +1,6 @@
 //! The keyword table: what the parser accepts, what the docs list and what the filter field
 //! offers as completion, from one list.
 
-/// One documented keyword of the commit filter.
 #[derive(Debug, Clone, Copy)]
 pub struct KeywordSpec {
     /// The literal before the `:`, or the whole bare word for a flag such as `merge`.

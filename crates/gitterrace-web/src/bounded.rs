@@ -98,7 +98,6 @@ impl<V: Clone + Weight> Bounded<V> {
         }
     }
 
-    /// Moves the budget, evicting the oldest entries when it shrank.
     pub(crate) fn set_budget(&mut self, budget: usize) {
         self.budget = budget;
         while self.used > self.budget {

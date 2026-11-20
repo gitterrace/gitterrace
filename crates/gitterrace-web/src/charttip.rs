@@ -5,7 +5,6 @@
 
 use crate::fmt::{count, thousands};
 
-/// What a chart counts, singular and plural.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Unit(pub(crate) &'static str, pub(crate) &'static str);
 

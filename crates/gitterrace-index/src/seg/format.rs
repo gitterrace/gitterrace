@@ -18,7 +18,6 @@ pub(crate) const HEADER_LEN: u64 = 16;
 pub(crate) const FOOTER_LEN: u64 = 64;
 pub(crate) const TOC_ENTRY_LEN: u64 = 24;
 
-/// What a container holds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Segment = 1,

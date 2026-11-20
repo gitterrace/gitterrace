@@ -157,7 +157,6 @@ pub(crate) struct Highlighter {
     state: ParseState,
     stack: ScopeStack,
     cache: HashMap<Scope, Option<&'static str>>,
-    /// Records the declarations the grammar names, when the caller wants an outline.
     symbols: Option<crate::symbols::scopes::Collector>,
 }
 

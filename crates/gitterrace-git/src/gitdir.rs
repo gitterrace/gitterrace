@@ -18,7 +18,6 @@ use crate::{Repo, Result};
 /// Not configurable: a read bound on files git writes, against corrupt or foreign bytes.
 const MAX_META_BYTES: u64 = 4096;
 
-/// An operation git is in the middle of.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InProgress {
     Rebase,
@@ -29,7 +28,6 @@ pub enum InProgress {
     ApplyMailbox,
 }
 
-/// Where HEAD points and what is half done.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadState {
     pub branch: Option<String>,
@@ -58,7 +56,6 @@ pub struct LinkedWorktree {
     pub locked: bool,
 }
 
-/// A local branch against the base branch.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BranchStatus {
     pub name: String,
@@ -74,7 +71,6 @@ impl BranchStatus {
     }
 }
 
-/// The message and tagger of an annotated tag.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TagAnnotation {
     pub tagger: Option<crate::Signature>,

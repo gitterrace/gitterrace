@@ -10,14 +10,12 @@ const MAX_LICENSE: usize = 256 * 1024;
 /// How much of the text names the license; the GPL texts mention others further down.
 const TITLE_CHARS: usize = 400;
 
-/// What is known about the exported project.
 pub(super) struct Credit {
     name: String,
     license: Option<License>,
     origin: Option<String>,
 }
 
-/// The license file and, when its text is recognised, the short name.
 struct License {
     file: String,
     id: Option<&'static str>,

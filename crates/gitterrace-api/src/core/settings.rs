@@ -8,7 +8,6 @@ use gitterrace_types::LinkStyle;
 
 use crate::core::{ApiState, options_from};
 
-/// What the configuration decides for the API.
 #[derive(Clone, Default)]
 pub(super) struct Settings {
     /// Form of the `link` field; `permalink` is always `/go`.

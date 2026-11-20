@@ -16,11 +16,9 @@ use gitterrace_git::WorkerTime;
 const NAMES: [&str; 8] =
     ["rev_list", "held", "stream", "stream.fold", "append", "finish", "messages", "tip"];
 
-/// One step of the last update.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PhaseTime {
     pub name: &'static str,
-    /// Wall seconds.
     pub secs: f64,
     /// CPU seconds of the updating process in the step, `null` for a share measured inside
     /// another step (`stream.fold`) or where the system cannot say.
@@ -80,7 +78,6 @@ impl Running {
 }
 
 impl Phases {
-    /// Forgets the last update's steps: a new one starts.
     pub(crate) fn reset(&self) {
         if let Ok(mut s) = self.inner.lock() {
             *s = State::default();
@@ -107,7 +104,6 @@ impl Phases {
         }
     }
 
-    /// Replaces the steps with those of an update run elsewhere.
     pub(crate) fn adopt(&self, steps: Vec<PhaseTime>) {
         if let Ok(mut s) = self.inner.lock() {
             *s = State { done: steps, now: None };

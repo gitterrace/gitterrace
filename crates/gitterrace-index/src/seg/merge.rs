@@ -10,7 +10,6 @@ use crate::seg::agg::{Aggregates, AuthorDay, Interner, PathAuthor, SUM_OVER, Str
 use crate::seg::postings::{Edge, Hit, Postings};
 use crate::seg::{SegError, SegResult};
 
-/// One segment's tables as the merge reads them.
 pub(crate) struct Part<'a> {
     pub agg: &'a Aggregates,
     pub postings: &'a Postings,
@@ -18,7 +17,6 @@ pub(crate) struct Part<'a> {
     pub rank: &'a [u32],
 }
 
-/// Old global string id to new id, by canonical first use.
 #[derive(Debug, Default)]
 pub(crate) struct Renumber {
     pub paths: Vec<u32>,
@@ -94,7 +92,6 @@ fn dense<T: Ord + Clone>(m: BTreeMap<u32, Vec<T>>, len: usize) -> Vec<Vec<T>> {
     out
 }
 
-/// Postings of the parts with ordinals ranked and ids renumbered.
 pub(crate) fn postings(parts: &[Part<'_>], n: &Renumber) -> Postings {
     let mut by_path: BTreeMap<u32, Vec<Hit>> = BTreeMap::new();
     let mut by_author: BTreeMap<u32, Vec<u32>> = BTreeMap::new();

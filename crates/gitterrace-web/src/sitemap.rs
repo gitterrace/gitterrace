@@ -5,7 +5,6 @@
 
 /// One row of the route table.
 pub struct Page {
-    /// What it is, as shown in the table's first column.
     pub shown: &'static str,
     pub does: &'static str,
     /// Every route literal this row covers, exactly as written in the routers.

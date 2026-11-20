@@ -55,7 +55,6 @@ pub struct Repo {
     text_limit: AtomicU64,
     /// Changed files the Uncommitted view lists, see [`Repo::set_worktree_limits`].
     worktree_files: AtomicUsize,
-    /// Largest file the Uncommitted view diffs, in bytes.
     worktree_diff_bytes: AtomicU64,
     /// Threads [`Repo::numstat_many`] uses; 0 means one per core.
     workers: usize,
@@ -138,7 +137,6 @@ impl Repo {
         }
     }
 
-    /// The memo in force, if its owner still holds it.
     pub(crate) fn change_memo(&self) -> Option<Arc<ChangeMemo>> {
         self.changes.lock().ok()?.upgrade()
     }

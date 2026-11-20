@@ -33,7 +33,6 @@ pub(crate) const fn add_count(a: &mut u64, b: u64) -> Option<()> {
     }
 }
 
-/// One author on one local day.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct AuthorDay {
     pub commits: u64,
@@ -53,11 +52,9 @@ pub(crate) struct PathAuthor {
 pub(crate) struct LifeMonth {
     pub touches: u64,
     pub lines: Sums,
-    /// Newest author time of a touch.
     pub last: i64,
 }
 
-/// First-use string ids, in the order the canonical stream introduces them.
 #[derive(Debug, Default)]
 pub(crate) struct Interner {
     ids: FastMap<Box<str>, u32>,

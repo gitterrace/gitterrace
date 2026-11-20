@@ -9,7 +9,6 @@ pub use people::ContributorTally;
 
 pub use gitterrace_types::Period;
 
-/// Commits of one size bucket, the histogram behind the commit-size chart.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SizeBucket {
     /// `1`, `2-5`, `6-20`, `21-100`, `101-500`, `501-2000`, `2000+`.
@@ -17,7 +16,6 @@ pub struct SizeBucket {
     pub commits: usize,
 }
 
-/// What the contributors list is ordered and charted by.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum Metric {
     #[default]
@@ -90,7 +88,6 @@ pub struct SeriesPoint {
 /// When work happens, in each commit's own timezone.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Rhythm {
-    /// One point per bucket of the period's axis, empty ones included.
     pub series: Vec<SeriesPoint>,
     pub unit: BucketUnit,
     /// `[weekday][hour]`, Monday is 0.

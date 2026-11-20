@@ -6,7 +6,6 @@ use gitterrace_testkit::git_at;
 use crate::Repo;
 use crate::repo::tests::{T0, commit, write};
 
-/// Full ids of one repository's public and hidden commits.
 struct Ids {
     old: String,
     tip: String,

@@ -7,7 +7,6 @@ use std::path::Path;
 
 use gix::ObjectId;
 
-/// Which added path came from which deleted one.
 #[derive(Default)]
 pub(super) struct Moves {
     pub(super) to: HashMap<String, String>,

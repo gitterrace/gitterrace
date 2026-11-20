@@ -36,7 +36,6 @@ struct LostPage {
     steps: Vec<Step>,
 }
 
-/// One next step on the page: a label and where it goes.
 struct Step {
     label: String,
     href: String,

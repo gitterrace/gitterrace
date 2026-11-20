@@ -20,10 +20,8 @@ pub struct Release {
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Cadence {
-    /// Oldest first.
     pub releases: Vec<Release>,
     pub median_days_between: Option<f64>,
-    /// Days from the newest release to the newest commit.
     pub days_since_last: Option<i64>,
 }
 

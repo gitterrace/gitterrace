@@ -33,12 +33,9 @@ const MAX_THREADS: usize = 8;
 const INLINE: u8 = 0;
 const IN_GIT: u8 = 1;
 
-/// One commit as the column stores it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Item {
-    /// Committer seconds, the key of the newest-first walk.
     pub time: i64,
-    /// Ranks of the parents in the set, first parent first.
     pub parents: Vec<u32>,
     /// Author name and email as written, and the message. `None` for an item too large to
     /// keep, which search checks from git.
@@ -126,7 +123,6 @@ pub struct MessageQuery<'a> {
     pub in_git: &'a (dyn Fn(&str) -> std::io::Result<bool> + Sync),
 }
 
-/// Every rank's match result plus the graph the newest-first walk replays.
 #[derive(Debug, Default)]
 pub struct Scan {
     pub hits: Vec<bool>,
@@ -146,7 +142,6 @@ pub trait MessageIndex {
     fn scan(&self, query: &MessageQuery<'_>) -> SegResult<Scan>;
 }
 
-/// The commits a search lists, newest first as git's walk gives them.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MessageHits {
     pub ids: Vec<String>,
@@ -254,7 +249,6 @@ impl MessageColumn {
         Ok(Some(MessageHits { capped: total > ids.len(), ids }))
     }
 
-    /// Every item in rank order, for a merge that rewrites the column.
     pub(crate) fn items(&self) -> SegResult<Vec<Item>> {
         let mut out = Vec::with_capacity(self.commits as usize);
         let mut z = codec::Unpacker::new()?;

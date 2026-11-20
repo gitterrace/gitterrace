@@ -24,7 +24,6 @@ struct IndexPage {
     rows: Vec<IndexRow>,
     /// The card's header: "Repositories" and "2 repositories, 14 commits today".
     head: crate::pagehead::PageHead,
-    /// The filter box's text, as typed.
     q: String,
     /// "12 of 101": the rows that match and all of them.
     count: String,
@@ -54,10 +53,8 @@ struct IndexRow {
     when: crate::when::When,
     commit_href: String,
     spark: String,
-    /// Commits in the sparkline's window.
     total: u32,
     tip: String,
-    /// What changed today, the line a returning reader looks for first.
     today: String,
     commits_today: u32,
     /// Uncommitted work in the working tree: `None` where the tree is not shown, else whether

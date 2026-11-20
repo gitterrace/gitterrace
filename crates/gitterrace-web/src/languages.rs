@@ -34,7 +34,6 @@ const LEFT: f64 = 72.0;
 const RIGHT: f64 = 8.0;
 const TOP_PAD: f64 = 10.0;
 const BOTTOM: f64 = 26.0;
-/// Points kept in the inline JSON and the area paths.
 const SAMPLES: usize = 700;
 const COMMIT_LIST: usize = 500;
 
@@ -71,7 +70,6 @@ pub(crate) struct LocQuery {
     to: Option<usize>,
 }
 
-/// Whether the view holds commits to show.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Held {
     Commits,
@@ -89,7 +87,6 @@ struct View {
     /// The range comes from `from`/`to` (a drag) and replaces the period.
     picked: bool,
     period: Period,
-    /// The period the page starts in, left out of links.
     dflt: Period,
     /// The period holds no commit.
     held: Held,

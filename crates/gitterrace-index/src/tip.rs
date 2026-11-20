@@ -31,11 +31,9 @@ use crate::seg::{SegError, SegResult};
 
 const META_LEN: usize = 12;
 
-/// One row of a commit under its tip name.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct TipTouch {
     pub path: PathId,
-    /// Added plus removed lines.
     pub raw: u32,
     /// The same with whitespace-only changes ignored.
     pub code: u32,

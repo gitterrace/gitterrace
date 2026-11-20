@@ -402,7 +402,6 @@ fn merge_positions(repo: &gix::Repository, ids: &[String]) -> Vec<usize> {
     (0..ids.len()).filter(|&i| parents(&ids[i]).is_some_and(|n| n > 1)).collect()
 }
 
-/// Heap bytes one index result holds, roughly: what the reorder window budgets.
 fn result_bytes(s: &CommitSummary, files: &[crate::FileDiff]) -> usize {
     let fixed = std::mem::size_of::<crate::FileDiff>();
     let files: usize = files

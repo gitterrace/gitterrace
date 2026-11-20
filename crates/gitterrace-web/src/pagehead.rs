@@ -33,7 +33,6 @@ pub(crate) struct Tab {
     pub(crate) on: bool,
 }
 
-/// One run of the tagline: words, a number or a link.
 #[derive(Debug, Clone)]
 pub(crate) struct Part {
     pub(crate) text: String,
@@ -90,7 +89,6 @@ impl Tagline {
         Self { parts, lead: false }
     }
 
-    /// Marks the tagline as the page's lead sentence.
     #[must_use]
     pub(crate) const fn lead(mut self) -> Self {
         self.lead = true;

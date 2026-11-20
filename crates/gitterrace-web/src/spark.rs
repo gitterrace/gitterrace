@@ -25,7 +25,6 @@ const MIN: i64 = 6;
 /// configurable: a chart definition, not a resource limit.
 const MAX: i64 = 7 * MIN;
 
-/// One bucket width and how a label names it: "per {per}".
 struct Rung {
     secs: i64,
     per: &'static str,
@@ -40,7 +39,6 @@ const LADDER: [Rung; 4] = [
     Rung { secs: WEEK, per: "week" },
 ];
 
-/// Commit counts over the fitted window, oldest bucket first.
 #[derive(Debug, Default)]
 pub(crate) struct Series {
     pub(crate) counts: Vec<u32>,

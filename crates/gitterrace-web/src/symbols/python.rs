@@ -9,16 +9,12 @@ use crate::symbols::{Symbol, SymbolKind};
 /// Skips string literals and comments: the state carried from one line to the next.
 #[derive(Default)]
 struct Scan {
-    /// The closing quote run of an open triple-quoted string.
     triple: Option<&'static str>,
-    /// Open brackets: a line starting inside them continues a statement.
     brackets: usize,
-    /// The previous line ended in a backslash.
     joined: bool,
 }
 
 impl Scan {
-    /// Advances over one line and says whether it starts a logical statement.
     fn line(&mut self, line: &str) -> bool {
         let starts = self.triple.is_none() && self.brackets == 0 && !self.joined;
         let b = line.as_bytes();
@@ -73,7 +69,6 @@ fn ident_len(s: &str) -> usize {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Block {
     Class,
-    /// A function body: nothing inside it is listed.
     Def,
     /// `if`, `try`, `with`, loops and `match`: transparent, a `def` in it belongs to the block
     /// around it.

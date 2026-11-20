@@ -12,9 +12,7 @@ pub enum Control {
     /// A whole number. Its range, when it has one, comes from [`crate::BOUNDS`].
     Number,
     Text,
-    /// One string per row.
     List,
-    /// One of the enum's canonical values, in declaration order.
     Select(Vec<&'static str>),
 }
 

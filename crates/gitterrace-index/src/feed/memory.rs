@@ -15,7 +15,6 @@ use crate::feed::{
 };
 use crate::insights::{local_day, under};
 
-/// Interned strings and per-record ids, in first-use order over the records.
 #[derive(Debug, Default)]
 pub(crate) struct MemoryTables {
     paths: Vec<Arc<str>>,
@@ -31,7 +30,6 @@ pub(crate) struct MemoryTables {
     commit_ids: FastMap<Arc<str>, u32>,
     /// Per path id: non-merge (rank, row) hits, ascending.
     by_path: Vec<Vec<Hit>>,
-    /// Per record: identity, kind, scope.
     per_commit: Vec<(IdentId, Option<LabelId>, Option<LabelId>)>,
     /// Per record: sums over its rows, so `commit` is O(1).
     sums: Vec<Sums>,

@@ -17,7 +17,6 @@ use crate::cache;
 pub(crate) const CHAIN_STATE_FILE: &str = "chain.state";
 
 const MAGIC: &[u8; 4] = b"GTWS";
-/// Bump when the container changes. A payload carries its own version.
 const VERSION: u32 = 1;
 const HEADER: usize = 4 + 4 + 8 + 8;
 const TRAILER: usize = 8;

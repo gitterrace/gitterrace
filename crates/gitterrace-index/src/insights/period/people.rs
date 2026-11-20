@@ -17,7 +17,6 @@ struct Acc {
     last: i64,
     days: BTreeSet<i64>,
     series: Vec<u32>,
-    /// Deleted lines per bucket, read for the net metric.
     dels: Vec<u32>,
 }
 

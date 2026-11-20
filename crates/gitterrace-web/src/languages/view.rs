@@ -9,7 +9,6 @@ use crate::charts::view::{Fig, P, Tick};
 use crate::empty::Empty;
 use crate::seg::Seg;
 
-/// One stacked band of the chart.
 #[derive(Debug)]
 pub(super) struct Band {
     pub(super) class: String,
@@ -17,7 +16,6 @@ pub(super) struct Band {
     pub(super) tip: String,
 }
 
-/// A date under the plot.
 #[derive(Debug)]
 pub(super) struct DateLabel {
     pub(super) x: P,
@@ -41,7 +39,6 @@ pub(super) struct Area {
 
 impl HtmlSafe for Area {}
 
-/// A language of the range card.
 #[derive(Debug)]
 pub(super) struct RangeRow {
     pub(super) class: String,
@@ -54,7 +51,6 @@ pub(super) struct RangeRow {
     pub(super) w: u64,
 }
 
-/// A commit of the range list.
 #[derive(Debug)]
 pub(super) struct RangeCommit {
     pub(super) sha: String,
@@ -80,11 +76,9 @@ pub(super) struct RangeCard {
     pub(super) rows: Vec<RangeRow>,
     pub(super) list_title: String,
     pub(super) commits: Vec<RangeCommit>,
-    /// Set when the list is cut: how many it shows.
     pub(super) cut: Option<usize>,
 }
 
-/// A part of the share bar.
 #[derive(Debug)]
 pub(super) struct SharePart {
     pub(super) class: String,
@@ -92,7 +86,6 @@ pub(super) struct SharePart {
     pub(super) tip: String,
 }
 
-/// A row of the languages-now table.
 #[derive(Debug)]
 pub(super) struct NowRow {
     pub(super) class: String,
@@ -117,7 +110,6 @@ pub(super) struct Now {
 #[derive(Debug)]
 pub(super) struct Shown {
     pub(super) lead: String,
-    /// The big numbers: languages, lines, the largest language and its share.
     pub(super) kpis: Vec<crate::insights::Kpi>,
     pub(super) period: Seg,
     pub(super) axis: Seg,

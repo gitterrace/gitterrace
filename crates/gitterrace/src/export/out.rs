@@ -18,7 +18,6 @@ pub(super) const MARKER: &str = ".gitterrace-export";
 /// Largest marker read. Not configurable: a real one lists the site's top-level names, a few
 /// hundred bytes, and a larger file is cut off and so grants nothing.
 const MARKER_MAX: u64 = 1 << 20;
-/// Marker line saying the export made the whole folder.
 const OWNS_ALL: &str = "owns *";
 /// Marker line prefix naming one top-level entry the export put in a shared folder.
 const OWNS: &str = "owns ";
@@ -31,7 +30,6 @@ pub(super) struct Target {
     pub(super) name: String,
 }
 
-/// What of the output folder an export owns.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum Owned {
     /// The folder is an earlier export's alone: the new site replaces it whole.

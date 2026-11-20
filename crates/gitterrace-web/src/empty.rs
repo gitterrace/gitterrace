@@ -7,7 +7,6 @@ use std::fmt;
 use askama::Template;
 use askama::filters::HtmlSafe;
 
-/// An empty state, as shown.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Empty {
     pub(crate) message: String,

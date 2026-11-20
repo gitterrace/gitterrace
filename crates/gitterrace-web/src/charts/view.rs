@@ -30,7 +30,6 @@ impl Escaper for Esc {
     }
 }
 
-/// A coordinate as the charts print it: one decimal.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct P(pub(crate) f64);
 
@@ -40,16 +39,13 @@ impl fmt::Display for P {
     }
 }
 
-/// A value gridline with its label on the left.
 #[derive(Debug)]
 pub(crate) struct Tick {
     pub(crate) y: P,
-    /// The label baseline, just below the line.
     pub(crate) ty: P,
     pub(crate) label: String,
 }
 
-/// A label under a column.
 #[derive(Debug)]
 pub(crate) struct XLabel {
     pub(crate) x: P,
@@ -116,7 +112,6 @@ pub(crate) struct Bars {
     pub(crate) cols: Vec<BarCol>,
 }
 
-/// One part of a stacked column.
 #[derive(Debug)]
 pub(crate) struct Seg {
     pub(crate) class: String,
@@ -196,7 +191,6 @@ pub(crate) struct ScatterDot {
 #[template(path = "chart_scatter.svg")]
 pub(crate) struct Scatter {
     pub(crate) f: Frame,
-    /// Labels along the bottom: x and value.
     pub(crate) xticks: Vec<(P, String)>,
     pub(crate) dots: Vec<ScatterDot>,
     pub(crate) x_title: String,

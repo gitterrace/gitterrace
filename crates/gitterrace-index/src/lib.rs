@@ -82,7 +82,6 @@ const TIP_FILE: &str = "tip";
 /// set up once and never wait on a batch, so this only paces its progress reports.
 const BATCH: usize = 2048;
 
-/// Per-commit facts the stats pages are built from.
 #[derive(Debug, Clone, Default)]
 pub struct CommitRecord {
     pub id: String,
@@ -93,7 +92,6 @@ pub struct CommitRecord {
     pub merge: bool,
     /// Parent ids, first parent first. Lets history be followed along the first-parent chain.
     pub parents: Vec<String>,
-    /// Conventional-commit type and scope, when the subject follows it.
     pub kind: Option<String>,
     pub scope: Option<String>,
     pub files: Vec<FileStat>,
@@ -112,7 +110,6 @@ pub struct FileStat {
     /// Counts with whitespace-only and blank-line changes ignored. `None` when equal to the
     /// raw counts, which is nearly always.
     pub code: Option<CodeStat>,
-    /// Previous path when the file was renamed in this commit.
     pub old: Option<std::sync::Arc<str>>,
     pub binary: bool,
     pub deleted: bool,
@@ -137,7 +134,6 @@ impl FileStat {
     }
 }
 
-/// Progress of the background build, read by the web layer.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize)]
 pub struct Progress {
     pub done: usize,

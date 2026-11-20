@@ -25,7 +25,6 @@ const SLEEP_GAP: Duration = Duration::from_secs(5);
 /// Says whether a path (absolute, `is_dir` when known to be a directory) is of no interest.
 pub type Skip = Arc<dyn Fn(&Path, bool) -> bool + Send + Sync>;
 
-/// What to watch and how often to nudge.
 #[derive(Clone)]
 pub struct NudgeConfig {
     /// Directories watched with everything below them that `skip` lets through.
@@ -33,7 +32,6 @@ pub struct NudgeConfig {
     pub skip: Skip,
     /// Quiet time after the last event before the nudge.
     pub debounce: Duration,
-    /// Longest a steady stream of events may hold the nudge back.
     pub max_delay: Duration,
     /// The safety timer: a nudge at least this often, events or not.
     pub rescan: Duration,
@@ -56,7 +54,6 @@ pub enum NudgeError {
     Os(String),
 }
 
-/// What the callback is told. Neither carries a path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Nudge {
     Look,

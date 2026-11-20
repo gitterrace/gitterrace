@@ -10,10 +10,8 @@ use std::{
 const PLAIN_EVERY: Duration = Duration::from_secs(5);
 const TTY_EVERY: Duration = Duration::from_millis(100);
 
-/// How progress reaches the user.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Mode {
-    /// One line, rewritten in place.
     Tty,
     /// A full line every few seconds, for logs and pipes.
     Plain,
@@ -34,7 +32,6 @@ impl Mode {
     }
 }
 
-/// The reporter one export drives.
 pub(crate) struct Progress {
     mode: Mode,
     out: Box<dyn Write + Send>,

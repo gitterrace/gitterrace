@@ -26,7 +26,6 @@ const DECODED_CAP: usize = 32 << 20;
 /// Named styles and axes listed. Not configurable: a display bound.
 const NAMES_CAP: usize = 32;
 
-/// Characters of one name shown.
 const NAME_LEN: usize = 100;
 
 #[derive(Debug, PartialEq, Eq)]

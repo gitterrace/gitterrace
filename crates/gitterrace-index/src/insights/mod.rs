@@ -69,18 +69,15 @@ pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, La
 
 pub(crate) use gitterrace_git::DAY;
 
-/// Which paths and commits count.
 #[expect(clippy::struct_excessive_bools, reason = "independent switches, one per option")]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Options {
     /// Extra globs (`fnmatch` style, matched against the full path and the file name).
     pub exclude: Vec<String>,
-    /// Count lock files and minified output.
     pub include_generated: bool,
     /// Leave out paths that `.gitignore` or `.ignore` rule out.
     pub respect_ignore: bool,
     pub count_whitespace: bool,
-    /// Count commits by bot accounts in per-file and per-period numbers.
     pub include_bots: bool,
     /// Count merge commits as commits. A merge never adds lines or files.
     pub include_merges: bool,
@@ -156,7 +153,6 @@ struct Derived {
     /// Walks of a counted set over these tables, for the tests that count work per page.
     #[cfg(any(test, feature = "oracle"))]
     walks: std::sync::atomic::AtomicUsize,
-    /// The walks of those that read file rows.
     #[cfg(any(test, feature = "oracle"))]
     row_walks: std::sync::atomic::AtomicUsize,
 }

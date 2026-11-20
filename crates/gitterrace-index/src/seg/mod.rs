@@ -81,7 +81,6 @@ impl SegError {
 
 pub type SegResult<T> = Result<T, SegError>;
 
-/// Receives one block: section id, item count, payload.
 pub(crate) type Sink<'s> = dyn FnMut(u16, u32, &[u8]) -> SegResult<()> + 's;
 
 /// FNV-1a 64 over the ordered oid bytes: the manifest's order fingerprint.

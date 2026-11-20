@@ -18,7 +18,6 @@ pub(crate) struct DocTab {
     pub(crate) on: bool,
 }
 
-/// A link at the right end of the header.
 #[derive(Debug)]
 pub(crate) struct DocAction {
     pub(crate) label: &'static str,
@@ -32,7 +31,6 @@ pub(crate) struct DocCrumb {
     pub(crate) href: String,
 }
 
-/// A document card's header, as shown.
 #[derive(Debug, Default)]
 pub(crate) struct DocHead {
     /// Shown when there are no tabs.
@@ -41,9 +39,7 @@ pub(crate) struct DocHead {
     pub(crate) crumbs: Vec<DocCrumb>,
     /// Muted facts before the actions (a file's size).
     pub(crate) meta: String,
-    /// The about documents; empty when one is present.
     pub(crate) tabs: Vec<DocTab>,
-    /// Whether the Preview/Code switch shows: rendered Markdown with its source.
     pub(crate) views: bool,
     /// The outline menu (`markdown::outline_menu`, icon only), empty below three headings.
     pub(crate) outline: String,

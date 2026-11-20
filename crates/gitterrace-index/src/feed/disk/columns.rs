@@ -22,7 +22,6 @@ use crate::seg::{SegError, SegResult, Sink};
 pub(super) const ITEM: usize = 80;
 const PER_BLOCK: usize = MAX_BLOCK / ITEM;
 
-/// One decoded item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Item {
     pub ident: u32,

@@ -23,9 +23,7 @@ const BUSY: u32 = 60;
 const FLOOR: usize = 1;
 /// Load, in percent of the cores, above which only the [`FLOOR`] runs.
 const SATURATED: u32 = 100;
-/// How often the sampler reads the load while a build runs.
 const POLL: Duration = Duration::from_secs(5);
-/// How long the sampler outlives the last build.
 const IDLE: Duration = Duration::from_secs(30);
 
 /// Set by a test that runs the real server: the load in percent, read instead of the machine's.
@@ -55,7 +53,6 @@ const fn share(total: usize, builds: usize) -> usize {
 struct Build {
     id: u64,
     tx: Sender<usize>,
-    /// The budget this build holds now.
     last: usize,
 }
 
@@ -71,7 +68,6 @@ pub(crate) struct Scheduler {
     poll: Duration,
     idle: Duration,
     state: Mutex<State>,
-    /// Signals a build entering, which the idle sampler waits for.
     entered: Condvar,
 }
 
@@ -129,7 +125,6 @@ impl Scheduler {
         each
     }
 
-    /// Starts the sampler thread, false when the thread cannot start.
     fn sample(self: &Arc<Self>, _s: &mut State) -> bool {
         let me = Arc::clone(self);
         match std::thread::Builder::new().name("index-load".into()).spawn(move || me.sampler()) {

@@ -142,7 +142,6 @@ fn rename_at(from: &Dir, name: &str, to: &Dir, to_name: &str, fresh: bool) -> io
 }
 
 impl Staging {
-    /// A fresh staging folder beside the output.
     pub(super) fn new(target: &Target) -> anyhow::Result<Self> {
         std::fs::create_dir_all(&target.parent)
             .with_context(|| format!("creating {}", target.parent.display()))?;
@@ -191,7 +190,6 @@ impl Staging {
         Ok(())
     }
 
-    /// The whole-folder swap. A failed second rename puts the old site back.
     fn replace(&self, parent: &Dir) -> anyhow::Result<()> {
         let name = &self.target.name;
         let aside = aside_name(name);

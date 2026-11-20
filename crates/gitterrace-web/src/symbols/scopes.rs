@@ -11,7 +11,6 @@ use syntect::parsing::{Scope, ScopeStack, ScopeStackOp};
 
 use crate::symbols::{Symbol, SymbolKind};
 
-/// Meta scopes whose body holds members: a declaration inside one is nested.
 const CONTAINERS: [&str; 12] = [
     "class",
     "struct",
@@ -69,12 +68,9 @@ const fn contains(kind: SymbolKind) -> bool {
     )
 }
 
-/// What one open scope says about the declarations inside it.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Meta {
-    /// Says nothing.
     Other,
-    /// A package or import line: nothing in it is listed.
     Skip,
     Function,
     Container,
@@ -127,7 +123,6 @@ fn place(metas: &[Meta], kind: SymbolKind) -> Option<u8> {
 pub(crate) struct Collector {
     kinds: HashMap<Scope, Option<SymbolKind>>,
     metas: HashMap<Scope, Meta>,
-    /// What the open scopes say, scratch reused per declaration.
     around: Vec<Meta>,
     /// The name being read: the stack depth below its scope, its start byte and its kind.
     open: Option<(usize, usize, SymbolKind, u8)>,

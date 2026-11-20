@@ -8,7 +8,6 @@ use crate::feed::{CommitRow, InsightsSource, LabelId};
 use crate::query::{Leaf, Query, When};
 use crate::{Selection, under};
 
-/// The terms of one query, grouped by what they read.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Matcher {
     kinds: Vec<(bool, Vec<String>)>,

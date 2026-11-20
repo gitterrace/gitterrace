@@ -40,7 +40,6 @@ pub struct LabelBucket {
     pub counts: Vec<LabelCount>,
 }
 
-/// Which conventional-commit field a breakdown groups by.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 pub enum Label {
     Kind,

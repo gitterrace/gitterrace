@@ -46,7 +46,6 @@ pub struct Entry {
     #[serde(default)]
     pub id: String,
     pub path: PathBuf,
-    /// Unix seconds.
     #[serde(default)]
     pub last_served: u64,
     /// The `/r/NAME` the repository is served under, assigned once and kept, so its links

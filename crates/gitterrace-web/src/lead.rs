@@ -29,7 +29,6 @@ pub(crate) fn activity(commits: u64, authors: u64, before: Option<u64>) -> Strin
     }
 }
 
-/// Contributors: how many people, and how many of them are new.
 pub(crate) fn contributors(total: usize, new: usize) -> String {
     if total == 0 {
         return String::new();
@@ -77,7 +76,6 @@ pub(crate) fn ownership(bus_factor: usize, owners: usize, dirs_at_one: usize) ->
     format!("{hold}. {dirs}")
 }
 
-/// Languages: the largest language and its share of all lines.
 pub(crate) fn languages(top: &str, share: &str, total: i64) -> String {
     if total <= 0 || top.is_empty() {
         return String::new();

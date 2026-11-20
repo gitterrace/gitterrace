@@ -22,7 +22,6 @@ pub struct Comparison {
     pub files_changed: usize,
     pub added: u64,
     pub removed: u64,
-    /// Largest net change first.
     pub languages: Vec<LangDelta>,
 }
 

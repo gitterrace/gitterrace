@@ -32,7 +32,6 @@ fn slot(n: usize) -> f64 {
     (W - LEFT) / n
 }
 
-/// Gridlines with thousands-separated tick labels; returns the ticks and the scale ceiling.
 fn axis(max: u64) -> (Vec<Tick>, f64) {
     let plot = H - TOP_PAD - BOTTOM;
     let (step, top_n) = ticks(max, MAX_TICKS);
@@ -262,7 +261,6 @@ pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> 
     }
 }
 
-/// Additions above the axis and deletions below it, one column per bucket.
 pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging {
     let up = points.iter().map(|p| p.1).max().unwrap_or(0);
     let down = points.iter().map(|p| p.2).max().unwrap_or(0);
@@ -373,11 +371,9 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> Spark {
 pub(crate) struct Dot {
     pub(crate) x: u64,
     pub(crate) y: u64,
-    /// Radius driver, for example the number of authors.
     pub(crate) size: u64,
     pub(crate) href: String,
     pub(crate) title: String,
-    /// What the dot is, for its row in the data table.
     pub(crate) name: String,
 }
 
@@ -427,7 +423,6 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
     }
 }
 
-/// Weekday by hour grid. Cell intensity is bucketed into five levels.
 pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> Heatmap {
     // Sized near the bar charts' width so labels render at the same pixel size.
     const CELL: usize = 38;

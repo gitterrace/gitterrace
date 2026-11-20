@@ -299,7 +299,6 @@ pub struct OptionParams {
     pub merges: Option<String>,
     /// `1` counts whitespace-only changes.
     pub ws: Option<String>,
-    /// Comma separated globs left out on top of the configured ones.
     pub exclude: Option<String>,
 }
 

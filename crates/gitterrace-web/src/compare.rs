@@ -31,7 +31,6 @@ pub(crate) struct CompareQuery {
     mode: Option<String>,
 }
 
-/// The query value of three-dot mode.
 const MERGE_BASE: &str = "merge-base";
 
 struct LangRow {
@@ -45,7 +44,6 @@ struct LangRow {
 struct Result2 {
     /// Set when the range is empty: what that means and the way on.
     empty: Option<Empty>,
-    /// The commits and authors counted, for the page head's tagline.
     said: String,
     kpis: Vec<Kpi>,
     langs: Vec<LangRow>,
@@ -68,7 +66,6 @@ struct ComparePage {
     result: Option<Result2>,
 }
 
-/// The base and head fields, the compare page head's toolbar. Enter submits.
 #[derive(Template)]
 #[template(path = "compare_form.html")]
 struct CmpForm {
@@ -85,7 +82,6 @@ const COMPARE_LIST: usize = 200;
 /// Not configurable: a guard on request cost, not a preference.
 const GIT_RANGE_CAP: usize = 2_000;
 
-/// What a comparison found.
 enum Range {
     Counted(Comparison),
     /// More than [`GIT_RANGE_CAP`] commits outside the index.

@@ -25,7 +25,6 @@ pub(crate) struct FindQuery {
 
 #[derive(Serialize, Debug, PartialEq, Eq)]
 struct Line {
-    /// The new line number, or the old one for a removed line.
     no: Option<u32>,
     text: String,
 }
@@ -33,7 +32,6 @@ struct Line {
 #[derive(Serialize, Debug, PartialEq, Eq)]
 struct Hit {
     path: String,
-    /// Lines of the file's diff holding the query.
     count: usize,
     lines: Vec<Line>,
 }

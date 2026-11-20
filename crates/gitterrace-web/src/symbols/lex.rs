@@ -17,7 +17,6 @@ pub(crate) enum Kind {
     Punct(u8),
 }
 
-/// Which literal rules apply.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Dialect {
     Rust,

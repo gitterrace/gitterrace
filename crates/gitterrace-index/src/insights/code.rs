@@ -30,7 +30,6 @@ pub struct ReworkPoint {
     pub share: Option<f64>,
 }
 
-/// The rework series with the window it was computed over.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Rework {
     pub window: usize,

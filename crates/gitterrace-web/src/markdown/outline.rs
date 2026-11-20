@@ -24,7 +24,6 @@ impl OutlineItem {
     }
 }
 
-/// Fewest listed headings that make an outline worth showing.
 const OUTLINE_MIN: usize = 3;
 
 /// The headings an outline lists: h2 and h3, plus h1 only when the document has several.
@@ -57,7 +56,6 @@ struct OutlineMarkup<'a> {
     kind_width: usize,
 }
 
-/// The outline as the rail or the menu, empty below three headings.
 fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
     let items = outline_items(all);
     if items.is_empty() {
@@ -77,7 +75,6 @@ fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
     OutlineMarkup { rail, icon_only, links, kind_width }.render().unwrap_or_default()
 }
 
-/// The wide-screen rail, "On this page". Empty below three headings.
 pub(crate) fn outline_rail(all: &[OutlineItem]) -> String {
     outline_html(all, true, false)
 }

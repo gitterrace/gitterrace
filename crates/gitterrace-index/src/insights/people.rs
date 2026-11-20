@@ -28,7 +28,6 @@ pub struct Person {
 
 #[derive(Debug, Clone, Default)]
 pub struct People {
-    /// Most commits first.
     pub list: Vec<Person>,
     index: HashMap<(String, String), usize>,
 }

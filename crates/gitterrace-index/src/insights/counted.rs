@@ -38,7 +38,6 @@ pub struct Counted<'a> {
     shifted: bool,
 }
 
-/// One counted commit as a reducer sees it.
 #[derive(Debug, Clone)]
 pub struct Item {
     pub commit: CommitRow,

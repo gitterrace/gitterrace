@@ -24,9 +24,7 @@ static BUSY: AtomicU64 = AtomicU64::new(0);
 /// the workers' lives in that step spent working.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct WorkerTime {
-    /// Lifetime of the workers that finished.
     pub alive: Duration,
-    /// Time those workers spent in their work.
     pub busy: Duration,
 }
 
@@ -92,7 +90,6 @@ impl WorkerGuard {
         r
     }
 
-    /// Waits outside the budget, counted as neither alive nor busy.
     pub(crate) fn idle<R>(&mut self, wait: impl FnOnce() -> R) -> R {
         let t = Instant::now();
         let r = wait();

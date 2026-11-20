@@ -88,7 +88,6 @@ pub enum ScopeError {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Scope {
     period: Period,
-    /// Local days, both inclusive.
     range: Option<(i64, i64)>,
     /// The selection as canonical filter text, for the scopes derived from this one.
     sel: Selection,

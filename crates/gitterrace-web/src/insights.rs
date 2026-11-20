@@ -89,7 +89,6 @@ impl InsightsQuery {
         self.opts.apply(d.clone().into_options())
     }
 
-    /// Option parameters as they appear in a query, defaults left out.
     fn pairs(&self, d: &Defaults) -> Vec<(&'static str, String)> {
         let o = self.options(d);
         let mut v = Vec::new();

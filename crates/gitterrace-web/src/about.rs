@@ -15,7 +15,6 @@ const KINDS: [(&str, &str, &[&str]); 6] = [
     ("conduct", "CODE OF CONDUCT", &["CODE_OF_CONDUCT"]),
     ("changelog", "CHANGELOG", &["CHANGELOG"]),
 ];
-/// Extensions in order of preference; the empty one is a bare name.
 const EXTS: [&str; 4] = [".md", ".markdown", ".txt", ""];
 
 /// One present document: the kind's slug and label, and the file name inside the tree.

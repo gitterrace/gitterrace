@@ -386,7 +386,6 @@ fn load_lives(
     crate::seg::canon::Lives::decode(&refs, paths, seg.name())
 }
 
-/// The order file's oids, in order.
 pub(crate) fn load_order(
     store: &crate::seg::read::Store,
 ) -> crate::seg::SegResult<Vec<crate::seg::Oid>> {

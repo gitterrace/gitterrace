@@ -51,11 +51,9 @@ impl Scope {
     }
 }
 
-/// The nudge state of one watch of one repository's refresher.
 pub(crate) struct Watch {
     scope: Scope,
     run: Option<Arc<Run>>,
-    /// Set by a nudge, cleared by the check that answers it.
     pending: Arc<AtomicBool>,
     pub(crate) nudged: Arc<Notify>,
     /// Events could not start or stopped being trusted: check on a timer, as polling.

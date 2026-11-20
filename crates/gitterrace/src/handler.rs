@@ -168,7 +168,6 @@ fn write_app(app: &Path, exe: &Path) -> anyhow::Result<()> {
 #[derive(Debug, PartialEq, Eq)]
 enum Owner {
     Absent,
-    /// install-handler did. Holds the program it runs, when the plist names one.
     Ours(Option<PathBuf>),
     Foreign,
 }

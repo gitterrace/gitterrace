@@ -73,7 +73,6 @@ pub enum SaveError {
     Io(#[from] io::Error),
 }
 
-/// A save that happened: the file's new stamp.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Saved {
     pub stamp: Stamp,

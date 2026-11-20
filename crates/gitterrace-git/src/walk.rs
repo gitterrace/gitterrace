@@ -21,7 +21,6 @@ const OBJECT_CACHE_BYTES: usize = 64 * 1024 * 1024;
 /// real repository comes near it.
 const MAX_TREE_ENTRIES: usize = 500_000;
 
-/// Opaque handle to a blob in the object database.
 #[derive(Clone, Copy, Debug)]
 pub struct BlobId(gix::ObjectId);
 
@@ -31,14 +30,12 @@ impl BlobId {
     }
 }
 
-/// A file in a commit's tree.
 #[derive(Debug, Clone)]
 pub struct FileRef {
     pub path: String,
     pub blob: BlobId,
 }
 
-/// The newest commit that changed one tree entry.
 #[derive(Debug, Clone)]
 pub struct LastCommit {
     pub name: String,

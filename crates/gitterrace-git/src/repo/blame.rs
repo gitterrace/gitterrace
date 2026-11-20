@@ -17,7 +17,6 @@ pub(super) const BLAME_CACHE_BYTES: usize = 32 * 1024 * 1024;
 /// 2 MB file with 500 versions holds 1 GB. Lines older than the oldest version that fits are
 /// blamed on the boundary commit, as `git blame --since` does.
 pub(crate) const BLAME_HISTORY_BYTES: u64 = 96 * 1024 * 1024;
-/// Delta cache of one horizon walk, freed when the walk ends.
 const HORIZON_PACK_CACHE_BYTES: usize = 8 * 1024 * 1024;
 
 /// What [`history_horizon`] found.
@@ -33,7 +32,6 @@ pub(super) struct BlameCache {
     /// Approximate bytes kept before the oldest entries go.
     pub(super) limit: usize,
     map: HashMap<(gix::ObjectId, String), Arc<Vec<BlameLine>>>,
-    /// Least recently used first.
     order: VecDeque<(gix::ObjectId, String)>,
     bytes: usize,
 }

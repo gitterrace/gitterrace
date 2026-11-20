@@ -111,7 +111,6 @@ pub(crate) struct Follow {
     /// Per path id, every alias it took, in replay order: (rank, row, canonical id). A row
     /// sees the aliases set by newer commits and by earlier rows of its own commit.
     log: FastMap<PathId, Vec<(Rank, u32, PathId)>>,
-    /// Per canonical id, the other ids that ever aliased to it.
     names: FastMap<PathId, Vec<PathId>>,
 }
 
@@ -172,7 +171,6 @@ pub struct Touch {
     pub time: i64,
     pub author: String,
     pub lines: u32,
-    /// Name the file had in that commit.
     pub path: String,
 }
 
@@ -181,9 +179,7 @@ pub struct Hotspot {
     pub path: String,
     pub language: String,
     pub lines: u32,
-    /// Commits that touched the file in the period.
     pub changes: usize,
-    /// Added plus removed lines in the period.
     pub lines_changed: u64,
     pub authors: usize,
     pub last_change: i64,
@@ -236,7 +232,6 @@ pub struct OwnershipReport {
 pub struct Coupling {
     pub a: String,
     pub b: String,
-    /// Commits that changed both.
     pub together: usize,
     pub a_changes: usize,
     pub b_changes: usize,

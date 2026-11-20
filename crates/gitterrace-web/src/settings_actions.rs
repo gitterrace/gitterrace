@@ -13,11 +13,9 @@ pub(crate) const LISTS: [(&str, &[Item]); 2] = [("send", &SEND_KEYS), ("action",
 pub(crate) struct List {
     pub(crate) name: &'static str,
     pub(crate) rows: Vec<Card>,
-    /// The inputs of a new row, numbered one past the last.
     pub(crate) blank: Card,
 }
 
-/// One row of a list.
 pub(crate) struct Card {
     /// `send.2`.
     pub(crate) id: String,
@@ -25,7 +23,6 @@ pub(crate) struct Card {
     pub(crate) fields: Vec<CardField>,
 }
 
-/// One key of a row.
 pub(crate) struct CardField {
     pub(crate) id: String,
     pub(crate) name: &'static str,

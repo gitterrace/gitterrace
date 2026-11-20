@@ -6,12 +6,10 @@
 /// zstd level: 3 is its default, fast to write and quick to read back.
 const LEVEL: i32 = 3;
 
-/// Compresses one block whole.
 pub(crate) fn pack(raw: &[u8]) -> std::io::Result<Vec<u8>> {
     zstd::bulk::compress(raw, LEVEL)
 }
 
-/// Inflates blocks, reusing one decoder per thread.
 pub(crate) struct Unpacker(zstd::bulk::Decompressor<'static>);
 
 impl Unpacker {

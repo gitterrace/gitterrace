@@ -1,4 +1,3 @@
-/// Errors from reading a repository.
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum Error {
     #[error("not a git repository: {0}")]

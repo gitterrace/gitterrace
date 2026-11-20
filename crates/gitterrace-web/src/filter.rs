@@ -29,7 +29,6 @@ pub(crate) struct Filter {
     all: bool,
 }
 
-/// The URL keys, as written.
 #[derive(Debug, Default, Deserialize)]
 struct Raw {
     #[serde(flatten)]

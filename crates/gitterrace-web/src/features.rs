@@ -106,7 +106,6 @@ fn is_api_index(route: &str) -> bool {
     route == API || route == "/api/v1/"
 }
 
-/// Route layer of one repository's pages and API.
 pub(crate) async fn repo_gate(State(app): State<Arc<App>>, req: Request, next: Next) -> Response {
     let Some(route) = req.extensions().get::<MatchedPath>().map(|m| m.as_str().to_owned()) else {
         return next.run(req).await;
@@ -127,7 +126,6 @@ pub(crate) async fn repo_gate(State(app): State<Arc<App>>, req: Request, next: N
     next.run(req).await
 }
 
-/// Route layer of the server-wide routes: the switcher list, actions, additions, assets.
 pub(crate) async fn server_gate(State(env): State<Env>, req: Request, next: Next) -> Response {
     let on = req
         .extensions()
@@ -194,7 +192,6 @@ pub(crate) fn href_if(f: Feature, path: &str) -> String {
     if on(f) { crate::fmt::href(path) } else { String::new() }
 }
 
-/// The insights pages of the page being rendered, in tab order.
 pub(crate) fn pages() -> Vec<&'static str> {
     now(|e| e.map_or_else(|| INSIGHT_PAGES.to_vec(), |e| e.pages.clone()))
 }

@@ -13,7 +13,6 @@ pub(crate) const MAX_TOC: usize = 4096;
 pub(crate) const MAX_STRING: usize = u16::MAX as usize;
 /// Longest varint encoding of a u64.
 pub(crate) const MAX_VARINT: usize = 10;
-/// Largest manifest.
 pub(crate) const MAX_MANIFEST: u64 = 1 << 20;
 
 /// Reads little-endian fields from a slice whose crc already passed. Every read is checked.

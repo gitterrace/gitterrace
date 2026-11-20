@@ -37,7 +37,6 @@ pub const SHARES: [(Cache, usize); 8] = [
 ];
 
 impl Cache {
-    /// The cache's name in the configuration page.
     #[must_use]
     pub const fn label(self) -> &'static str {
         match self {

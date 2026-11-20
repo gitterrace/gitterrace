@@ -29,7 +29,6 @@ pub(crate) struct Count {
     pub(crate) tip: &'static str,
 }
 
-/// One commit, as listed.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct CommitRow {
     /// The commit id as its link, finished HTML from `fmt::sha_link`.

@@ -18,7 +18,6 @@ struct FarPage {
     indexed: Option<String>,
 }
 
-/// The sentence both the page and the API answer carry.
 pub(crate) fn why(read: usize) -> String {
     format!(
         "Insights for this revision need a reindex: it has more than {} that the indexed branch \

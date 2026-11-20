@@ -134,7 +134,6 @@ fn span_text(from: Option<i64>, to: i64, days: Option<i64>) -> String {
     )
 }
 
-/// The weekday split of the narrowed range.
 fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
     let days: Vec<(String, u64)> =
         WEEKDAYS.iter().zip(by_weekday).map(|(n, v)| ((*n).to_owned(), u64::from(*v))).collect();

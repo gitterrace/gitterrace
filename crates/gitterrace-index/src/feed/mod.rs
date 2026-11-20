@@ -61,7 +61,6 @@ impl Clock for SystemClock {
     }
 }
 
-/// A clock stopped at one instant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedClock(pub i64);
 
@@ -224,7 +223,6 @@ pub struct CommitRow {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct FileRow {
     pub path: PathId,
-    /// Previous path when renamed in this commit.
     pub old: Option<PathId>,
     pub add: u32,
     pub del: u32,
@@ -252,7 +250,6 @@ pub enum CommitRange {
     Time(Range<i64>),
 }
 
-/// Author x local day aggregate, merges left out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AuthorDayRow {
     /// Days since 1970-01-01 in the author's time zone ([`crate::local_day`]).
@@ -262,7 +259,6 @@ pub struct AuthorDayRow {
     pub sums: Sums,
 }
 
-/// Path x author aggregate over the whole history, merges left out.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PathAuthorRow {
     pub path: PathId,
@@ -341,7 +337,6 @@ pub trait InsightsSource: Send + Sync {
 
     fn postings(&self, key: Posting) -> Stream<'_, Hit>;
 
-    /// Every rename edge, ascending rank. Follow walks them newest first.
     fn rename_edges(&self) -> Stream<'_, RenameEdge>;
 
     fn path(&self, id: PathId) -> Option<Arc<str>>;

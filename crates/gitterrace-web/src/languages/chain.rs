@@ -25,7 +25,6 @@ const MARKS: usize = 2048;
 /// Fewest commits between two marks, so a short history does not hold a mark per commit.
 const MIN_GAP: usize = 64;
 
-/// One chain position as the page reads it.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct Point {
     id: String,
@@ -33,7 +32,6 @@ pub(crate) struct Point {
     offset: i32,
     /// Lines per shown language after this commit, `Other` last when folded.
     lines: Vec<i64>,
-    /// Lines added and removed from the oldest commit through this one.
     added: u64,
     removed: u64,
 }
@@ -119,7 +117,6 @@ fn rows_oldest_first(
     }
 }
 
-/// The view of the whole chain: the positions the unranged page reads.
 const fn unranged() -> View {
     View {
         time: false,

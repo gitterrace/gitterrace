@@ -22,7 +22,6 @@ pub(crate) fn fig(name: &str, summary: String, table: Table) -> Fig {
     Fig { id: chart_id(name), name: name.to_owned(), summary, table }
 }
 
-/// "from Mon to Sun", or "for Mon" for a single column.
 fn span(first: &str, last: &str) -> String {
     if first == last { format!("for {first}") } else { format!("from {first} to {last}") }
 }
@@ -107,7 +106,6 @@ pub(crate) fn stacked(name: &str, labels: &[&str], series: &[&str], cols: &[Vec<
     fig(name, summary, table)
 }
 
-/// Additions above the axis and deletions below it.
 pub(crate) fn diverging(name: &str, points: &[(String, u64, u64)]) -> Fig {
     let (added, removed): (u64, u64) = points.iter().fold((0, 0), |(a, d), p| (a + p.1, d + p.2));
     let summary = match (points.first(), points.last()) {
@@ -131,7 +129,6 @@ pub(crate) fn diverging(name: &str, points: &[(String, u64, u64)]) -> Fig {
     fig(name, summary, table)
 }
 
-/// The share line: where it started, ended and peaked.
 pub(crate) fn percent_line(name: &str, points: &[(String, Option<f64>)]) -> Fig {
     let read: Vec<(&str, f64)> =
         points.iter().filter_map(|(l, v)| v.map(|v| (l.as_str(), v))).collect();

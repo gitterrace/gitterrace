@@ -14,7 +14,6 @@ use crate::{CommitRecord, CommitSource};
 /// asks for a reindex instead.
 pub const FRESH_CAP: usize = 2000;
 
-/// What the bounded read found.
 pub(crate) enum Walk {
     /// The unindexed commits (canonical order among themselves) and the indexed ranks where
     /// the walk met the set.
@@ -23,7 +22,6 @@ pub(crate) enum Walk {
     TooFar(usize),
 }
 
-/// One unindexed commit: its columns, id, parent ids and file rows.
 pub(crate) struct FreshRow {
     pub(crate) row: CommitRow,
     pub(crate) id: Arc<str>,
@@ -31,7 +29,6 @@ pub(crate) struct FreshRow {
     pub(crate) files: Vec<FileRow>,
 }
 
-/// Unindexed commits of one view, oldest first, with ids for their strings.
 #[derive(Default)]
 pub(crate) struct Fresh {
     pub(crate) rows: Vec<FreshRow>,

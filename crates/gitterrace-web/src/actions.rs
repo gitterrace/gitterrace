@@ -35,7 +35,6 @@ const BODY_LIMIT: usize = 8 * 1024;
 /// How often `actions.toml` is checked for edits.
 const RELOAD_POLL: Duration = Duration::from_secs(1);
 
-/// One served repository as permalinks and run requests see it.
 pub(crate) struct Target {
     /// The name a locator uses: the URL name with several repos, the folder name with one.
     pub(crate) key: String,
@@ -50,7 +49,6 @@ impl AsRef<Repo> for Target {
     }
 }
 
-/// Actions switched on: the token pages embed and the live action set.
 pub(crate) struct Live {
     token: Token,
     config: Arc<RwLock<Arc<Config>>>,
@@ -91,7 +89,6 @@ pub(crate) fn menu_entries(config: &Config) -> String {
     serde_json::to_string(&items).unwrap_or_default()
 }
 
-/// One entry of the action menu.
 // Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
 #[derive(serde::Serialize)]
 struct MenuEntry<'a> {
@@ -108,7 +105,6 @@ struct StatusBody {
     note: Option<String>,
 }
 
-/// The answer to a run request.
 // Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
 #[derive(serde::Serialize)]
 struct Outcome<'a> {
@@ -164,7 +160,6 @@ fn not_loaded(e: impl std::fmt::Display) -> String {
 
 /// Everything `/go` and the run route read.
 pub(crate) struct Site {
-    /// Follows the repositories added to and removed from the running server.
     pub(crate) targets: RwLock<Vec<Arc<Target>>>,
     pub(crate) live: Option<Arc<Live>>,
     pub(crate) status: Arc<Status>,

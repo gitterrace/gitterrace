@@ -25,7 +25,6 @@ fn json<T: serde::Serialize>(v: &T) -> Response {
     }
 }
 
-/// All file paths at a revision, for the client-side finder.
 pub(super) async fn files(State(app): Shared, Path(rev): Path<String>) -> Result<Response> {
     let paths = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;

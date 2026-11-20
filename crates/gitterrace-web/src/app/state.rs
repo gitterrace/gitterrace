@@ -16,7 +16,6 @@ pub(crate) enum RepoState {
     Indexing,
     /// The index holds HEAD; the tables the first pages read are being built.
     Warming,
-    /// Insights pages serve.
     Ready,
     /// The last build attempt failed before the repository was ever ready. The next change
     /// of HEAD, or a page that asks, tries again.

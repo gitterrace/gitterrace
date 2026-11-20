@@ -27,7 +27,6 @@ pub struct Parent {
     pub far: bool,
 }
 
-/// One commit to lay out, parents first parent first.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Row {
     pub id: u32,
@@ -44,12 +43,10 @@ pub struct Seg {
     pub color: u32,
 }
 
-/// Where one row's commit and lines go.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Placed {
     pub col: u16,
     pub color: u32,
-    /// No line came down into the commit: it is a branch tip.
     pub tip: bool,
     pub top: Vec<Seg>,
     pub bottom: Vec<Seg>,

@@ -193,7 +193,6 @@ impl Scan<'_> {
         Ok(out)
     }
 
-    /// One value: quoted, or bare up to space, comma or an operator.
     fn value(&mut self, start: usize) -> Result<String, QueryError> {
         if self.peek() == Some('"') {
             let v = self.quoted()?;

@@ -51,7 +51,6 @@ pub fn options_from(cfg: &gitterrace_config::Config, name: &str) -> Options {
     }
 }
 
-/// Shared handle on one repository and its insights cache.
 #[derive(Clone)]
 pub struct ApiState {
     pub(crate) repo: Arc<Repo>,

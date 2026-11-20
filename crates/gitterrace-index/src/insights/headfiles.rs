@@ -6,7 +6,6 @@ use gitterrace_git::{BlobReader, MAX_TEXT_BYTES, Repo};
 
 pub(crate) const CACHE_FILE: &str = "lines.json";
 
-/// A text file of the head tree with its line count.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct HeadFile {
     pub path: String,

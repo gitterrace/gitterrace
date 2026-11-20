@@ -10,7 +10,6 @@ use crate::insights::{
     weekday,
 };
 
-/// Commits, authors, distinct counted files and lines.
 #[derive(Default)]
 pub struct Totals {
     s: PeriodStats,
@@ -52,7 +51,6 @@ impl Reducer for Totals {
     }
 }
 
-/// Commits and lines per axis bucket.
 #[derive(Debug)]
 pub struct Series {
     points: Vec<(u32, u64, u64)>,
@@ -106,7 +104,6 @@ impl Reducer for When {
     }
 }
 
-/// One person's counts.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct PersonTally {
     pub name: String,
@@ -115,7 +112,6 @@ pub struct PersonTally {
     pub additions: u64,
     pub deletions: u64,
     pub active_days: usize,
-    /// Commits per axis bucket.
     pub series: Vec<u32>,
 }
 

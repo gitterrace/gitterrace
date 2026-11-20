@@ -8,10 +8,11 @@ use crate::{CommitSource, DiskSet, Index, TIP_FILE, cache, feed, seg, store};
 
 /// What [`Index::source_for`] picked for a rev.
 pub enum Selected {
-    /// The set, or the reach view over it, behind one checked handle.
     Ready(feed::Checked<dyn feed::InsightsSource>),
     /// The rev lacks more than [`Index::fresh_cap`] commits the set holds: reindex for it.
-    NeedsReindex { read: usize },
+    NeedsReindex {
+        read: usize,
+    },
 }
 
 impl Index {

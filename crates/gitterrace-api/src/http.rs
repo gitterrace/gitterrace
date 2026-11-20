@@ -184,7 +184,6 @@ pub(crate) async fn log(
 
 #[derive(Deserialize)]
 pub(crate) struct CommitQuery {
-    /// Include hunks. Defaults to true.
     diff: Option<bool>,
     max_lines: Option<usize>,
 }

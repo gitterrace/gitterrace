@@ -58,18 +58,15 @@ pub(crate) fn columns(rows: &[Placed]) -> u16 {
     rows.iter().map(|p| reach(p) + 1).max().unwrap_or(1)
 }
 
-/// The rightmost column a row draws in.
 fn reach(p: &Placed) -> u16 {
     p.top.iter().chain(&p.bottom).flat_map(|s| [s.from, s.to]).chain([p.col]).max().unwrap_or(0)
 }
 
-/// One piece of line: its SVG path data and classes.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Line {
     pub(crate) d: String,
     /// `main` on the first-parent chain, plus the fold that hides it (see [`hide`]).
     pub(crate) cls: &'static str,
-    /// The column's color class, from the cycle of theme colors.
     pub(crate) k: &'static str,
 }
 
@@ -92,14 +89,12 @@ pub(crate) fn lane(color: u32) -> &'static str {
 pub(crate) struct Cell {
     pub(crate) w: u32,
     pub(crate) paths: Vec<Line>,
-    /// x of a stub below the dot, for edges to far parents.
     pub(crate) stub: Option<u32>,
     /// The dot's classes: `m` for a merge (hollow), `main` on the first-parent chain.
     pub(crate) dot: &'static str,
     /// The fold that hides the dot and its stub, `""` when every screen shows them.
     pub(crate) off: &'static str,
     pub(crate) cx: u32,
-    /// The dot's column color class, also worn by the tip's labels.
     pub(crate) lane: &'static str,
     /// A branch tip with labels: a dashed line runs from the cell's left edge to the dot.
     pub(crate) tip: bool,

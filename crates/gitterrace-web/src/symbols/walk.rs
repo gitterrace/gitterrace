@@ -8,7 +8,6 @@
 use crate::symbols::lex::{Dialect, Kind, Tok, tokens};
 use crate::symbols::{Symbol, SymbolKind};
 
-/// One open bracket: its byte and whether it is a container body.
 #[derive(Clone, Copy)]
 struct Open {
     byte: u8,

@@ -48,7 +48,6 @@ pub(crate) enum SymbolKind {
 }
 
 impl SymbolKind {
-    /// The short label the outline shows, as the language spells it.
     pub(crate) const fn label(self) -> &'static str {
         match self {
             Self::Function => "fn",
@@ -67,7 +66,6 @@ impl SymbolKind {
         }
     }
 
-    /// The full word, for assistive tech and the outline filter.
     pub(crate) const fn spoken(self) -> &'static str {
         match self {
             Self::Function => "function",
@@ -87,11 +85,9 @@ impl SymbolKind {
     }
 }
 
-/// Which scanner reads a language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scanner {
     Brace(Dialect),
-    /// Lines and indentation.
     Python,
 }
 

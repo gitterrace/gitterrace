@@ -4,7 +4,6 @@ use axum::Json;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 
-/// Everything an API call can fail with.
 #[derive(Debug, thiserror::Error)]
 pub enum ApiError {
     #[error("{0}")]

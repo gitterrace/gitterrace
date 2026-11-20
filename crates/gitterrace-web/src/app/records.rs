@@ -167,7 +167,6 @@ impl App {
         self.unreadable_now()
     }
 
-    /// Drops everything read from the cache, deletes it and starts the rebuild.
     pub(crate) fn unreadable_now(&self) -> Result<()> {
         // Everything built over the source goes with it: a rebuild of the same history gets
         // the same generation, so a table built while a read failed would be served again.

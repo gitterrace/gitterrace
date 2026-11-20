@@ -1,7 +1,6 @@
 pub use gitterrace_types::api::Signature;
 pub use gitterrace_types::{ChangeKind, LineKind, RefKind, TreeEntryKind};
 
-/// One commit as shown in a log list.
 #[derive(Debug, Clone)]
 pub struct CommitSummary {
     pub id: String,
@@ -11,7 +10,6 @@ pub struct CommitSummary {
     pub subject: String,
 }
 
-/// A commit with its full message and diff against the first parent.
 #[derive(Debug, Clone)]
 pub struct CommitDetail {
     pub summary: CommitSummary,

@@ -11,7 +11,6 @@ use gitterrace_git::LastCommit;
 
 use crate::bounded::Bounded;
 
-/// A commit id and the index generation it was read at.
 pub(crate) type HeadGen = (String, u64);
 pub(crate) type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 /// Overview totals for one (commit, index generation, options).

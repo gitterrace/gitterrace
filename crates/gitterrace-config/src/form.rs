@@ -6,7 +6,6 @@ use crate::schema::{BOUNDS, Config, Key, Reload, keys};
 use crate::value::Control;
 use crate::{Loaded, Source};
 
-/// One input of the settings form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Field {
     pub id: &'static str,
@@ -21,7 +20,6 @@ pub struct Field {
     pub input: Input,
 }
 
-/// The input of one field, with what it accepts.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Input {
     Checkbox,

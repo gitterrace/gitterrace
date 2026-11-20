@@ -13,7 +13,6 @@ use serde::Serialize;
 use crate::core::ApiState;
 use crate::http;
 
-/// One query parameter.
 #[derive(Debug, Serialize)]
 pub struct Param {
     pub name: &'static str,

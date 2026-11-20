@@ -238,7 +238,6 @@ struct LogFilter {
     text: String,
     /// Why the text was refused, `""` when it parsed.
     error: String,
-    /// Example expressions the field offers as completions, from the keyword table.
     keywords: Vec<&'static str>,
     /// The help popover's lines as `(syntax, what it matches)`, from the keyword table.
     help: Vec<(&'static str, &'static str)>,

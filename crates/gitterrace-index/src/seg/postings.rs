@@ -10,7 +10,6 @@ use crate::seg::format::section;
 use crate::seg::spill::Spill;
 use crate::seg::{SegResult, Sink};
 
-/// One row of a commit that touched a path.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Hit {
     pub ordinal: u32,
@@ -28,9 +27,7 @@ pub(crate) struct Edge {
 
 #[derive(Debug, Default)]
 pub(crate) struct Postings {
-    /// Per path id, ascending.
     pub by_path: Vec<Vec<Hit>>,
-    /// Per identity id, ascending ordinals.
     pub by_author: Vec<Vec<u32>>,
     /// Ascending by (ordinal, row).
     pub edges: Vec<Edge>,

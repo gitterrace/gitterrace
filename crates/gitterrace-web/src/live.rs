@@ -37,7 +37,6 @@ pub(crate) struct Change {
     /// Digest of the fingerprint, as a decimal string: it does not fit a JavaScript number.
     pub(crate) v: u64,
     pub(crate) banner: Option<String>,
-    /// The Working tree chip in the top bar.
     pub(crate) dirty: bool,
 }
 
@@ -59,14 +58,11 @@ pub(crate) struct Mode {
     /// `refresh` re-renders the page in place, `notice` shows a quiet "Updated, refresh" note,
     /// empty ignores changes and never opens a stream.
     pub(crate) how: &'static str,
-    /// Space separated kinds the page shows.
     pub(crate) on: &'static str,
 }
 
 impl Mode {
-    /// Lists of commits and anything that follows HEAD.
     pub(crate) const NOTICE: Self = Self { how: "notice", on: "head refs" };
-    /// Branches, tags, stashes and worktrees are all counted on the refs page.
     pub(crate) const REFS: Self = Self { how: "notice", on: "head refs stash worktrees" };
     pub(crate) const WORKTREE: Self = Self { how: "refresh", on: "head refs index worktree" };
 
@@ -78,7 +74,6 @@ impl Mode {
 
 #[derive(Deserialize)]
 pub(crate) struct EventsQuery {
-    /// Fingerprint digest the page was rendered at.
     v: Option<String>,
     /// `1` when the page shows the working tree, which turns the working tree scan on.
     wt: Option<String>,

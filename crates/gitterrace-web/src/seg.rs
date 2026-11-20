@@ -26,7 +26,6 @@ impl Choice {
     }
 }
 
-/// A segmented control, as shown.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Seg {
     /// Visible caption before the choices and the group's accessible name. Empty hides the

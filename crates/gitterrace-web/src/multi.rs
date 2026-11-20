@@ -36,11 +36,9 @@ use crate::fmt;
 pub use crate::multi::discover::{discover_repos, search_roots};
 use crate::multi::recent::Recent;
 
-/// One served repository: its URL name and where it lives.
 pub(crate) struct Served {
     pub(crate) name: String,
     pub(crate) path: PathBuf,
-    /// Canonical top folder, what an addition is compared against.
     pub(crate) root: PathBuf,
     router: OnceCell<Router>,
     /// Set for an addition until its router is built: the repository is listed as indexing and
@@ -50,7 +48,6 @@ pub(crate) struct Served {
     /// `None` once stopped: a router built after that (its build was already under way) has
     /// its tasks aborted at once instead of stored, so they never outlive the removal.
     tasks: Mutex<Option<Vec<tokio::task::AbortHandle>>>,
-    /// The app its router serves, halted when the repository is taken off.
     app: Mutex<Weak<App>>,
     /// Newest commit and the sparkline's counts at the HEAD they were read for, so the index page
     /// opens a repository once per HEAD move or new local day instead of once per hit.
@@ -59,7 +56,6 @@ pub(crate) struct Served {
     dirty: Mutex<Option<(std::time::Instant, bool)>>,
 }
 
-/// A repository's router, the background tasks it started and its app.
 pub(crate) type Built = (Router, Vec<tokio::task::AbortHandle>, Weak<App>);
 
 /// The repository table. A URL name resolves only through this map, never by joining it
@@ -96,11 +92,7 @@ pub(crate) enum Kept {
 /// What [`Table::add`] did: the name the repository is served under, and whether it was new.
 pub(crate) enum Added {
     Fresh(Arc<Served>),
-    /// Already served: under this URL prefix.
-    Present {
-        name: String,
-        base: String,
-    },
+    Present { name: String, base: String },
 }
 
 #[derive(serde::Serialize)]
@@ -404,7 +396,6 @@ impl Served {
         })
     }
 
-    /// Whether an addition's router is still being built.
     fn opening(&self) -> bool {
         self.opening.load(Ordering::Acquire) && self.router.get().is_none()
     }

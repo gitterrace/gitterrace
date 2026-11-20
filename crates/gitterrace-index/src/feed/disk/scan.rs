@@ -27,7 +27,6 @@ pub(super) struct Scan<'s> {
     /// Current `ROW_INDEX` block and its bytes.
     idx_block: usize,
     idx_bytes: Vec<u8>,
-    /// A record that spans blocks, gathered here.
     joined: Vec<u8>,
     /// Current `COMMITS` block and its bytes.
     col_block: usize,
@@ -182,7 +181,6 @@ impl<'s> Scan<'s> {
         (self.rank, self.seg, self.ord) = (rank, seg, ord);
     }
 
-    /// The next commit and, when asked for, its file rows.
     pub(super) fn next_row(&mut self, files: &mut Vec<FileRow>) -> Option<CommitRow> {
         if self.done || self.rank >= self.to {
             return None;

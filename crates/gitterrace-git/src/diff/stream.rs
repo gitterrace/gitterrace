@@ -39,7 +39,6 @@ fn next_item(
 struct Ahead<'a> {
     next: usize,
     held: usize,
-    /// Positions taken first, ascending, and how many of them are taken.
     first: &'a [usize],
     first_taken: usize,
     /// Marks `first`'s positions, which the ascending queue skips.
