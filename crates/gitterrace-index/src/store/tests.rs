@@ -3,6 +3,7 @@
 use std::fs;
 use std::io;
 
+use crate::insights::fixtures::file;
 use crate::seg::format::section;
 
 use super::{LOCK_FILE, VERSION_FILE, ensure_dir, version_stamp};
@@ -96,22 +97,9 @@ fn a_built_segment_set_is_kept_and_a_corrupt_one_wiped() -> io::Result<()> {
             author: "Ann".into(),
             email: "ann@x".into(),
             time: 1_700_000_000 + i64::try_from(i).unwrap_or(0) * 86_400,
-            offset: 0,
-            merge: false,
-            parents: Vec::new(),
             kind: Some("feat".into()),
-            scope: None,
-            files: vec![crate::FileStat {
-                path: path.into(),
-                additions: 1,
-                deletions: 0,
-                lines: 1,
-                rewritten: 0,
-                code: None,
-                old: None,
-                binary: false,
-                deleted: false,
-            }],
+            files: vec![file(path, 1, 0, 1)],
+            ..Default::default()
         };
         b.push(&r).map_err(io::Error::other)?;
     }
@@ -167,22 +155,10 @@ fn rec(i: usize, path: &str) -> crate::CommitRecord {
         author: if i.is_multiple_of(2) { "Ann" } else { "Bob" }.into(),
         email: "x@x".into(),
         time: 1_700_000_000 + i64::try_from(i).unwrap_or(0) * 86_400,
-        offset: 0,
-        merge: false,
-        parents: Vec::new(),
         kind: Some("fix".into()),
         scope: Some(format!("s{}", i % 3)),
-        files: vec![crate::FileStat {
-            path: path.into(),
-            additions: 2,
-            deletions: 1,
-            lines: 3,
-            rewritten: 0,
-            code: None,
-            old: None,
-            binary: false,
-            deleted: false,
-        }],
+        files: vec![file(path, 2, 1, 3)],
+        ..Default::default()
     }
 }
 

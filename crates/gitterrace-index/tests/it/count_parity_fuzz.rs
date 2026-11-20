@@ -142,10 +142,9 @@ fn record(i: usize, g: &Gen) -> CommitRecord {
         time,
         offset,
         merge: g.merge,
-        parents: Vec::new(),
         kind: KINDS[g.kind].map(str::to_owned),
-        scope: None,
         files,
+        ..CommitRecord::default()
     }
 }
 
