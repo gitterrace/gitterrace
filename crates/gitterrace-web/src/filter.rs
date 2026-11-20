@@ -203,16 +203,16 @@ impl Filter {
     /// This filter with the range replaced by the days `from` to `to`, both inclusive. It
     /// replaces the period: the bar a link comes from says the days, not the window.
     pub(crate) fn with_range(&self, from: i64, to: i64) -> Self {
-        let mut query = self.unranged().query;
-        for leaf in [
-            Leaf::After(When::Day(from)),
-            // `before:` is exclusive: the day after `to`, computed as a day.
-            Leaf::Before(When::Day(to.saturating_add(1))),
-        ] {
-            let mut terms = query.terms().to_vec();
-            terms.push(Term { neg: false, leaf });
-            query = Query::new(terms);
-        }
+        let mut terms = self.unranged().query.terms().to_vec();
+        terms.extend(
+            [
+                Leaf::After(When::Day(from)),
+                // `before:` is exclusive: the day after `to`, computed as a day.
+                Leaf::Before(When::Day(to.saturating_add(1))),
+            ]
+            .map(|leaf| Term { neg: false, leaf }),
+        );
+        let query = Query::new(terms);
         Self {
             query: query.replace(|l| matches!(l, Leaf::After(When::Period(_))), None),
             refused: None,
