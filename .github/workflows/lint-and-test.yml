@@ -62,7 +62,8 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
-      - run: sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
+      # The package lists first: act's runner image ships without them.
+      - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends gcc-mingw-w64-x86-64
       # -k: every gate runs after one fails, so one run lists them all; the job still fails.
       # MEMORY=0: the memory budget runs as its own job below, beside this one.
       - run: make -k check CROSS=x86_64-pc-windows-gnu MEMORY=0
