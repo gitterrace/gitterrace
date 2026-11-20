@@ -20,16 +20,9 @@ impl Insights<'_> {
     }
 
     /// Hotspots among `files` changed by the commits `c` counts.
-    pub fn hotspots_in(&self, files: &[HeadFile], c: &Counted<'_>) -> HotspotReport {
-        self.hotspots_of(&under_path(files, c), c)
-    }
-
-    fn hotspots_of(&self, files: &[HeadFile], counted: &Counted<'_>) -> HotspotReport {
+    pub fn hotspots_in(&self, files: &[HeadFile], counted: &Counted<'_>) -> HotspotReport {
         let mut rows = Vec::new();
-        let shown: Vec<&HeadFile> = files
-            .iter()
-            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
-            .collect();
+        let shown = self.shown(files, counted);
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         // (changes, churn, last change, authors) per shown file, filled in one visit. A file's
         // touches come together, so a person stamp per file counts its authors without a set.
@@ -48,7 +41,7 @@ impl Insights<'_> {
             }
             true
         });
-        for (f, (count, churn, last, who)) in shown.into_iter().zip(acc) {
+        for (f, (count, churn, last, who)) in shown.iter().zip(acc) {
             if count == 0 {
                 continue;
             }
@@ -190,25 +183,12 @@ impl Insights<'_> {
     ) -> OwnershipReport {
         let s = c.scope();
         let whole = s.period() == Period::All && s.range().is_none() && s.matcher().is_empty();
-        let per_file = |shown: &[&HeadFile]| self.owner_lines(shown, c, whole);
-        self.ownership_with(&under_path(files, c), depth, per_file)
-    }
-
-    fn ownership_with(
-        &self,
-        files: &[HeadFile],
-        depth: usize,
-        per_file: impl FnOnce(&[&HeadFile]) -> Vec<BTreeMap<usize, u64>>,
-    ) -> OwnershipReport {
+        let shown = self.shown(files, c);
+        let per_file = self.owner_lines(&shown.iter().collect::<Vec<_>>(), c, whole);
         let mut dirs: BTreeMap<String, Acc> = BTreeMap::new();
         let mut all = Acc::default();
         let (mut solo, mut stale, mut untracked) = (0u64, 0u64, 0u64);
-        let shown: Vec<&HeadFile> = files
-            .iter()
-            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
-            .collect();
-        let per_file = per_file(&shown);
-        for (f, who) in shown.into_iter().zip(per_file) {
+        for (f, who) in shown.iter().zip(per_file) {
             let changed: u64 = who.values().sum();
             if changed == 0 {
                 untracked += u64::from(f.lines);
@@ -306,17 +286,8 @@ impl Insights<'_> {
         min_together: usize,
         limit: usize,
     ) -> Vec<Coupling> {
+        let counted = c;
         let files = under_path(files, c);
-        self.coupling_of(&files, c, min_together, limit)
-    }
-
-    fn coupling_of(
-        &self,
-        files: &[HeadFile],
-        counted: &Counted<'_>,
-        min_together: usize,
-        limit: usize,
-    ) -> Vec<Coupling> {
         let mut head: Vec<&str> = files
             .iter()
             .filter(|f| !self.skips_head(&f.path))
@@ -433,17 +404,10 @@ impl Insights<'_> {
     /// [`Insights::code_age`] over the commits `c` counts: its days, selection and options. The
     /// patterns page passes an all-time `c`, so a file's age is its last counted change, and a
     /// merge or a filtered-out author never makes it younger.
-    pub fn code_age_in(&self, files: &[HeadFile], c: &Counted<'_>) -> AgeReport {
-        self.code_age_of(&under_path(files, c), c)
-    }
-
-    fn code_age_of(&self, files: &[HeadFile], counted: &Counted<'_>) -> AgeReport {
+    pub fn code_age_in(&self, files: &[HeadFile], counted: &Counted<'_>) -> AgeReport {
         let mut years: BTreeMap<i64, (u64, usize)> = BTreeMap::new();
         let mut total = 0;
-        let shown: Vec<&HeadFile> = files
-            .iter()
-            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
-            .collect();
+        let shown = self.shown(files, counted);
         let names: Vec<&str> = shown.iter().map(|f| &*f.path).collect();
         // Touches come newest commit first: the first one is the file's last change.
         let mut newest: Vec<Option<crate::feed::CommitRow>> = vec![None; shown.len()];
@@ -451,7 +415,7 @@ impl Insights<'_> {
             newest[i] = Some(*c);
             false
         });
-        for (f, c) in shown.into_iter().zip(newest) {
+        for (f, c) in shown.iter().zip(newest) {
             let Some(c) = c else {
                 continue;
             };
@@ -472,6 +436,14 @@ impl Insights<'_> {
 }
 
 impl Insights<'_> {
+    /// The head files under the selection that have lines and are not skipped.
+    fn shown(&self, files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
+        under_path(files, c)
+            .into_iter()
+            .filter(|f| f.lines != 0 && !self.skips_head(&f.path))
+            .collect()
+    }
+
     /// Ties in a ranked list of people: display name, then the first e-mail. Never the person
     /// index, which follows commit counts of whatever history the tables were built over.
     fn person_order(&self, a: usize, b: usize) -> std::cmp::Ordering {
