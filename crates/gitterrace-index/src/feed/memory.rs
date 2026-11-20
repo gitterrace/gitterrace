@@ -283,23 +283,11 @@ impl InsightsSource for MemorySource<'_> {
     }
 
     fn rename_edges(&self) -> Stream<'_, RenameEdge> {
-        Box::new((0..self.recs().len()).flat_map(move |i| {
-            let edges: Vec<RenameEdge> = self
-                .t()
-                .files(i)
-                .iter()
-                .enumerate()
-                .filter_map(|(fi, f)| {
-                    f.old.map(|old| RenameEdge {
-                        rank: rank(i),
-                        row: u32::try_from(fi).unwrap_or(u32::MAX),
-                        old,
-                        new: f.path,
-                    })
-                })
-                .collect();
-            edges
-        }))
+        Box::new(
+            (0..self.recs().len()).flat_map(move |i| {
+                RenameEdge::of_rows(rank(i), self.t().files(i)).collect::<Vec<_>>()
+            }),
+        )
     }
 
     fn path(&self, id: PathId) -> Option<Arc<str>> {

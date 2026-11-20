@@ -293,6 +293,20 @@ pub struct RenameEdge {
     pub new: PathId,
 }
 
+impl RenameEdge {
+    /// The edges of the renamed files among `files`, the rows of commit `rank`.
+    pub(crate) fn of_rows(rank: Rank, files: &[FileRow]) -> impl Iterator<Item = Self> + '_ {
+        files.iter().enumerate().filter_map(move |(i, f)| {
+            f.old.map(|old| Self {
+                rank,
+                row: u32::try_from(i).unwrap_or(u32::MAX),
+                old,
+                new: f.path,
+            })
+        })
+    }
+}
+
 /// The next [`InsightsSource::instance`] id, from 1: unique for the life of the process.
 #[cfg(any(test, feature = "oracle"))]
 pub(crate) fn next_instance() -> u64 {

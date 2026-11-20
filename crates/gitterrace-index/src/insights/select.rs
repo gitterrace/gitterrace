@@ -232,20 +232,7 @@ impl InsightsSource for Scoped<'_> {
     fn rename_edges(&self) -> Stream<'_, RenameEdge> {
         Box::new((0..self.kept.len()).flat_map(move |i| {
             let r = dense(i);
-            let edges: Vec<RenameEdge> = self
-                .rows(r)
-                .iter()
-                .enumerate()
-                .filter_map(|(row, f)| {
-                    f.old.map(|old| RenameEdge {
-                        rank: r,
-                        row: u32::try_from(row).unwrap_or(u32::MAX),
-                        old,
-                        new: f.path,
-                    })
-                })
-                .collect();
-            edges
+            RenameEdge::of_rows(r, &self.rows(r)).collect::<Vec<_>>()
         }))
     }
 

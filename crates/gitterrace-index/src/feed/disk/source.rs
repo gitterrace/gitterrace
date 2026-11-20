@@ -152,16 +152,7 @@ impl InsightsSource for DiskSource {
     fn rename_edges(&self) -> Stream<'_, RenameEdge> {
         let mut out = Vec::new();
         self.each_row(|c, files| {
-            for (i, f) in files.iter().enumerate() {
-                if let Some(old) = f.old {
-                    out.push(RenameEdge {
-                        rank: c.rank,
-                        row: u32::try_from(i).unwrap_or(u32::MAX),
-                        old,
-                        new: f.path,
-                    });
-                }
-            }
+            out.extend(RenameEdge::of_rows(c.rank, files));
         });
         Box::new(out.into_iter())
     }

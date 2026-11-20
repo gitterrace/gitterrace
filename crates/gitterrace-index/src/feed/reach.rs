@@ -273,16 +273,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
             .filter_map(|e| self.dense(e.rank).map(|rank| RenameEdge { rank, ..e }))
             .collect();
         for FreshRow { row: c, files, .. } in &self.fresh.rows {
-            for (i, f) in files.iter().enumerate() {
-                if let Some(old) = f.old {
-                    out.push(RenameEdge {
-                        rank: c.rank,
-                        row: u32::try_from(i).unwrap_or(u32::MAX),
-                        old,
-                        new: f.path,
-                    });
-                }
-            }
+            out.extend(RenameEdge::of_rows(c.rank, files));
         }
         Box::new(out.into_iter())
     }
