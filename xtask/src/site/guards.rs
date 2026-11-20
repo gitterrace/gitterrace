@@ -12,6 +12,9 @@
 //! 7. a page without a title, a meta description or the shared bar, main and footer;
 //! 8. a docs page missing from the docs index, the docs list or the previous and next chain.
 //!
+//! 9. a page over its kind's byte budget (landing, docs, other), the budgets in the `[counts]`
+//!    of `ratchet.toml` that only fall, so an unminified inline SVG or a pasted blob fails.
+//!
 //! Guard 2 (a dead internal link or anchor) is `disk::dead_links`, and guard 5 (sideways scroll
 //! at 390 px) is the `site-bar` browser check, which measures it in a real browser.
 
@@ -35,6 +38,31 @@ pub(super) struct Facts<'a> {
     pub published: BTreeSet<String>,
     /// The docs pages in index order, as site paths (`docs/cli/`).
     pub docs: Vec<String>,
+    /// The byte budget of each page kind, from the ratchet registry.
+    pub budgets: Budgets,
+}
+
+/// The most raw bytes a built page of each kind may weigh.
+pub(super) struct Budgets {
+    pub landing: usize,
+    pub docs: usize,
+    pub other: usize,
+}
+
+impl Budgets {
+    /// The `site_bytes_*` counts of a ratchet registry, `None` when one is missing.
+    pub(super) fn parse(registry: &str) -> Option<Self> {
+        let get = |name: &str| {
+            registry
+                .lines()
+                .find_map(|l| l.strip_prefix(name)?.strip_prefix(" = ")?.trim().parse().ok())
+        };
+        Some(Self {
+            landing: get("site_bytes_landing")?,
+            docs: get("site_bytes_docs")?,
+            other: get("site_bytes_other")?,
+        })
+    }
 }
 
 /// Every problem the guards find on `pages`, each as one line.
@@ -53,6 +81,7 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
     bad.extend(raw_drawings(pages));
     bad.extend(missing_head_or_frame(pages));
     bad.extend(orphan_docs(pages, facts));
+    bad.extend(over_budget(pages, &facts.budgets));
     bad
 }
 
@@ -241,6 +270,28 @@ fn thin_pages(pages: &BTreeMap<String, String>) -> Vec<String> {
                 "{path}: {words} words and {} h2, too thin for a page",
                 main.matches("<h2").count()
             ));
+        }
+    }
+    bad
+}
+
+/// Guard 9: a page heavier than its kind's budget.
+fn over_budget(pages: &BTreeMap<String, String>, budgets: &Budgets) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        if path.starts_with("changelog/") {
+            continue;
+        }
+        let (kind, max) = if path == "index.html" {
+            ("landing", budgets.landing)
+        } else if path.starts_with("docs/") {
+            ("docs", budgets.docs)
+        } else {
+            ("other", budgets.other)
+        };
+        let size = html.len();
+        if size > max {
+            bad.push(format!("{path}: {size} bytes, over the {kind} budget of {max}"));
         }
     }
     bad

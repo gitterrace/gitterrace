@@ -46,6 +46,7 @@ fn site() -> (BTreeMap<String, String>, Facts<'static>) {
         repo: REPO,
         published: ["docs/a.md".to_owned(), "docs/b.md".to_owned()].into(),
         docs: vec!["docs/a/".to_owned(), "docs/b/".to_owned()],
+        budgets: Budgets { landing: 10_000, docs: 10_000, other: 10_000 },
     };
     (pages, facts)
 }
@@ -204,4 +205,21 @@ fn guard_8_a_page_left_out_of_the_index_the_list_or_the_chain_is_red() {
         edit_page(p, "docs/a/index.html", next, "<a class=\"x\"");
     });
     assert!(broken.contains("the previous and next chain"), "{broken}");
+}
+
+/// The class: a page that grows past its kind, such as one shipping an unminified inline SVG.
+#[test]
+fn a_page_over_its_byte_budget_is_reported() {
+    let got = plant(|p| {
+        edit_page(p, "docs/a/index.html", "</main>", &format!("<svg>{}</svg></main>", "9".repeat(10_000)));
+    });
+    assert!(got.contains("docs/a/index.html") && got.contains("docs budget"), "{got}");
+    assert!(!plant(|_| {}).contains("budget"));
+}
+
+#[test]
+fn budgets_are_read_from_the_registry_counts() {
+    let b = Budgets::parse("site_bytes_landing = 3\nsite_bytes_docs = 2\nsite_bytes_other = 1\n");
+    assert_eq!(b.map(|b| (b.landing, b.docs, b.other)), Some((3, 2, 1)));
+    assert!(Budgets::parse("site_bytes_docs = 2").is_none());
 }

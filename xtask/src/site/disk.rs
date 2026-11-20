@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 
 use crate::docs_index::{normalize, on_site};
 use crate::out::Out;
@@ -230,7 +230,12 @@ pub fn check(root: &Path, site: &Path, outs: &[Out], repo: &str) -> Result<Vec<S
     let mut published: BTreeSet<String> = on_site().iter().map(|d| d.0.to_owned()).collect();
     published.extend(crate::docs_index::LEGAL.iter().map(|l| l.0.to_owned()));
     published.insert(crate::site::docs::CHANGELOG.to_owned());
-    let facts = guards::Facts { repo, published, docs };
+    let registry = std::fs::read_to_string(root.join("schwarzwald/config/ratchet.toml"))
+        .context("reading the ratchet registry")?;
+    let Some(budgets) = guards::Budgets::parse(&registry) else {
+        bail!("schwarzwald/config/ratchet.toml has no site_bytes_landing, _docs and _other");
+    };
+    let facts = guards::Facts { repo, published, docs, budgets };
     bad.extend(guards::problems(&tree.pages, &facts));
     Ok(bad)
 }
