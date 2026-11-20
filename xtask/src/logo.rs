@@ -206,6 +206,86 @@ fn data(path: &str) -> Result<&str> {
     Ok(&path[start..end])
 }
 
+/// A coordinate in hundredths as the shortest SVG number: no leading zero, no trailing zeros.
+fn hundredths(v: i64) -> String {
+    let (sign, a) = (if v < 0 { "-" } else { "" }, v.abs());
+    let (whole, frac) = (a / 100, a % 100);
+    if frac == 0 {
+        return format!("{sign}{whole}");
+    }
+    let frac = format!("{frac:02}");
+    let whole = if whole == 0 { String::new() } else { whole.to_string() };
+    format!("{sign}{whole}.{}", frac.trim_end_matches('0'))
+}
+
+/// Absolute M, L, H, V, Q and Z data of at most two decimals as relative commands with the
+/// separators SVG lets go. The arithmetic is in whole hundredths, so the shapes do not move.
+fn relative(d: &str) -> Result<String> {
+    let cmds = Regex::new(r"([MLHVQZ])([^MLHVQZ]*)")?;
+    let (mut cur, mut start) = ((0_i64, 0_i64), (0_i64, 0_i64));
+    let (mut out, mut last) = (String::new(), ' ');
+    let push = |out: &mut String, n: i64| {
+        let t = hundredths(n);
+        let tail = out.rsplit(|c: char| c.is_ascii_alphabetic() || c == ' ' || c == '-').next();
+        let tight = out.ends_with(|c: char| c.is_ascii_alphabetic())
+            || t.starts_with('-')
+            || (t.starts_with('.') && tail.is_some_and(|x| x.contains('.')));
+        if !out.is_empty() && !tight {
+            out.push(' ');
+        }
+        out.push_str(&t);
+    };
+    for c in cmds.captures_iter(d) {
+        let nums = numbers(&c[2])?
+            .into_iter()
+            .map(|v| format!("{v:.2}").replace('.', "").parse::<i64>().map_err(Into::into))
+            .collect::<Result<Vec<i64>>>()?;
+        let (cmd, width) = match &c[1] {
+            "M" | "L" => (c[1].to_lowercase(), 2),
+            "H" | "V" => (c[1].to_lowercase(), 1),
+            "Q" => ("q".to_owned(), 4),
+            _ => {
+                out.push('z');
+                (cur, last) = (start, 'z');
+                continue;
+            }
+        };
+        for (i, ch) in nums.chunks(width).enumerate() {
+            if ch.len() != width {
+                bail!("header layout changed: a wordmark command with missing numbers");
+            }
+            let letter = if &c[1] == "M" && i > 0 { 'l' } else { cmd.chars().next().unwrap_or('l') };
+            if letter != last || letter == 'm' {
+                out.push(letter);
+            }
+            last = letter;
+            match &c[1] {
+                "H" => {
+                    push(&mut out, ch[0] - cur.0);
+                    cur.0 = ch[0];
+                }
+                "V" => {
+                    push(&mut out, ch[0] - cur.1);
+                    cur.1 = ch[0];
+                }
+                _ => {
+                    let mut at = cur;
+                    for pair in ch.chunks(2) {
+                        push(&mut out, pair[0] - cur.0);
+                        push(&mut out, pair[1] - cur.1);
+                        at = (pair[0], pair[1]);
+                    }
+                    cur = at;
+                    if &c[1] == "M" && i == 0 {
+                        start = cur;
+                    }
+                }
+            }
+        }
+    }
+    Ok(out)
+}
+
 /// The outlined "git" and "terrace" as one inline SVG cropped to their ink, each half colored
 /// by a class that `app.css` and `site.css` fill from the tokens.
 fn wordmark(re: &Re, header: &str) -> Result<String> {
@@ -230,6 +310,7 @@ fn wordmark(re: &Re, header: &str) -> Result<String> {
     };
     let (x0, y0, x1, y1) = (lo(|b| b.0), lo(|b| b.1), hi(|b| b.2), hi(|b| b.3));
     let [git, terrace] = ds.as_slice() else { bail!("header layout changed: no wordmark paths") };
+    let (git, terrace) = (relative(git)?, relative(terrace)?);
     Ok(format!(
         "<svg class=\"wordmark\" viewBox=\"{x0} {y0} {} {}\" aria-hidden=\"true\">\
          <path class=\"w-git\" d=\"{git}\"/><path class=\"w-terrace\" d=\"{terrace}\"/></svg>",
