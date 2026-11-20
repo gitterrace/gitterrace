@@ -8,16 +8,41 @@ use crate::app::App;
 #[template(source = "data", ext = "txt")]
 struct Data;
 
+/// A repository with one commit adding `a.txt`.
+fn one_file(dir: &std::path::Path) -> std::path::PathBuf {
+    gitterrace_testkit::Fixture::init(dir)
+        .write("a.txt", "a\n")
+        .commit("feat: a")
+        .path()
+        .to_owned()
+}
+
+/// An app over `p` whose index is built but not marked ready.
+fn built(p: &std::path::Path) -> Arc<App> {
+    let repo = gitterrace_git::Repo::discover(p).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app
+}
+
+/// A built app past the before-ready pass, and its HEAD.
+fn warmed(p: &std::path::Path) -> (Arc<App>, String) {
+    let app = built(p);
+    let head = app.repo.resolve("HEAD").expect("head");
+    super::warm_shared(&app, &head);
+    app.mark_ready();
+    (app, head)
+}
+
 /// The indexing page rendered just before the index turns ready is never memoized: the
 /// next request after ready shows data, not a stale indexing page for the memo's minute.
 #[tokio::test]
 async fn the_indexing_page_is_never_memoized() {
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
+    let p = one_file(dir.path());
     let repo = gitterrace_git::Repo::discover(&p).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
@@ -44,11 +69,7 @@ async fn the_indexing_page_is_never_memoized() {
 async fn concurrent_requests_for_one_cold_page_render_it_once() {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
+    let p = one_file(dir.path());
     let app = crate::tests::ready_app(&p);
     let builds = Arc::new(AtomicUsize::new(0));
     let n = 8;
@@ -124,11 +145,7 @@ async fn a_cold_activity_page_walks_its_counted_set_once() {
 #[tokio::test]
 async fn the_overview_reuses_the_shared_tables_of_head() {
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
+    let p = one_file(dir.path());
     let app = crate::tests::ready_app(&p);
     let router = crate::routes::router(Arc::clone(&app));
     let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
@@ -150,20 +167,8 @@ async fn the_overview_reuses_the_shared_tables_of_head() {
 #[tokio::test]
 async fn pages_after_the_warm_up_build_no_tables() {
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    let head = app.repo.resolve("HEAD").expect("head");
-    super::warm_shared(&app, &head);
-    app.mark_ready();
+    let p = one_file(dir.path());
+    let (app, head) = warmed(&p);
     let builds = || {
         let src = app.source(&head).expect("source").expect("ready");
         src.run(|s| gitterrace_index::table_builds(&**s))
@@ -192,15 +197,7 @@ async fn a_cold_overview_reads_no_file_rows() {
         .commit("feat: b")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    let head = app.repo.resolve("HEAD").expect("head");
-    super::warm_shared(&app, &head);
-    app.mark_ready();
+    let (app, head) = warmed(&p);
     let rows = || {
         let src = app.source(&head).expect("source").expect("ready");
         src.run(|s| {
@@ -236,15 +233,7 @@ async fn a_cold_languages_page_after_the_warm_up_walks_no_chain() {
         .commit("feat: b")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    let head = app.repo.resolve("HEAD").expect("head");
-    super::warm_shared(&app, &head);
-    app.mark_ready();
+    let (app, _) = warmed(&p);
     let router = crate::routes::router(Arc::clone(&app));
     let before = app.chain_walks.load(Ordering::Relaxed);
     let (status, body) = gitterrace_testkit::get(&router, "/stats/languages").await;
@@ -314,11 +303,7 @@ async fn another_repository_going_idle_keeps_these_tables() {
 #[tokio::test]
 async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
+    let p = one_file(dir.path());
     let app = crate::tests::ready_app(&p);
     let api = gitterrace_api::ApiState::open(&p).expect("api");
     app.set_api(api.clone());
@@ -358,17 +343,8 @@ async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
 async fn a_page_request_during_a_slow_warmer_answers_with_the_pending_page() {
     use std::sync::atomic::{AtomicBool, Ordering};
     let dir = tempfile::tempdir().expect("tmp");
-    let p = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    let p = one_file(dir.path());
+    let app = built(&p);
     assert!(app.advance(crate::app::RepoState::Warming));
     let (rendering, answered) = (
         Arc::new(AtomicBool::new(false)),
