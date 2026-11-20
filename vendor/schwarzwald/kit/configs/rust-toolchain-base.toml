@@ -3,5 +3,5 @@
 [toolchain]
 # Exact, never `stable`: a new clippy release adds lints, and a floating toolchain turns each into
 # a failure on a tree nobody touched. Bump it deliberately, in its own commit.
-channel = "1.98.0"
+channel = "1.100.0"
 components = ["clippy", "rustfmt"]

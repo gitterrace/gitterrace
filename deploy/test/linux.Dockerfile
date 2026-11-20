@@ -3,7 +3,7 @@
 # `make check` needs.
 # Built for the native arch (arm64 on Apple silicon), never emulated.
 FROM ubuntu:24.04@sha256:fe81560990fae86dc4743202b2cb4d3df98d0bcf949173cecef15ce1127ef852
-ARG RUST_TOOLCHAIN=1.98.0
+ARG RUST_TOOLCHAIN=1.100.0
 ENV DEBIAN_FRONTEND=noninteractive RUSTUP_HOME=/usr/local/rustup CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:/usr/local/bin:/usr/bin:/bin
 RUN apt-get update \

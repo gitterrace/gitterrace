@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-14T12:08:58Z",
+  "date": "2026-11-20T00:24:53Z",
   "parts": [
     "configs",
     "fonts",
@@ -19,7 +19,7 @@
     "tools/selftest.py"
   ],
   "files": {
-    "README.md": "9f06548bf27fd784881079b1207cfb570b2233d622bce5554931cda1c44ca16a",
+    "README.md": "77cebf84af8948c7dc15599b5f2b8ecde45c3a0a1630a111127d58bab5ee8749",
     "check.py": "42413a5f2df406126d7ebf142317beb462716825ab16e5804b0e1f28a05a3d95",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -28,7 +28,7 @@
     "configs/help.mk": "b7ea4d2801e29344a3be1eca52e08be64153e26cddcf5bd9ab038b5ce2fc0226",
     "configs/markdownlint/prose-length.cjs": "51ee7f6effb196f3f59b79ae4183ec54d65ced58a81c94161abe9a33382d5519",
     "configs/ruff-base.toml": "e75be3129e27b5b087e1bee46c92d61776e75116872a1d6b69baec71858a2221",
-    "configs/rust-toolchain-base.toml": "fcd22842ce9711ddf2840f9c515b30ecca887cae6fd9103e5acdb56b7961ca63",
+    "configs/rust-toolchain-base.toml": "c392b0c956ea5b5a03bebd17f74d63b06dfaa18795bfb2e26b990a27abc12883",
     "configs/sgconfig-base.yml": "e8a5dc54499b235da4c8c6eb6cfcfdcd1f967b7f5027e147849c4055fec2a61a",
     "configs/typos-base.toml": "9d27b31a6dd1ddee811e677fc76b35d5d2a1c5f9486a75e57d6ad48c878e5f91",
     "configs/vale/Schwarzwald/American.yml": "874bc9a17f8e90a3c1e121c4fa36c01754ffbdffa0771d42a9b0edac77e409be",
