@@ -149,6 +149,12 @@ def rss_mb(pid: int) -> float:
     return int(out.strip() or 0) / 1024
 
 
+def child_pids(pid: int) -> list[int]:
+    """The direct children of `pid`: the index build runs in one."""
+    out = subprocess.run(["pgrep", "-P", str(pid)], capture_output=True, text=True).stdout
+    return [int(x) for x in out.split()]
+
+
 def footprint_mb(pid: int) -> float | None:
     """Dirty memory the kernel charges the process: `footprint` on macOS, Private_Dirty from
     smaps_rollup on Linux. Clean mapped pages (pack files, the index) are not counted."""
@@ -303,6 +309,8 @@ class Server:
         self.phase_rss: dict[str, float] = {}
         self.phase_fp: dict[str, float] = {}
         self.peak_footprint = 0.0
+        # The index build runs in a child process, so the server's own footprint leaves it out.
+        self.peak_child_footprint = 0.0
         self.phases: list[dict[str, Any]] = []
         step = "start"
         while time.perf_counter() - self.t0 < timeout:
@@ -314,6 +322,8 @@ class Server:
             fp = footprint_mb(self.pid) or 0.0
             self.peak_footprint = max(self.peak_footprint, fp)
             self.phase_fp[step] = max(self.phase_fp.get(step, 0.0), fp)
+            child = sum(footprint_mb(k) or 0.0 for k in child_pids(self.pid))
+            self.peak_child_footprint = max(self.peak_child_footprint, child)
             try:
                 if prefix is None:
                     prefix = site_prefix(self.port)

@@ -121,10 +121,12 @@ def bench_phases(
         secs, ready, peak = srv.wait_ready()
         res["index"] = {"secs": secs, "ready_secs": ready, "peak_rss_mb": peak}
         res["index"]["peak_footprint_mb"] = srv.peak_footprint
+        res["index"]["peak_child_footprint_mb"] = srv.peak_child_footprint
         res["index"]["phases"] = bl.phase_table(srv.phases, srv.phase_rss, srv.phase_fp)
         print(
             f"  index {secs:.1f} s, ready {ready:.1f} s, peak footprint "
-            f"{srv.peak_footprint:.0f} MB, peak RSS {peak:.0f} MB",
+            f"{srv.peak_footprint:.0f} MB, peak RSS {peak:.0f} MB, index child "
+            f"{srv.peak_child_footprint:.0f} MB",
             flush=True,
         )
         for p in res["index"]["phases"]:

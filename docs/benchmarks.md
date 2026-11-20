@@ -55,7 +55,10 @@ the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
 The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
 `phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages. RSS
-is recorded beside it.
+is recorded beside it. The server's footprint includes the warm-up, which runs
+before the repository turns ready. The index build runs in a child process, so
+its peak footprint is recorded on its own (`peak_child_footprint_mb` in the
+index result).
 
 Serving memory does not grow with the history: once the index is ready, idle
 footprint stays at most 48 MB above a just-started server (`footprint_idle_mb`,
