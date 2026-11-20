@@ -26,7 +26,6 @@ const TRAILER: usize = 8;
 /// [`crate::CACHE_FILES`] and the cache would sweep it as foreign.
 #[derive(Clone, Copy, Debug)]
 pub enum StateFile {
-    /// The first-parent chain's running language totals.
     Chain,
 }
 
@@ -45,7 +44,6 @@ pub(crate) fn load(dir: &Path, file: StateFile, key: u64) -> Option<Vec<u8>> {
     decode(&bytes, key)
 }
 
-/// Saves `payload` under `key`, replacing the file whole.
 pub(crate) fn save(dir: &Path, file: StateFile, key: u64, payload: &[u8]) -> io::Result<()> {
     cache::write_atomic(dir, file.name(), &encode(key, payload))
 }

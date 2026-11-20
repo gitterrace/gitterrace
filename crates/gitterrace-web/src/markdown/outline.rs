@@ -19,7 +19,6 @@ pub(crate) struct OutlineItem {
 }
 
 impl OutlineItem {
-    /// A document heading, whose id goes through `doc_id`.
     pub(crate) fn heading(level: u8, id: String, text: &str) -> Self {
         Self { level, id, text: text.to_owned(), chrome: false, kind: None }
     }

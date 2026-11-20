@@ -48,7 +48,6 @@ pub const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
 /// as it is when N runs past the root. Not configurable: no page links a rev this far back.
 const MAX_REV_STEPS: usize = 1_000;
 
-/// A repository opened read-only.
 pub struct Repo {
     inner: gix::ThreadSafeRepository,
     blame_cache: Mutex<BlameCache>,
@@ -66,7 +65,6 @@ pub struct Repo {
     pub(crate) divergence: Mutex<HashMap<(gix::ObjectId, gix::ObjectId), (usize, usize)>>,
     /// The root-commit id, see `repo_id.rs`.
     pub(crate) id_cache: OnceLock<Option<String>>,
-    /// See [`Repo::committed_only`].
     committed_only: AtomicBool,
     /// The commits a committed-only handle may name by full id, see `visible.rs`.
     visible: Mutex<Visible>,
@@ -78,14 +76,11 @@ pub struct Repo {
     /// The last peeled ref list and the hash of the raw refs it was built from, see
     /// [`Repo::refs`]. One entry, so it holds at most one list.
     refs_memo: Mutex<Option<(u64, Vec<RefInfo>)>>,
-    /// See [`Repo::commits_read`].
     pub(crate) commits_read: AtomicU64,
-    /// See [`Repo::tree_walks`].
     pub(crate) tree_walks: AtomicU64,
 }
 
 impl Repo {
-    /// Opens the repository containing `path` (discovers upward).
     pub fn discover(path: &Path) -> Result<Self> {
         let inner = gix::ThreadSafeRepository::discover(path)
             .map_err(|e| crate::Error::NotARepo(e.to_string()))?;
@@ -220,7 +215,6 @@ impl Repo {
         self
     }
 
-    /// The text cap in force, see [`Repo::with_limits`].
     pub fn text_limit(&self) -> u64 {
         self.text_limit.load(Ordering::Relaxed)
     }
@@ -242,7 +236,6 @@ impl Repo {
         }
     }
 
-    /// Display name: the worktree folder name.
     pub fn name(&self) -> String {
         self.root()
             .file_name()

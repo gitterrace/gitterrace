@@ -9,9 +9,7 @@ use crate::keys;
 
 /// One form a name may take.
 pub struct Rule {
-    /// What the name holds.
     pub holds: &'static str,
-    /// The form, as the docs show it.
     pub form: &'static str,
     /// Accepted endings (or prefixes, for a bool).
     pub parts: &'static [&'static str],
@@ -20,7 +18,6 @@ pub struct Rule {
 
 /// A name that breaks its rule on purpose, with why.
 pub struct Exception {
-    /// A key id, or a flag as `--name`.
     pub name: &'static str,
     /// The key a flag sets, for a terse flag; empty for a key.
     pub sets: &'static str,

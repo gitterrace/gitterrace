@@ -14,7 +14,6 @@ use crate::seg::{SegResult, Sink};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) struct Hit {
     pub ordinal: u32,
-    /// Index into the commit's file rows.
     pub row: u32,
 }
 

@@ -42,7 +42,6 @@ pub(crate) fn contributors(total: usize, new: usize) -> String {
     }
 }
 
-/// Hotspots: how concentrated change is.
 pub(crate) fn hotspots(files: usize, concentration: f64) -> String {
     if files == 0 {
         return String::new();

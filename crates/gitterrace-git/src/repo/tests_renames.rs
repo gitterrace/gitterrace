@@ -38,7 +38,6 @@ fn merged_moves(d: &std::path::Path, n: usize, edited: usize) {
     commit(d, "plain renames");
 }
 
-/// Changes of `id` as (kind, path, old path), sorted.
 fn kinds(repo: &Repo, id: &str, renames: Renames) -> Vec<String> {
     let gix = repo.repo();
     let commit = gix.find_commit(repo.full_id(&gix, id).expect("id")).expect("commit");

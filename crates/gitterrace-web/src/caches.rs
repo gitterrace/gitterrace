@@ -13,7 +13,6 @@ use crate::bounded::Bounded;
 
 /// A commit id and the index generation it was read at.
 pub(crate) type HeadGen = (String, u64);
-/// One commit and its ignore files as `(path, text)`.
 pub(crate) type IgnoreFiles = (String, Arc<Vec<(String, String)>>);
 /// Overview totals for one (commit, index generation, options).
 pub(crate) type TotalsEntry = (String, OverviewTotals);
@@ -102,7 +101,6 @@ impl Caches {
         .fold(false, |any, held| any | held)
     }
 
-    /// Sets the byte budget of the bounded caches.
     pub(crate) fn set_budget(&self, cfg: &Config) {
         if let Ok(mut g) = self.file_lists.lock() {
             g.set_budget(cfg.cache_bytes(Cache::FileLists));

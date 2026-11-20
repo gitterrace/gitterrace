@@ -13,9 +13,7 @@ pub(crate) struct Tok {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
     Ident,
-    /// A literal: string, char, number, regex or template.
     Lit,
-    /// One punctuation byte.
     Punct(u8),
 }
 
@@ -395,7 +393,6 @@ impl Lexer<'_> {
     }
 }
 
-/// The tokens of `src`.
 pub(crate) fn tokens(src: &str, dialect: Dialect) -> Vec<Tok> {
     let mut lx = Lexer {
         src: src.as_bytes(),

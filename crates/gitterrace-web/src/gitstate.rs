@@ -87,7 +87,6 @@ pub(crate) async fn stashes(State(app): Shared) -> Redirect {
 struct TagPage {
     c: Chrome,
     head: crate::pagehead::PageHead,
-    /// The tagged commit, as every list shows a commit.
     commit: views::CommitRow,
     when: crate::when::When,
     subject: String,

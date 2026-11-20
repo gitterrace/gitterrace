@@ -21,10 +21,8 @@ pub struct Writer {
     generation: u64,
     next: usize,
     w: ContainerWriter,
-    /// Blocks in `w`, and the most one file takes.
     blocks: usize,
     limit: usize,
-    /// Blocks written over all files.
     written: usize,
     done: Vec<FileEntry>,
     raw: Vec<u8>,

@@ -13,7 +13,6 @@ use askama::Template;
 use askama::filters::HtmlSafe;
 use gitterrace_index::graph::{FAR_ROWS, Open, Parent, Placed, Row, Seg};
 
-/// Width of one column in CSS pixels.
 const COL: u32 = 12;
 /// Columns shown before the rest fold into a "+N" marker: a narrow screen, then a wide one.
 /// app.css shows the marker that matches the screen, and hides the pieces of line and the dots
@@ -55,7 +54,6 @@ pub(crate) fn place(history: &[(String, Vec<String>)], from: usize, to: usize) -
     out
 }
 
-/// Columns the widest row of `rows` uses.
 pub(crate) fn columns(rows: &[Placed]) -> u16 {
     rows.iter().map(|p| reach(p) + 1).max().unwrap_or(1)
 }
@@ -92,7 +90,6 @@ pub(crate) fn lane(color: u32) -> &'static str {
 #[derive(Debug, Clone, PartialEq, Eq, Template)]
 #[template(path = "graph_cell.html")]
 pub(crate) struct Cell {
-    /// Width in CSS pixels.
     pub(crate) w: u32,
     pub(crate) paths: Vec<Line>,
     /// x of a stub below the dot, for edges to far parents.

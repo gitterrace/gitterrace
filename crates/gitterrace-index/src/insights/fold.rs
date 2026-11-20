@@ -27,7 +27,6 @@ pub struct ActivityFold {
     pub scopes: (Vec<LabelCount>, Vec<LabelBucket>),
     pub dirs: Vec<DirChurn>,
     pub files: Vec<FileChurn>,
-    /// [`Counted::frequency_totals`] and [`Counted::rework`].
     pub frequency: (BucketUnit, Vec<Frequency>, LineTotals),
     pub rework: Rework,
 }

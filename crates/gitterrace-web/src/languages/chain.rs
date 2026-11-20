@@ -21,7 +21,6 @@ pub(crate) use state::{State, key as state_key};
 
 /// Commits per row batch: bounded, and large enough that a batch read stays sequential.
 const CHUNK: usize = 4096;
-/// Most marks a skeleton holds, whatever the history length.
 const MARKS: usize = 2048;
 /// Fewest commits between two marks, so a short history does not hold a mark per commit.
 const MIN_GAP: usize = 64;
@@ -51,7 +50,6 @@ struct Mark {
 /// What every view of the languages page shares, sized by the page, not the history.
 pub(crate) struct Skeleton {
     n: usize,
-    /// Top languages, largest first, then `Other` when folded.
     langs: Vec<String>,
     /// Commits between marks; the mark of position `p` sits at the end of gap `p / gap`.
     gap: usize,

@@ -13,7 +13,6 @@ pub(crate) enum RepoState {
     /// Waiting for its first index build: not started yet, or `index.build_on_start` is off
     /// and no page asked for insights.
     Queued,
-    /// The index build runs.
     Indexing,
     /// The index holds HEAD; the tables the first pages read are being built.
     Warming,

@@ -46,7 +46,6 @@ pub(crate) struct Defaults {
     pub(crate) generated: bool,
     /// Globs the config leaves out of every insight, always applied.
     pub(crate) exclude: Vec<String>,
-    /// `None` leaves each page its own default period.
     pub(crate) period: Option<Period>,
 }
 
@@ -141,7 +140,6 @@ impl InsightsQuery {
         fmt::href(&format!("{base}{}", filter.query(&pairs)))
     }
 
-    /// The quiet options row under the filter bar.
     pub(crate) fn row(&self, d: &Defaults, base: &str) -> Vec<OptLink> {
         let o = self.options(d);
         // The link that flips an option: the opposite value, or none when that is the default.

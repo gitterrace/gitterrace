@@ -41,7 +41,6 @@ pub(crate) enum SymbolKind {
     Impl,
     Class,
     Interface,
-    /// A type alias or a Go type declaration.
     Type,
     Module,
     Namespace,
@@ -91,7 +90,6 @@ impl SymbolKind {
 /// Which scanner reads a language.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Scanner {
-    /// Tokens and brackets, in one of the brace dialects.
     Brace(Dialect),
     /// Lines and indentation.
     Python,

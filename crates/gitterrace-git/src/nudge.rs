@@ -59,7 +59,6 @@ pub enum NudgeError {
 /// What the callback is told. Neither carries a path.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Nudge {
-    /// Something may have changed: look again.
     Look,
     /// The watch limit or the cap is reached, so some folders have no watch. Look again and
     /// poll from now on.

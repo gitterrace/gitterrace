@@ -72,7 +72,6 @@ pub struct ApiState {
     /// The web pages' source and derived tables, when the server runs the API: a request over
     /// the tip the pages read slices their tables instead of building a second copy.
     pages: Arc<RwLock<Option<Pages>>>,
-    /// A rebuild this state started itself is running.
     rebuilding: Arc<std::sync::atomic::AtomicBool>,
     /// Slots for blocking reads. One per core on its own; the web server hands in its page
     /// job slots ([`ApiState::share_jobs`]), so API reads and pages share one bound.
@@ -121,7 +120,6 @@ impl ApiState {
         self
     }
 
-    /// Opens the repository containing `path` and its cache.
     pub fn open(path: &Path) -> Result<Self, ApiError> {
         let repo = Repo::discover(path)?;
         let index = Index::open(&repo)?;

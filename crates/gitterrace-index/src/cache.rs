@@ -109,7 +109,6 @@ pub(crate) fn open_read(dir: &Path, name: &str) -> io::Result<Option<File>> {
     gitterrace_git::open_read_no_follow(dir, name)
 }
 
-/// Opens a cache file for appending, creating it.
 pub(crate) fn open_append(dir: &Path, name: &str) -> io::Result<File> {
     cache_file(dir, name)?;
     gitterrace_git::open_append_no_follow(dir, name, 0o644)
@@ -121,7 +120,6 @@ pub(crate) fn write_atomic(dir: &Path, name: &str, bytes: &[u8]) -> io::Result<(
     gitterrace_git::write_atomic(dir, name, bytes, 0o644)
 }
 
-/// Removes a cache file; a missing one is fine.
 pub(crate) fn remove(dir: &Path, name: &str) -> io::Result<()> {
     match fs::remove_file(cache_file(dir, name)?) {
         Err(e) if e.kind() != io::ErrorKind::NotFound => Err(e),

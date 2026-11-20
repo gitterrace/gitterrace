@@ -93,7 +93,6 @@ impl Insights<'_> {
         self.in_period(period, |c| c.per_file())
     }
 
-    /// Churn per containing directory, most commits first, then path.
     pub fn dir_churn(&self, period: Period) -> Vec<DirChurn> {
         self.in_period(period, |c| c.per_dir())
     }
@@ -117,7 +116,6 @@ impl Counted<'_> {
         r.finish(self)
     }
 
-    /// Churn per containing directory, most commits first, then path.
     pub fn per_dir(&self) -> Vec<DirChurn> {
         let mut r = DirTally::default();
         self.reduce(&mut [&mut r]);

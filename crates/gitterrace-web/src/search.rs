@@ -110,7 +110,6 @@ struct SearchPage {
     capped: bool,
     files: Vec<FileHits>,
     commits: Vec<CommitRow>,
-    /// Shown when the search ran and found nothing.
     nothing: Option<crate::empty::Empty>,
 }
 

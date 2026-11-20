@@ -75,7 +75,6 @@ struct CmpForm {
     action: String,
     base: String,
     head: String,
-    /// Three-dot: the range starts at the merge base.
     merge: bool,
 }
 

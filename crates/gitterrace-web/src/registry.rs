@@ -174,7 +174,6 @@ fn now() -> u64 {
     u64::try_from(gitterrace_index::wall_clock()).unwrap_or(0)
 }
 
-/// The `keep` most recently served entries, newest first.
 fn newest(mut all: Vec<Entry>, keep: usize) -> Vec<Entry> {
     all.sort_by_key(|e| std::cmp::Reverse(e.last_served));
     all.truncate(keep);

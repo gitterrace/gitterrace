@@ -9,14 +9,12 @@ use gitterrace_index::{Insights, Options};
 use crate::core::ApiState;
 use crate::error::ApiError;
 
-/// What [`Pages::source`] calls.
 pub type PageSource =
     Arc<dyn Fn(&str) -> Option<(Checked<dyn InsightsSource>, String)> + Send + Sync>;
 
 /// What the web pages share with the API, see [`ApiState::share_pages`].
 #[derive(Clone)]
 pub struct Pages {
-    /// The tables the pages slice.
     pub tables: Arc<gitterrace_index::SharedTables>,
     /// The pages' source of a resolved tip and the key their tables hold it under, `None`
     /// while the pages hold no source for it.

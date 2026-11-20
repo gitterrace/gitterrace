@@ -101,7 +101,6 @@ pub(crate) fn put_varint(out: &mut Vec<u8>, mut v: u64) {
     out.push(v as u8);
 }
 
-/// Zigzag, for signed deltas.
 pub(crate) const fn zigzag(v: i64) -> u64 {
     ((v << 1) ^ (v >> 63)) as u64
 }

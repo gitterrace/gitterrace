@@ -20,18 +20,15 @@ pub struct Roots {
     key: Option<u64>,
     /// Ref names at that read, so a deletion is noticed.
     names: HashSet<String>,
-    /// Commit tips already walked.
     tips: HashSet<gix::ObjectId>,
     ids: BTreeSet<String>,
 }
 
 impl Roots {
-    /// Root commit ids, full hex, sorted.
     pub const fn ids(&self) -> &BTreeSet<String> {
         &self.ids
     }
 
-    /// Whether `self` and `other` share a root commit.
     pub fn shares(&self, other: &Self) -> bool {
         self.ids.iter().any(|id| other.ids.contains(id))
     }

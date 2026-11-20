@@ -85,7 +85,6 @@ impl WorkerGuard {
         Self { started: Instant::now(), busy: Duration::ZERO, parked: Duration::ZERO }
     }
 
-    /// Runs one piece of work, counted as busy.
     pub(crate) fn busy<R>(&mut self, work: impl FnOnce() -> R) -> R {
         let t = Instant::now();
         let r = work();

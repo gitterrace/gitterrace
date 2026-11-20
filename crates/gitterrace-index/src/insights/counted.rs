@@ -42,11 +42,8 @@ pub struct Counted<'a> {
 #[derive(Debug, Clone)]
 pub struct Item {
     pub commit: CommitRow,
-    /// Person index after mailmap and identity merging.
     pub person: usize,
-    /// Local day, in the commit's own offset.
     pub day: i64,
-    /// Local hour 0..24.
     pub hour: usize,
     /// Lines over the counted files (and, with a path selection, the rows under the path).
     pub lines: Lines,
@@ -112,7 +109,6 @@ impl<'a> Counted<'a> {
         &self.axis
     }
 
-    /// Local days counted, both inclusive.
     pub const fn days(&self) -> &RangeInclusive<i64> {
         &self.days
     }

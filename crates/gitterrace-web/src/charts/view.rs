@@ -137,7 +137,6 @@ pub(crate) struct StackCol {
 pub(crate) struct Stacked {
     pub(crate) f: Frame,
     pub(crate) cols: Vec<StackCol>,
-    /// Legend entries: class and series name.
     pub(crate) legend: Vec<(String, String)>,
     pub(crate) other: bool,
 }
@@ -174,7 +173,6 @@ pub(crate) struct LinePoint {
 pub(crate) struct PercentLine {
     pub(crate) f: Frame,
     pub(crate) points: Vec<LinePoint>,
-    /// The path data of the line.
     pub(crate) d: String,
 }
 
@@ -226,7 +224,6 @@ pub(crate) struct Heatmap {
     pub(crate) w: usize,
     pub(crate) h: usize,
     pub(crate) side: usize,
-    /// Hour labels: x and two-digit hour.
     pub(crate) hours: Vec<(usize, String)>,
     pub(crate) rows: Vec<HeatRow>,
 }

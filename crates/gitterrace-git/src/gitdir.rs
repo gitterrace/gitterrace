@@ -32,9 +32,7 @@ pub enum InProgress {
 /// Where HEAD points and what is half done.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadState {
-    /// Branch HEAD points at, `None` when detached.
     pub branch: Option<String>,
-    /// Commit HEAD resolves to, `None` on an unborn branch.
     pub commit: Option<String>,
     pub in_progress: Option<InProgress>,
 }
@@ -246,7 +244,6 @@ impl Repo {
         Ok(true)
     }
 
-    /// Stash entries from the `refs/stash` reflog, newest first.
     pub fn stashes(&self) -> Result<Vec<Stash>> {
         let repo = self.repo();
         let Ok(Some(reference)) = repo.try_find_reference("refs/stash") else {

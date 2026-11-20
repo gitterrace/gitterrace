@@ -39,7 +39,6 @@ pub fn syntax(text: &str) -> Result<(), Located> {
     })
 }
 
-/// 1-based line and column of byte `offset`.
 pub(crate) fn line_col(text: &str, offset: usize) -> (usize, usize) {
     let before = text.get(..offset.min(text.len())).unwrap_or(text);
     let line = before.matches('\n').count() + 1;

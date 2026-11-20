@@ -32,7 +32,6 @@ pub(crate) struct Seg {
     /// Visible caption before the choices and the group's accessible name. Empty hides the
     /// caption but `name` still names the group.
     pub(crate) caption: String,
-    /// Accessible name of the group.
     pub(crate) name: String,
     pub(crate) choices: Vec<Choice>,
     /// Buttons that switch panes in place instead of links that load a page.

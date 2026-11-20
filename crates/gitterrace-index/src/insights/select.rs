@@ -294,7 +294,6 @@ pub struct OptionParams {
     pub bots: Option<String>,
     /// `1` counts lock files and minified output, `0` leaves them out.
     pub generated: Option<String>,
-    /// `0` counts paths that `.gitignore` rules out.
     pub ignore: Option<String>,
     /// `1` counts merge commits as commits, never their lines or files.
     pub merges: Option<String>,

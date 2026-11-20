@@ -33,7 +33,6 @@ pub(super) struct Area {
     pub(super) ticks: Vec<Tick>,
     pub(super) bands: Vec<Band>,
     pub(super) dates: Vec<DateLabel>,
-    /// The selected range: x and width, zero for none.
     pub(super) sel: (P, P),
     pub(super) none: bool,
     pub(super) ph: P,
@@ -58,7 +57,6 @@ pub(super) struct RangeRow {
 /// A commit of the range list.
 #[derive(Debug)]
 pub(super) struct RangeCommit {
-    /// Finished HTML from `fmt::sha_link`.
     pub(super) sha: String,
     pub(super) subject: String,
     pub(super) day: String,
@@ -125,10 +123,8 @@ pub(super) struct Shown {
     pub(super) axis: Seg,
     pub(super) scale: Seg,
     pub(super) total: String,
-    /// Legend entries: class and language.
     pub(super) legend: Vec<(String, String)>,
     pub(super) area: Area,
-    /// The plot data, JSON safe inside a script element.
     pub(super) json: String,
     pub(super) range: RangeCard,
     pub(super) now: Now,

@@ -123,7 +123,6 @@ pub struct Contributor {
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct ContributorReport {
-    /// Axis label of every bucket of the period.
     pub labels: Vec<String>,
     pub unit: BucketUnit,
     /// Most commits first. Bots count as the options say, like in every other count.

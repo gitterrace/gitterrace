@@ -5,9 +5,7 @@ use crate::Result;
 /// How far [`stream`]'s workers may run ahead of the oldest result not yet emitted.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct Window<'a> {
-    /// Items started past the next one to emit.
     pub(crate) items: usize,
-    /// Estimated bytes of finished results held for reordering.
     pub(crate) bytes: usize,
     /// Positions to start ahead of the others, ascending, see [`stream`].
     pub(crate) first: &'a [usize],

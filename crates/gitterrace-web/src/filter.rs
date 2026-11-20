@@ -15,7 +15,6 @@ use crate::fmt::{enc_seg, href};
 use crate::insights::OptLink;
 use crate::seg::{Choice, Seg};
 
-/// Value that selects commits without a scope (`none`).
 pub(crate) const NO_SCOPE: &str = Selection::NO_SCOPE;
 pub(crate) use gitterrace_index::under;
 

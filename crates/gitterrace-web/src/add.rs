@@ -68,7 +68,6 @@ impl<'a> AddReply<'a> {
     }
 }
 
-/// Header carrying the secret from the token file.
 pub const TOKEN_HEADER: &str = "x-gitterrace-add-token";
 /// Not configurable: a request body bound against hostile pages posting to the local server.
 const BODY_LIMIT: usize = 8 * 1024;

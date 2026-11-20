@@ -9,7 +9,6 @@ use crate::oracle::{canonical, digest, golden_line, without_chrome};
 /// Counts and classified differences of one proof run.
 #[derive(Debug, Default)]
 pub struct Proof {
-    /// Answers in the full product run.
     pub full: usize,
     /// Answers in the golden cell set run.
     pub small: usize,

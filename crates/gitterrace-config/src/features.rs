@@ -59,7 +59,6 @@ impl Feature {
         Self::Api,
     ];
 
-    /// The key under `[features]`.
     pub const fn key(self) -> &'static str {
         match self {
             Self::Blame => "blame_enabled",

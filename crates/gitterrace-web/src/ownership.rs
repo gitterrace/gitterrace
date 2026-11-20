@@ -18,7 +18,6 @@ use crate::{
 const TOP_DIRS: usize = 40;
 
 struct DirRow {
-    /// The directory split at `/`, for the `_path.html` macro.
     path: Vec<String>,
     href: String,
     lines: String,

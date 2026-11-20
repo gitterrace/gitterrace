@@ -4,9 +4,7 @@ use gitterrace_config::Display;
 
 /// What the base template writes on `<body>` for diffs.
 pub(crate) struct DiffLook {
-    /// `data-diff-palette` value, empty for the default colors.
     pub(crate) palette: String,
-    /// Wrap long lines.
     pub(crate) wrap: bool,
     /// Tab width in characters, `data-diff-tab` when it is not the default 4.
     pub(crate) tab: u64,

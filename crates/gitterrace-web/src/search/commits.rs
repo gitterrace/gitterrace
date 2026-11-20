@@ -66,7 +66,6 @@ pub(crate) fn search_indexed(
     }
 }
 
-/// Commit search by walking git from `rev`, newest first.
 pub(crate) fn walk_commits(
     a: &App,
     rev: &str,

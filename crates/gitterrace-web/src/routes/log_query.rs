@@ -32,9 +32,7 @@ pub(crate) struct LogPage {
 /// What answering the page cost: the counted-work bound a test holds it to.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Work {
-    /// Index rows read.
     pub(crate) rows: usize,
-    /// Commits the git walk read.
     pub(crate) walked: usize,
 }
 

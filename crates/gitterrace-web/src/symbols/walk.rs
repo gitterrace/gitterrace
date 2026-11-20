@@ -13,7 +13,6 @@ use crate::symbols::{Symbol, SymbolKind};
 struct Open {
     byte: u8,
     container: bool,
-    /// A class body, where members are methods.
     class: bool,
 }
 
@@ -131,7 +130,6 @@ impl<'a> Walk<'a> {
     }
 }
 
-/// The symbols of a brace-language source.
 pub(crate) fn symbols(src: &str, dialect: Dialect) -> Vec<Symbol> {
     let mut w = Walk {
         src,

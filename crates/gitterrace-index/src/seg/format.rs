@@ -24,7 +24,6 @@ pub enum Kind {
     Segment = 1,
     Strings = 2,
     Order = 3,
-    /// The message column of commit search (`messages.rs`).
     Messages = 4,
     // 5 held the stored first-parent chain, dropped in cache format 2. Never reuse it.
     /// Slim file rows of the non-merge commits, the per-file pages' read (`tip.rs`).

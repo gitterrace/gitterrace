@@ -20,7 +20,6 @@ const SHARED_MAILBOXES: [&str; 4] = ["noreply@", "no-reply@", "none@", "root@"];
 /// One person: every (name, e-mail) pair that shares an address or a normalised name.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct Person {
-    /// Most used spelling, preferring full names.
     pub name: String,
     pub bot: bool,
     pub commits: usize,

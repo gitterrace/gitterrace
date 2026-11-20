@@ -10,7 +10,6 @@ use gitterrace_config::RowKey;
 /// The lists of tables the form edits, with the keys of one row.
 pub(crate) const LISTS: [(&str, &[Item]); 2] = [("send", &SEND_KEYS), ("action", &ACTION_KEYS)];
 
-/// One list (`[[send]]`) as the form shows it.
 pub(crate) struct List {
     pub(crate) name: &'static str,
     pub(crate) rows: Vec<Card>,
@@ -28,7 +27,6 @@ pub(crate) struct Card {
 
 /// One key of a row.
 pub(crate) struct CardField {
-    /// `send.2.label`, the id an edit names.
     pub(crate) id: String,
     pub(crate) name: &'static str,
     pub(crate) doc: &'static str,

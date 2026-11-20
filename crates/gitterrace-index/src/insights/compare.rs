@@ -29,10 +29,8 @@ pub struct Comparison {
 /// Lines of one commit as git reports them, for a range the index does not hold.
 pub struct RawCommit {
     pub id: String,
-    /// The author, by email as the mailmap names them.
     pub author: String,
     pub merge: bool,
-    /// `(path, added, removed, rewritten)` per file.
     pub files: Vec<(String, u64, u64, u64)>,
 }
 

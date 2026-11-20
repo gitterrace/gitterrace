@@ -26,7 +26,6 @@ const MAX_TREE_ENTRIES: usize = 500_000;
 pub struct BlobId(gix::ObjectId);
 
 impl BlobId {
-    /// Lowercase hex object id, a stable cache key.
     pub fn hex(&self) -> String {
         self.0.to_string()
     }
@@ -137,7 +136,6 @@ impl gix::traverse::tree::Visit for Capped {
     }
 }
 
-/// Reads blobs on one thread. Make one per worker.
 pub struct BlobReader {
     repo: gix::Repository,
 }

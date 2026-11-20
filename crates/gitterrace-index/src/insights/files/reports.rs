@@ -161,7 +161,6 @@ impl Insights<'_> {
         self.in_period(period, |c| self.ownership_in(files, c, depth))
     }
 
-    /// [`Insights::ownership`] over the commits `c` counts.
     pub fn ownership_in(
         &self,
         files: &[HeadFile],
@@ -255,7 +254,6 @@ impl Insights<'_> {
         self.in_period(period, |c| self.coupling_in(files, c, min_together, limit))
     }
 
-    /// [`Insights::coupling`] over the commits `c` counts.
     pub fn coupling_in(
         &self,
         files: &[HeadFile],

@@ -126,7 +126,6 @@ pub(super) fn check_out(
     Ok(Some(Owned::Entries(BTreeSet::new())))
 }
 
-/// The marker for a site of `repos` owning `owned`.
 pub(super) fn marker(repos: &[PathBuf], owned: &Owned) -> String {
     let names: Vec<String> = repos
         .iter()

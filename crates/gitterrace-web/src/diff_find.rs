@@ -15,7 +15,6 @@ use crate::{app::blocking, error::Result, routes::Shared, search::MAX_QUERY_BYTE
 /// Not configurable: the list is a preview, the counts above it are complete.
 const LINES_PER_FILE: usize = 3;
 const MAX_HITS: usize = 500;
-/// Characters of one listed line.
 const LINE_CHARS: usize = 160;
 
 #[derive(Deserialize, Default)]

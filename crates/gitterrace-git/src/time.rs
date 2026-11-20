@@ -14,7 +14,6 @@ pub fn civil_from_days(days: i64) -> (i64, i64, i64) {
     (yoe + era * 400 + i64::from(m <= 2), m, d)
 }
 
-/// Inverse of `civil_from_days`.
 pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     let y = y - i64::from(m <= 2);
     let era = y.div_euclid(400);
@@ -25,7 +24,6 @@ pub fn days_from_civil(y: i64, m: i64, d: i64) -> i64 {
     era * 146_097 + doe - 719_468
 }
 
-/// Seconds in a day.
 pub const DAY: i64 = 86_400;
 
 /// First and last second of years 1 to 9999, the range a date can be written in.

@@ -9,14 +9,11 @@ use crate::{Loaded, Source};
 /// One input of the settings form.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Field {
-    /// `section.name`, the id an edit names.
     pub id: &'static str,
     pub section: &'static str,
     pub name: &'static str,
     pub doc: &'static str,
-    /// The default as a TOML literal, the placeholder.
     pub default: String,
-    /// The value in force as a TOML literal.
     pub value: String,
     pub source: Source,
     /// Whether a running server takes an edit only after a restart.
@@ -57,7 +54,6 @@ impl Field {
     }
 }
 
-/// The form's fields for `loaded`, in declaration order.
 pub fn fields(loaded: &Loaded) -> Vec<Field> {
     keys().into_iter().map(|k| field(&loaded.config, loaded, k)).collect()
 }

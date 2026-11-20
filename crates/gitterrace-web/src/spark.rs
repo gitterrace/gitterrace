@@ -44,7 +44,6 @@ const LADDER: [Rung; 4] = [
 #[derive(Debug, Default)]
 pub(crate) struct Series {
     pub(crate) counts: Vec<u32>,
-    /// The bucket in words, as in "per day".
     pub(crate) per: &'static str,
     /// The window in words, "9 days"; empty for an empty repository.
     pub(crate) span: String,

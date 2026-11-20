@@ -154,7 +154,6 @@ pub(super) fn report(e: &SegError) {
 }
 
 impl DiskSource {
-    /// One record as stored, raw identity and raw time.
     pub(super) fn record(&self, rank: Rank) -> SegResult<CommitRecord> {
         let mut files = Vec::new();
         let rec = self.decode(rank, Some(&mut files))?;

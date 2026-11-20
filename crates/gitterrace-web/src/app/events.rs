@@ -24,7 +24,6 @@ pub(crate) const POLL_FALLBACK: Duration = Duration::from_secs(1);
 /// the log lines. The state machine is [`Watch`] for both.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Scope {
-    /// The working tree, honouring the committed ignore rules.
     Tree,
     /// HEAD, refs, `packed-refs` and the index. A handful of watches, woken only by a git write.
     Git,
@@ -55,15 +54,12 @@ impl Scope {
 /// The nudge state of one watch of one repository's refresher.
 pub(crate) struct Watch {
     scope: Scope,
-    /// The running or starting watcher of the current settings.
     run: Option<Arc<Run>>,
     /// Set by a nudge, cleared by the check that answers it.
     pending: Arc<AtomicBool>,
-    /// Wakes the refresher on a nudge.
     pub(crate) nudged: Arc<Notify>,
     /// Events could not start or stopped being trusted: check on a timer, as polling.
     polling: Arc<AtomicBool>,
-    /// The settings the running watcher was started with.
     started: Option<(u64, bool)>,
 }
 

@@ -17,7 +17,6 @@ struct FrequencySection {
     verdict: String,
 }
 
-/// The section's markup for the commits `q` selects.
 pub(crate) fn section(fold: &ActivityFold) -> String {
     {
         let (unit, weeks, sum) = &fold.frequency;

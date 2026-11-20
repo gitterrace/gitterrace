@@ -207,7 +207,6 @@ impl Repo {
         Ok(ids)
     }
 
-    /// One commit with its diff against the first parent.
     pub fn commit(&self, id: &str) -> Result<CommitDetail> {
         let repo = self.repo();
         let oid = self.resolve_id(&repo, id)?;

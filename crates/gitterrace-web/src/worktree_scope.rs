@@ -17,7 +17,6 @@ impl ScopeQuery {
     }
 }
 
-/// The scope a `scope=` value names.
 pub(crate) fn named(v: Option<&str>) -> Scope {
     match v {
         Some("staged") => Scope::Staged,

@@ -53,7 +53,6 @@ pub struct Placed {
     pub tip: bool,
     pub top: Vec<Seg>,
     pub bottom: Vec<Seg>,
-    /// Edges to parents drawn as stubs.
     pub stubs: u16,
 }
 
@@ -77,7 +76,6 @@ impl Open {
         self.cols.len() as u16
     }
 
-    /// Lays out `row` below the rows placed so far.
     pub fn place(&mut self, row: &Row) -> Placed {
         let first = !self.started;
         self.started = true;

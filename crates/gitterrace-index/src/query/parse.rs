@@ -13,7 +13,6 @@ const SUPPORTED: &str = "terms side by side (all must match), `!` before a term,
 /// no real filter comes near it, and the API and pages must refuse the same text.
 const MAX_LEN: usize = 2_048;
 
-/// Reads `text` into terms, in the order written.
 pub(super) fn terms(text: &str) -> Result<Vec<Term>, QueryError> {
     if text.len() > MAX_LEN {
         return Err(QueryError {

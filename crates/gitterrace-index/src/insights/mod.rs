@@ -79,7 +79,6 @@ pub struct Options {
     pub include_generated: bool,
     /// Leave out paths that `.gitignore` or `.ignore` rule out.
     pub respect_ignore: bool,
-    /// Count whitespace-only and blank-line changes.
     pub count_whitespace: bool,
     /// Count commits by bot accounts in per-file and per-period numbers.
     pub include_bots: bool,

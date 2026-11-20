@@ -28,7 +28,6 @@ pub(crate) struct Entry {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct Listing {
     pub(crate) entries: Vec<Entry>,
-    /// More entries exist past the cap.
     pub(crate) more: bool,
 }
 
@@ -40,7 +39,6 @@ struct ListingMarkup<'a> {
     cap: usize,
 }
 
-/// The archive kind of `path`, by extension.
 pub(crate) fn kind(path: &str) -> Option<Kind> {
     let lower = path.to_ascii_lowercase();
     if lower.ends_with(".tar.gz") {

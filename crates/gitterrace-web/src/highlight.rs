@@ -90,7 +90,6 @@ fn alias(token: &str) -> &str {
     }
 }
 
-/// The syntax for a markdown fence token.
 fn syntax_for_token(token: &str) -> Option<&'static SyntaxReference> {
     let set = syntaxes();
     let token = token.trim();
@@ -154,7 +153,6 @@ fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxRefere
         .filter(|s| s.name != "Plain Text")
 }
 
-/// Highlights line by line, keeping parse state across calls.
 pub(crate) struct Highlighter {
     state: ParseState,
     stack: ScopeStack,

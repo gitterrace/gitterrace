@@ -44,7 +44,6 @@ struct HotspotsPage {
     kpis: Vec<Kpi>,
     scatter: crate::charts::view::Scatter,
     rows: Vec<HotRow>,
-    /// The patterns sections, markup from `patterns`.
     patterns: String,
 }
 

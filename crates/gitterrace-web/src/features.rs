@@ -72,7 +72,6 @@ pub(crate) const INSIGHT_ROUTES: &[(&str, &str)] = &[
     ("ownership", "/stats/ownership"),
 ];
 
-/// Where the API is mounted.
 const API: &str = "/api/v1";
 
 /// Features JS reads from the `gt-off` meta: they own a key, a menu entry or a fetch.
@@ -185,7 +184,6 @@ fn now<T>(f: impl FnOnce(Option<&Effective>) -> T) -> T {
     NOW.with(|n| f(n.borrow().as_deref()))
 }
 
-/// Whether `f` is on for the page being rendered.
 pub(crate) fn on(f: Feature) -> bool {
     now(|e| e.is_none_or(|e| !e.off.contains(&f)))
 }
@@ -201,7 +199,6 @@ pub(crate) fn pages() -> Vec<&'static str> {
     now(|e| e.map_or_else(|| INSIGHT_PAGES.to_vec(), |e| e.pages.clone()))
 }
 
-/// The web route of the insights page `page`.
 pub(crate) fn page_route(page: &str) -> Option<&'static str> {
     INSIGHT_ROUTES.iter().find(|(p, r)| *p == page && !r.starts_with(API)).map(|(_, r)| *r)
 }

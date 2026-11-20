@@ -33,7 +33,6 @@ pub struct ReworkPoint {
 /// The rework series with the window it was computed over.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Rework {
-    /// Commits in the rolling window, scaled to the selection.
     pub window: usize,
     pub unit: BucketUnit,
     pub points: Vec<ReworkPoint>,

@@ -27,7 +27,6 @@ pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self
 
 /// What the guard checks, fixed at startup.
 pub(crate) struct Gate {
-    /// The bound address when it is not loopback.
     bound: Option<IpAddr>,
     /// `server.is_public`.
     public: bool,

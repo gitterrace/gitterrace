@@ -24,7 +24,6 @@ pub(crate) fn parse_mailmap(
         })
 }
 
-/// Mailmap of a commit.
 pub(crate) fn mailmap(repo: &gix::Repository, commit: gix::ObjectId) -> gix::mailmap::Snapshot {
     parse_mailmap(repo, mailmap_blob(repo, commit))
 }

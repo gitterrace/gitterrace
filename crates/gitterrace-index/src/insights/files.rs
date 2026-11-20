@@ -86,7 +86,6 @@ impl TipIndex {
         Some(Self { start, touches, cols })
     }
 
-    /// Touches of tip name `id`, newest commit first.
     pub(crate) fn of(&self, id: PathId) -> Option<&[Tipped]> {
         let i = id.0 as usize;
         let (a, b) = (*self.start.get(i)?, *self.start.get(i + 1)?);
@@ -98,7 +97,6 @@ impl TipIndex {
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct TouchRaw {
     pub commit: Rank,
-    /// The file row index inside the commit.
     pub row: u32,
     /// The file row inside the commit, which holds the name at that time.
     pub path: PathId,
@@ -182,7 +180,6 @@ pub struct Touch {
 pub struct Hotspot {
     pub path: String,
     pub language: String,
-    /// Lines now.
     pub lines: u32,
     /// Commits that touched the file in the period.
     pub changes: usize,
@@ -208,7 +205,6 @@ pub struct HotspotReport {
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Owner {
     pub name: String,
-    /// Share of the knowledge, 0..=1.
     pub share: f64,
 }
 

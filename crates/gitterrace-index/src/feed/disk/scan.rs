@@ -19,7 +19,6 @@ pub(super) struct Scan<'s> {
     rows: bool,
     rank: u32,
     to: u32,
-    /// Segment, ordinal inside it.
     seg: usize,
     ord: u32,
     /// Current `ROWS` block (index among the segment's row blocks) and its bytes.
@@ -33,7 +32,6 @@ pub(super) struct Scan<'s> {
     /// Current `COMMITS` block and its bytes.
     col_block: usize,
     col_bytes: Vec<u8>,
-    /// Block reads so far, for the guard.
     pub(super) reads: usize,
     done: bool,
 }

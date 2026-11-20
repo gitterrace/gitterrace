@@ -141,7 +141,6 @@ pub(crate) fn fold_path_author(
     }))
 }
 
-/// Boxed streaming iterator borrowed from the source.
 pub type Stream<'s, T> = Box<dyn Iterator<Item = T> + 's>;
 
 /// Line sums of one change set: raw, and with whitespace-only changes ignored ("code").
@@ -211,16 +210,13 @@ pub struct CommitRow {
     pub rank: Rank,
     /// Raw identity (mailmap applied to its strings, see the module contract).
     pub ident: IdentId,
-    /// Author time, epoch seconds.
     pub time: i64,
     /// Author time zone offset in seconds, as [`crate::CommitRecord::offset`].
     pub offset: i32,
     pub merge: bool,
     pub kind: Option<LabelId>,
     pub scope: Option<LabelId>,
-    /// Number of file rows.
     pub files: u32,
-    /// Sums over every file row, no path filter applied.
     pub sums: Sums,
 }
 
@@ -232,13 +228,11 @@ pub struct FileRow {
     pub old: Option<PathId>,
     pub add: u32,
     pub del: u32,
-    /// Line count after the commit.
     pub lines: u32,
     pub rewritten: u32,
     /// (add, del, rewritten) ignoring whitespace, `None` when equal to the raw counts.
     pub code: Option<(u32, u32, u32)>,
     pub binary: bool,
-    /// The commit deleted the file.
     pub deleted: bool,
 }
 
@@ -253,7 +247,6 @@ impl FileRow {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum CommitRange {
     All,
-    /// Ranks `[start, end)`.
     Ranks(Range<u32>),
     /// Author time `[from, to)` in epoch seconds (UTC, as [`gitterrace_types::Period::window`]).
     Time(Range<i64>),
@@ -358,7 +351,6 @@ pub trait InsightsSource: Send + Sync {
     /// Number of path ids, so per-path bit vectors can be sized.
     fn paths(&self) -> usize;
 
-    /// (name, email) of a raw identity, mailmap applied.
     fn ident(&self, id: IdentId) -> Option<(Arc<str>, Arc<str>)>;
     fn idents(&self) -> usize;
 

@@ -189,7 +189,6 @@ pub(crate) fn selected_seg() -> String {
     enc_seg(&selected())
 }
 
-/// Runs `f` with [`selected`] answering `rev`.
 pub(crate) fn with_rev<T>(rev: &str, f: impl FnOnce() -> T) -> T {
     scoped(&REV, rev.to_owned(), f)
 }

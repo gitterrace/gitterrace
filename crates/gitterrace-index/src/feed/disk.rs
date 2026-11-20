@@ -86,7 +86,6 @@ enum Key {
 #[derive(Debug)]
 struct Block {
     bytes: Vec<u8>,
-    /// Item starts for string blocks.
     starts: Vec<u32>,
 }
 
@@ -132,7 +131,6 @@ pub fn block_cache_default() -> usize {
     gitterrace_config::Config::default().cache_bytes(gitterrace_config::Cache::Blocks)
 }
 
-/// The disk base. Build it with [`DiskSource::open`].
 pub struct DiskSource {
     segs: Vec<Seg>,
     deltas: Vec<Container>,

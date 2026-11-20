@@ -344,7 +344,6 @@ impl CountContext {
     }
 }
 
-/// [`CountContext::span`] of explicit days.
 pub(crate) const fn span_of(days: &RangeInclusive<i64>) -> Range<i64> {
     let margin = 2 * DAY;
     let lo = if *days.start() == i64::MIN {

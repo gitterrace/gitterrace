@@ -28,7 +28,6 @@ use std::fmt;
 /// A commit id, raw bytes.
 pub type Oid = [u8; 20];
 
-/// The 40 lowercase hex digits of `oid`.
 pub fn hex(oid: &Oid) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
     let mut s = String::with_capacity(40);

@@ -165,7 +165,6 @@ pub async fn pause(d: Duration) {
     tokio::time::sleep(d).await;
 }
 
-/// The blocking twin of [`pause`].
 pub fn pause_blocking(d: Duration) {
     std::thread::sleep(d);
 }

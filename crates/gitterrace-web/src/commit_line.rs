@@ -17,7 +17,6 @@ use crate::views::{author_href, hue, initials};
 pub(crate) struct Lead {
     pub(crate) name: String,
     pub(crate) href: String,
-    /// Badges after the name, such as `default` or `merged`.
     pub(crate) badges: Vec<&'static str>,
 }
 
@@ -54,7 +53,6 @@ pub(crate) struct CommitRow {
 }
 
 impl CommitRow {
-    /// The row of `c`, its time relative to `now`.
     pub(crate) fn of(c: &CommitSummary, now: i64) -> Self {
         Self {
             sha: sha_link(&c.id),

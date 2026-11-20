@@ -48,7 +48,6 @@ struct FontMarkup<'a> {
     src: Option<&'a str>,
 }
 
-/// Whether `path` names a font this module reads.
 pub(crate) fn is_font(path: &str) -> bool {
     path.rsplit_once('.').is_some_and(|(_, e)| {
         ["ttf", "otf", "woff", "woff2"].iter().any(|f| e.eq_ignore_ascii_case(f))

@@ -16,7 +16,6 @@ fn ext(path: &str) -> String {
     path.rsplit_once('.').map_or_else(String::new, |(_, e)| e.to_ascii_lowercase())
 }
 
-/// What kind of media `path` is, by extension.
 pub(crate) fn kind(path: &str) -> Option<Kind> {
     Some(match ext(path).as_str() {
         "png" | "jpg" | "jpeg" | "gif" | "webp" | "avif" | "bmp" | "ico" => Kind::Image,
@@ -32,7 +31,6 @@ pub(crate) fn is_image(path: &str) -> bool {
     matches!(kind(path), Some(Kind::Image | Kind::Svg))
 }
 
-/// `Content-Type` for `/raw`.
 pub(crate) fn content_type(path: &str) -> &'static str {
     match ext(path).as_str() {
         "png" => "image/png",

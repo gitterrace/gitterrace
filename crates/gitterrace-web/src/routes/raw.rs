@@ -18,7 +18,6 @@ pub(crate) const fn raw_refused(size: u64, raw_mb: u64) -> bool {
     size > raw_mb << 20
 }
 
-/// Whether an `If-None-Match` header lists `tag` (or `*`).
 fn tag_matches(headers: &axum::http::HeaderMap, tag: &str) -> bool {
     headers.get(header::IF_NONE_MATCH).is_some_and(|v| {
         v.as_bytes()

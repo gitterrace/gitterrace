@@ -87,7 +87,6 @@ impl Phases {
         }
     }
 
-    /// Ends the running step, if any, and starts `name`.
     pub(crate) fn start(&self, name: &'static str) {
         if let Ok(mut s) = self.inner.lock() {
             close(&mut s);
@@ -95,7 +94,6 @@ impl Phases {
         }
     }
 
-    /// Ends the running step.
     pub(crate) fn end(&self) {
         if let Ok(mut s) = self.inner.lock() {
             close(&mut s);

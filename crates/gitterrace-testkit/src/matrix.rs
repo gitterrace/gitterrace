@@ -5,7 +5,6 @@
 //! covering array of it (the equivalence golden), and [`named`] the high-risk cells real history
 //! broke, each with its reason.
 
-/// Every period value the filter bar offers.
 pub const PERIODS: [&str; 5] = ["1w", "1m", "3m", "1y", "all"];
 
 /// Which `.mailmap` the repository carries: as built, or edited by a later commit.

@@ -370,7 +370,6 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> Spark {
     Spark { class: class.to_owned(), points: pts.trim_end().to_owned() }
 }
 
-/// One dot of [`scatter`].
 pub(crate) struct Dot {
     pub(crate) x: u64,
     pub(crate) y: u64,

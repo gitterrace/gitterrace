@@ -36,7 +36,6 @@ pub(crate) const fn add_count(a: &mut u64, b: u64) -> Option<()> {
 /// One author on one local day.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) struct AuthorDay {
-    /// Non-merge commits.
     pub commits: u64,
     pub merges: u64,
     pub lines: Sums,
@@ -116,7 +115,6 @@ pub(crate) struct Aggregates {
     pub author_day: BTreeMap<(i64, u32), AuthorDay>,
     /// (path, identity).
     pub path_author: BTreeMap<(u32, u32), PathAuthor>,
-    /// (life, local month as year * 12 + month - 1).
     pub life_month: BTreeMap<(u32, i64), LifeMonth>,
     /// (life, identity).
     pub life_author: BTreeMap<(u32, u32), PathAuthor>,

@@ -39,7 +39,6 @@ pub(super) struct Staging {
 }
 
 impl Dir {
-    /// Opens `path`, refusing a symlink at its last component.
     fn open(path: &Path) -> io::Result<Self> {
         #[cfg(unix)]
         {

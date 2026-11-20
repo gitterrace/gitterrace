@@ -2,7 +2,6 @@
 
 /// Where a markdown file lives, so relative links can be resolved.
 pub(crate) struct Base {
-    /// Revision as it should appear in URLs (already encoded).
     pub(crate) rev: String,
     /// Directory of the markdown file inside the repo, no slashes at the ends.
     pub(crate) dir: String,

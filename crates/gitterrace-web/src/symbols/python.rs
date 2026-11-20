@@ -80,11 +80,9 @@ enum Block {
     Flow,
 }
 
-/// Keywords that open a flow block.
 const FLOW: [&str; 11] =
     ["if", "elif", "else", "try", "except", "finally", "with", "for", "while", "match", "case"];
 
-/// The symbols of a Python source.
 pub(crate) fn symbols(src: &str) -> Vec<Symbol> {
     let mut out = Vec::new();
     let mut scan = Scan::default();

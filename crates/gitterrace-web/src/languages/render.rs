@@ -57,7 +57,6 @@ pub(super) fn sample(n: usize, keep: &[usize]) -> Vec<usize> {
 
 const AREA_NAME: &str = "Lines of code by language over history";
 
-/// The area chart and the JSON `loc.js` reads.
 fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, String) {
     let n = ch.len();
     let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);

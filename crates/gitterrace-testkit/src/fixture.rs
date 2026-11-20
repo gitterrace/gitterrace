@@ -22,7 +22,6 @@ pub struct Adversarial {
     /// The two parentless commits, oldest first.
     pub roots: [String; 2],
     pub octopus: String,
-    /// The commit that adds `.mailmap`.
     pub mailmap: String,
     pub far: String,
     pub extreme: String,
@@ -147,7 +146,6 @@ impl Fixture {
         &self.dir
     }
 
-    /// Runs git in the repository and returns trimmed stdout.
     pub fn git(&self, args: &[&str]) -> String {
         self.date.as_ref().map_or_else(|| git(&self.dir, args), |d| git_at(&self.dir, d, args))
     }

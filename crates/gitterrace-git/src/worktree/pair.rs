@@ -10,7 +10,6 @@ use gix::ObjectId;
 /// Which added path came from which deleted one.
 #[derive(Default)]
 pub(super) struct Moves {
-    /// Added path to the deleted path it came from.
     pub(super) to: HashMap<String, String>,
     /// Deleted paths that became a rename, so they are not listed again as deletions.
     pub(super) sources: BTreeSet<String>,

@@ -76,11 +76,8 @@ enum Meta {
     Other,
     /// A package or import line: nothing in it is listed.
     Skip,
-    /// A function's whole declaration (`meta.function.c`).
     Function,
-    /// A container's whole declaration (`meta.class.java`).
     Container,
-    /// A container's body (`meta.class.body.java`).
     Body,
 }
 
@@ -144,7 +141,6 @@ pub(crate) struct Collector {
 }
 
 impl Collector {
-    /// Starts the next line.
     pub(crate) const fn next_line(&mut self) {
         self.line += 1;
         self.open = None;

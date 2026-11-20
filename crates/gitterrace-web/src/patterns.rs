@@ -42,7 +42,6 @@ struct PatternsSection {
     no_releases: Option<Empty>,
 }
 
-/// The sections' markup for the commits `q` selects.
 pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String {
     {
         let defaults = a.defaults();

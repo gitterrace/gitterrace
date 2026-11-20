@@ -66,7 +66,6 @@ pub(crate) fn applescript(exe: &Path) -> String {
     )
 }
 
-/// JSON for `CFBundleURLTypes`, inserted into the generated `Info.plist`.
 pub(crate) const fn url_types_json() -> &'static str {
     r#"[{"CFBundleURLName":"gitterrace link","CFBundleURLSchemes":["gitterrace"]}]"#
 }

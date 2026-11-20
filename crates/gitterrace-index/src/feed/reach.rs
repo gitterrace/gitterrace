@@ -37,7 +37,6 @@ pub enum RevView<S> {
 pub struct Reach<S> {
     base: S,
     bits: Vec<u64>,
-    /// Set bits before each word.
     before: Vec<u32>,
     inner: u32,
     fresh: Fresh,

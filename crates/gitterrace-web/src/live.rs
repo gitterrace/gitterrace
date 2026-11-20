@@ -141,18 +141,15 @@ struct Stream {
     stop: watch::Receiver<bool>,
     app: Arc<App>,
     first: Option<Event>,
-    /// Released when the stream drops, which frees the slot.
     _slot: OwnedSemaphorePermit,
     _wt: Option<WorktreeWatch>,
 }
 
-/// A home page's stream: list notices only.
 struct HomeStream {
     rx: broadcast::Receiver<Arc<Change>>,
     stop: watch::Receiver<bool>,
     env: Env,
     first: Option<Event>,
-    /// Released when the stream drops, which frees the slot.
     _slot: OwnedSemaphorePermit,
 }
 

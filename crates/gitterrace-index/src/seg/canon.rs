@@ -30,7 +30,6 @@ pub(crate) const NONE: u32 = u32::MAX;
 pub(crate) struct Lives {
     /// Per path id: last life, `HOLDS` while held, `NONE` if never.
     by_name: Vec<u32>,
-    /// Per life: last name.
     name: Vec<u32>,
 }
 

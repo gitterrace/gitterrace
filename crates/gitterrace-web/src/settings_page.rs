@@ -19,7 +19,6 @@ use crate::empty::Empty;
 use crate::seg::{Choice, Seg};
 use crate::settings::Settings;
 
-/// One input row of the form, as shown.
 pub(crate) struct Row {
     pub(crate) id: &'static str,
     pub(crate) name: &'static str,
@@ -36,11 +35,9 @@ pub(crate) struct Row {
     pub(crate) max: String,
     pub(crate) options: Vec<(&'static str, bool)>,
     pub(crate) checked: bool,
-    /// For `tri`: `unset`, `true` or `false`.
     pub(crate) tri: &'static str,
 }
 
-/// One `[section]` of the form.
 pub(crate) struct Section {
     pub(crate) name: &'static str,
     pub(crate) rows: Vec<Row>,
@@ -102,7 +99,6 @@ fn row(f: Field) -> Row {
     }
 }
 
-/// The form's sections for config text that loads.
 pub(crate) fn sections(loaded: &gitterrace_config::Loaded) -> Vec<Section> {
     let mut out: Vec<Section> = Vec::new();
     for f in gitterrace_config::fields(loaded) {
@@ -127,7 +123,6 @@ fn first_error(r: &crate::settings::CheckReply) -> Option<String> {
     })
 }
 
-/// One line per `[repo.NAME]` override, shown read-only.
 fn overrides(c: &gitterrace_config::Config) -> Vec<String> {
     c.repo
         .iter()

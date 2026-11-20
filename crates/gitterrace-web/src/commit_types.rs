@@ -40,7 +40,6 @@ struct Cell {
     n: usize,
     level: u8,
     href: String,
-    /// The cell's tip, from the one tip builder.
     tip: String,
 }
 

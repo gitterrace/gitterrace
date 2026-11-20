@@ -115,7 +115,6 @@ pub struct FileStat {
     /// Previous path when the file was renamed in this commit.
     pub old: Option<std::sync::Arc<str>>,
     pub binary: bool,
-    /// The commit deleted the file: its life ends here.
     pub deleted: bool,
 }
 
@@ -248,7 +247,6 @@ impl Index {
         self.halted.store(true, std::sync::atomic::Ordering::Release);
     }
 
-    /// Whether [`Index::halt`] was called.
     pub fn halted(&self) -> bool {
         self.halted.load(std::sync::atomic::Ordering::Acquire)
     }
@@ -266,7 +264,6 @@ impl Index {
         self.phases.adopt(steps);
     }
 
-    /// The setting [`Index::set_message_index`] put in force.
     pub fn message_index(&self) -> bool {
         self.messages.load(std::sync::atomic::Ordering::Relaxed)
     }
@@ -308,7 +305,6 @@ impl Index {
         self.block_cache.store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
-    /// The cap set by [`Index::with_fresh_cap`].
     pub const fn fresh_cap(&self) -> usize {
         self.fresh_cap
     }

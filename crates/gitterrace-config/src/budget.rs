@@ -5,21 +5,15 @@
 
 use crate::Config;
 
-/// The parts `resources.cache_mb` is cut into.
 pub const PARTS: usize = 16;
 
 /// A serving cache with a share of `resources.cache_mb`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Cache {
-    /// Line blame per (commit, path), in the git handle.
     Blame,
-    /// Highlighted code per file.
     Code,
-    /// Rendered pages, the one cache the idle release keeps.
     Pages,
-    /// File lists per tree.
     FileLists,
-    /// Last commit per directory entry.
     LastCommits,
     /// `git log -- path` ids.
     PathLogs,

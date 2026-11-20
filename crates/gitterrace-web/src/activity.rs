@@ -61,9 +61,7 @@ struct ActivityPage {
     series: crate::charts::view::Bars,
     heatmap: crate::charts::view::Heatmap,
     range: Option<RangeCard>,
-    /// The commit types section, markup from `commit_types`.
     types: String,
-    /// The code frequency section, markup from `frequency`.
     frequency: String,
 }
 

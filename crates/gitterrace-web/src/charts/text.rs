@@ -37,7 +37,6 @@ fn heads(cols: &[&str]) -> Vec<String> {
     cols.iter().map(|c| (*c).to_owned()).collect()
 }
 
-/// A row of counts followed by their sum.
 fn sum_row(label: &str, vals: &[u64]) -> Row {
     let mut cells: Vec<String> = vals.iter().map(|v| fmt::thousands(*v)).collect();
     cells.push(fmt::thousands(vals.iter().sum::<u64>()));
