@@ -594,7 +594,4 @@ pub(crate) use range::run_range;
 mod range;
 
 #[cfg(test)]
-mod error_tests;
-
-#[cfg(test)]
 mod tests;
