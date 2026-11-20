@@ -156,12 +156,41 @@ export async function openPage(browser, url, { width = 900, height = 800, scheme
   return p;
 }
 
+/**
+ * Runs `fn(page, { name, scheme, width, item })` on a fresh page at every browser, colour scheme,
+ * width and `items` entry, closing each page and browser after it.
+ */
+export async function sweep(opts, fn) {
+  const { browsers, context, widths, height = 900, items = [null] } = opts;
+  const schemes = opts.schemes ?? ['light', 'dark'];
+  for (const name of browsers) {
+    const { b, ctx } = await context(name);
+    for (const scheme of schemes) {
+      for (const width of widths) {
+        for (const item of items) {
+          const p = await ctx.newPage();
+          await p.emulateMedia({ colorScheme: scheme });
+          await p.setViewportSize({ width, height });
+          await fn(p, { name, scheme, width, item });
+          await p.close();
+        }
+      }
+    }
+    await b.close();
+  }
+}
+
 /** Collects pass/fail lines; `result()` prints the verdict and returns the exit code. */
 export function reporter() {
   let failed = 0;
   return {
     ok: (m) => console.log('ok  ', m),
     fail: (m) => { failed++; console.log('FAIL', m); },
+    // One verdict line: a fault list fails as `where: a; b`, an empty one passes as `where: good`.
+    verdict(where, bad, good = '', sep = '; ') {
+      if (bad.length) this.fail(`${where}: ${bad.join(sep)}`);
+      else this.ok(good ? `${where}: ${good}` : where);
+    },
     result: () => { console.log(failed ? `RESULT: FAIL (${failed})` : 'RESULT: ok'); return failed ? 1 : 0; },
   };
 }

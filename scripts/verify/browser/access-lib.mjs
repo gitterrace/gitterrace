@@ -1,6 +1,7 @@
 // Reading and keyboard checks: highlighted text, the skip link and tab stops, the shortcut
 // sheet and the overview sidebar order. Each runs in every browser, light and dark, at 1400
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
+import { sweep } from '../../lib/browser-lib.mjs';
 
 const SCHEMES = ['light', 'dark'];
 const WIDTHS = [1400, 900];
@@ -32,20 +33,11 @@ async function golden(p, base) {
 export function checks({ dir, srv, r, browsers, context }) {
   /** Runs `fn(page)`, which returns its failures, on `path` in every browser, scheme, width. */
   async function each(label, path, fn) {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
-      for (const scheme of SCHEMES) for (const width of WIDTHS) {
-        const p = await ctx.newPage();
-        await p.emulateMedia({ colorScheme: scheme });
-        await p.setViewportSize({ width, height: 800 });
-        await p.goto(srv.base + path, { waitUntil: 'load' });
-        const where = `${label} ${name} ${scheme} ${width}`;
-        const bad = await fn(p);
-        bad.length ? r.fail(`${where}: ${bad.join('; ')}`) : r.ok(where);
-        await p.close();
-      }
-      await b.close();
-    }
+    const sw = { browsers, context, widths: WIDTHS, height: 800 };
+    await sweep(sw, async (p, { name, scheme, width }) => {
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      r.verdict(`${label} ${name} ${scheme} ${width}`, await fn(p));
+    });
   }
 
   /** Reloads `p` until `sel` is on the page: insights parts appear once the index is built. */

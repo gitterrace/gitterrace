@@ -3,7 +3,7 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh } from '../../lib/browser-lib.mjs';
+import { sh, sweep } from '../../lib/browser-lib.mjs';
 import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
@@ -23,221 +23,181 @@ export function checks(env) {
 }
 
 async function sideWidth() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) {
-      for (const width of [1440, 1100, 360]) {
-        const p = await ctx.newPage();
-        await p.emulateMedia({ colorScheme: scheme });
-        await p.setViewportSize({ width, height: 900 });
-        // The sidebar appears once the index is built: reload until it does.
-        for (let i = 0; i < 40; i++) {
-          await p.goto(srv.base + '/', { waitUntil: 'load' });
-          if (await p.$('.side .langbar')) break;
-          await p.waitForTimeout(250);
-        }
-        const m = await p.evaluate(() => {
-          const s = document.querySelector('.side svg.spark'),
-            l = document.querySelector('.side .langbar');
-          if (!s || !l) return null;
-          const a = s.getBoundingClientRect(), c = l.getBoundingClientRect();
-          return { sw: a.width, lw: c.width, sh: a.height, lh: c.height };
-        });
-        const where = `side-width ${name} ${scheme} ${width}`;
-        if (!m) r.fail(`${where}: no sparkline or language bar`);
-        else if (Math.abs(m.sw - m.lw) > 1) {
-          r.fail(`${where}: sparkline ${m.sw} px wide, language bar ${m.lw} px`);
-        } else r.ok(`${where}: both ${Math.round(m.lw)} px wide`);
-        await p.close();
-      }
+  const sw = { browsers, context, widths: [1440, 1100, 360], height: 900 };
+  await sweep(sw, async (p, { name, scheme, width }) => {
+    // The sidebar appears once the index is built: reload until it does.
+    for (let i = 0; i < 40; i++) {
+      await p.goto(srv.base + '/', { waitUntil: 'load' });
+      if (await p.$('.side .langbar')) break;
+      await p.waitForTimeout(250);
     }
-    await b.close();
-  }
+    const m = await p.evaluate(() => {
+      const s = document.querySelector('.side svg.spark'),
+        l = document.querySelector('.side .langbar');
+      if (!s || !l) return null;
+      const a = s.getBoundingClientRect(), c = l.getBoundingClientRect();
+      return { sw: a.width, lw: c.width, sh: a.height, lh: c.height };
+    });
+    const where = `side-width ${name} ${scheme} ${width}`;
+    if (!m) r.fail(`${where}: no sparkline or language bar`);
+    else if (Math.abs(m.sw - m.lw) > 1) {
+      r.fail(`${where}: sparkline ${m.sw} px wide, language bar ${m.lw} px`);
+    } else r.ok(`${where}: both ${Math.round(m.lw)} px wide`);
+  });
 }
 async function calmHeader() {
   writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
   await new Promise((ok) => setTimeout(ok, 2600));
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) {
-      for (const width of [1440, 900, 360]) {
-        const p = await ctx.newPage();
-        await p.emulateMedia({ colorScheme: scheme });
-        await p.setViewportSize({ width, height: 400 });
-        await p.goto(srv.base + '/', { waitUntil: 'load' });
-        await p.mouse.move(width - 1, 399);
-        const m = await p.evaluate(() => {
-          const look = (el) => {
-            if (!el) return null;
-            const s = getComputedStyle(el);
-            const bw = ['Top', 'Right', 'Bottom', 'Left'].some((k) =>
-              parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' &&
-              !/rgba\(.*, 0\)$|transparent/.test(s[`border${k}Color`])
-            );
-            return { border: bw, weight: Number(s.fontWeight) };
-          };
-          const chip = document.getElementById('wtchip'),
-            q = /** @type {HTMLElement | null} */ (document.getElementById('searchbtn'));
-          const x = () => (q && q.offsetParent ? q.getBoundingClientRect().x : null);
-          const out = {
-            branch: look(document.getElementById('refbtn')),
-            chip: look(chip),
-            shown: chip && !chip.hidden,
-          };
-          if (chip) {
-            const a = x();
-            chip.hidden = !chip.hidden;
-            const c = x();
-            chip.hidden = !chip.hidden;
-            out.dx = a === null ? 0 : Math.abs(a - c);
-          }
-          return out;
-        });
-        const where = `calm-header ${name} ${scheme} ${width}`;
-        const bad = [];
-        if (!m.branch) bad.push('no branch switcher');
-        else {
-          if (m.branch.border) bad.push('switcher has a border at rest');
-          if (m.branch.weight >= 600) bad.push(`switcher weight ${m.branch.weight}`);
-        }
-        if (!m.shown) bad.push('chip not shown on a dirty tree');
-        else {
-          if (m.chip.border) bad.push('chip has a border at rest');
-          if (m.chip.weight >= 600) bad.push(`chip weight ${m.chip.weight}`);
-        }
-        if (m.dx > 0.5) bad.push(`search moves ${m.dx.toFixed(1)} px when the chip toggles`);
-        bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: quiet, search steady`);
-        await p.close();
+  const sw = { browsers, context, widths: [1440, 900, 360], height: 400 };
+  await sweep(sw, async (p, { name, scheme, width }) => {
+    await p.goto(srv.base + '/', { waitUntil: 'load' });
+    await p.mouse.move(width - 1, 399);
+    const m = await p.evaluate(() => {
+      const look = (el) => {
+        if (!el) return null;
+        const s = getComputedStyle(el);
+        const bw = ['Top', 'Right', 'Bottom', 'Left'].some((k) =>
+          parseFloat(s[`border${k}Width`]) > 0 && s[`border${k}Style`] !== 'none' &&
+          !/rgba\(.*, 0\)$|transparent/.test(s[`border${k}Color`])
+        );
+        return { border: bw, weight: Number(s.fontWeight) };
+      };
+      const chip = document.getElementById('wtchip'),
+        q = /** @type {HTMLElement | null} */ (document.getElementById('searchbtn'));
+      const x = () => (q && q.offsetParent ? q.getBoundingClientRect().x : null);
+      const out = {
+        branch: look(document.getElementById('refbtn')),
+        chip: look(chip),
+        shown: chip && !chip.hidden,
+      };
+      if (chip) {
+        const a = x();
+        chip.hidden = !chip.hidden;
+        const c = x();
+        chip.hidden = !chip.hidden;
+        out.dx = a === null ? 0 : Math.abs(a - c);
       }
+      return out;
+    });
+    const where = `calm-header ${name} ${scheme} ${width}`;
+    const bad = [];
+    if (!m.branch) bad.push('no branch switcher');
+    else {
+      if (m.branch.border) bad.push('switcher has a border at rest');
+      if (m.branch.weight >= 600) bad.push(`switcher weight ${m.branch.weight}`);
     }
-    await b.close();
-  }
+    if (!m.shown) bad.push('chip not shown on a dirty tree');
+    else {
+      if (m.chip.border) bad.push('chip has a border at rest');
+      if (m.chip.weight >= 600) bad.push(`chip weight ${m.chip.weight}`);
+    }
+    if (m.dx > 0.5) bad.push(`search moves ${m.dx.toFixed(1)} px when the chip toggles`);
+    bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: quiet, search steady`);
+  });
   sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
 }
 // The section tabs stay one row at every width: on a narrow screen they scroll sideways instead
 // of wrapping, the tab of the open section is fully in view, and an edge fade shows that more
 // tabs are off screen (the scroll bar is hidden).
 async function tabsOneLine() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) {
-      for (const width of [1440, 900, 360, 320]) {
-        for (const [row, path] of [['.tabnav', '/stats'], ['.tabs', '/stats/ownership']]) {
-          const p = await ctx.newPage();
-          await p.emulateMedia({ colorScheme: scheme });
-          await p.setViewportSize({ width, height: 600 });
-          await p.goto(srv.base + path, { waitUntil: 'load' });
-          await p.evaluate(() =>
-            document.fonts.ready.then(() =>
-              new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
-            )
-          );
-          const m = await p.evaluate((sel) => {
-            const nav = document.querySelector(sel);
-            if (!nav) {
-              return null;
-            }
-            const tabs = [...nav.querySelectorAll('a')];
-            const tops = new Set(tabs.map((a) => Math.round(a.getBoundingClientRect().top)));
-            const on = nav.querySelector('a[aria-current="page"]');
-            const n = nav.getBoundingClientRect(), o = on && on.getBoundingClientRect();
-            const over = nav.scrollWidth > nav.clientWidth + 1;
-            const mask = getComputedStyle(nav).maskImage || getComputedStyle(nav).webkitMaskImage ||
-              'none';
-            return {
-              rows: tops.size,
-              over,
-              fade: mask !== 'none',
-              onIn: !!o && o.left >= n.left - 0.5 && o.right <= n.right + 0.5,
-              page: document.documentElement.scrollWidth > innerWidth + 1,
-            };
-          }, row);
-          const where = `tabs-one-line ${name} ${scheme} ${width} ${row}`;
-          const bad = [];
-          if (!m) bad.push('no section tabs');
-          else {
-            if (m.rows !== 1) bad.push(`tabs in ${m.rows} rows`);
-            if (!m.onIn) bad.push('the open tab is not fully visible');
-            if (m.over && !m.fade) bad.push('tabs overflow with no edge fade');
-            if (m.page) bad.push('the page scrolls sideways');
-          }
-          bad.length
-            ? r.fail(`${where}: ${bad.join(', ')}`)
-            : r.ok(`${where}: one row${m.over ? ', scrolls with a fade' : ''}`);
-          await p.close();
-        }
+  const rows = [['.tabnav', '/stats'], ['.tabs', '/stats/ownership']];
+  const sw = { browsers, context, widths: [1440, 900, 360, 320], height: 600, items: rows };
+  await sweep(sw, async (p, { name, scheme, width, item: [row, path] }) => {
+    await p.goto(srv.base + path, { waitUntil: 'load' });
+    await p.evaluate(() =>
+      document.fonts.ready.then(() =>
+        new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
+      )
+    );
+    const m = await p.evaluate((sel) => {
+      const nav = document.querySelector(sel);
+      if (!nav) {
+        return null;
       }
+      const tabs = [...nav.querySelectorAll('a')];
+      const tops = new Set(tabs.map((a) => Math.round(a.getBoundingClientRect().top)));
+      const on = nav.querySelector('a[aria-current="page"]');
+      const n = nav.getBoundingClientRect(), o = on && on.getBoundingClientRect();
+      const over = nav.scrollWidth > nav.clientWidth + 1;
+      const mask = getComputedStyle(nav).maskImage || getComputedStyle(nav).webkitMaskImage ||
+        'none';
+      return {
+        rows: tops.size,
+        over,
+        fade: mask !== 'none',
+        onIn: !!o && o.left >= n.left - 0.5 && o.right <= n.right + 0.5,
+        page: document.documentElement.scrollWidth > innerWidth + 1,
+      };
+    }, row);
+    const where = `tabs-one-line ${name} ${scheme} ${width} ${row}`;
+    const bad = [];
+    if (!m) bad.push('no section tabs');
+    else {
+      if (m.rows !== 1) bad.push(`tabs in ${m.rows} rows`);
+      if (!m.onIn) bad.push('the open tab is not fully visible');
+      if (m.over && !m.fade) bad.push('tabs overflow with no edge fade');
+      if (m.page) bad.push('the page scrolls sideways');
     }
-    await b.close();
-  }
+    bad.length
+      ? r.fail(`${where}: ${bad.join(', ')}`)
+      : r.ok(`${where}: one row${m.over ? ', scrolls with a fade' : ''}`);
+  });
 }
 // Segmented controls never break across lines: on every insights page and a document, at 360
 // and 1440 px, each control shows either one row of choices or its native select, never a
 // second row and never wider than the page.
 async function segOneRow() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) {
-      for (const width of [1440, 360]) {
-        for (
-          const path of [
-            '/stats',
-            '/stats/contributors',
-            '/stats/hotspots',
-            '/stats/ownership',
-            '/stats/languages',
-            '/blob/HEAD/README.md',
-          ]
-        ) {
-          const p = await ctx.newPage();
-          await p.emulateMedia({ colorScheme: scheme });
-          await p.setViewportSize({ width, height: 700 });
-          await p.goto(srv.base + path, { waitUntil: 'load' });
-          // Measure the settled page: after the web fonts and the frame that refits the controls.
-          await p.evaluate(() =>
-            document.fonts.ready.then(() =>
-              new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
-            )
-          );
-          const m = await p.evaluate(() =>
-            [...document.querySelectorAll('.segctl')].map((box) => {
-              const segs = box.querySelector('.segs'), sel = box.querySelector('select');
-              const shown = (e) =>
-                !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
-              const tops = new Set(
-                [...segs.children].map((c) => Math.round(c.getBoundingClientRect().top)),
-              );
-              const r = box.getBoundingClientRect();
-              return {
-                name: box.getAttribute('aria-label'),
-                segs: shown(segs),
-                sel: shown(sel),
-                rows: shown(segs) ? tops.size : 0,
-                cut: segs.scrollWidth > segs.clientWidth + 1 && shown(segs),
-                out: r.right > document.documentElement.clientWidth + 1,
-              };
-            })
-          );
-          const where = `seg-one-row ${name} ${scheme} ${width} ${path}`;
-          const bad = [];
-          for (const c of m) {
-            if (c.segs === c.sel) {
-              bad.push(`${c.name}: ${c.segs ? 'both' : 'neither'} row and select shown`);
-            }
-            if (c.rows > 1) bad.push(`${c.name}: ${c.rows} rows`);
-            if (c.cut) bad.push(`${c.name}: choices cut off`);
-            if (c.out) bad.push(`${c.name}: wider than the page`);
-          }
-          if (path.startsWith('/stats') && !m.length) bad.push('no segmented control');
-          bad.length
-            ? r.fail(`${where}: ${bad.join(', ')}`)
-            : r.ok(`${where}: ${m.length} controls, one row or a select`);
-          await p.close();
-        }
+  const paths = [
+    '/stats',
+    '/stats/contributors',
+    '/stats/hotspots',
+    '/stats/ownership',
+    '/stats/languages',
+    '/blob/HEAD/README.md',
+  ];
+  const sw = { browsers, context, widths: [1440, 360], height: 700, items: paths };
+  await sweep(sw, async (p, { name, scheme, width, item: path }) => {
+    await p.goto(srv.base + path, { waitUntil: 'load' });
+    // Measure the settled page: after the web fonts and the frame that refits the controls.
+    await p.evaluate(() =>
+      document.fonts.ready.then(() =>
+        new Promise((ok) => requestAnimationFrame(() => requestAnimationFrame(ok)))
+      )
+    );
+    const m = await p.evaluate(() =>
+      [...document.querySelectorAll('.segctl')].map((box) => {
+        const segs = box.querySelector('.segs'), sel = box.querySelector('select');
+        const shown = (e) =>
+          !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+        const tops = new Set(
+          [...segs.children].map((c) => Math.round(c.getBoundingClientRect().top)),
+        );
+        const r = box.getBoundingClientRect();
+        return {
+          name: box.getAttribute('aria-label'),
+          segs: shown(segs),
+          sel: shown(sel),
+          rows: shown(segs) ? tops.size : 0,
+          cut: segs.scrollWidth > segs.clientWidth + 1 && shown(segs),
+          out: r.right > document.documentElement.clientWidth + 1,
+        };
+      })
+    );
+    const where = `seg-one-row ${name} ${scheme} ${width} ${path}`;
+    const bad = [];
+    for (const c of m) {
+      if (c.segs === c.sel) {
+        bad.push(`${c.name}: ${c.segs ? 'both' : 'neither'} row and select shown`);
       }
+      if (c.rows > 1) bad.push(`${c.name}: ${c.rows} rows`);
+      if (c.cut) bad.push(`${c.name}: choices cut off`);
+      if (c.out) bad.push(`${c.name}: wider than the page`);
     }
-    await b.close();
-  }
+    if (path.startsWith('/stats') && !m.length) bad.push('no segmented control');
+    bad.length
+      ? r.fail(`${where}: ${bad.join(', ')}`)
+      : r.ok(`${where}: ${m.length} controls, one row or a select`);
+  });
 }
 // Tab levels: a page's own tabs never share the header nav's type, and every insights page is
 // one tab of the row: no More, and the open tab is marked in place.
@@ -356,94 +316,85 @@ async function stickyHeads() {
   }
   const sha = git('commit-tree', git('write-tree'), '-p', 'HEAD', '-m', 'Three long files');
   git('update-ref', 'refs/heads/sticky-check', sha);
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const scheme of ['light', 'dark']) {
-      for (const width of [1440, 375]) {
-        const p = await ctx.newPage();
-        await p.emulateMedia({ colorScheme: scheme });
-        await p.setViewportSize({ width, height: 700 });
-        await p.goto(`${srv.base}/commit/${sha}`, { waitUntil: 'load' });
-        const m = await p.evaluate(() => {
-          const s = [...document.querySelectorAll('section.file')];
-          if (s.length < 2) return null;
-          const r = s[1].getBoundingClientRect();
-          scrollTo(0, scrollY + r.top + r.height / 2);
-          const top = (el) => el.getBoundingClientRect().top;
-          const site = document.querySelector('header.top');
-          return {
-            second: top(s[1].querySelector('header')),
-            first: top(s[0].querySelector('header')),
-            site: site ? top(site) : 0,
-          };
-        });
-        const where = `sticky-heads ${name} ${scheme} ${width}`;
-        const bad = [];
-        if (!m) bad.push('fewer than two files on the commit page');
-        else {
-          if (Math.abs(m.second) > 1) {
-            bad.push(`second file header at ${m.second.toFixed(1)} px, not pinned`);
-          }
-          if (Math.abs(m.first) <= 1) bad.push('first file header still pinned');
-          if (width <= 600 && Math.abs(m.site) <= 1) bad.push('site header pinned at 375');
-        }
-        await p.goto(`${srv.base}/blob/${sha}/sticky/two.txt#L120`, { waitUntil: 'load' });
-        await p.waitForTimeout(100);
-        const a = await p.evaluate(() => {
-          const l = document.getElementById('L120');
-          if (!l) return null;
-          const t = l.getBoundingClientRect();
-          let cover = 0;
-          for (const el of document.querySelectorAll('body *')) {
-            const st = getComputedStyle(el);
-            if (st.position !== 'sticky' && st.position !== 'fixed') continue;
-            const r = el.getBoundingClientRect();
-            if (r.height && r.top <= 1 && r.left < t.right && r.right > t.left) {
-              cover = Math.max(cover, r.bottom);
-            }
-          }
-          return { top: t.top, bottom: t.bottom, cover, h: innerHeight };
-        });
-        if (!a) bad.push('no #L120 on the source page');
-        else if (a.top < a.cover - 0.5 || a.bottom > a.h) {
-          bad.push(
-            `#L120 at ${a.top.toFixed(1)} px, under a pinned bar ending at ${
-              a.cover.toFixed(1)
-            } px`,
-          );
-        }
-        if (width > 600 && a && a.cover < 1) bad.push('source path bar not pinned');
-        // The pinned page head holds the path and the file's tabs, so the reader keeps both.
-        if (width > 600) {
-          const held = await p.evaluate(() => {
-            const h = document.querySelector('main>.ph.pin');
-            const path = h && h.querySelector('h1.crumbs a:last-child');
-            return !!(path && h.querySelector('.tabs a[aria-current="page"]'));
-          });
-          if (!held) bad.push('the pinned head lacks the path or the File tab');
-        }
-        const held =
-          'file header pinned and handed over, #L120 clear of the head, path and tabs held';
-        bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: ${held}`);
-        if (arg('--shots')) {
-          mkdirSync(arg('--shots'), { recursive: true });
-          await p.screenshot({
-            path: join(arg('--shots'), `sticky-blob-${name}-${scheme}-${width}.png`),
-          });
-          await p.goto(`${srv.base}/commit/${sha}`);
-          await p.evaluate(() => {
-            const s = document.querySelectorAll('section.file')[1].getBoundingClientRect();
-            scrollTo(0, scrollY + s.top + s.height / 2);
-          });
-          await p.screenshot({
-            path: join(arg('--shots'), `sticky-commit-${name}-${scheme}-${width}.png`),
-          });
-        }
-        await p.close();
+  const sw = { browsers, context, widths: [1440, 375], height: 700 };
+  await sweep(sw, async (p, { name, scheme, width }) => {
+    await p.goto(`${srv.base}/commit/${sha}`, { waitUntil: 'load' });
+    const m = await p.evaluate(() => {
+      const s = [...document.querySelectorAll('section.file')];
+      if (s.length < 2) return null;
+      const r = s[1].getBoundingClientRect();
+      scrollTo(0, scrollY + r.top + r.height / 2);
+      const top = (el) => el.getBoundingClientRect().top;
+      const site = document.querySelector('header.top');
+      return {
+        second: top(s[1].querySelector('header')),
+        first: top(s[0].querySelector('header')),
+        site: site ? top(site) : 0,
+      };
+    });
+    const where = `sticky-heads ${name} ${scheme} ${width}`;
+    const bad = [];
+    if (!m) bad.push('fewer than two files on the commit page');
+    else {
+      if (Math.abs(m.second) > 1) {
+        bad.push(`second file header at ${m.second.toFixed(1)} px, not pinned`);
       }
+      if (Math.abs(m.first) <= 1) bad.push('first file header still pinned');
+      if (width <= 600 && Math.abs(m.site) <= 1) bad.push('site header pinned at 375');
     }
-    await b.close();
-  }
+    await p.goto(`${srv.base}/blob/${sha}/sticky/two.txt#L120`, { waitUntil: 'load' });
+    await p.waitForTimeout(100);
+    const a = await p.evaluate(() => {
+      const l = document.getElementById('L120');
+      if (!l) return null;
+      const t = l.getBoundingClientRect();
+      let cover = 0;
+      for (const el of document.querySelectorAll('body *')) {
+        const st = getComputedStyle(el);
+        if (st.position !== 'sticky' && st.position !== 'fixed') continue;
+        const r = el.getBoundingClientRect();
+        if (r.height && r.top <= 1 && r.left < t.right && r.right > t.left) {
+          cover = Math.max(cover, r.bottom);
+        }
+      }
+      return { top: t.top, bottom: t.bottom, cover, h: innerHeight };
+    });
+    if (!a) bad.push('no #L120 on the source page');
+    else if (a.top < a.cover - 0.5 || a.bottom > a.h) {
+      bad.push(
+        `#L120 at ${a.top.toFixed(1)} px, under a pinned bar ending at ${
+          a.cover.toFixed(1)
+        } px`,
+      );
+    }
+    if (width > 600 && a && a.cover < 1) bad.push('source path bar not pinned');
+    // The pinned page head holds the path and the file's tabs, so the reader keeps both.
+    if (width > 600) {
+      const held = await p.evaluate(() => {
+        const h = document.querySelector('main>.ph.pin');
+        const path = h && h.querySelector('h1.crumbs a:last-child');
+        return !!(path && h.querySelector('.tabs a[aria-current="page"]'));
+      });
+      if (!held) bad.push('the pinned head lacks the path or the File tab');
+    }
+    const held =
+      'file header pinned and handed over, #L120 clear of the head, path and tabs held';
+    bad.length ? r.fail(`${where}: ${bad.join(', ')}`) : r.ok(`${where}: ${held}`);
+    if (arg('--shots')) {
+      mkdirSync(arg('--shots'), { recursive: true });
+      await p.screenshot({
+        path: join(arg('--shots'), `sticky-blob-${name}-${scheme}-${width}.png`),
+      });
+      await p.goto(`${srv.base}/commit/${sha}`);
+      await p.evaluate(() => {
+        const s = document.querySelectorAll('section.file')[1].getBoundingClientRect();
+        scrollTo(0, scrollY + s.top + s.height / 2);
+      });
+      await p.screenshot({
+        path: join(arg('--shots'), `sticky-commit-${name}-${scheme}-${width}.png`),
+      });
+    }
+  });
 }
 // ---- settings --------------------------------------------------------------------------------
 async function settings() {

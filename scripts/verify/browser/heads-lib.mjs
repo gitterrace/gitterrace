@@ -1,5 +1,6 @@
 // Page heads: each page's controls sit in the title row or one bar, never in rows of their own.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
+import { sweep } from '../../lib/browser-lib.mjs';
 
 /** Visible head rows of the page: the path bar and any document header, as boxes. */
 const HEADS = 'main .head, main>.ph>.ph-row, main>.ph>.fbar, [data-dochead]';
@@ -7,20 +8,10 @@ const HEADS = 'main .head, main>.ph>.ph-row, main>.ph>.fbar, [data-dochead]';
 export function checks({ srv, r, browsers, context }) {
   /** Runs `fn(page)` returning a list of faults at each width and scheme; reports one line each. */
   async function each(label, path, fn, widths = [1440, 900, 390]) {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
-      for (const scheme of ['light', 'dark']) for (const width of widths) {
-        const p = await ctx.newPage();
-        await p.emulateMedia({ colorScheme: scheme });
-        await p.setViewportSize({ width, height: 900 });
-        await p.goto(srv.base + path, { waitUntil: 'load' });
-        const bad = await fn(p, width);
-        const where = `page-heads ${name} ${scheme} ${width} ${label}`;
-        if (bad.length) r.fail(`${where}: ${bad.join('; ')}`); else r.ok(where);
-        await p.close();
-      }
-      await b.close();
-    }
+    await sweep({ browsers, context, widths }, async (p, { name, scheme, width }) => {
+      await p.goto(srv.base + path, { waitUntil: 'load' });
+      r.verdict(`page-heads ${name} ${scheme} ${width} ${label}`, await fn(p, width));
+    });
   }
 
   async function pageHeads() {
