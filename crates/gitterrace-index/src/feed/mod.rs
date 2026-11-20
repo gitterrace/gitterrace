@@ -156,6 +156,16 @@ pub struct Sums {
 }
 
 impl Sums {
+    pub(crate) fn add_file(&mut self, f: &crate::FileStat) {
+        let c = f.code_stat();
+        self.add += u64::from(f.additions);
+        self.del += u64::from(f.deletions);
+        self.rewritten += u64::from(f.rewritten);
+        self.code_add += u64::from(c.additions);
+        self.code_del += u64::from(c.deletions);
+        self.code_rewritten += u64::from(c.rewritten);
+    }
+
     /// Adds one file row, or `None` when a sum passes u64 (`self` unchanged then). Rows read
     /// from a file can repeat without bound across commits, so this is checked as
     /// [`Sums::merge`] is.

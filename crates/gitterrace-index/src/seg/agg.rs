@@ -15,50 +15,7 @@ use crate::seg::canon::Lives;
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
 
-/// Line sums, raw and with whitespace-only changes ignored.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) struct Sums {
-    pub add: u64,
-    pub del: u64,
-    pub rewritten: u64,
-    pub code_add: u64,
-    pub code_del: u64,
-    pub code_rewritten: u64,
-}
-
-impl Sums {
-    fn add_file(&mut self, f: &crate::FileStat) {
-        let c = f.code_stat();
-        self.add += u64::from(f.additions);
-        self.del += u64::from(f.deletions);
-        self.rewritten += u64::from(f.rewritten);
-        self.code_add += u64::from(c.additions);
-        self.code_del += u64::from(c.deletions);
-        self.code_rewritten += u64::from(c.rewritten);
-    }
-
-    /// Adds `o`, or `None` when a sum passes u64 (stored counts only get there). `self` is
-    /// unchanged on `None`.
-    #[must_use]
-    pub(crate) const fn merge(&mut self, o: &Self) -> Option<()> {
-        let (Some(add), Some(del), Some(rewritten)) = (
-            self.add.checked_add(o.add),
-            self.del.checked_add(o.del),
-            self.rewritten.checked_add(o.rewritten),
-        ) else {
-            return None;
-        };
-        let (Some(code_add), Some(code_del), Some(code_rewritten)) = (
-            self.code_add.checked_add(o.code_add),
-            self.code_del.checked_add(o.code_del),
-            self.code_rewritten.checked_add(o.code_rewritten),
-        ) else {
-            return None;
-        };
-        *self = Self { add, del, rewritten, code_add, code_del, code_rewritten };
-        Some(())
-    }
-}
+pub(crate) use crate::feed::Sums;
 
 /// What an unreadable error names when stored counts summed past u64. A build never gets
 /// there (a commit adds u32 counts), so only a hostile or broken file does.

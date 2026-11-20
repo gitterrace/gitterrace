@@ -221,7 +221,7 @@ impl<B: InsightsSource> SegmentSource<B> {
                     sums: Sums::default(),
                 });
                 agg::add_count(&mut e.commits, v.commits)?;
-                e.sums.merge(&sums(&v.lines))
+                e.sums.merge(&v.lines)
             })
         })?;
         Ok(out.into_values().collect())
@@ -247,7 +247,7 @@ impl<B: InsightsSource> SegmentSource<B> {
                     sums: Sums::default(),
                 });
                 agg::add_count(&mut e.touches, v.touches)?;
-                e.sums.merge(&sums(&v.lines))
+                e.sums.merge(&v.lines)
             })
         })?;
         Ok(out.into_values().collect())
@@ -317,17 +317,6 @@ impl<B: InsightsSource> SegmentSource<B> {
         })?;
         out.sort_unstable();
         Ok(out)
-    }
-}
-
-const fn sums(s: &agg::Sums) -> Sums {
-    Sums {
-        add: s.add,
-        del: s.del,
-        rewritten: s.rewritten,
-        code_add: s.code_add,
-        code_del: s.code_del,
-        code_rewritten: s.code_rewritten,
     }
 }
 
