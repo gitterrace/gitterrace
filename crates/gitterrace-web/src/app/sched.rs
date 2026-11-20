@@ -3,8 +3,8 @@
 //!
 //! The index builds in a child process, so the server cannot cap its threads directly. It sends
 //! the child `budget <n>` lines instead (see `child.rs`): 12 workers while the machine is under
-//! 60% loaded, 4 up to 100%, none above, shared evenly by the builds running at once. A build
-//! with no workers pauses and goes on when the load falls.
+//! 60% loaded, 4 up to 100%, one above, shared evenly by the builds running at once. A running
+//! build keeps one worker even on a saturated machine, or it would never finish.
 //!
 //! One sampler thread reads the load while any build runs and exits after [`IDLE`] without
 //! one, so an idle server keeps no thread for this.
@@ -19,7 +19,9 @@ const FULL: usize = 12;
 const REDUCED: usize = 4;
 /// Load, in percent of the cores, from which the budget drops to [`REDUCED`].
 const BUSY: u32 = 60;
-/// Load, in percent of the cores, above which no worker runs.
+/// Workers above [`SATURATED`]: a floor, so a build on a busy machine still ends.
+const FLOOR: usize = 1;
+/// Load, in percent of the cores, above which only the [`FLOOR`] runs.
 const SATURATED: u32 = 100;
 /// How often the sampler reads the load while a build runs.
 const POLL: Duration = Duration::from_secs(5);
@@ -35,7 +37,7 @@ const fn tier(load: Option<u32>) -> usize {
         None => FULL,
         Some(l) if l < BUSY => FULL,
         Some(l) if l <= SATURATED => REDUCED,
-        Some(_) => 0,
+        Some(_) => FLOOR,
     }
 }
 
@@ -185,6 +187,10 @@ impl Drop for Lease {
         let mut s = self.sched.lock();
         s.builds.retain(|b| b.id != self.id);
         self.sched.rebalance(&mut s, None);
+        drop(s);
+        // The sampler waits out a whole poll: wake it to see the last build gone and start its
+        // idle countdown now.
+        self.sched.entered.notify_all();
     }
 }
 

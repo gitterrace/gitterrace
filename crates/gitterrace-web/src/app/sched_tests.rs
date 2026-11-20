@@ -19,14 +19,14 @@ fn sampling(s: &Scheduler) -> bool {
     s.lock().sampling
 }
 
-/// Guard class: the load tiers. 12 under 60, 4 up to 100, none above, at each edge. Red when
+/// Guard class: the load tiers. 12 under 60, 4 up to 100, one above, at each edge. Red when
 /// a tier compares with the wrong operator or a load that cannot be read stops the builds.
 #[test]
-fn the_budget_is_twelve_under_sixty_four_up_to_a_hundred_none_above() {
+fn the_budget_is_twelve_under_sixty_four_up_to_a_hundred_one_above() {
     let at = |l| tier(Some(l));
     assert_eq!([at(0), at(50), at(59)], [12, 12, 12]);
     assert_eq!([at(60), at(80), at(100)], [4, 4, 4]);
-    assert_eq!([at(101), at(120)], [0, 0]);
+    assert_eq!([at(101), at(120)], [1, 1]);
     assert_eq!(tier(None), 12, "an unreadable load does not stop builds");
 }
 
@@ -48,7 +48,7 @@ fn a_running_build_is_sent_the_budget_of_each_load_it_sees() {
     load.store(80, Ordering::SeqCst);
     assert_eq!(rx.recv_timeout(DEADLINE), Ok(4));
     load.store(120, Ordering::SeqCst);
-    assert_eq!(rx.recv_timeout(DEADLINE), Ok(0));
+    assert_eq!(rx.recv_timeout(DEADLINE), Ok(1));
     load.store(10, Ordering::SeqCst);
     assert_eq!(rx.recv_timeout(DEADLINE), Ok(12));
 }
