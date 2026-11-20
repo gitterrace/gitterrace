@@ -66,7 +66,7 @@ fn the_checker_sees_a_bare_date() {
 
 #[test]
 fn every_relative_date_has_its_tip() {
-    if !oracle::frozen("every_relative_date_has_its_tip") {
+    if !oracle::frozen("dates_have_tips::every_relative_date_has_its_tip") {
         return;
     }
     let rt = tokio::runtime::Runtime::new().expect("runtime");
