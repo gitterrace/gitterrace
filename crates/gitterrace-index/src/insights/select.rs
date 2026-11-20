@@ -10,7 +10,7 @@ use std::sync::Arc;
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
     PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow, Sums,
-    local_day_of,
+    fold_author_day, fold_path_author,
 };
 use crate::insights::Options;
 use crate::query::{Matcher, Query, QueryError};
@@ -200,46 +200,19 @@ impl InsightsSource for Scoped<'_> {
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
-        let mut m: BTreeMap<(i64, IdentId), (u64, Sums)> = BTreeMap::new();
-        for c in self.commits_in(CommitRange::All).filter(|c| !c.merge) {
-            let day = local_day_of(c.time, c.offset);
-            if days.contains(&day) {
-                let e = m.entry((day, c.ident)).or_default();
-                e.0 += 1;
-                self.over.note(e.1.merge(&c.sums));
-            }
-        }
-        Box::new(
-            m.into_iter()
-                .map(|((day, ident), (commits, sums))| AuthorDayRow {
-                    day,
-                    ident,
-                    commits,
-                    sums,
-                }),
-        )
+        fold_author_day(self.commits_in(CommitRange::All), &days, &self.over)
     }
 
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
         let prefix = prefix.trim_matches('/');
-        let mut m: BTreeMap<(PathId, IdentId), (u64, Sums)> = BTreeMap::new();
-        for c in self.commits_in(CommitRange::All).filter(|c| !c.merge) {
-            for f in self.rows(c.rank) {
-                if prefix.is_empty() || self.base.path(f.path).is_some_and(|n| under(&n, prefix)) {
-                    let e = m.entry((f.path, c.ident)).or_default();
-                    e.0 += 1;
-                    self.over.note(e.1.add_row(&f));
+        fold_path_author(
+            &self.over,
+            |p| prefix.is_empty() || self.base.path(p).is_some_and(|n| under(&n, prefix)),
+            |f| {
+                for c in self.commits_in(CommitRange::All) {
+                    f(&c, &self.rows(c.rank));
                 }
-            }
-        }
-        Box::new(
-            m.into_iter()
-                .map(|((path, ident), (touches, sums))| PathAuthorRow {
-                    path,
-                    ident,
-                    touches,
-                    sums,
-                }),
+            },
         )
     }
 

@@ -16,7 +16,8 @@ use crate::CommitSource;
 use crate::feed::fresh::{self, Fresh, FreshRow, Walk, label_count};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, SumOverflow,
+    fold_author_day, fold_path_author,
 };
 
 /// Commits per `rows_for` call while folding an aggregate, so one fold holds one chunk.
@@ -155,7 +156,7 @@ impl<S: InsightsSource> Reach<S> {
             .and_then(|i| self.fresh.rows.get(i as usize))
     }
 
-    fn each_row(&self, mut f: impl FnMut(&CommitRow, &[FileRow])) {
+    fn each_row(&self, f: &mut dyn FnMut(&CommitRow, &[FileRow])) {
         let n = u32::try_from(self.len()).unwrap_or(u32::MAX);
         let mut at = 0;
         while at < n {
@@ -238,57 +239,23 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
-        let mut m: BTreeMap<(i64, IdentId), (u64, Sums)> = BTreeMap::new();
-        for c in self.commits_in(CommitRange::All) {
-            let day = crate::feed::local_day_of(c.time, c.offset);
-            if c.merge || !days.contains(&day) {
-                continue;
-            }
-            let e = m.entry((day, c.ident)).or_default();
-            e.0 += 1;
-            self.over.note(e.1.merge(&c.sums));
-        }
-        Box::new(
-            m.into_iter()
-                .map(|((day, ident), (commits, sums))| AuthorDayRow {
-                    day,
-                    ident,
-                    commits,
-                    sums,
-                }),
-        )
+        fold_author_day(self.commits_in(CommitRange::All), &days, &self.over)
     }
 
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
         let prefix = prefix.trim_matches('/');
-        let mut keep: BTreeMap<PathId, bool> = BTreeMap::new();
-        let mut m: BTreeMap<(PathId, IdentId), (u64, Sums)> = BTreeMap::new();
-        self.each_row(|c, files| {
-            if c.merge {
-                return;
-            }
-            for f in files {
-                let ok = *keep.entry(f.path).or_insert_with(|| {
+        let mut seen: BTreeMap<PathId, bool> = BTreeMap::new();
+        fold_path_author(
+            &self.over,
+            |p| {
+                *seen.entry(p).or_insert_with(|| {
                     prefix.is_empty()
                         || self
-                            .path(f.path)
-                            .is_some_and(|p| crate::insights::under(&p, prefix))
-                });
-                if ok {
-                    let e = m.entry((f.path, c.ident)).or_default();
-                    e.0 += 1;
-                    self.over.note(e.1.add_row(f));
-                }
-            }
-        });
-        Box::new(
-            m.into_iter()
-                .map(|((path, ident), (touches, sums))| PathAuthorRow {
-                    path,
-                    ident,
-                    touches,
-                    sums,
-                }),
+                            .path(p)
+                            .is_some_and(|n| crate::insights::under(&n, prefix))
+                })
+            },
+            |f| self.each_row(f),
         )
     }
 

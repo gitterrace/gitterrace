@@ -30,6 +30,7 @@ mod memory;
 mod reach;
 pub(crate) mod segments;
 
+use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::Arc;
 
@@ -94,6 +95,61 @@ pub const fn local_time_of(time: i64, offset: i32) -> i64 {
 pub const fn local_day_of(time: i64, offset: i32) -> i64 {
     time.saturating_add(offset as i64)
         .div_euclid(crate::insights::DAY)
+}
+
+/// Author x day rows over `commits` (merges skipped), for views that fold their own rows.
+pub(crate) fn fold_author_day(
+    commits: impl Iterator<Item = CommitRow>,
+    days: &Range<i64>,
+    over: &SumOverflow,
+) -> Stream<'static, AuthorDayRow> {
+    let mut m: BTreeMap<(i64, IdentId), (u64, Sums)> = BTreeMap::new();
+    for c in commits.filter(|c| !c.merge) {
+        let day = local_day_of(c.time, c.offset);
+        if days.contains(&day) {
+            let e = m.entry((day, c.ident)).or_default();
+            e.0 += 1;
+            over.note(e.1.merge(&c.sums));
+        }
+    }
+    Box::new(
+        m.into_iter()
+            .map(|((day, ident), (commits, sums))| AuthorDayRow {
+                day,
+                ident,
+                commits,
+                sums,
+            }),
+    )
+}
+
+/// Path x author rows over the rows `each` hands out (merges skipped by the caller), keeping
+/// the paths `keep` accepts.
+pub(crate) fn fold_path_author(
+    over: &SumOverflow,
+    mut keep: impl FnMut(PathId) -> bool,
+    each: impl FnOnce(&mut dyn FnMut(&CommitRow, &[FileRow])),
+) -> Stream<'static, PathAuthorRow> {
+    let mut m: BTreeMap<(PathId, IdentId), (u64, Sums)> = BTreeMap::new();
+    each(&mut |c, files| {
+        if c.merge {
+            return;
+        }
+        for f in files.iter().filter(|f| keep(f.path)) {
+            let e = m.entry((f.path, c.ident)).or_default();
+            e.0 += 1;
+            over.note(e.1.add_row(f));
+        }
+    });
+    Box::new(
+        m.into_iter()
+            .map(|((path, ident), (touches, sums))| PathAuthorRow {
+                path,
+                ident,
+                touches,
+                sums,
+            }),
+    )
 }
 
 /// Boxed streaming iterator borrowed from the source.
