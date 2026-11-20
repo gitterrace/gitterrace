@@ -1,7 +1,7 @@
 //! Every commit id on a page is the shared `a.sha` link. Renders the main pages of a fixture
 //! repository and checks that no 7-to-40 hex token in visible text sits outside one.
 
-use gitterrace_testkit::{git, page as get};
+use gitterrace_testkit::{Fixture, git, page as get};
 
 /// Hex runs of 7 to 40 digits in visible text (outside tags, scripts, styles and `a.sha`),
 /// bounded by non-word characters and holding both a digit and a letter, so counts and plain
@@ -90,26 +90,22 @@ fn scanner_flags_a_plain_id() {
 #[tokio::test(flavor = "multi_thread")]
 async fn every_commit_id_is_a_sha_link() {
     let root = tempfile::tempdir().expect("tmp");
-    let p = root.path().join("repo");
-    std::fs::create_dir_all(p.join("src")).expect("dir");
-    git(&p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("README.md"), "# Hi\n").expect("w");
-    std::fs::write(p.join("src/a.rs"), "fn main() {}\n").expect("w");
-    git(&p, &["add", "."]);
-    git(&p, &["commit", "-q", "-m", "feat(core): first"]);
-    git(&p, &["branch", "side"]);
-    git(&p, &["tag", "-a", "v1", "-m", "release one"]);
-    std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n").expect("w");
-    git(&p, &["commit", "-qam", "fix: second"]);
-    std::fs::write(p.join("src/a.rs"), "fn main() {\n    1;\n}\n").expect("w");
-    git(&p, &["stash", "push", "-q", "-m", "wip stash"]);
     let wt = root.path().join("wt");
-    git(
-        &p,
-        &["worktree", "add", "-q", wt.to_str().expect("utf8"), "side"],
-    );
-    // A detached HEAD puts the id into the banner shown on every page.
-    git(&p, &["checkout", "-q", "--detach"]);
+    let f = Fixture::init(&root.path().join("repo"))
+        .write("README.md", "# Hi\n")
+        .write("src/a.rs", "fn main() {}\n")
+        .commit("feat(core): first")
+        .branch("side")
+        .checkout("main")
+        .tag("v1", "release one")
+        .write("src/a.rs", "fn main() {\n}\n")
+        .commit("fix: second")
+        .write("src/a.rs", "fn main() {\n    1;\n}\n")
+        .stash("wip stash")
+        .worktree(&wt, "side")
+        // A detached HEAD puts the id into the banner shown on every page.
+        .detach();
+    let p = f.path().to_owned();
 
     let router = gitterrace_web::app_router(&p).expect("router");
     let head = git(&p, &["rev-parse", "HEAD"]);
