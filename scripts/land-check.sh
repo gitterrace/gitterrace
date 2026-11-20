@@ -356,6 +356,13 @@ self_test() {
       echo "self-test: a command of \`make lines names\` never runs in land-check" >&2
       exit 1
     }
+  # The Windows clippy step needs only the rustup target: gated on a linker it was skipped on a
+  # host that could run it, and a test helper dead on Windows reached CI. The same gate on any
+  # other clippy target would hide that target's cfg-only code the same way.
+  if grep -B3 -- 'step cargo clippy .*--target x86_64' "$0" | grep -q 'ming[w]'; then
+    echo "self-test: the windows clippy step is gated on a linker" >&2
+    exit 1
+  fi
   # The landing base: a single landing's base is HEAD^, a plan landing's is FETCH_HEAD.
   empty_commit "$d" "feat(x): base"
   empty_commit "$d" "feat(x): one"
@@ -520,12 +527,13 @@ echo "land-check: ${scope[*]:-no crate touched}"
 # The Windows target of `make clippy-cross`, scoped: test-only code that is dead there fails.
 # Both paths run it, since the landing gate calls --tests-only and land.toml skips the
 # workspace clippy-cross on that promise.
+# Clippy only checks, so no linker is needed: requiring mingw skipped this step on a
+# host that could run it and let a unix-only caller leave a helper dead on Windows.
 windows_step() {
-  if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu &&
-    command -v x86_64-w64-mingw32-gcc >/dev/null; then
+  if rustup target list --installed 2>/dev/null | grep -qx x86_64-pc-windows-gnu; then
     step cargo clippy "$@" --all-targets --target x86_64-pc-windows-gnu -- -D warnings
   else
-    echo "land-check: no x86_64-pc-windows-gnu target or mingw, the Windows clippy is CI's"
+    echo "land-check: windows clippy skipped, rustup target x86_64-pc-windows-gnu missing"
   fi
 }
 
