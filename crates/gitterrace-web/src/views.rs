@@ -2,6 +2,7 @@
 
 mod code;
 mod diff;
+mod look;
 
 use gitterrace_git::{
     ChangeKind, CommitDetail, CommitSummary, FileDiff, RefInfo, TreeEntry, TreeEntryKind,
@@ -22,6 +23,7 @@ pub(crate) use crate::views::code::{
 pub(crate) use crate::views::diff::{
     DiffSource, MediaFacts, diff_fragment, diff_html_with, worktree_fragment, worktree_generated,
 };
+pub(crate) use crate::views::look::DiffLook;
 
 /// The settings a rendered fragment depends on, read once per request from the config.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -114,8 +116,8 @@ pub(crate) struct Chrome {
     pub(crate) theme: String,
     /// Tint the line under the pointer (`display.has_line_hover`).
     pub(crate) has_line_hover: bool,
-    /// Diff colors (`display.diff_palette`), empty for the default.
-    pub(crate) diff_palette: String,
+    /// How a diff looks (`display.diff_*`).
+    pub(crate) diff: DiffLook,
     /// Open a live-update stream: off on pages pinned to a commit or tag.
     pub(crate) live: bool,
     /// What the page does with a change: `refresh`, `notice` or nothing but the chrome.
@@ -258,7 +260,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             t => t.as_str().to_owned(),
         },
         has_line_hover: app.cfg().display.has_line_hover,
-        diff_palette: app.cfg().display.diff_palette.attr(),
+        diff: DiffLook::of(&app.cfg().display),
         live: !app.public()
             && crate::features::on(Feature::Live)
             && app.cfg().watch.enabled

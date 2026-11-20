@@ -313,7 +313,7 @@ fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::C
             t => t.as_str().to_owned(),
         },
         has_line_hover: cfg.display.has_line_hover,
-        diff_palette: cfg.display.diff_palette.attr(),
+        diff: crate::views::DiffLook::of(&cfg.display),
         live: false,
         live_how: "",
         live_on: "",

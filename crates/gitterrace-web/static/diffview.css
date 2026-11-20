@@ -1,0 +1,45 @@
+/* Diff view settings (display.diff_*): wrap, tab width and code font size, as body attributes. */
+body[data-diff-tab="1"] div.diff{tab-size:1}
+body[data-diff-tab="2"] div.diff{tab-size:2}
+body[data-diff-tab="3"] div.diff{tab-size:3}
+body[data-diff-tab="4"] div.diff{tab-size:4}
+body[data-diff-tab="5"] div.diff{tab-size:5}
+body[data-diff-tab="6"] div.diff{tab-size:6}
+body[data-diff-tab="7"] div.diff{tab-size:7}
+body[data-diff-tab="8"] div.diff{tab-size:8}
+body[data-diff-tab="9"] div.diff{tab-size:9}
+body[data-diff-tab="10"] div.diff{tab-size:10}
+body[data-diff-tab="11"] div.diff{tab-size:11}
+body[data-diff-tab="12"] div.diff{tab-size:12}
+body[data-diff-tab="13"] div.diff{tab-size:13}
+body[data-diff-tab="14"] div.diff{tab-size:14}
+body[data-diff-tab="15"] div.diff{tab-size:15}
+body[data-diff-tab="16"] div.diff{tab-size:16}
+body[data-diff-font="8"] div.diff{font-size:8px}
+body[data-diff-font="9"] div.diff{font-size:9px}
+body[data-diff-font="10"] div.diff{font-size:10px}
+body[data-diff-font="11"] div.diff{font-size:11px}
+body[data-diff-font="12"] div.diff{font-size:12px}
+body[data-diff-font="13"] div.diff{font-size:13px}
+body[data-diff-font="14"] div.diff{font-size:14px}
+body[data-diff-font="15"] div.diff{font-size:15px}
+body[data-diff-font="16"] div.diff{font-size:16px}
+body[data-diff-font="17"] div.diff{font-size:17px}
+body[data-diff-font="18"] div.diff{font-size:18px}
+body[data-diff-font="19"] div.diff{font-size:19px}
+body[data-diff-font="20"] div.diff{font-size:20px}
+body[data-diff-font="21"] div.diff{font-size:21px}
+body[data-diff-font="22"] div.diff{font-size:22px}
+body[data-diff-font="23"] div.diff{font-size:23px}
+body[data-diff-font="24"] div.diff{font-size:24px}
+body[data-diff-font="25"] div.diff{font-size:25px}
+body[data-diff-font="26"] div.diff{font-size:26px}
+body[data-diff-font="27"] div.diff{font-size:27px}
+body[data-diff-font="28"] div.diff{font-size:28px}
+body[data-diff-font="29"] div.diff{font-size:29px}
+body[data-diff-font="30"] div.diff{font-size:30px}
+body[data-diff-font="31"] div.diff{font-size:31px}
+body[data-diff-font="32"] div.diff{font-size:32px}
+body[data-diff-wrap] div.diff :is(.add,.del,.ctx,.hh){
+  white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
+body[data-diff-wrap] div.diff .ch{width:auto}

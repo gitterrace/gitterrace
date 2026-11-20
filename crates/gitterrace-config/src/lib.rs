@@ -29,7 +29,7 @@ pub use features::{Feature, INSIGHT_PAGES};
 pub use form::{Field, Input, fields};
 pub use locate::{Located, located, syntax};
 pub use rows::{RowKey, row_editable, row_literal, rows, table_literal};
-pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Key, Reload, RepoOverride, keys};
+pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Display, Key, Reload, RepoOverride, keys};
 pub use value::{Control, Show};
 pub use write::{MAX_FILE_BYTES, SaveError, Saved, Stamp, save, save_config};
 

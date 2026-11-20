@@ -216,6 +216,8 @@ fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, cr
 /// Range of every bounded number: (id, least, most). The least is never 0, so a limit cannot
 /// switch its page off; the most keeps one request within a machine.
 pub const BOUNDS: &[(&str, u64, u64)] = &[
+    ("display.diff_tab_chars", 1, 16),
+    ("display.diff_font_px", 8, 32),
     ("server.public_timeout_secs", 1, 3600),
     ("limits.search_file_lines", 1, 100_000),
     ("limits.search_commits", 1, 100_000),
@@ -385,6 +387,12 @@ settings! {
         /// Colors a diff marks additions and removals with: `default` (green and red) or
         /// `colorblind` (blue and orange).
         diff_palette: DiffPalette = DiffPalette::Default => Live,
+        /// Wrap long lines in a diff instead of scrolling sideways.
+        has_diff_wrap: bool = false => Live,
+        /// Width of a tab in a diff, in characters.
+        diff_tab_chars: u64 = 4 => Live,
+        /// Code font size in a diff, in pixels.
+        diff_font_px: u64 = 13 => Live,
         /// Tint the whole line under the pointer in a file, its blame and a diff.
         has_line_hover: bool = true => Live,
         /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,

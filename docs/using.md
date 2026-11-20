@@ -147,6 +147,8 @@ lists every key.
 
 Good to know: `display.diff_palette = "colorblind"` marks diff additions blue and
 removals orange instead of green and red.
+`display.has_diff_wrap`, `display.diff_tab_chars` and `display.diff_font_px` wrap diff
+lines, set the tab width and the code font size in every diff.
 
 ## Keys
 

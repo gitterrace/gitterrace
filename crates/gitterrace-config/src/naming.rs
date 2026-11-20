@@ -31,8 +31,8 @@ pub struct Exception {
 pub const RULES: &[Rule] = &[
     Rule {
         holds: "a size",
-        form: "integer ending in `_kb` or `_mb` (KiB, MiB)",
-        parts: &["_kb", "_mb"],
+        form: "integer ending in `_kb` or `_mb` (KiB, MiB), `_px` or `_chars`",
+        parts: &["_kb", "_mb", "_px", "_chars"],
         example: "`limits.text_kb`",
     },
     Rule {

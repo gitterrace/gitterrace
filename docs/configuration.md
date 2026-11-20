@@ -36,7 +36,7 @@ as unknown and the default applies.
 
 | Holds | Form | Example |
 | --- | --- | --- |
-| a size | integer ending in `_kb` or `_mb` (KiB, MiB) | `limits.text_kb` |
+| a size | integer ending in `_kb` or `_mb` (KiB, MiB), `_px` or `_chars` | `limits.text_kb` |
 | a duration | integer ending in `_ms` or `_secs` | `watch.rescan_secs` |
 | a count | integer ending in the plural it counts | `api.blame_lines` |
 | a switch | bool with a predicate prefix (`is_`, `has_`, `needs_`, `include_`) or the `enabled` gate of its section | `insights.include_bots` |
@@ -195,6 +195,11 @@ Exceptions, each on purpose:
 - `diff_palette` (string, default `"default"`): Colors a diff marks additions
   and removals with: `default` (green and red) or `colorblind` (blue and
   orange).
+- `has_diff_wrap` (bool, default `false`): Wrap long lines in a diff instead of
+  scrolling sideways.
+- `diff_tab_chars` (integer, default `4`): Width of a tab in a diff, in
+  characters.
+- `diff_font_px` (integer, default `13`): Code font size in a diff, in pixels.
 - `has_line_hover` (bool, default `true`): Tint the whole line under the pointer
   in a file, its blame and a diff.
 - `sidebar` (list of strings, default

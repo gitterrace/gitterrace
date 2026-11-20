@@ -30,7 +30,7 @@ const CSS: &str = "text/css; charset=utf-8";
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 /// Every embedded script and stylesheet: (name under `/static/`, type, body).
-const TABLE: [(&str, &str, &str); 27] = [
+const TABLE: [(&str, &str, &str); 28] = [
     ("loc.js", JS, include_str!("../../static/loc.js")),
     ("tokens.css", CSS, include_str!("../../static/tokens.css")),
     ("app.css", CSS, include_str!("../../static/app.css")),
@@ -56,6 +56,11 @@ const TABLE: [(&str, &str, &str); 27] = [
     ("send.css", CSS, include_str!("../../static/send.css")),
     ("buttons.css", CSS, include_str!("../../static/buttons.css")),
     ("docnav.css", CSS, include_str!("../../static/docnav.css")),
+    (
+        "diffview.css",
+        CSS,
+        include_str!("../../static/diffview.css"),
+    ),
     ("graph.css", CSS, include_str!("../../static/graph.css")),
     ("markdown.js", JS, include_str!("../../static/markdown.js")),
     ("outline.js", JS, include_str!("../../static/outline.js")),
