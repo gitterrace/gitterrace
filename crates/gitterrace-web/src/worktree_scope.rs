@@ -13,11 +13,16 @@ pub(crate) struct ScopeQuery {
 
 impl ScopeQuery {
     pub(crate) fn scope(&self) -> Scope {
-        match self.scope.as_deref() {
-            Some("staged") => Scope::Staged,
-            Some("unstaged") => Scope::Unstaged,
-            _ => Scope::All,
-        }
+        named(self.scope.as_deref())
+    }
+}
+
+/// The scope a `scope=` value names.
+pub(crate) fn named(v: Option<&str>) -> Scope {
+    match v {
+        Some("staged") => Scope::Staged,
+        Some("unstaged") => Scope::Unstaged,
+        _ => Scope::All,
     }
 }
 

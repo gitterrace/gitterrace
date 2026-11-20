@@ -21,7 +21,15 @@ use crate::{
 };
 
 /// Route prefixes whose answers scripts read: never wrapped in the page shell.
-const FRAGMENTS: [&str; 5] = ["/api/", "/diff/", "/hl/", "/worktree/diff/", "/events"];
+const FRAGMENTS: [&str; 7] = [
+    "/api/",
+    "/diff/",
+    "/diff-find/",
+    "/hl/",
+    "/worktree/diff/",
+    "/worktree/find",
+    "/events",
+];
 
 /// What a 404 said, carried on the response so the repository layer can re-render it.
 #[derive(Clone)]

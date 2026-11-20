@@ -47,18 +47,19 @@ pub const PAGES: &[Page] = &[
         &["/log", "/log/{rev}", "/history/{*path}", "/compare"],
     ),
     page(
-        "`/commit/{id}`, `/diff/{rev}/{index}`",
+        "`/commit/{id}`, `/diff/{rev}/{index}`, `/diff-find/{rev}`",
         "A commit's diff, large files fold and load on demand",
-        &["/commit/{id}", "/diff/{rev}/{index}"],
+        &["/commit/{id}", "/diff/{rev}/{index}", "/diff-find/{rev}"],
     ),
     page(
         concat!(
             "`/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, ",
-            "`/worktree/diff/{path}`, `/worktree/raw/{path}`, `/worktree/blob/{path}`",
+            "`/worktree/diff/{path}`, `/worktree/find`, `/worktree/raw/{path}`, ",
+            "`/worktree/blob/{path}`",
         ),
         concat!(
-            "Git state: branches, tags, linked worktrees, stashes and uncommitted changes, ",
-            "each changed file as diff, bytes or page",
+            "Git state: branches, tags, worktrees, stashes and uncommitted changes, ",
+            "each file as diff, bytes or page",
         ),
         &[
             "/refs",
@@ -67,6 +68,7 @@ pub const PAGES: &[Page] = &[
             "/stashes",
             "/worktree",
             "/worktree/diff/{*path}",
+            "/worktree/find",
             "/worktree/raw/{*path}",
             "/worktree/blob/{*path}",
         ],

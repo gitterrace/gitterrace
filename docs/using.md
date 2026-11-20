@@ -101,6 +101,13 @@ browser's localStorage, per page address, and never leave the machine. A file
 marked viewed whose diff changed since (a live refresh of the working tree, say)
 is unchecked and shows a **Changed since viewed** badge until you mark it again.
 
+## Find in the whole diff
+
+The box above a commit's or the working tree's diff searches every changed
+file on the server, folded and not yet loaded ones too, which the browser's own
+find cannot see. It lists the files that hold the text with a few lines each,
+and a click opens the file. Case is ignored.
+
 ## Share a link to a line
 
 1. Click a line number. Shift-click another to select a range.

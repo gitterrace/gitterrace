@@ -29,7 +29,7 @@
       p.setAttribute("role", "status");
       files[0].parentNode.insertBefore(p, files[0]);
     }
-    p.textContent = n + " of " + files.length + " files viewed";
+    p.textContent = "Viewed " + n + " of " + files.length;
   }
   function decorate() {
     var files = Array.prototype.slice.call(document.querySelectorAll("section.file[data-path]"));

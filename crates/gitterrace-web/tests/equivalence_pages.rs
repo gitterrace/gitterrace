@@ -221,7 +221,7 @@ fn the_pairwise_golden_agrees_with_the_full_matrix() {
 
 /// The browsing pages, one or more cells each, over the matrix repository at HEAD. Every page
 /// kind the router serves has a cell here or on an insights page, or is exempt below.
-const BROWSE: [&str; 57] = [
+const BROWSE: [&str; 59] = [
     "/log",
     "/log/HEAD",
     "/log/HEAD?q=path:src",
@@ -247,6 +247,8 @@ const BROWSE: [&str; 57] = [
     "/stashes",
     "/worktree",
     "/worktree/diff/src/lib.rs",
+    "/worktree/find?q=fn",
+    "/diff-find/HEAD?q=fn",
     "/search?q=fn",
     "/search?q=feat&kind=commits",
     "/search?q=nothing-matches-this",

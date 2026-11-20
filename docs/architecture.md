@@ -171,8 +171,8 @@ the prefix.
 | `/` | README, last commit, file list, key numbers. The server's own `/` forwards to the one repository, or lists several |
 | `/tree`, `/blob`, `/raw`, `/blame` `/{rev}/{path}` | Files: listing, highlighted view (large files load in chunks), bytes, authorship |
 | `/log/{rev}`, `/history/{path}`, `/compare` | Commits, one file's history, two revisions |
-| `/commit/{id}`, `/diff/{rev}/{index}` | A commit's diff, large files fold and load on demand |
-| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`, `/worktree/raw/{path}`, `/worktree/blob/{path}` | Git state: branches, tags, linked worktrees, stashes and uncommitted changes, each changed file as diff, bytes or page |
+| `/commit/{id}`, `/diff/{rev}/{index}`, `/diff-find/{rev}` | A commit's diff, large files fold and load on demand |
+| `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`, `/worktree/find`, `/worktree/raw/{path}`, `/worktree/blob/{path}` | Git state: branches, tags, worktrees, stashes and uncommitted changes, each file as diff, bytes or page |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period: activity (with commit types and code frequency), contributors, hotspots (with patterns), languages, ownership. `?rev=` follows any ref |
 | `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |

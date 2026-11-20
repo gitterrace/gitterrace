@@ -57,6 +57,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/log/{rev}", get(log))
         .route("/commit/{id}", get(commit))
         .route("/diff/{rev}/{index}", get(views::diff_fragment))
+        .route("/diff-find/{rev}", get(crate::diff_find::commit))
+        .route("/worktree/find", get(crate::diff_find::worktree))
         .route("/tree/{rev}", get(tree_root))
         .route("/tree/{rev}/", get(tree_root))
         .route("/tree/{rev}/{*path}", get(tree))

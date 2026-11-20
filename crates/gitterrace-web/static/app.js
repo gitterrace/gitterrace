@@ -288,7 +288,9 @@
   // Folded diff files: only where the page has one, or once a live refresh brings one.
   function withDiffs() {
     if (document.querySelector("[data-load-diff]")) window.gtLazy("diffs");
-    if (document.querySelector("section.file[data-path]")) window.gtLazy("diffs-viewed");
+    if (!document.querySelector("section.file[data-path]")) return;
+    window.gtLazy("diffs-viewed");
+    window.gtLazy("diffs-find");
   }
   withDiffs();
   document.addEventListener("gt:live-refreshed", withDiffs);

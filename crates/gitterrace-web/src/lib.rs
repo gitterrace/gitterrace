@@ -14,6 +14,7 @@ mod commit_types;
 mod compare;
 #[cfg(test)]
 mod crawl_tests;
+mod diff_find;
 mod dochead;
 mod empty;
 mod error;

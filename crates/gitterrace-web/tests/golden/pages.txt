@@ -16,6 +16,7 @@ d7a2965c77ef75ea16fc11dbdfa84d25 d7a2965c77ef75ea16fc11dbdfa84d25 [browse] /comp
 848e0f9a159ef15d0c78aeb3bab85173 848e0f9a159ef15d0c78aeb3bab85173 [browse] /compare?base=HEAD&head=HEAD
 5731670985000f63a97494d10187c7fe f04c1a8fa9283f6f35581262091836f8 [browse] /compare?base=HEAD~3&head=HEAD
 eba95453cd68775d746312facf691414 eba95453cd68775d746312facf691414 [browse] /compare?base=nope&head=HEAD
+d65872969205dfd2ef222defa2815747 d65872969205dfd2ef222defa2815747 [browse] /diff-find/HEAD?q=fn
 921660a173014b3bcd4db441b93f75c4 921660a173014b3bcd4db441b93f75c4 [browse] /diff/HEAD/0
 0bc6c228b95d2b83a4eb7ca194c60857 9246e511b8b09ed6ad50c3632406aab7 [browse] /diff/HEAD/99
 6ee661e9895f8f9250742badf82d6de1 caac7c130f98873a2638d3bb27b0e573 [browse] /history/src/lib.rs
@@ -52,6 +53,7 @@ cc2876d753a44750134c64775c3911cf cc2876d753a44750134c64775c3911cf [browse] /work
 11d2ef2fe988d1b73ff52f2ae1a88336 2e58a733d69adeb2f766ca44a4b94038 [browse] /worktree/blob/missing.rs
 ac37aba401dc5496eaa5c941800c1c42 4e14c3c85a0f8c964dccabe7edd6e2c0 [browse] /worktree/blob/src/lib.rs
 64b0449b741409027c0e1bcc47459a42 64b0449b741409027c0e1bcc47459a42 [browse] /worktree/diff/src/lib.rs
+6265960974b96c7656696b285f683d6f 6265960974b96c7656696b285f683d6f [browse] /worktree/find?q=fn
 11d2ef2fe988d1b73ff52f2ae1a88336 2e58a733d69adeb2f766ca44a4b94038 [browse] /worktree/raw/missing.rs
 ac37aba401dc5496eaa5c941800c1c42 4e14c3c85a0f8c964dccabe7edd6e2c0 [browse] /worktree/raw/src/lib.rs
 b3d230f3fa4c7fe2ee263a6af7f5b2b0 3d8063d763148f70df6f7606d756ed1a [browse] /worktrees

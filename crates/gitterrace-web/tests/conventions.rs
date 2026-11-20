@@ -332,6 +332,9 @@ const NOT_PAGES: &[&str] = &[
     "/worktrees",
     "/stashes",
     "/worktree/diff/{*path}",
+    // HTML fragments: the hits under a diff page's find box, with no page head.
+    "/diff-find/{rev}",
+    "/worktree/find",
     "/worktree/raw/{*path}",
     // The blob page's own template, walked at `/blob`; the check's fixture has a clean tree.
     "/worktree/blob/{*path}",

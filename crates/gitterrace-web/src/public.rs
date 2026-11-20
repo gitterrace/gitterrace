@@ -15,6 +15,7 @@ pub(crate) const PUBLIC: &[&str] = &[
     "/log/{rev}",
     "/commit/{id}",
     "/diff/{rev}/{index}",
+    "/diff-find/{rev}",
     "/tree/{rev}",
     "/tree/{rev}/",
     "/tree/{rev}/{*path}",
@@ -50,6 +51,7 @@ pub(crate) const PUBLIC: &[&str] = &[
 pub(crate) const LOCAL: &[&str] = &[
     "/worktree",
     "/worktree/diff/{*path}",
+    "/worktree/find",
     "/worktree/raw/{*path}",
     "/worktree/blob/{*path}",
     "/worktrees",

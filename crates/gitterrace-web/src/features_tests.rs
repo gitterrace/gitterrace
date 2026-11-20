@@ -21,6 +21,7 @@ const CORE_ROUTES: &[&str] = &[
     "/log/{rev}",
     "/commit/{id}",
     "/diff/{rev}/{index}",
+    "/diff-find/{rev}",
     "/tree/{rev}",
     "/tree/{rev}/",
     "/tree/{rev}/{*path}",
