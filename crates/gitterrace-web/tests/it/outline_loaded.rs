@@ -28,7 +28,7 @@ fn the_check_sees_an_outline_without_its_script() {
 /// The loader in app.js fetches outline.js for every outline on the page.
 #[test]
 fn app_js_loads_the_outline_script_for_an_outline() {
-    let app = include_str!("../static/app.js");
+    let app = include_str!("../../static/app.js");
     assert!(
         app.contains("[data-outline]") && app.contains("gtLazy(\"outline\")"),
         "app.js no longer loads outline.js for [data-outline]"

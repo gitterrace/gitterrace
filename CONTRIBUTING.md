@@ -77,7 +77,7 @@ is a cut, not coverage.
 | Integration | `crates/*/tests/` | crate-boundary behavior over a fixture repo: one behavior per file |
 | Oracle | `crates/gitterrace-index/tests/`, `equivalence*` | the cache agrees with a direct git read, on hostile and large inputs |
 | Golden | `crates/gitterrace-web/tests/golden/` | rendered markup, byte for byte: the place that owns HTML shape |
-| Conventions | `crates/gitterrace-testkit/tests/conventions.rs`, `crates/gitterrace-web/tests/conventions.rs` | tree-wide rules (links, limits, plurals, routes) as one scan each |
+| Conventions | `crates/gitterrace-testkit/tests/conventions.rs`, `crates/gitterrace-web/tests/it/conventions.rs` | tree-wide rules (links, limits, plurals, routes) as one scan each |
 | Browser | `scripts/verify/browser/` | what only a real browser sees: layout, focus, scripts, overlap |
 | Bench | `scripts/bench/`, `make speed-check` | time and memory budgets, never correctness |
 

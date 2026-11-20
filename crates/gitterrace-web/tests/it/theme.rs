@@ -2,15 +2,15 @@
 
 /// Every stylesheet but tokens.css: a new file added here is checked by every rule below.
 const SHEETS: [(&str, &str); 9] = [
-    ("app.css", include_str!("../static/app.css")),
-    ("markdown.css", include_str!("../static/markdown.css")),
-    ("media.css", include_str!("../static/media.css")),
-    ("send.css", include_str!("../static/send.css")),
-    ("buttons.css", include_str!("../static/buttons.css")),
-    ("docnav.css", include_str!("../static/docnav.css")),
-    ("graph.css", include_str!("../static/graph.css")),
-    ("insights.css", include_str!("../static/insights.css")),
-    ("charts.css", include_str!("../static/charts.css")),
+    ("app.css", include_str!("../../static/app.css")),
+    ("markdown.css", include_str!("../../static/markdown.css")),
+    ("media.css", include_str!("../../static/media.css")),
+    ("send.css", include_str!("../../static/send.css")),
+    ("buttons.css", include_str!("../../static/buttons.css")),
+    ("docnav.css", include_str!("../../static/docnav.css")),
+    ("graph.css", include_str!("../../static/graph.css")),
+    ("insights.css", include_str!("../../static/insights.css")),
+    ("charts.css", include_str!("../../static/charts.css")),
 ];
 
 /// Any stylesheet besides tokens.css must reach colors through a token.
@@ -49,7 +49,7 @@ fn clipped_text_keeps_room_for_descenders() {
 /// stops at the base state paints a button background on a text control.
 #[test]
 fn unset_resets_cover_hover() {
-    let css = include_str!("../static/app.css");
+    let css = include_str!("../../static/app.css");
     for rule in css.split('}') {
         let Some((sel, body)) = rule.split_once('{') else {
             continue;
