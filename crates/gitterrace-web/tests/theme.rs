@@ -1,21 +1,22 @@
 //! Colours live in `static/tokens.css` only, and it is generated from the snapshot.
 
-/// Any stylesheet besides tokens.css must reach colors through a token, so a new
-/// file added here is checked the same way.
+/// Every stylesheet but tokens.css: a new file added here is checked by every rule below.
+const SHEETS: [(&str, &str); 9] = [
+    ("app.css", include_str!("../static/app.css")),
+    ("markdown.css", include_str!("../static/markdown.css")),
+    ("media.css", include_str!("../static/media.css")),
+    ("send.css", include_str!("../static/send.css")),
+    ("buttons.css", include_str!("../static/buttons.css")),
+    ("docnav.css", include_str!("../static/docnav.css")),
+    ("graph.css", include_str!("../static/graph.css")),
+    ("insights.css", include_str!("../static/insights.css")),
+    ("charts.css", include_str!("../static/charts.css")),
+];
+
+/// Any stylesheet besides tokens.css must reach colors through a token.
 #[test]
 fn stylesheets_hold_no_raw_colors() {
-    let sheets = [
-        ("app.css", include_str!("../static/app.css")),
-        ("markdown.css", include_str!("../static/markdown.css")),
-        ("media.css", include_str!("../static/media.css")),
-        ("send.css", include_str!("../static/send.css")),
-        ("buttons.css", include_str!("../static/buttons.css")),
-        ("docnav.css", include_str!("../static/docnav.css")),
-        ("graph.css", include_str!("../static/graph.css")),
-        ("insights.css", include_str!("../static/insights.css")),
-        ("charts.css", include_str!("../static/charts.css")),
-    ];
-    for (name, css) in sheets {
+    for (name, css) in SHEETS {
         for (i, line) in css.lines().enumerate() {
             let raw = line.contains("rgb(") || line.contains("rgba(") || {
                 line.match_indices('#').any(|(at, _)| {
@@ -35,17 +36,7 @@ fn stylesheets_hold_no_raw_colors() {
 /// the bottom of g, j, p, q and y is cut off.
 #[test]
 fn clipped_text_keeps_room_for_descenders() {
-    for (name, css) in [
-        ("app.css", include_str!("../static/app.css")),
-        ("markdown.css", include_str!("../static/markdown.css")),
-        ("media.css", include_str!("../static/media.css")),
-        ("send.css", include_str!("../static/send.css")),
-        ("buttons.css", include_str!("../static/buttons.css")),
-        ("docnav.css", include_str!("../static/docnav.css")),
-        ("graph.css", include_str!("../static/graph.css")),
-        ("insights.css", include_str!("../static/insights.css")),
-        ("charts.css", include_str!("../static/charts.css")),
-    ] {
+    for (name, css) in SHEETS {
         for rule in css.split('}') {
             let tight = rule.contains("/1 ") || rule.contains("line-height:1;");
             assert!(
@@ -84,17 +75,7 @@ fn unset_resets_cover_hover() {
 /// message uses the one `.subj` class, so that is the only selector allowed to truncate.
 #[test]
 fn only_commit_messages_truncate() {
-    for (name, css) in [
-        ("app.css", include_str!("../static/app.css")),
-        ("markdown.css", include_str!("../static/markdown.css")),
-        ("media.css", include_str!("../static/media.css")),
-        ("send.css", include_str!("../static/send.css")),
-        ("buttons.css", include_str!("../static/buttons.css")),
-        ("docnav.css", include_str!("../static/docnav.css")),
-        ("graph.css", include_str!("../static/graph.css")),
-        ("insights.css", include_str!("../static/insights.css")),
-        ("charts.css", include_str!("../static/charts.css")),
-    ] {
+    for (name, css) in SHEETS {
         for rule in css.split('}') {
             let squeezed: String = rule.split_whitespace().collect();
             if squeezed.contains("text-overflow:ellipsis") {
@@ -116,18 +97,7 @@ fn only_commit_messages_truncate() {
 /// rounded boxes. Text-field rules name the inputs they style; toggles keep one shared rule.
 #[test]
 fn text_field_rules_skip_toggles() {
-    let sheets = [
-        ("app.css", include_str!("../static/app.css")),
-        ("markdown.css", include_str!("../static/markdown.css")),
-        ("media.css", include_str!("../static/media.css")),
-        ("send.css", include_str!("../static/send.css")),
-        ("buttons.css", include_str!("../static/buttons.css")),
-        ("docnav.css", include_str!("../static/docnav.css")),
-        ("graph.css", include_str!("../static/graph.css")),
-        ("insights.css", include_str!("../static/insights.css")),
-        ("charts.css", include_str!("../static/charts.css")),
-    ];
-    for (name, css) in sheets {
+    for (name, css) in SHEETS {
         for rule in css.split('}') {
             let Some((sel, body)) = rule.split_once('{') else {
                 continue;
