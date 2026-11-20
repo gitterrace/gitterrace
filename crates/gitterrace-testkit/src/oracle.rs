@@ -20,6 +20,11 @@ use crate::web::page;
 pub use change::{Change, read_dump};
 pub use proof::Proof;
 
+/// Whether libtest's report says one test ran: a filter that matches nothing exits 0 too.
+pub(crate) fn ran_one_test(report: &str) -> bool {
+    report.lines().any(|l| l.trim() == "running 1 test")
+}
+
 /// The frozen "now": 2024-03-10T00:00:00Z, nine days after the adversarial tip.
 pub const FROZEN_NOW: i64 = 1_710_028_800;
 
@@ -38,12 +43,15 @@ pub fn frozen(name: &str) -> bool {
         return true;
     }
     let exe = std::env::current_exe().expect("test binary");
-    let status = std::process::Command::new(exe)
+    let out = std::process::Command::new(exe)
         .args([name, "--exact", "--nocapture", "--test-threads=1", "--include-ignored"])
         .env(NOW_VAR, FROZEN_NOW.to_string())
-        .status()
+        .stderr(std::process::Stdio::inherit())
+        .output()
         .expect("run child");
-    assert!(status.success(), "{name} failed with the clock frozen");
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success(), "{name} failed with the clock frozen:\n{stdout}");
+    assert!(ran_one_test(&stdout), "{name} matched no test: the re-run proved nothing:\n{stdout}");
     false
 }
 

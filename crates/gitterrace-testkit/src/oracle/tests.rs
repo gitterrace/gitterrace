@@ -1,6 +1,6 @@
 //! Tests for the oracle's tie detection and digest.
 
-use crate::oracle::{canonical, digest, tie_only};
+use crate::oracle::{canonical, digest, ran_one_test, tie_only};
 
 fn row(time: &str, who: &str) -> String {
     format!("<li><b>{who}</b> <time data-tip=\"{time}\" tabindex=\"0\">2 months ago</time></li>")
@@ -144,4 +144,11 @@ fn a_planted_change_in_one_cell_is_real() {
     assert_eq!((was.as_str(), now.as_str()), ("<p>7 commits</p>", "<p>8 commits</p>"));
     assert!(c.render("").contains("REAL 1"));
     assert_eq!(c.unexplained(), 1);
+}
+
+#[test]
+fn a_rerun_that_matched_no_test_is_not_a_pass() {
+    assert!(ran_one_test("\nrunning 1 test\ntest a ... ok\n\ntest result: ok. 1 passed\n"));
+    assert!(!ran_one_test("\nrunning 0 tests\n\ntest result: ok. 0 passed; 106 filtered out\n"));
+    assert!(!ran_one_test("running 2 tests\ntest result: ok. 2 passed\n"));
 }
