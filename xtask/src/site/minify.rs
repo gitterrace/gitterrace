@@ -69,7 +69,8 @@ mod tests {
 
     #[test]
     fn comments_and_blank_space_go_and_meaning_stays() {
-        let src = "/* c */\na , b {\n  color : red ;\n  margin: calc(1px + 2px) ;\n}\n.x :hover{content:\"a  b;\"}";
+        let src = "/* c */\na , b {\n  color : red ;\n  margin: calc(1px + 2px) ;\n}\n\
+                   .x :hover{content:\"a  b;\"}";
         assert_eq!(
             css(src),
             "a,b{color : red;margin: calc(1px + 2px)}\n.x :hover{content:\"a  b;\"}\n"
