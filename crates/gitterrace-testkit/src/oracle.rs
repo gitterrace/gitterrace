@@ -195,22 +195,7 @@ pub async fn capture(
     cells: &[Cell],
     values: &Values,
 ) -> BTreeMap<String, String> {
-    let mut out = BTreeMap::new();
-    for cell in cells {
-        let q = cell.query(values);
-        for t in targets {
-            let key = format!("{t}?{q}");
-            let (status, body) = page(router, &key).await;
-            let body = normalize(&body);
-            let v = if status == 200 {
-                body
-            } else {
-                format!("status {status}\n{body}")
-            };
-            out.insert(key, v);
-        }
-    }
-    out
+    capture_with(router, targets, cells, values, None).await
 }
 
 /// [`capture`] with `rev=<rev>` appended to every query: the page or API for that revision.
@@ -221,9 +206,22 @@ pub async fn capture_rev(
     values: &Values,
     rev: &str,
 ) -> BTreeMap<String, String> {
+    capture_with(router, targets, cells, values, Some(rev)).await
+}
+
+async fn capture_with(
+    router: &Router,
+    targets: &[String],
+    cells: &[Cell],
+    values: &Values,
+    rev: Option<&str>,
+) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
     for cell in cells {
-        let q = format!("{}&rev={}", cell.query(values), crate::matrix::enc(rev));
+        let mut q = cell.query(values);
+        if let Some(rev) = rev {
+            q = format!("{q}&rev={}", crate::matrix::enc(rev));
+        }
         for t in targets {
             let key = format!("{t}?{q}");
             let (status, body) = page(router, &key).await;

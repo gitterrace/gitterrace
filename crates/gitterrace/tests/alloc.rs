@@ -4,22 +4,32 @@
 //! miss. This spawns the real `git-terrace` and reads back what its allocator runs with.
 #![cfg(not(windows))]
 
-#[test]
-fn the_binary_runs_with_zero_page_decay() {
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"))
-        .env("TEST_ALLOC_DECAY", "1")
-        .env_remove("JEMALLOC_SYS_WITH_MALLOC_CONF")
-        .env_remove("MALLOC_CONF")
-        .env_remove("_RJEM_MALLOC_CONF")
-        .output();
+/// Runs the binary with `probe` set and `unset` cleared, and checks what it prints.
+fn probe(probe: &str, unset: &[&str], want: &str, what: &str) {
+    let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"));
+    cmd.env(probe, "1");
+    for k in unset {
+        cmd.env_remove(k);
+    }
+    let out = cmd.output();
     let Ok(out) = out else {
         panic!("run git-terrace: {out:?}");
     };
     assert!(out.status.success(), "{out:?}");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), want, "{what}");
+}
+
+#[test]
+fn the_binary_runs_with_zero_page_decay() {
+    probe(
+        "TEST_ALLOC_DECAY",
+        &[
+            "JEMALLOC_SYS_WITH_MALLOC_CONF",
+            "MALLOC_CONF",
+            "_RJEM_MALLOC_CONF",
+        ],
         "0 0 0 0",
-        "dirty and muzzy decay of new arenas and arena 0, ms"
+        "dirty and muzzy decay of new arenas and arena 0, ms",
     );
 }
 
@@ -28,19 +38,11 @@ fn the_binary_runs_with_zero_page_decay() {
 /// after the idle release, and a released server stays 5 to 8 MB above a just-started one.
 #[test]
 fn the_binary_runs_with_one_arena() {
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"))
-        .env("TEST_ALLOC_ARENAS", "1")
-        .env_remove("MALLOC_CONF")
-        .env_remove("_RJEM_MALLOC_CONF")
-        .output();
-    let Ok(out) = out else {
-        panic!("run git-terrace: {out:?}");
-    };
-    assert!(out.status.success(), "{out:?}");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
+    probe(
+        "TEST_ALLOC_ARENAS",
+        &["MALLOC_CONF", "_RJEM_MALLOC_CONF"],
         "1",
-        "jemalloc arenas: build without JEMALLOC_SYS_WITH_MALLOC_CONF from .cargo/config.toml"
+        "jemalloc arenas: build without JEMALLOC_SYS_WITH_MALLOC_CONF from .cargo/config.toml",
     );
 }
 
@@ -48,19 +50,11 @@ fn the_binary_runs_with_one_arena() {
 /// flushed when it ends: with them the git.git index build takes 10.8 s, without 21.6 s.
 #[test]
 fn the_binary_enables_thread_caches_only_inside_index_workers() {
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"))
-        .env("TEST_ALLOC_TCACHE", "1")
-        .env_remove("MALLOC_CONF")
-        .env_remove("_RJEM_MALLOC_CONF")
-        .output();
-    let Ok(out) = out else {
-        panic!("run git-terrace: {out:?}");
-    };
-    assert!(out.status.success(), "{out:?}");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
+    probe(
+        "TEST_ALLOC_TCACHE",
+        &["MALLOC_CONF", "_RJEM_MALLOC_CONF"],
         "false true false",
-        "thread cache: main thread, worker running, worker done"
+        "thread cache: main thread, worker running, worker done",
     );
 }
 
@@ -69,16 +63,10 @@ fn the_binary_enables_thread_caches_only_inside_index_workers() {
 #[cfg(target_os = "linux")]
 #[test]
 fn the_binary_runs_with_transparent_huge_pages_disabled() {
-    let out = std::process::Command::new(env!("CARGO_BIN_EXE_git-terrace"))
-        .env("TEST_ALLOC_THP", "1")
-        .output();
-    let Ok(out) = out else {
-        panic!("run git-terrace: {out:?}");
-    };
-    assert!(out.status.success(), "{out:?}");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout).trim(),
+    probe(
+        "TEST_ALLOC_THP",
+        &[],
         "true",
-        "PR_GET_THP_DISABLE of the binary"
+        "PR_GET_THP_DISABLE of the binary",
     );
 }
