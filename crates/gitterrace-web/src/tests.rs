@@ -434,13 +434,7 @@ async fn one_week_selection_renders_seven_day_columns() {
     std::fs::write(p.join("a.txt"), "x\n").expect("write");
     git(p, &["add", "."]);
     git(p, &["commit", "-q", "-m", "feat(core): first"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = ready_app(p);
     // The commits chart, then the code frequency section's chart, of the activity page.
     let (s, body) = get(&app, "/stats?period=1w").await;
     assert_eq!(s, 200);
@@ -545,6 +539,18 @@ async fn router_rejects_foreign_and_missing_host() {
         .expect("response");
     assert_eq!(res.headers()["x-content-type-options"], "nosniff");
     assert!(!res.headers().contains_key("content-security-policy"));
+}
+
+/// An app over `p` whose index is built and marked ready.
+pub(crate) fn ready_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
+    let repo = gitterrace_git::Repo::discover(p.as_ref()).expect("repo");
+    let index = gitterrace_index::Index::open(&repo).expect("index");
+    let app = Arc::new(App::new(repo, index));
+    app.index
+        .update(&app.repo, "HEAD", &|_| {})
+        .expect("update");
+    app.mark_ready();
+    app
 }
 
 pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {

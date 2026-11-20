@@ -13,7 +13,7 @@ use crate::actions::actions_tests;
 use crate::app::App;
 #[cfg(unix)]
 use crate::tests::fetch;
-use crate::tests::{fixture, get, links};
+use crate::tests::{fixture, get, links, ready_app};
 
 fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
     let f = Fixture::standard(&root.join("solo"))
@@ -26,17 +26,6 @@ fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
         .write("README.md", "dirty\n")
         .stash("wip stash");
     f.path().to_owned()
-}
-
-fn ready_app(p: &std::path::Path) -> Arc<App> {
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
-    app
 }
 
 /// A cache a newer build wrote is explained on the insights pages, served as 200, and left

@@ -38,13 +38,7 @@ fn far_branch_app() -> (tempfile::TempDir, Arc<App>) {
     }
     gitterrace_testkit::git_stdin(path, &["fast-import", "--quiet"], s.as_bytes());
     git(path, &["checkout", "-q", "main"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     (dir, app)
 }
 

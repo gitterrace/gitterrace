@@ -24,14 +24,7 @@ pub(crate) fn app(dir: &std::path::Path) -> Arc<App> {
     std::fs::write(f.path().join("new.rs"), "c\n").expect("write");
     gitterrace_testkit::git(f.path(), &["add", "-A"]);
     gitterrace_testkit::git(f.path(), &["commit", "-q", "-m", "fix(core): new"]);
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
-    app
+    crate::tests::ready_app(f.path())
 }
 
 /// The `(label, href, on)` of each choice in the page's Period control.

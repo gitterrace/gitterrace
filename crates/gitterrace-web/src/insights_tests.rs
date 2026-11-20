@@ -49,13 +49,7 @@ async fn concurrent_requests_for_one_cold_page_render_it_once() {
         .commit("feat: a")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(&p);
     let builds = Arc::new(AtomicUsize::new(0));
     let n = 8;
     let start = Arc::new(tokio::sync::Barrier::new(n));
@@ -111,13 +105,7 @@ async fn a_cold_activity_page_walks_its_counted_set_once() {
         .commit("fix(b): two")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(&p);
     let router = crate::routes::router(Arc::clone(&app));
     let before = walks(&app);
     let (status, body) = gitterrace_testkit::get(&router, "/stats").await;
@@ -141,13 +129,7 @@ async fn the_overview_reuses_the_shared_tables_of_head() {
         .commit("feat: a")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(&p);
     let router = crate::routes::router(Arc::clone(&app));
     let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
     assert_eq!(status, 200);
@@ -337,13 +319,7 @@ async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
         .commit("feat: a")
         .path()
         .to_owned();
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(&p);
     let api = gitterrace_api::ApiState::open(&p).expect("api");
     app.set_api(api.clone());
     let router = crate::routes::router(Arc::clone(&app))
