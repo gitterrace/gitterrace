@@ -18,8 +18,7 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
     f = f.write("shared/d.txt", &"d\n".repeat(50));
     f.git(&["add", "-A"]);
     f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann again"]);
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    gitterrace_testkit::oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
     let table = body.split("class=\"entries own\"").nth(1).expect("table");
@@ -49,8 +48,7 @@ async fn one_owner_everywhere_drops_the_owner_columns() {
     f = f.write("src/a.txt", "a\n").write("docs/b.txt", "b\n");
     f.git(&["add", "-A"]);
     f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann"]);
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    gitterrace_testkit::oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
     assert!(body.contains("Every directory has one owner, Ann."), "no single-owner line");

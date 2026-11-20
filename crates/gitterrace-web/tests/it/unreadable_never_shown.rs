@@ -101,8 +101,7 @@ fn a_cache_that_fails_a_read_is_never_shown_as_data() {
     let dir = tempfile::tempdir().expect("tmp");
     let repo = repo(dir.path());
     let clean = rt.block_on(async {
-        let router = gitterrace_web::app_router(&repo).expect("router");
-        oracle::ready(&router).await;
+        let _router = crate::common::ready_router(&repo).await;
         answers(&repo).await
     });
     for (t, (status, body)) in &clean {

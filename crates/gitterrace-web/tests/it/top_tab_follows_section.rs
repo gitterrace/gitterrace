@@ -4,7 +4,7 @@
 //! Commit types and code frequency are sections of Activity, patterns a section of Hotspots:
 //! each renders there, and the pages they once had answer like any unknown path.
 
-use gitterrace_testkit::{Fixture, base, oracle, page};
+use gitterrace_testkit::{Fixture, base, page};
 
 /// Pages that are gone: no redirect keeps them, so they must 404 like an unknown path.
 const GONE: [&str; 4] = ["/stats/types", "/stats/frequency", "/stats/patterns", "/insights"];
@@ -65,8 +65,7 @@ async fn every_page_marks_its_own_section() {
     let f = Fixture::standard(dir.path());
     let id = f.git(&["rev-parse", "HEAD"]);
     let commit = format!("/commit/{}", id.trim());
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let cases = [
         ("/", "Code"),
         ("/tree/HEAD/src", "Code"),
@@ -96,8 +95,7 @@ async fn every_page_marks_its_own_section() {
 async fn every_old_section_renders_on_its_new_page() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = sections_fixture(dir.path());
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let mut fails = Vec::new();
     for (p, id, heading) in SECTIONS {
         let (status, body) = page(&router, p).await;
@@ -127,8 +125,7 @@ async fn every_old_section_renders_on_its_new_page() {
 async fn five_insights_tabs_and_compare_sits_under_commits() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = sections_fixture(dir.path());
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let root = base(&router).await;
     let (_, body) = page(&router, "/stats").await;
     let tabs = body
@@ -163,8 +160,7 @@ async fn five_insights_tabs_and_compare_sits_under_commits() {
 async fn removed_insights_paths_answer_as_unknown_pages() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = sections_fixture(dir.path());
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     for p in GONE {
         let (status, body) = page(&router, p).await;
         // The not-found page, never a redirect or the page that took the old one's place. Its

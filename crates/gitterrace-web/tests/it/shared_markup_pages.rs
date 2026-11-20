@@ -2,9 +2,8 @@
 //! and none shows a hand-shaped copy (a commit in a table row, a switch outside the segmented
 //! control, a document card without the shared header, a style attribute). One router over one
 //! shared repository serves every page here.
-#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use gitterrace_testkit::{Shared, oracle, page, wait};
+use gitterrace_testkit::{Shared, page, wait};
 
 /// A table row that holds a commit id link next to a subject: a commit row shaped as a table.
 fn table_commits(body: &str) -> usize {
@@ -101,8 +100,7 @@ fn hand_shaped_markup_is_caught() {
 
 /// The shared docs repository's router, once its index has the commits the pages list.
 async fn ready_router() -> axum::Router {
-    let router = gitterrace_web::app_router(Shared::Docs.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(Shared::Docs.path()).await;
     wait::page_until(&router, "/search?q=first&kind=commits", |b| b.contains("class=\"crow\""))
         .await;
     router

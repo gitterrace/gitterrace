@@ -39,8 +39,7 @@ async fn a_reused_path_does_not_inherit_the_moved_file_history() {
         .at("2024-03-09T12:00:00Z")
         .write("src/lib.rs", "pub mod core;\n")
         .commit("feat(core): a new lib");
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
 
     let new_lib = src_owners(&router, "src/core.rs").await;
     assert_eq!(new_lib, ["Jane Doe"], "the new src/lib.rs has its own author only");
@@ -82,8 +81,7 @@ async fn an_author_selection_follows_renames_made_by_others() {
     let f = f.at("2024-03-02T12:00:00Z");
     f.git(&["mv", "src/old.rs", "src/new.rs"]);
     f.git(&["commit", "-q", "--author", "Jane <jane@x.io>", "-m", "refactor: rename"]);
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
 
     let all = src_dir(&router, "").await;
     let bob = src_dir(&router, "q=author%3Abob%40y.io").await;

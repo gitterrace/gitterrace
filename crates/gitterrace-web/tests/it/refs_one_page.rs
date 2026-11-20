@@ -1,7 +1,7 @@
 //! Branches & tags is one page: no tab row, sections in a fixed order, empty ones left out.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use gitterrace_testkit::{Fixture, oracle, page};
+use gitterrace_testkit::{Fixture, page};
 use tower::ServiceExt;
 
 async fn location(router: &axum::Router, uri: &str) -> (u16, String) {
@@ -19,8 +19,7 @@ async fn location(router: &axum::Router, uri: &str) -> (u16, String) {
 async fn refs_is_one_page_with_ordered_sections() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = Fixture::init(dir.path()).write("a.rs", "fn main() {}\n").commit("feat: first");
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
 
     let (status, body) = page(&router, "/refs").await;
     assert_eq!(status, 200);

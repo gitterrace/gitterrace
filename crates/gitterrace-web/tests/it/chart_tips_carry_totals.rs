@@ -63,8 +63,7 @@ async fn every_chart_tip_carries_value_share_and_total() {
             .write("x.py", &format!("a = {n}\nb = 2\n"))
             .commit("fix(core): next");
     }
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    gitterrace_testkit::oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let mut fails = Vec::new();
     let mut seen = 0;
     for p in ["/stats", "/stats/hotspots", "/stats/languages"] {

@@ -2,7 +2,6 @@
 //! the same history built by appends. Life ids (and string ids) may differ between the two
 //! until the background merge, the pages never may. On the rename chain, whose dates are old,
 //! so a period window that moves with the clock between the two captures cuts nothing.
-#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 use std::collections::BTreeMap;
 use std::path::Path;
@@ -15,8 +14,7 @@ fn targets() -> Vec<String> {
 }
 
 async fn answers(repo: &Path) -> BTreeMap<String, String> {
-    let router = gitterrace_web::app_router(repo).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(repo).await;
     let mut out = BTreeMap::new();
     for t in targets() {
         for q in ["period=all", "period=1y", "period=all&bots=1"] {

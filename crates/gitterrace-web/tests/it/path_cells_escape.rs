@@ -5,7 +5,7 @@
 //! Not on Windows: it refuses `<` and `>` in a file name, so no checkout there holds one.
 #![cfg(not(windows))]
 
-use gitterrace_testkit::{Fixture, oracle, page};
+use gitterrace_testkit::{Fixture, page};
 
 const RAW: &str = "<b>&c";
 const SAFE: &str = "<span class=\"seg\">&#60;b&#62;&#38;c</span>";
@@ -22,8 +22,7 @@ async fn a_marked_up_file_name_is_text_in_every_path_table() {
             .write("src/other.rs", &format!("{i}\n"))
             .commit("feat(core): change both");
     }
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
 
     for (uri, section) in [
         ("/stats/hotspots?period=all", "hotspots"),

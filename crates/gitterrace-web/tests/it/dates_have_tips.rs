@@ -73,8 +73,7 @@ fn every_relative_date_has_its_tip() {
     rt.block_on(async {
         let dir = tempfile::tempdir().expect("tmp");
         let (repo, values) = oracle::matrix_repo(dir.path(), Mailmap::AsIs);
-        let router = gitterrace_web::app_router(&repo).expect("router");
-        oracle::ready(&router).await;
+        let router = crate::common::ready_router(&repo).await;
         let mut pages: Vec<String> =
             gitterrace_web::WARM_PAGES.iter().map(|p| (*p).to_owned()).collect();
         pages.extend(

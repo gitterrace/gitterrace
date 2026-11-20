@@ -41,8 +41,7 @@ fn every_page_with_an_outline_loads_the_outline_script() {
     let dir = tempfile::tempdir().expect("tmp");
     let (repo, _) = oracle::matrix_repo(dir.path(), Mailmap::AsIs);
     let pages = rt.block_on(async {
-        let router = gitterrace_web::app_router(&repo).expect("router");
-        oracle::ready(&router).await;
+        let router = crate::common::ready_router(&repo).await;
         let mut paths: Vec<String> =
             gitterrace_web::WARM_PAGES.iter().map(|p| (*p).to_owned()).collect();
         paths.extend(["/".to_owned(), "/blob/HEAD/docs/x.md".to_owned()]);

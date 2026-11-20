@@ -64,8 +64,7 @@ async fn every_lead_states_numbers_the_page_shows() {
         .commit("fix: second")
         .write("src/b.rs", "fn b() {}\n")
         .commit("refactor: third");
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    gitterrace_testkit::oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let mut fails = Vec::new();
     for p in
         ["/stats", "/stats/contributors", "/stats/hotspots", "/stats/ownership", "/stats/languages"]

@@ -2,7 +2,7 @@
 //! 200 for the gitlink and for anything below it, and the last commit per entry names the
 //! commit that really touched each entry, with the gitlink's commit as the old submodule bump.
 
-use gitterrace_testkit::{git, git_at, oracle, page};
+use gitterrace_testkit::{git, git_at, page};
 
 const GONE: &str = "1dfaa4db2479753a46a3e90f2c3c89d89d0b21f1";
 const D: &str = "2024-01-01T00:00:00+00:00";
@@ -32,8 +32,7 @@ async fn a_former_submodule_path_answers_below_5xx_and_last_commits_are_exact() 
     git_at(p, D, &["add", "b.txt"]);
     git_at(p, "2024-01-03T01:00:00+00:00", &["commit", "-q", "-m", "more"]);
 
-    let router = gitterrace_web::app_router(p).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(p).await;
 
     for uri in [
         format!("/tree/{with_gitlink}"),

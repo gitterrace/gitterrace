@@ -193,8 +193,7 @@ async fn each_cell(mut f: impl AsyncFnMut(&axum::Router, String)) {
     for mm in [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold] {
         let dir = tempfile::tempdir().expect("tmp");
         let (repo, values) = oracle::matrix_repo(dir.path(), mm);
-        let router = gitterrace_web::app_router(&repo).expect("router");
-        oracle::ready(&router).await;
+        let router = crate::common::ready_router(&repo).await;
         for cell in matrix::pairwise().iter().filter(|c| c.mailmap == mm) {
             f(&router, cell.query(&values)).await;
         }
@@ -250,8 +249,7 @@ fn mixed(dir: &std::path::Path) -> std::path::PathBuf {
 #[tokio::test]
 async fn the_overview_counts_the_log() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(mixed(dir.path())).await;
     let (_, ov) = page(&router, "/").await;
     let shown = count_before(&ov, " commits").expect("overview commits");
     let (mut listed, mut pg) = (0, 0);
@@ -272,8 +270,7 @@ async fn the_overview_counts_the_log() {
 #[tokio::test]
 async fn the_overview_and_the_api_agree() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(mixed(dir.path())).await;
     let (_, ov) = page(&router, "/").await;
     let repo = json(&router, "/api/v1/repo").await;
     let t = &repo["totals"];
@@ -288,8 +285,7 @@ async fn the_overview_and_the_api_agree() {
 #[tokio::test]
 async fn a_count_beside_a_list_is_its_length() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(mixed(dir.path())).await;
     for p in ["src/a.rs", "Cargo.toml", "src/b.rs"] {
         let (_, h) = page(&router, &format!("/history/{p}")).await;
         let said = count_before(&h, " commit").expect("history count");
@@ -307,8 +303,7 @@ async fn a_count_beside_a_list_is_its_length() {
 #[tokio::test]
 async fn file_counts_follow_the_bot_option() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(mixed(dir.path())).await;
     let (_, h) = page(&router, "/history/Cargo.toml").await;
     assert_eq!(rows(&h), 0, "{h}");
     let (_, ov) = page(&router, "/").await;
@@ -322,8 +317,7 @@ async fn file_counts_follow_the_bot_option() {
 #[tokio::test]
 async fn every_overview_number_names_its_population() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(mixed(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(mixed(dir.path())).await;
     let (_, ov) = page(&router, "/").await;
     let at = ov.find("<p class=\"facts\">").expect("facts line");
     let line = &ov[at..at + ov[at..].find("</p>").expect("end")];

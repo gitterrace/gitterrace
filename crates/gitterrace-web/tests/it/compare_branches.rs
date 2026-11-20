@@ -5,7 +5,7 @@
 
 use std::fmt::Write as _;
 
-use gitterrace_testkit::{Fixture, oracle, page};
+use gitterrace_testkit::{Fixture, page};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_side_branch_compares_and_an_empty_range_says_so() {
@@ -22,8 +22,7 @@ async fn a_side_branch_compares_and_an_empty_range_says_so() {
         .at("2024-03-03T10:00:00Z")
         .write("a.rs", "fn a() {}\nfn b() {}\n")
         .commit("fix(core): main work");
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
 
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
@@ -68,8 +67,7 @@ fn long_side(n: usize) -> (tempfile::TempDir, Fixture) {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_range_past_the_cap_asks_for_a_nearer_base() {
     let (_dir, f) = long_side(2_001);
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let t = std::time::Instant::now();
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
@@ -100,8 +98,7 @@ async fn a_failed_git_read_shows_an_error_not_zeros() {
     let tree = f.git(&["rev-parse", concat!("side^", "{", "tree}")]);
     let obj = f.path().join(".git/objects").join(&tree[..2]).join(&tree[2..]);
     std::fs::remove_file(&obj).expect("loose tree after fast-import unpack");
-    let router = gitterrace_web::app_router(f.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(f.path()).await;
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
     assert!(html.contains("could not be read"), "the failure is said");

@@ -2,7 +2,7 @@
 //! or which head files a path covers. The API and the statistics pages read the same rule.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use gitterrace_testkit::{Fixture, oracle, page};
+use gitterrace_testkit::{Fixture, page};
 
 /// Bob: a feat on 2024-01-10, a fix on 2024-03-10. Ann: the newest commit, 2024-03-20, which
 /// adds `docs/guide.md` (outside `src`).
@@ -35,8 +35,7 @@ fn keys(v: &serde_json::Value) -> Vec<serde_json::Value> {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_chip_keeps_the_period_anchor() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(repo(dir.path())).await;
     let api = "/api/v1/insights";
     let all = json(&router, &format!("{api}/summary?period=1m")).await;
     let bob = json(&router, &format!("{api}/summary?q=author:bob%40y.io&period=1m")).await;
@@ -51,8 +50,7 @@ async fn a_chip_keeps_the_period_anchor() {
 #[tokio::test(flavor = "multi_thread")]
 async fn new_is_judged_on_the_whole_history() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(repo(dir.path())).await;
     let c = json(&router, "/api/v1/insights/contributors?q=type:fix&period=1m").await;
     let bob = c["contributors"]
         .as_array()
@@ -68,8 +66,7 @@ async fn new_is_judged_on_the_whole_history() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_path_covers_only_its_head_files() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(repo(dir.path())).await;
     let o = json(&router, "/api/v1/insights/ownership?q=path:src&period=all").await;
     assert_eq!(o["untracked_lines"], 0, "{o}");
 }
@@ -80,8 +77,7 @@ async fn a_path_covers_only_its_head_files() {
 #[tokio::test(flavor = "multi_thread")]
 async fn patterns_empty_state_follows_the_period_anchor() {
     let dir = tempfile::tempdir().expect("tmp");
-    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(repo(dir.path())).await;
     let (status, body) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=1w").await;
     assert_eq!(status, 200, "{body}");
     assert!(body.contains("No commits match these filters."), "{body}");

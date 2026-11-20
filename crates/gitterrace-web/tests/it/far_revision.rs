@@ -51,8 +51,7 @@ fn repo(dir: &Path) {
 async fn a_far_revision_asks_for_a_reindex_and_holds_nothing() {
     let dir = tempfile::tempdir().expect("tmp");
     repo(dir.path());
-    let router = gitterrace_web::app_router(dir.path()).expect("router");
-    oracle::ready(&router).await;
+    let router = crate::common::ready_router(dir.path()).await;
 
     let (status, body) = page(&router, "/stats?rev=far").await;
     assert_eq!(status, 200);
