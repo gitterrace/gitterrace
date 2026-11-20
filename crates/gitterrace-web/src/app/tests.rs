@@ -24,11 +24,7 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     std::fs::write(path.join("a.txt"), "1\n").expect("write");
     git(path, &["add", "."]);
     git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let head = app.repo.resolve("HEAD").expect("head");
     let key = app.memo_key("t", Some("q=type:fix"));
     assert_ne!(key, app.memo_key("t", Some("q=type:feat")));
@@ -60,11 +56,7 @@ fn overview_totals_are_computed_once_per_tip() {
     std::fs::write(path.join("a.txt"), "1\n").expect("write");
     git(path, &["add", "."]);
     git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let opts = || app.defaults().into_options();
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
@@ -110,11 +102,7 @@ fn alternating_selected_commits_each_read_the_segment_set() {
     let first = git(path, &["rev-parse", "HEAD"]);
     std::fs::write(path.join("a.txt"), "2\n").expect("write");
     git(path, &["commit", "-qam", "fix: two"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let head = app.repo.resolve("HEAD").expect("head");
     for _ in 0..3 {
         assert_eq!(crate::tests::unchecked_src(&app, &head).len(), 2);
@@ -158,11 +146,7 @@ fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
     std::fs::write(path.join(".gitignore"), "target/\n").expect("write");
     git(path, &["add", "."]);
     git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let head = app.repo.resolve("HEAD").expect("head");
     (dir, app, head)
 }
@@ -246,7 +230,7 @@ fn warm_up_reads_do_not_delay_the_release() {
 
 /// A history with renames, a dir rename, deletes, an untouched-path merge, a merge that
 /// takes one side, and an evil merge that matches neither parent.
-fn tangled() -> (tempfile::TempDir, App) {
+fn tangled() -> (tempfile::TempDir, Arc<App>) {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
     let mut day = 0;
@@ -306,11 +290,7 @@ fn tangled() -> (tempfile::TempDir, App) {
     let date = commit("unused2");
     let merge = ["merge", "-q", "--no-ff", "-m", "merge skew", "skew"];
     gitterrace_testkit::git_at(p, &date, &merge);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(p);
     (dir, app)
 }
 
@@ -381,11 +361,7 @@ fn a_missing_tree_cuts_the_path_log_to_a_correct_prefix() {
         git(p, &["add", "."]);
         git(p, &["commit", "-q", "-m", &format!("c{n}")]);
     }
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(p);
     let head = app.repo.resolve("HEAD").expect("head");
     let walked = app.repo.log(&head, Some("f"), 0, 3).expect("log").into_iter().len();
     let spec = format!("HEAD~4^{}tree{}", '{', '}');

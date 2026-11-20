@@ -2,7 +2,6 @@
 
 use gitterrace_testkit::git;
 
-use crate::app::App;
 
 #[test]
 fn a_block_corrupted_while_serving_rebuilds_the_cache() {
@@ -13,11 +12,7 @@ fn a_block_corrupted_while_serving_rebuilds_the_cache() {
     std::fs::write(path.join("a.txt"), "1\n").expect("write");
     git(path, &["add", "."]);
     git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
     let cache = app.index.dir().to_path_buf();
@@ -61,11 +56,7 @@ fn a_cache_emptied_from_outside_while_ready_starts_a_rebuild() {
     std::fs::write(path.join("a.txt"), "1\n").expect("write");
     git(path, &["add", "."]);
     git(path, &["commit", "-q", "-m", "feat: one"]);
-    let repo = gitterrace_git::Repo::discover(path).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(path);
     let head = app.repo.resolve("HEAD").expect("head");
     let cache = app.index.dir().to_path_buf();
     for e in std::fs::read_dir(&cache).expect("ls").filter_map(Result::ok) {

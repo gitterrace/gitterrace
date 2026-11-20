@@ -128,11 +128,7 @@ fn a_two_day_repository_draws_no_leading_empty_buckets() {
     let f = f.at("2024-03-08T00:30:00+00:00").write("a", "1").commit("one");
     let f = f.at("2024-03-09T12:00:00+00:00").write("a", "2").commit("two");
     let _f = f.at("2024-03-10T00:00:00+00:00").write("a", "3").commit("three");
-    let repo = gitterrace_git::Repo::discover(dir.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = App::new(repo, index);
-    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
-    app.mark_ready();
+    let app = crate::tests::ready_app(dir.path());
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
     // 2024-03-10T00:00:00Z, the frozen test clock.
