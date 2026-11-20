@@ -339,24 +339,18 @@ pub(crate) fn home() -> PathBuf {
 }
 
 fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
-    ConfigError::Invalid {
-        id: id.to_string(),
-        why: why.into(),
-    }
+    let (id, why) = (id.to_string(), why.into());
+    ConfigError::Invalid { id, why }
 }
 
 fn script_err(id: &str, why: impl Into<String>) -> ConfigError {
-    ConfigError::Script {
-        id: id.to_string(),
-        why: why.into(),
-    }
+    let (id, why) = (id.to_string(), why.into());
+    ConfigError::Script { id, why }
 }
 
 fn send_err(id: &str, why: impl Into<String>) -> ConfigError {
-    ConfigError::Send {
-        id: id.to_string(),
-        why: why.into(),
-    }
+    let (id, why) = (id.to_string(), why.into());
+    ConfigError::Send { id, why }
 }
 
 fn valid_id(id: &str) -> bool {
