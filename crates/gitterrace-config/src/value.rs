@@ -1,6 +1,6 @@
 //! How a setting value is read from TOML and shown.
 
-use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period, StringEnum};
+use gitterrace_types::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period, StringEnum};
 
 /// The input the settings form shows for a type. Derived from the type alone, so a new setting
 /// gets its input without a list to update.
@@ -143,4 +143,4 @@ macro_rules! one_of {
         }
     )+};
 }
-one_of!(ColorScheme, DateStyle, LinkStyle, Period);
+one_of!(ColorScheme, DateStyle, DiffPalette, LinkStyle, Period);

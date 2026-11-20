@@ -3,7 +3,7 @@
 
 use std::collections::BTreeMap;
 
-use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period};
+use gitterrace_types::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period};
 
 use crate::features::{Feature, INSIGHT_PAGES};
 use crate::value::{Control, Show};
@@ -382,6 +382,9 @@ settings! {
         theme: ColorScheme = ColorScheme::System => Live,
         /// How dates read: `relative` or `absolute`.
         dates: DateStyle = DateStyle::Relative => Live,
+        /// Colors a diff marks additions and removals with: `default` (green and red) or
+        /// `colorblind` (blue and orange).
+        diff_palette: DiffPalette = DiffPalette::Default => Live,
         /// Tint the whole line under the pointer in a file, its blame and a diff.
         has_line_hover: bool = true => Live,
         /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,

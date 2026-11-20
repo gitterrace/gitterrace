@@ -25,7 +25,7 @@
 <link rel="stylesheet" href="{{ crate::asset_url("media.css") }}">
 <link rel="stylesheet" href="{{ crate::asset_url("docnav.css") }}">
 </head>
-<body{% if c.has_line_hover %} data-line-hover{% endif %} data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
+<body{% if !c.diff_palette.is_empty() %} data-diff-palette="{{ c.diff_palette }}"{% endif %}{% if c.has_line_hover %} data-line-hover{% endif %} data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
 <a class="skip" href="#gt-main">Skip to content</a>
 <header class="top"><div class="wrap">
 <div class="topbar{% if c.bare() %} bare{% endif %}">

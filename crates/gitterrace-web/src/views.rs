@@ -114,6 +114,8 @@ pub(crate) struct Chrome {
     pub(crate) theme: String,
     /// Tint the line under the pointer (`display.has_line_hover`).
     pub(crate) has_line_hover: bool,
+    /// Diff colors (`display.diff_palette`), empty for the default.
+    pub(crate) diff_palette: String,
     /// Open a live-update stream: off on pages pinned to a commit or tag.
     pub(crate) live: bool,
     /// What the page does with a change: `refresh`, `notice` or nothing but the chrome.
@@ -256,6 +258,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             t => t.as_str().to_owned(),
         },
         has_line_hover: app.cfg().display.has_line_hover,
+        diff_palette: app.cfg().display.diff_palette.attr(),
         live: !app.public()
             && crate::features::on(Feature::Live)
             && app.cfg().watch.enabled

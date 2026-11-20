@@ -15,7 +15,7 @@ pub mod markup;
 mod registry_tests;
 
 pub use codec::{ParseError, StringEnum};
-pub use config::{ColorScheme, DateStyle, LinkStyle, Period, SettingsFile};
+pub use config::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period, SettingsFile};
 pub use git::{ChangeKind, LineKind, RefKind, TreeEntryKind};
 pub use markup::{esc, esc_text};
 

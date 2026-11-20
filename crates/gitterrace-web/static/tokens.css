@@ -45,3 +45,10 @@
 /* The wordmark's halves, the README header's fills; `cargo xtask check` fails on drift. */
 --muted-brand:#707881;--wm-git:var(--muted-brand);--wm-terrace:var(--fg);
 }
+/* Diff palette for color blindness (display.diff_palette): blue adds, orange removes, a pair that
+   stays apart under red-green deficiency. Only the diff roles move. */
+:root{--cb-add:light-dark(#1f5f9e,#7db4ea);--cb-add-bg:light-dark(#e1ebf6,#233447);
+--cb-add-hl:light-dark(#c7dbef,#2d4663);--cb-del:light-dark(#a24f00,#f0a14f);
+--cb-del-bg:light-dark(#f6eadc,#40301f);--cb-del-hl:light-dark(#f0dcc3,#52391d)}
+body[data-diff-palette=colorblind]{--add:var(--cb-add);--add-bg:var(--cb-add-bg);
+--add-hl:var(--cb-add-hl);--del:var(--cb-del);--del-bg:var(--cb-del-bg);--del-hl:var(--cb-del-hl)}

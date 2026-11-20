@@ -145,6 +145,9 @@ Good to know: Settings is never on a public server or in an export.
 `features.settings_enabled = false` removes it. [Configuration](configuration.md)
 lists every key.
 
+Good to know: `display.diff_palette = "colorblind"` marks diff additions blue and
+removals orange instead of green and red.
+
 ## Keys
 
 Press `?` on any page for the full list. The common ones:

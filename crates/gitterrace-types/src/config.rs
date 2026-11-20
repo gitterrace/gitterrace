@@ -74,6 +74,28 @@ string_enum! {
 }
 
 string_enum! {
+    /// Colors a diff marks additions and removals with (`display.diff_palette`).
+    #[derive(Default)]
+    pub enum DiffPalette [serde] {
+        #[default]
+        Default => "default",
+        Colorblind => "colorblind",
+    }
+}
+
+impl DiffPalette {
+    /// The `data-diff-palette` value, empty for the default colors.
+    #[must_use]
+    pub fn attr(self) -> String {
+        if self == Self::Default {
+            String::new()
+        } else {
+            self.as_str().to_owned()
+        }
+    }
+}
+
+string_enum! {
     /// How dates read (`display.dates`).
     #[derive(Default)]
     pub enum DateStyle [serde] {
@@ -105,13 +127,14 @@ string_enum! {
 #[cfg(test)]
 mod tests {
     use crate::codec::assert_round_trip;
-    use crate::{ColorScheme, DateStyle, LinkStyle, Period, SettingsFile, StringEnum};
+    use crate::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period, SettingsFile, StringEnum};
 
     #[test]
     fn every_config_value_round_trips() {
         assert_round_trip::<Period>();
         assert_round_trip::<ColorScheme>();
         assert_round_trip::<DateStyle>();
+        assert_round_trip::<DiffPalette>();
         assert_round_trip::<LinkStyle>();
         assert_round_trip::<SettingsFile>();
     }

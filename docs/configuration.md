@@ -192,6 +192,9 @@ Exceptions, each on purpose:
   one: `system`, `light` or `dark`.
 - `dates` (string, default `"relative"`): How dates read: `relative` or
   `absolute`.
+- `diff_palette` (string, default `"default"`): Colors a diff marks additions
+  and removals with: `default` (green and red) or `colorblind` (blue and
+  orange).
 - `has_line_hover` (bool, default `true`): Tint the whole line under the pointer
   in a file, its blame and a diff.
 - `sidebar` (list of strings, default
