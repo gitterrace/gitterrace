@@ -15,9 +15,7 @@ fn one_file(dir: &std::path::Path) -> std::path::PathBuf {
 
 /// An app over `p` whose index is built but not marked ready.
 fn built(p: &std::path::Path) -> Arc<App> {
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
     app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app
 }
@@ -37,9 +35,7 @@ fn warmed(p: &std::path::Path) -> (Arc<App>, String) {
 async fn the_indexing_page_is_never_memoized() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = one_file(dir.path());
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(&p);
     // The build has finished (the index generation moved) but the ready flag is not set
     // yet: a request in that window renders the indexing page under the final memo key.
     app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
@@ -227,9 +223,7 @@ async fn a_cold_languages_page_after_the_warm_up_walks_no_chain() {
 async fn another_repository_going_idle_keeps_these_tables() {
     let app = |dir: &std::path::Path| {
         drop(gitterrace_testkit::Fixture::init(dir).write("a.txt", "a\n").commit("feat: a"));
-        let repo = gitterrace_git::Repo::discover(dir).expect("repo");
-        let index = gitterrace_index::Index::open(&repo).expect("index");
-        let app = Arc::new(App::new(repo, index));
+        let app = crate::tests::new_app(dir);
         app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         let head = app.repo.resolve("HEAD").expect("head");
         super::warm_shared(&app, &head);

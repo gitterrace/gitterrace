@@ -99,8 +99,6 @@ fn a_woff_over_the_total_cap_is_refused() {
 
 #[tokio::test]
 async fn a_font_blob_shows_its_facts_and_a_sample_from_raw() {
-    use std::sync::Arc;
-
     use gitterrace_testkit::git;
 
     let dir = tempfile::tempdir().expect("tempdir");
@@ -110,9 +108,7 @@ async fn a_font_blob_shows_its_facts_and_a_sample_from_raw() {
     std::fs::write(p.join("bad.ttf"), b"\0\x01\0\0junk").expect("write");
     git(p, &["add", "."]);
     git(p, &["commit", "-q", "-m", "feat: fonts"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(crate::app::App::new(repo, index));
+    let app = crate::tests::new_app(p);
     let (s, body) = crate::tests::get(&app, "/blob/HEAD/f.woff2").await;
     assert_eq!(s, 200);
     assert!(body.contains("JetBrains Mono") && body.contains("glyphs"), "{body}");

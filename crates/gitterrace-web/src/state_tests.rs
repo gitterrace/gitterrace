@@ -1,7 +1,5 @@
 //! Tests for revisions, git state, read-only routes, public mode and binding.
 
-use std::sync::Arc;
-
 #[cfg(unix)]
 use axum::{body::Body, http::Request};
 use gitterrace_testkit::{Fixture, git};
@@ -10,7 +8,6 @@ use tower::ServiceExt;
 
 #[cfg(unix)]
 use crate::actions::actions_tests;
-use crate::app::App;
 #[cfg(unix)]
 use crate::tests::fetch;
 use crate::tests::{fixture, get, links, ready_app};
@@ -50,9 +47,7 @@ async fn a_newer_cache_is_explained_not_clobbered() {
         v
     };
     let before = snapshot(&cache);
-    let repo = gitterrace_git::Repo::discover(&p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(&p);
     // The server marks the app ready once its update attempt ends, failed or not.
     app.mark_ready();
     for uri in ["/stats", "/stats/languages", "/stats/hotspots"] {

@@ -2,7 +2,6 @@
 
 use gitterrace_testkit::git;
 
-
 #[test]
 fn a_block_corrupted_while_serving_rebuilds_the_cache() {
     use gitterrace_index::feed::CommitRange;

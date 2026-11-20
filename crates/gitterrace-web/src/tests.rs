@@ -25,9 +25,7 @@ async fn about_tabs_follow_the_docs_present() {
         .write("contributing.md", "# Help\n")
         .write("docs/LICENSE/x.txt", "folder named LICENSE\n")
         .commit("feat: docs");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(f.path());
     let (s, body) = get(&app, "/").await;
     assert_eq!(s, 200);
     assert_eq!(body.matches("class=\"tabs doctabs\"").count(), 1);
@@ -53,9 +51,7 @@ async fn about_tabs_follow_the_docs_present() {
 async fn readme_alone_has_no_tab_row() {
     let dir = tempfile::tempdir().expect("tempdir");
     let f = Fixture::standard(dir.path());
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(f.path());
     let (_, body) = get(&app, "/").await;
     assert!(body.contains("data-dochead") && !body.contains("doctabs"));
 }
@@ -74,9 +70,7 @@ async fn serves_every_page() {
     std::fs::write(p.join("src/a.rs"), "fn main() {\n}\n").expect("write");
     git(p, &["commit", "-qam", "fix: second"]);
 
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
 
     let (s, body) = get(&app, "/").await;
     assert_eq!(s, 200);
@@ -222,9 +216,7 @@ async fn oversized_blob_links_to_raw_instead_of_rendering() {
     std::fs::write(p.join("big.txt"), big).expect("write");
     git(p, &["add", "."]);
     git(p, &["commit", "-q", "-m", "feat: big"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
     let (s, body) = get(&app, "/blob/HEAD/big.txt").await;
     assert_eq!(s, 200);
     assert!(body.contains("File too large to display"));
@@ -253,9 +245,7 @@ async fn huge_blobs_are_refused_before_they_are_loaded() {
     .expect("write");
     git(p, &["add", "."]);
     git(p, &["commit", "-q", "-m", "feat: big"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
     assert!(crate::routes::raw_refused((256 << 20) + 1, 256));
     assert!(!crate::routes::raw_refused(256 << 20, 256));
     let (s, body) = get(&app, "/blob/HEAD/big.png").await;
@@ -281,9 +271,7 @@ async fn media_renders_inline_and_in_diffs() {
     png.extend([1, 2, 3]);
     std::fs::write(p.join("a.png"), &png).expect("write");
     git(p, &["commit", "-qam", "fix: png"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
     let (_, body) = get(&app, "/blob/HEAD/a.png").await;
     assert!(body.contains("class=\"media-img\" src=\"/raw/HEAD/a.png\"") && body.contains("7 x 5"));
     let (_, body) = get(&app, "/blob/HEAD/v.svg").await;
@@ -378,9 +366,7 @@ async fn hotspots_memo_follows_head() {
     std::fs::write(p.join("first.txt"), "x\n").expect("write");
     git(p, &["add", "."]);
     git(p, &["commit", "-q", "-m", "init"]);
-    let repo = gitterrace_git::Repo::discover(p).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    let app = crate::tests::new_app(p);
     let refresh = |app: &Arc<App>| {
         app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         app.mark_ready();
@@ -454,11 +440,16 @@ async fn router_rejects_foreign_and_missing_host() {
     assert!(!res.headers().contains_key("content-security-policy"));
 }
 
-/// An app over `p` whose index is built and marked ready.
-pub(crate) fn ready_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
+/// An app over the repository at `p`, its index not yet built.
+pub(crate) fn new_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
     let repo = gitterrace_git::Repo::discover(p.as_ref()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
-    let app = Arc::new(App::new(repo, index));
+    Arc::new(App::new(repo, index))
+}
+
+/// An app over `p` whose index is built and marked ready.
+pub(crate) fn ready_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
+    let app = new_app(p);
     app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     app

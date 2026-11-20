@@ -20,10 +20,7 @@ async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
         .write("big.txt", "a\nB\nc\nd\n")
         .write("small.txt", "2\n")
         .commit("fix: b");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
@@ -87,10 +84,7 @@ async fn a_long_blame_arrives_in_bounded_pages() {
     let body = "line\n".repeat(lines);
     let dir = tempfile::tempdir().expect("tmp");
     let f = gitterrace_testkit::Fixture::init(dir.path()).write("big.txt", &body).commit("feat: a");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     let get = |from: Option<usize>| {
         let app = Arc::clone(&app);
         async move {
@@ -202,10 +196,7 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
     use axum::extract::Query;
     let dir = tempfile::tempdir().expect("tmp");
     let f = gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "one\n").commit("feat: a");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     let get = |app: &Arc<crate::app::App>| {
         super::files::tree(
             State(Arc::clone(app)),
@@ -230,10 +221,7 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
 async fn blame_page_is_memoized_until_the_branch_moves() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "one\n").commit("feat: a");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     let get = |app: &Arc<crate::app::App>| {
         super::files::blame(
             State(Arc::clone(app)),

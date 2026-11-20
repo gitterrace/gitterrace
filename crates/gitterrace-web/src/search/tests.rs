@@ -14,10 +14,7 @@ async fn repeat_search_at_one_tip_is_memoized() {
     let dir = tempfile::tempdir().expect("tmp");
     let f =
         gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "needle\n").commit("feat: a");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     let q = || SearchQuery { q: Some("needle".into()), ..SearchQuery::default() };
     let first = search(State(Arc::clone(&app)), Query(q())).await.expect("page").0;
     assert!(first.contains("1 match"), "{first}");
@@ -138,10 +135,7 @@ async fn an_over_long_query_or_filter_is_refused_with_a_message() {
     let dir = tempfile::tempdir().expect("tmp");
     let f =
         gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "needle\n").commit("feat: a");
-    let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
-    let index = gitterrace_index::Index::open(&repo).expect("index");
-    let env = crate::app::Env::new(gitterrace_config::Config::default());
-    let app = Arc::new(crate::app::App::configured(repo, index, &env));
+    let app = crate::tests::new_app(f.path());
     let long = "needle".repeat(crate::search::MAX_QUERY_BYTES);
     let page = search(
         State(Arc::clone(&app)),
