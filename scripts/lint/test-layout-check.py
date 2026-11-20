@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Fail when inline unit tests break the layout CONTRIBUTING#testing states.
 
-A source file holds at most one inline test module (`mod tests {`, `mod x_tests {`), it is the last inline item
-in the file (`mod x;` file modules may follow), and test code carries no section-divider banners. Platform variants nest inside the
+A source file holds at most one inline test module (`mod tests {`, `mod x_tests {`), it is the
+last inline item in the file (`mod x;` file modules may follow), and test code carries no
+section-divider banners. Platform variants nest inside
 one module (`#[cfg(unix)] mod unix { ... }`). Run by the lint runner as the test-layout hook.
 
   python3 scripts/lint/test-layout-check.py [--self-test] [root]
@@ -16,7 +17,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 GLOBS = ("crates/**/*.rs", "xtask/**/*.rs")
-GATE = re.compile(r"^#\[cfg\((?:[^()\n]|\((?:[^()\n]|\([^()\n]*\))*\))*\btest\b[^\n]*\]\n(?:#\[[^\n]*\n)*(?:pub(?:\([a-z]+\))? )?mod \w*tests \{\n", re.M)
+GATE = re.compile(
+    r"^#\[cfg\((?:[^()\n]|\((?:[^()\n]|\([^()\n]*\))*\))*\btest\b[^\n]*\]\n"
+    r"(?:#\[[^\n]*\n)*(?:pub(?:\([a-z]+\))? )?mod \w*tests \{\n",
+    re.M,
+)
 BANNER = re.compile(r"^\s*//\s*(?:[-=#*]{4,}|[-=#*]{2,}\s.*\s[-=#*]{2,})\s*$", re.M)
 
 
@@ -26,12 +31,12 @@ def problems_in(text: str) -> list[str]:
     if len(mods) > 1:
         out.append("more than one top-level test module, nest the extras inside `mod tests`")
     if mods:
-        close = re.search(r"^\}\n?", text[mods[-1].end():], re.M)
-        tail = text[mods[-1].end() + close.end():] if close else ""
+        close = re.search(r"^\}\n?", text[mods[-1].end() :], re.M)
+        tail = text[mods[-1].end() + close.end() :] if close else ""
         tail = re.sub(r"(?:#\[[^\n]*\n)*(?:pub(?:\([a-z]+\))? )?mod \w+;\n?", "", tail)
         if tail.strip():
             out.append("code after the test module, `mod tests` goes last")
-        if BANNER.search(text[mods[0].start():]):
+        if BANNER.search(text[mods[0].start() :]):
             out.append("section-divider banner in test code, use blank lines")
     return out
 

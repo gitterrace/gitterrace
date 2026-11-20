@@ -78,7 +78,7 @@ Install any tool it reports as missing.
   table-driven test. A test that cannot fail is deleted.
 
 `scripts/lint/test-layout-check.py` enforces the first and third rules, with a
-red and a green case in its `--self-test`.
+red and a green case in its self test.
 
 ## Commits
 
