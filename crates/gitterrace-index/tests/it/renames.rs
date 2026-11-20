@@ -223,7 +223,7 @@ fn incremental_append_equals_full_rebuild() {
         assert!(store.segments.len() > 1, "step {step} built by appends");
         let got = gitterrace_index::seg::canon::dump(&store).expect("dump");
         let src = Repo::discover(&r.repo).expect("repo");
-        let index = Index::open_dir(cache.clone()).expect("index");
+        let index = Index::open_dir(cache).expect("index");
         let disk = index
             .disk_source(&src, &git(&r.repo, &["rev-parse", "HEAD"]))
             .expect("open")

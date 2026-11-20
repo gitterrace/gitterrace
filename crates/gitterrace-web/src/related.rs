@@ -228,10 +228,10 @@ mod tests {
         assert!(peers.walks() >= before + 3, "the warm-up walks");
         let walked = peers.walks();
         assert_eq!(peers.related("a"), ["b"]);
-        assert!(peers.related("c").is_empty());
+        assert_eq!(peers.related("c").len(), 0);
         assert!(peers.related("lone").is_empty(), "not in the table");
         assert_eq!(peers.walks(), walked, "reads never walk");
         peers.remove("b");
-        assert!(peers.related("a").is_empty());
+        assert_eq!(peers.related("a").len(), 0);
     }
 }

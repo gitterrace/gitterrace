@@ -106,7 +106,7 @@ fn cost_tagged_keys_are_the_per_request_knobs() {
 #[test]
 fn costs_above_default_name_only_raised_keys() {
     let mut c = Config::default();
-    assert!(c.costs_above_default().is_empty());
+    assert_eq!(c.costs_above_default(), [] as [&str; 0]);
     c.api.diff_lines += 1;
     c.limits.search_matches += 1;
     c.limits.blob_lines -= 1;

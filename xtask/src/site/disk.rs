@@ -296,9 +296,15 @@ mod tests {
             ("docs/cli/index.html", &cli),
             ("assets/a.svg", ""),
         ]);
-        assert!(dead_links(&tree, REPO, &repo_file).is_empty());
+        assert_eq!(
+            dead_links(&tree, REPO, &repo_file),
+            [] as [std::string::String; 0]
+        );
         let docs = ["docs/why/".to_owned(), "docs/cli/".to_owned()];
-        assert!(leftovers(&tree, &written(&tree), &docs).is_empty());
+        assert_eq!(
+            leftovers(&tree, &written(&tree), &docs),
+            [] as [std::string::String; 0]
+        );
     }
 
     #[test]
@@ -355,7 +361,10 @@ mod tests {
         assert_eq!(bad.lines().count(), 3, "{bad}");
         written.insert("docs/removed/index.html".to_owned());
         let docs = ["docs/why/".to_owned(), "docs/removed/".to_owned()];
-        assert!(leftovers(&tree, &written, &docs).is_empty());
+        assert_eq!(
+            leftovers(&tree, &written, &docs),
+            [] as [std::string::String; 0]
+        );
     }
 
     /// A fresh build: what `make docs-check` runs, held here too so `cargo test` sees it.

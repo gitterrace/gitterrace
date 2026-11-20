@@ -211,7 +211,7 @@ fn author_log_comes_from_the_records_newest_first() {
     };
     assert_eq!(ids("author:ann@x.y"), ["c", "a"]);
     assert_eq!(ids("author:Ann path:src"), ["a"]);
-    assert!(ids("author:nobody").is_empty());
+    assert_eq!(ids("author:nobody").len(), 0);
     assert_eq!(ids("author:Ann,bob@x.y !path:docs"), ["b", "a"]);
     assert_eq!(ids("!author:Ann"), ["b"]);
 }

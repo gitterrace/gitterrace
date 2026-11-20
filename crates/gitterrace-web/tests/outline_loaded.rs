@@ -25,7 +25,7 @@ fn the_check_sees_an_outline_without_its_script() {
         "/x".to_owned(),
         format!("<nav data-outline></nav><script {SCRIPT}1\">"),
     )];
-    assert!(missing(&good).is_empty());
+    assert_eq!(missing(&good), [] as [&str; 0]);
 }
 
 /// The loader in app.js fetches outline.js for every outline on the page.

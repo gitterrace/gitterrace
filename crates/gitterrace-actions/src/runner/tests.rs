@@ -547,7 +547,7 @@ fn stdin_modes() {
     record(t.path(), &[], Stdin::Markdown, &p).expect("md");
     assert_eq!(read(), p.markdown.as_bytes());
     record(t.path(), &[], Stdin::None, &p).expect("none");
-    assert!(read().is_empty());
+    assert_eq!(read(), [] as [u8; 0]);
 }
 
 /// A timed-out run gives its slot back when `run` returns, not when the kernel reaps its group:

@@ -63,5 +63,5 @@ fn an_enum_without_a_round_trip_test_is_reported() {
     let planted = "string_enum! {\n    pub enum Planted {\n        A => \"a\",\n    }\n}\n";
     assert_eq!(uncovered(planted), ["Planted"]);
     let covered = format!("{planted}\nassert_round_trip::<Planted>();");
-    assert!(uncovered(&covered).is_empty());
+    assert_eq!(uncovered(&covered), [] as [std::string::String; 0]);
 }

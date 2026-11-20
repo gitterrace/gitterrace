@@ -153,7 +153,7 @@ mod tests {
         assert_eq!(t.len(), 1);
         assert_eq!(t[0].id, head);
         assert!(t[0].message.starts_with("feat: one\n\nbody line"));
-        assert!(t[0].parents.is_empty());
+        assert_eq!(t[0].parents, [] as [std::string::String; 0]);
         let s = repo.search_summaries("HEAD", &[head]).expect("summaries");
         assert_eq!(s[0].subject, "feat: one");
         assert_eq!(repo.commits_read(), 1);

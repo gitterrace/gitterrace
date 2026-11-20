@@ -68,7 +68,7 @@ fn the_checker_sees_a_bare_date() {
     );
     let ok = "<time data-tip=\"x\" datetime=\"y\" tabindex=\"0\">3 days ago</time> \
               <time data-tip=\"x\" datetime=\"y\" tabindex=\"0\">just now</time>";
-    assert!(bare_dates(ok).is_empty());
+    assert_eq!(bare_dates(ok), [] as [std::string::String; 0]);
 }
 
 #[test]

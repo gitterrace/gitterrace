@@ -358,7 +358,7 @@ mod tests {
         let mut buf = Vec::new();
         let e = s.segments[0].blocks(section::COMMITS)[0];
         assert_eq!(s.segments[0].read_block(&e, &mut buf)?, &[0u8; 40]);
-        assert!(s.segments[0].blocks(section::CANON).is_empty());
+        assert_eq!(s.segments[0].blocks(section::CANON).len(), 0);
         Ok(())
     }
 

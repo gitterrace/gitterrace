@@ -352,7 +352,7 @@ mod tests {
         }
         assert_eq!(old.restart_changes(&changed), restart);
         changed.keep_restart(&old);
-        assert!(old.restart_changes(&changed).is_empty());
+        assert_eq!(old.restart_changes(&changed), [] as [&str; 0]);
         assert_eq!(
             changed.server.live_streams, 3,
             "live keys are not held back"
@@ -426,7 +426,7 @@ mod tests {
             "names the valid ones: {e}"
         );
         let l = parse("[display]\nsidebar = []\n").expect("empty is valid");
-        assert!(l.config.display.sidebar.is_empty());
+        assert_eq!(l.config.display.sidebar, [] as [std::string::String; 0]);
     }
 
     /// By default the open work (the branch, then loose ends) comes before the activity numbers.

@@ -290,7 +290,7 @@ mod tests {
         assert!(matches!(i.path(&long), Err(SegError::TooLong { .. })));
         assert!(matches!(i.identity(&long), Err(SegError::TooLong { .. })));
         assert!(i.path(&"x".repeat(MAX_STRING)).is_ok());
-        assert!(i.into_delta().identities.is_empty());
+        assert_eq!(i.into_delta().identities.len(), 0);
     }
 
     #[test]

@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(c.languages[0].language, "Python");
         assert_eq!(c.languages[0].net, 3200);
         assert_eq!(c.languages[1].net, -3);
-        assert!(ins.compare("b", "nope").commits.is_empty());
+        assert_eq!(ins.compare("b", "nope").commits.len(), 0);
     }
 
     #[test]

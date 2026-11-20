@@ -146,7 +146,7 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
     assert_eq!(a, b, "{case}: rows_for");
     for days in [i64::MIN..i64::MAX, 19_680..19_700] {
         let a: Vec<_> = d.agg_author_day(days.clone()).collect();
-        let b: Vec<_> = m.agg_author_day(days.clone()).collect();
+        let b: Vec<_> = m.agg_author_day(days).collect();
         assert_eq!(a, b, "{case}: author day");
     }
     for p in ["", "src", "new/", "zz"] {

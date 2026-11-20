@@ -11,7 +11,7 @@
 
 FROM debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4 AS build
 # Keep in step with rust-toolchain.toml (scripts/verify/docker-check.sh checks it).
-ARG RUST_TOOLCHAIN=1.98.0
+ARG RUST_TOOLCHAIN=1.100.0
 # Parallel compile jobs. A busy machine builds with fewer: --build-arg JOBS=1.
 ARG JOBS=2
 # What `git-terrace --version` prints. .git stays out of the context, so pass it:

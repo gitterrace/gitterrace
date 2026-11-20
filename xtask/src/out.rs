@@ -389,10 +389,9 @@ mod tests {
             PAGE
         );
         apply(tmp.path(), outs(), Mode::Write).expect("write");
-        assert!(
-            apply(tmp.path(), outs(), Mode::Check)
-                .expect("check")
-                .is_empty()
+        assert_eq!(
+            apply(tmp.path(), outs(), Mode::Check).expect("check"),
+            [] as [std::string::String; 0]
         );
     }
 
@@ -407,6 +406,9 @@ mod tests {
         assert!(!root.join("docs/x.md").exists(), "check wrote to the tree");
 
         apply(root, outs(), Mode::Write).expect("write");
-        assert!(apply(root, outs(), Mode::Check).expect("check").is_empty());
+        assert_eq!(
+            apply(root, outs(), Mode::Check).expect("check"),
+            [] as [std::string::String; 0]
+        );
     }
 }

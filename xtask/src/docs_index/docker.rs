@@ -74,7 +74,10 @@ mod tests {
         ] {
             assert_eq!(check("x.md", wrong, port).len(), 1, "{wrong}");
         }
-        assert!(check("x.md", &format!("`http://localhost:{port}/r/`"), port).is_empty());
+        assert_eq!(
+            check("x.md", &format!("`http://localhost:{port}/r/`"), port),
+            [] as [std::string::String; 0]
+        );
         for doc in ["README.md", "docs/online.md"] {
             let text = std::fs::read_to_string(root.join(doc)).expect("doc");
             assert!(text.contains(&format!("localhost:{port}")), "{doc}");

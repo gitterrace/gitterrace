@@ -137,7 +137,7 @@ fn a_planted_chart_without_a_table_is_caught() {
         r#"<svg class="chart" role="img" aria-label="Activity">"#,
         r#"<g data-tip="Mon: 3 commits (100%) of 3"></g></svg>"#,
     );
-    assert!(!faults(bare).is_empty());
+    assert_ne!(faults(bare), [] as [std::string::String; 0]);
     let good = concat!(
         r#"<figure class="chart-fig"><svg class="chart" role="img" aria-label="A" "#,
         r#"aria-describedby="chart-a-sum"><g data-tip="Mon: 3 commits (100%) of 3"></g></svg>"#,
@@ -152,15 +152,15 @@ fn a_planted_chart_without_a_table_is_caught() {
         r#"<td class="r">3</td></tr></tfoot>"#,
         r#"<td class="r">4</td></tr></tfoot>"#,
     );
-    assert!(!faults(&drift).is_empty());
+    assert_ne!(faults(&drift), [] as [std::string::String; 0]);
     let summary_less = good.replace("3 commits.</figcaption>", "</figcaption>");
-    assert!(!faults(&summary_less).is_empty());
+    assert_ne!(faults(&summary_less), [] as [std::string::String; 0]);
     // A shaded grid outside a figure counts as a chart without a table.
     let grid = concat!(
         r#"<div class="card matrix"><table><tr>"#,
         r#"<td data-tip="a / b: 3 commits (100%) of 3">3</td></tr></table></div>"#,
     );
-    assert!(!faults(grid).is_empty());
+    assert_ne!(faults(grid), [] as [std::string::String; 0]);
 }
 
 #[test]

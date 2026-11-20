@@ -95,7 +95,7 @@ fn hand_shaped_markup_is_caught() {
     assert_eq!(loose_switches(metric).len(), 1);
     let shared = "<div class=\"segctl\" role=\"group\">\
                   <span class=\"segs\"><a class=\"on\">a</a><a>b</a></span></div>";
-    assert!(loose_switches(shared).is_empty());
+    assert_eq!(loose_switches(shared), [] as [std::string::String; 0]);
     let readme = "<div class=\"card readme\"><div class=\"readme-h\">README</div><div \
                   class=\"markdown-body\"></div></div>";
     assert_eq!(bad_cards(readme).len(), 1);
@@ -103,7 +103,7 @@ fn hand_shaped_markup_is_caught() {
     assert_eq!(bad_cards(pre).len(), 1);
     let good = "<div class=\"card x\"><div class=\"dochead sticky\" data-dochead></div><div \
                 class=\"markdown-body\"></div></div>";
-    assert!(bad_cards(good).is_empty());
+    assert_eq!(bad_cards(good), [] as [std::string::String; 0]);
 }
 
 /// The shared docs repository's router, once its index has the commits the pages list.

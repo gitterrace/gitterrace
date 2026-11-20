@@ -384,7 +384,10 @@ mod tests {
         let prose = format!("<p>{}</p>", "word ".repeat(30));
         assert_eq!(breakable_wide_lines(&prose).len(), 1);
         let url = format!("<a href=\"https://example.org/{}\">x</a>", "a".repeat(120));
-        assert!(breakable_wide_lines(&url).is_empty());
-        assert!(breakable_wide_lines(&fit(&prose)).is_empty());
+        assert_eq!(breakable_wide_lines(&url), [] as [std::string::String; 0]);
+        assert_eq!(
+            breakable_wide_lines(&fit(&prose)),
+            [] as [std::string::String; 0]
+        );
     }
 }

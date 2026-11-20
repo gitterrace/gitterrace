@@ -82,7 +82,7 @@ fn a_page_that_breaks_a_rule_is_caught() {
     let escape = format!("{icon}<a href=\"/r/b/log\">");
     assert_eq!(page_faults("/x", &escape, Some("/r/a/")).len(), 1);
     let fine = format!("{icon}<a href=\"/\"></a><a href=\"/r/a/log\"></a>");
-    assert!(page_faults("/x", &fine, Some("/r/a/")).is_empty());
+    assert_eq!(page_faults("/x", &fine, Some("/r/a/")).len(), 0);
     let related = "<span class=\"related\"><a href=\"/r/b/log\">b</a><a href=\"/x\">x</a></span>";
     let (hrefs, rest) = related_logs(related, &["b"]);
     assert_eq!(hrefs, ["/r/b/log"]);

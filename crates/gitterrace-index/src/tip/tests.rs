@@ -492,7 +492,7 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     // with no tag reads no commit column.
     src.scans.store(0, std::sync::atomic::Ordering::Relaxed);
     let none = ins.in_period(Period::All, |c| ins.cadence_in(&[], c));
-    assert!(none.releases.is_empty());
+    assert_eq!(none.releases.len(), 0);
     let scans = src.scans.load(std::sync::atomic::Ordering::Relaxed);
     assert_eq!(scans, 0, "cadence without tags scanned the commits");
     // The same pages without the tip file read the rows: the guard can see a row read.

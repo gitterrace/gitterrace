@@ -176,6 +176,6 @@ mod tests {
             assert!(menu.contains(&format!("href=\"#{id}\"")), "{id}");
         }
         let two = section_jumps(&[("a", "A", true), ("c", "C", true)]);
-        assert!(outline_menu(&two, false).is_empty());
+        assert_eq!(outline_menu(&two, false).len(), 0);
     }
 }

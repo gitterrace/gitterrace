@@ -570,8 +570,8 @@ mod tests {
     #[test]
     fn outline_is_hidden_below_three_headings() {
         let doc = crate::markdown::render_doc("## A\n\n## B\n\n#### C\n", Base::new("HEAD", ""));
-        assert!(crate::markdown::outline_rail(&doc.outline).is_empty());
-        assert!(crate::markdown::outline_menu(&doc.outline, false).is_empty());
+        assert_eq!(crate::markdown::outline_rail(&doc.outline).len(), 0);
+        assert_eq!(crate::markdown::outline_menu(&doc.outline, false).len(), 0);
     }
 
     #[test]

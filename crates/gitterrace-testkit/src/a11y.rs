@@ -116,7 +116,10 @@ mod tests {
         assert!(problems("<main><h2>x</h2></main>")[0].contains("0 h1"));
         let two = "<h1>Page</h1><div class=\"markdown-body\"><h1>Doc</h1></div>";
         assert!(problems(two)[0].contains("2 h1"));
-        assert!(problems("<h1 class=\"vh\">Page</h1><hr><header></header>").is_empty());
+        assert_eq!(
+            problems("<h1 class=\"vh\">Page</h1><hr><header></header>"),
+            [] as [std::string::String; 0]
+        );
     }
 
     #[test]

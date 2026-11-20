@@ -471,7 +471,7 @@ fn file_reports_in_counted_match_the_period() {
     let hot = ins.hotspots_in(&hf, &c);
     assert_eq!(hot.files.len(), 1);
     assert_eq!(hot.files[0].path, "new/x.rs");
-    assert!(ins.coupling_in(&hf, &c, 1, 9).is_empty());
+    assert_eq!(ins.coupling_in(&hf, &c, 1, 9).len(), 0);
 }
 
 /// A ranked list of people never depends on internal person ids. Ann and Yan share every

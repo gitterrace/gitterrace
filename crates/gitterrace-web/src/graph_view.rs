@@ -293,11 +293,8 @@ mod tests {
         assert!(c.contains("class=\"gfold n\">+7<"), "{c}");
         assert!(c.contains("class=\"gfold w\">+2<"), "{c}");
         // Below the point where the lines join, the mainline alone needs no fold.
-        assert!(
-            cell(&rows[hist.len() - 1], None, columns(&rows), false)
-                .folds
-                .is_empty()
-        );
+        let last = cell(&rows[hist.len() - 1], None, columns(&rows), false);
+        assert_eq!(last.folds.len(), 0);
     }
 
     #[test]

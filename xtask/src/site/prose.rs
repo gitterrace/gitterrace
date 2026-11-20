@@ -85,7 +85,7 @@ fn a_planted_one_page_claim_is_reported() {
         "README.md".to_owned(),
         "The one-page site is here.\n".to_owned(),
     )];
-    assert!(one_page_claims(1, &prose).is_empty());
+    assert_eq!(one_page_claims(1, &prose), [] as [std::string::String; 0]);
     let bad = one_page_claims(5, &prose).join("\n");
     assert!(bad.contains("README.md:1"), "{bad}");
 }

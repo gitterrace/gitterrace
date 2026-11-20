@@ -213,8 +213,8 @@ const TYPE = <const> { ALL: 0 };
 
 #[test]
 fn files_in_other_languages_have_no_symbols() {
-    assert!(symbols("a.c", "int main() { return 0; }\n").is_empty());
-    assert!(symbols("notes.txt", "fn main() {}\n").is_empty());
+    assert_eq!(symbols("a.c", "int main() { return 0; }\n").len(), 0);
+    assert_eq!(symbols("notes.txt", "fn main() {}\n").len(), 0);
 }
 
 #[test]

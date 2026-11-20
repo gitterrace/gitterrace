@@ -406,11 +406,11 @@ fn every_rule_finds_its_red_samples_and_passes_its_green_ones() {
         }
     }
     // Test modules may spell the markup back in asserts.
-    assert!(
+    assert_eq!(
         avatars(scan::product(
             "fn a() {}\n#[cfg(test)]\nmod t { \"class=\\\"av \" }"
-        ))
-        .is_empty()
+        )),
+        [] as [std::string::String; 0]
     );
     assert!(fails.is_empty(), "{}", fails.join("\n"));
 }

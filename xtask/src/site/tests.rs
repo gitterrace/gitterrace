@@ -445,7 +445,10 @@ fn no_generated_line_is_wider_than_the_width_where_it_could_break() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
     let planted = format!("<p>{}</p>\n", "a wide line of prose ".repeat(8));
-    assert!(!super::fit::breakable_wide_lines(&planted).is_empty());
+    assert_ne!(
+        super::fit::breakable_wide_lines(&planted),
+        [] as [std::string::String; 0]
+    );
 }
 
 /// Guard class: every heading id of every published page is the id the app gives that heading,

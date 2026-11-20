@@ -451,7 +451,7 @@ mod tests {
         m.commit(dir.path())?;
         let mut stop = |s: Step| s != Step::ManifestWritten;
         assert!(m.clone().commit_with(dir.path(), &mut stop).is_err());
-        assert!(m.retired.is_empty());
+        assert_eq!(m.retired.len(), 0);
         assert!(!dir.path().join("seg-2-0.gts").exists());
         assert_eq!(
             Manifest::load(dir.path())?.map(|m| m.retired.len()),

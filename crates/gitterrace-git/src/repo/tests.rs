@@ -385,7 +385,7 @@ fn tree_blob_blame_refs() {
     let kinds: Vec<_> = refs.iter().map(|r| (r.name.as_str(), r.kind)).collect();
     assert!(kinds.contains(&("main", crate::RefKind::Branch)));
     assert!(kinds.contains(&("v1", crate::RefKind::Tag)));
-    assert!(!repo.name().is_empty());
+    assert_ne!(repo.name(), "");
 }
 
 #[test]

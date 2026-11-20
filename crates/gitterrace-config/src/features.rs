@@ -245,6 +245,6 @@ mod tests {
         let c = parse("[features]\ninsights_enabled = false\n")
             .expect("parse")
             .config;
-        assert!(c.insight_pages(None).is_empty());
+        assert_eq!(c.insight_pages(None), [] as [&str; 0]);
     }
 }

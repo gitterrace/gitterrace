@@ -83,7 +83,7 @@ mod tests {
     #[test]
     fn a_planted_placeholder_refuses_the_deploy_and_a_filled_page_passes() {
         let filled = vec![("p.md".to_owned(), "Jane Doe, Main Street 1\n".to_owned())];
-        assert!(deploy_problems(&filled).is_empty());
+        assert_eq!(deploy_problems(&filled), [] as [std::string::String; 0]);
         let planted = vec![(
             "p.md".to_owned(),
             "Jane\n{{STREET_AND_NUMBER}}\n".to_owned(),

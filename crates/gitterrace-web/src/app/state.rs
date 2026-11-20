@@ -72,7 +72,7 @@ impl StateCell {
     /// ready repository serving what it has. Returns whether it moved.
     pub(crate) fn advance(&self, to: RepoState) -> bool {
         self.now
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |c| {
+            .try_update(Ordering::AcqRel, Ordering::Acquire, |c| {
                 (c != RepoState::Ready.code()).then_some(to.code())
             })
             .is_ok()

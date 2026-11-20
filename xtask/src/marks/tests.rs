@@ -17,7 +17,8 @@ fn outs(paths: &[&str]) -> Vec<Out> {
 #[test]
 fn a_marked_generated_doc_passes() {
     let a = attrs(&["docs/api.md", "docs/openapi.json"]);
-    assert!(problems(&a, &outs(&["docs/api.md", "docs/openapi.json"])).is_empty());
+    let found = problems(&a, &outs(&["docs/api.md", "docs/openapi.json"]));
+    assert_eq!(found, Vec::<String>::new());
 }
 
 /// The class this guards: a generator's document added without its mark, of any extension.

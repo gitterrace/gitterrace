@@ -385,7 +385,7 @@ fn every_built_page_has_the_shared_footer_and_nav() {
 #[test]
 fn a_page_with_an_altered_footer_or_nav_is_reported() {
     let (mut pages, _) = generated();
-    assert!(chrome_problems(&pages).is_empty());
+    assert_eq!(chrome_problems(&pages), [] as [std::string::String; 0]);
     pages[1].1 = pages[1].1.replacen(
         "Docs</a>\n<a href=\"/changelog/\">",
         "</a>\n<a href=\"/changelog/\">",
@@ -538,7 +538,10 @@ fn a_footer_version_without_its_changelog_heading_is_reported() {
     let page = "<footer><a href=\"/changelog/\">v9.9.9</a></footer>";
     let bad = version_link_problems(page, released, "9.9.9");
     assert!(bad[0].contains("not the anchor of v9.9.9"), "{bad:?}");
-    assert!(version_link_problems(page, changelog, "9.9.9").is_empty());
+    assert_eq!(
+        version_link_problems(page, changelog, "9.9.9"),
+        [] as [std::string::String; 0]
+    );
     let bad = version_link_problems(landing, changelog, "1.0.0");
     assert!(bad[0].contains("no link to v1.0.0"), "{bad:?}");
 }

@@ -107,7 +107,7 @@ fn a_halted_update_leaves_the_previous_set_unchanged() -> io::Result<()> {
             idx.update(&src, "HEAD", &|_| {}).is_err(),
             "{tag}: a halted handle updated again"
         );
-        let fresh = Index::open_dir(path.clone())?;
+        let fresh = Index::open_dir(path)?;
         assert_eq!(
             fresh.pending(&Paths::new("a", 10), "HEAD")?,
             0,

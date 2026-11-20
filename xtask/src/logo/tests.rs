@@ -26,10 +26,9 @@ fn halves_of_one_color_are_refused() {
 fn a_wordmark_token_that_differs_from_the_header_fill_is_drift() {
     let re = Re::new().expect("patterns");
     let ok = "--wm-git:light-dark(#101010,#e3ecf6);--wm-terrace:var(--accent);--accent:#5b5e8d;";
-    assert!(
-        token_drift(&re, HEADER, "light", ok)
-            .expect("drift")
-            .is_empty()
+    assert_eq!(
+        token_drift(&re, HEADER, "light", ok).expect("drift"),
+        Vec::<String>::new()
     );
     let bad = ok.replace("#101010", "#000000");
     assert_eq!(

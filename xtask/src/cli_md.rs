@@ -183,7 +183,10 @@ mod tests {
             }
         }
         assert!(bad.is_empty(), "{}", bad.join("\n"));
-        assert!(!empty_columns("| a | b |\n| --- | --- |\n| x |  |\n").is_empty());
+        assert_ne!(
+            empty_columns("| a | b |\n| --- | --- |\n| x |  |\n"),
+            [] as [std::string::String; 0]
+        );
     }
 
     /// Every column of every Markdown table in `md` that is empty in all of its rows, as

@@ -82,9 +82,9 @@ fn scanner_flags_a_plain_id() {
         r#"<p>parent <a class="sha" href="/commit/abc1234def" "#,
         r#"data-tip="abc1234def">abc1234d</a></p>"#,
     );
-    assert!(bare_ids(new).is_empty());
+    assert_eq!(bare_ids(new), [] as [std::string::String; 0]);
     let script = "<script>var x = 'abc1234d';</script>";
-    assert!(bare_ids(script).is_empty());
+    assert_eq!(bare_ids(script), [] as [std::string::String; 0]);
 }
 
 #[tokio::test(flavor = "multi_thread")]

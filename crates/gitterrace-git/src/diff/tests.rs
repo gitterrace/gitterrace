@@ -194,7 +194,7 @@ fn items_named_first_start_ahead_of_the_rest() {
 fn a_tiny_window_with_late_first_items_still_finishes() {
     for workers in [1, 2, 8] {
         let order = start_order(100, workers, 2, 0, (90..100).collect());
-        let mut sorted = order.clone();
+        let mut sorted = order;
         sorted.sort_unstable();
         assert_eq!(sorted, (0..100).collect::<Vec<_>>(), "{workers} workers");
     }

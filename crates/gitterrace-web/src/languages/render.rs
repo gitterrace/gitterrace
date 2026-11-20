@@ -2,9 +2,7 @@
 
 #![expect(
     clippy::too_many_lines,
-    clippy::needless_range_loop,
-    reason = "one linear sequence, splitting it hides the flow; the index is used for several \
-        parallel arrays"
+    reason = "one linear sequence, splitting it hides the flow"
 )]
 
 use std::fmt::Write as _;
