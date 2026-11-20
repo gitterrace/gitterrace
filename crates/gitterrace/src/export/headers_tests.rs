@@ -53,30 +53,19 @@ async fn every_asset_an_exported_page_names_carries_the_build_version() {
         .await
         .expect("export");
     let v = format!("?v={}", gitterrace_web::asset_version());
-    let mut stack = vec![out.clone()];
     let mut seen = 0;
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).expect("read_dir") {
-            let p = e.expect("entry").path();
-            if p.is_dir() {
-                stack.push(p);
+    for p in gitterrace_testkit::scan::files(std::slice::from_ref(&out), &["html", "css"]) {
+        let text = std::fs::read_to_string(&p).expect("read");
+        for (at, _) in text.match_indices("static/") {
+            let rest = &text[at..];
+            let end = rest.find(['"', '\'', ')', ' ', '>']).unwrap_or(rest.len());
+            let url = &rest[..end];
+            // A folder name in prose or a comment, not a file.
+            if !url.contains('.') {
                 continue;
             }
-            if !p.extension().is_some_and(|x| x == "html" || x == "css") {
-                continue;
-            }
-            let text = std::fs::read_to_string(&p).expect("read");
-            for (at, _) in text.match_indices("static/") {
-                let rest = &text[at..];
-                let end = rest.find(['"', '\'', ')', ' ', '>']).unwrap_or(rest.len());
-                let url = &rest[..end];
-                // A folder name in prose or a comment, not a file.
-                if !url.contains('.') {
-                    continue;
-                }
-                seen += 1;
-                assert!(url.ends_with(&v), "{}: {url} lacks {v}", p.display());
-            }
+            seen += 1;
+            assert!(url.ends_with(&v), "{}: {url} lacks {v}", p.display());
         }
     }
     assert!(seen > 5, "the export names its assets");

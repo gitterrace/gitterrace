@@ -329,23 +329,12 @@ async fn export_ships_no_scriptable_raw_file() {
     crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
-    let mut raw = Vec::new();
-    let mut stack = vec![out.clone()];
-    while let Some(d) = stack.pop() {
-        for e in std::fs::read_dir(&d).expect("read_dir") {
-            let p = e.expect("entry").path();
-            if p.is_dir() {
-                stack.push(p);
-            } else if p
-                .strip_prefix(&out)
-                .expect("under out")
-                .components()
-                .any(|c| c.as_os_str() == "raw")
-            {
-                raw.push(p);
-            }
-        }
-    }
+    let raw: Vec<_> = gitterrace_testkit::scan::files(std::slice::from_ref(&out), &[])
+        .into_iter()
+        .filter(|p| {
+            p.strip_prefix(&out).expect("under out").components().any(|c| c.as_os_str() == "raw")
+        })
+        .collect();
     for p in &raw {
         assert!(
             gitterrace_web::plain_media(&p.to_string_lossy()),
@@ -406,19 +395,11 @@ async fn export_skips_what_features_turn_off() {
         .expect("export");
     assert!(!out.join("r/r/stats").exists(), "insights exported");
     let mut seen = 0;
-    let mut todo = vec![out.clone()];
-    while let Some(d) = todo.pop() {
-        for e in std::fs::read_dir(&d).expect("dir").flatten() {
-            let p = e.path();
-            if p.is_dir() {
-                todo.push(p);
-            } else if p.extension().is_some_and(|x| x == "html") {
-                let html = std::fs::read_to_string(&p).expect("read");
-                assert!(!html.contains("/r/r/stats"), "{} links insights", p.display());
-                assert!(!html.contains("role=\"contentinfo\""), "{} has a credit", p.display());
-                seen += 1;
-            }
-        }
+    for p in gitterrace_testkit::scan::files(std::slice::from_ref(&out), &["html"]) {
+        let html = std::fs::read_to_string(&p).expect("read");
+        assert!(!html.contains("/r/r/stats"), "{} links insights", p.display());
+        assert!(!html.contains("role=\"contentinfo\""), "{} has a credit", p.display());
+        seen += 1;
     }
     assert!(seen > 3, "pages were written");
 }
