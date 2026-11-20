@@ -86,11 +86,7 @@ fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BT
                     out.insert(entry.rela_path.to_str_lossy().into_owned());
                 }
             }
-            Iw::Rewrite {
-                source,
-                dirwalk_entry,
-                ..
-            } => {
+            Iw::Rewrite { source, dirwalk_entry, .. } => {
                 out.insert(source.rela_path().to_str_lossy().into_owned());
                 out.insert(dirwalk_entry.rela_path.to_str_lossy().into_owned());
             }
@@ -127,11 +123,7 @@ fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>, limit: usize
 
     let head_tree = repo.head_tree_id_or_empty().map_err(git)?;
     let index = repo.index_or_empty().map_err(git)?;
-    let exact = gix::diff::Rewrites {
-        percentage: None,
-        limit: 0,
-        ..Default::default()
-    };
+    let exact = gix::diff::Rewrites { percentage: None, limit: 0, ..Default::default() };
     let mut pairs = 0;
     repo.tree_index_status(
         &head_tree,
@@ -139,9 +131,7 @@ fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>, limit: usize
         None,
         gix::status::tree_index::TrackRenames::Given(exact),
         |change, _, _| {
-            if let ChangeRef::Rewrite {
-                source_location, ..
-            } = &change
+            if let ChangeRef::Rewrite { source_location, .. } = &change
                 && out.insert(source_location.to_str_lossy().into_owned())
             {
                 pairs += 1;
@@ -218,9 +208,7 @@ pub fn worktree_signature(repo: &Repo) -> Result<u64> {
 /// True when anything differs from HEAD. Stops at the first difference.
 #[must_use]
 pub fn is_dirty(repo: &Repo) -> bool {
-    open(repo)
-        .and_then(|r| changed_paths(&r, 1))
-        .is_ok_and(|p| !p.is_empty())
+    open(repo).and_then(|r| changed_paths(&r, 1)).is_ok_and(|p| !p.is_empty())
 }
 
 /// Every uncommitted file as a diff against HEAD.
@@ -360,13 +348,7 @@ fn classify(path: &str, old: &Read, new: &Read) -> Option<FileDiff> {
         _ => ChangeKind::Modified,
     };
     let big = matches!(old, Read::Big) || matches!(new, Read::Big);
-    Some(file_diff(
-        path.to_owned(),
-        kind,
-        old.bytes(),
-        new.bytes(),
-        big,
-    ))
+    Some(file_diff(path.to_owned(), kind, old.bytes(), new.bytes(), big))
 }
 
 fn head_blob(repo: &gix::Repository, tree: &gix::Tree<'_>, path: &str, big: u64) -> Read {
@@ -393,9 +375,7 @@ fn index_blob(repo: &gix::Repository, index: &gix::index::File, path: &str, big:
 fn blob_read(repo: &gix::Repository, id: gix::ObjectId, big: u64) -> Read {
     match repo.find_header(id) {
         Ok(h) if h.size() > big => Read::Big,
-        Ok(_) => repo
-            .find_object(id)
-            .map_or(Read::Skip, |o| Read::data(o.detach().data)),
+        Ok(_) => repo.find_object(id).map_or(Read::Skip, |o| Read::data(o.detach().data)),
         Err(_) => Read::Skip,
     }
 }
@@ -411,10 +391,7 @@ enum Read {
 }
 
 impl Read {
-    #[cfg_attr(
-        not(test),
-        expect(clippy::missing_const_for_fn, reason = "counts bytes in tests")
-    )]
+    #[cfg_attr(not(test), expect(clippy::missing_const_for_fn, reason = "counts bytes in tests"))]
     fn data(d: Vec<u8>) -> Self {
         #[cfg(test)]
         held::add(d.len());
@@ -477,9 +454,8 @@ fn read_worktree(work: &Path, rel: &str, big: u64) -> Read {
         return Read::Missing;
     };
     if meta.is_symlink() {
-        return std::fs::read_link(&full).map_or(Read::Skip, |t| {
-            Read::data(t.to_string_lossy().into_owned().into_bytes())
-        });
+        return std::fs::read_link(&full)
+            .map_or(Read::Skip, |t| Read::data(t.to_string_lossy().into_owned().into_bytes()));
     }
     if !meta.is_file() {
         return Read::Skip;

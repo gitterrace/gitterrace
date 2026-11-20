@@ -114,9 +114,8 @@ mod tests {
             r##"<a href="../log/HEAD/index.html?q=a&amp;b">q</a><a href="#top">frag</a>"##,
             r#"<a data-href="gone">d</a><a href="https://x.dev/">e</a>"#
         );
-        let (out, n) = unlink(html, |l| {
-            l == "../log/HEAD/index.html" || l.contains(':') || l == "#top"
-        });
+        let (out, n) =
+            unlink(html, |l| l == "../log/HEAD/index.html" || l.contains(':') || l == "#top");
         assert_eq!(
             out,
             concat!(

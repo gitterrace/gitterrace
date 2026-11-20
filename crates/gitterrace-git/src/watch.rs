@@ -54,19 +54,9 @@ struct Stamp {
 impl Stamp {
     fn of(meta: Option<&Metadata>) -> Self {
         let Some(m) = meta else {
-            return Self {
-                present: false,
-                size: 0,
-                mtime_ns: 0,
-                ino: 0,
-            };
+            return Self { present: false, size: 0, mtime_ns: 0, ino: 0 };
         };
-        Self {
-            present: true,
-            size: m.len(),
-            mtime_ns: mtime_ns(m),
-            ino: inode(m),
-        }
+        Self { present: true, size: m.len(), mtime_ns: mtime_ns(m), ino: inode(m) }
     }
 }
 
@@ -155,10 +145,7 @@ pub struct Watcher {
 impl Repo {
     /// A change detector for this repository. Every tick of it is `stat` calls only.
     pub fn watcher(&self) -> Watcher {
-        Watcher::new(
-            self.git_dir().to_path_buf(),
-            self.repo().common_dir().to_path_buf(),
-        )
+        Watcher::new(self.git_dir().to_path_buf(), self.repo().common_dir().to_path_buf())
     }
 }
 
@@ -256,22 +243,14 @@ impl Watcher {
             let fresh = self.dirs.get(&dir).is_some_and(|l| l.stamp == stamp) && !racy;
             if !fresh {
                 let (children, entries) = self.list(&dir, racy);
-                self.dirs.insert(
-                    dir.clone(),
-                    Listed {
-                        stamp,
-                        children,
-                        entries,
-                    },
-                );
+                self.dirs.insert(dir.clone(), Listed { stamp, children, entries });
             }
             if let Some(l) = self.dirs.get(&dir) {
                 l.entries.hash(h);
                 stack.extend(l.children.iter().rev().cloned());
             }
         }
-        self.dirs
-            .retain(|p, _| !p.starts_with(root) || seen.contains(p));
+        self.dirs.retain(|p, _| !p.starts_with(root) || seen.contains(p));
     }
 
     /// Subdirectories of `dir`, sorted, and for a racy directory a hash of its entries' stamps.
@@ -336,14 +315,7 @@ impl Watcher {
         let cached = self.dirs.get(base).is_some_and(|l| l.stamp == stamp) && !racy;
         if !cached {
             let (children, entries) = self.list(base, false);
-            self.dirs.insert(
-                base.to_path_buf(),
-                Listed {
-                    stamp,
-                    children,
-                    entries,
-                },
-            );
+            self.dirs.insert(base.to_path_buf(), Listed { stamp, children, entries });
         }
         Some(
             self.dirs
@@ -431,24 +403,11 @@ mod tests {
         fs::remove_file(dir.join(".git/MERGE_HEAD")).expect("rm");
         step("operation marker removed", &mut w, &mut last);
         let wt = dir.parent().expect("parent").join("wt");
-        git(
-            &dir,
-            &[
-                "worktree",
-                "add",
-                "-q",
-                wt.to_str().expect("utf8"),
-                "-b",
-                "wtb",
-            ],
-        );
+        git(&dir, &["worktree", "add", "-q", wt.to_str().expect("utf8"), "-b", "wtb"]);
         step("worktree added", &mut w, &mut last);
         commit(&wt, "w", "in worktree");
         step("commit in a linked worktree", &mut w, &mut last);
-        git(
-            &dir,
-            &["worktree", "remove", "--force", wt.to_str().expect("utf8")],
-        );
+        git(&dir, &["worktree", "remove", "--force", wt.to_str().expect("utf8")]);
         step("worktree removed", &mut w, &mut last);
     }
 
@@ -469,27 +428,14 @@ mod tests {
         assert_eq!(moved(&mut w), ["index"], "staging moves the index only");
         git(&dir, &["commit", "-qm", "two"]);
         let names = moved(&mut w);
-        assert!(
-            names.contains(&"refs") && !names.contains(&"head"),
-            "{names:?}"
-        );
+        assert!(names.contains(&"refs") && !names.contains(&"head"), "{names:?}");
         git(&dir, &["checkout", "-q", "--detach"]);
         assert!(moved(&mut w).contains(&"head"), "detaching moves HEAD");
         fs::write(dir.join("a"), "dirty").expect("write");
         git(&dir, &["stash", "-q"]);
         assert!(moved(&mut w).contains(&"stash"));
         let wt = dir.parent().expect("parent").join("wt2");
-        git(
-            &dir,
-            &[
-                "worktree",
-                "add",
-                "-q",
-                wt.to_str().expect("utf8"),
-                "-b",
-                "w2",
-            ],
-        );
+        git(&dir, &["worktree", "add", "-q", wt.to_str().expect("utf8"), "-b", "w2"]);
         assert!(moved(&mut w).contains(&"worktrees"));
         assert!(moved(&mut w).is_empty(), "a quiet tick names nothing");
     }
@@ -501,10 +447,7 @@ mod tests {
         let repo = Repo::discover(&dir).expect("open");
         let mut w = quiet(&repo);
         let first = w.fingerprint();
-        assert!(
-            w.last_cost().dir_listings > 0,
-            "the first tick lists the ref tree"
-        );
+        assert!(w.last_cost().dir_listings > 0, "the first tick lists the ref tree");
         for _ in 0..5 {
             assert_eq!(w.fingerprint(), first);
             assert_eq!(w.last_cost().dir_listings, 0, "a quiet tick lists nothing");

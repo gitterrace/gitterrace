@@ -92,19 +92,12 @@ impl State {
         let n = r.count()?;
         let gap = r.count()?;
         let tip = r.text()?;
-        let names = (0..r.count()?)
-            .map(|_| r.text())
-            .collect::<Option<Vec<_>>>()?;
+        let names = (0..r.count()?).map(|_| r.text()).collect::<Option<Vec<_>>>()?;
         let net = r.nets()?;
         let (added, removed) = (r.u64()?, r.u64()?);
         let checks = (0..r.count()?)
             .map(|_| {
-                Some(Check {
-                    id: r.text()?,
-                    net: r.nets()?,
-                    added: r.u64()?,
-                    removed: r.u64()?,
-                })
+                Some(Check { id: r.text()?, net: r.nets()?, added: r.u64()?, removed: r.u64()? })
             })
             .collect::<Option<Vec<_>>>()?;
         // A state that does not add up is damaged: a gap of 0 would divide by zero later, and
@@ -114,16 +107,7 @@ impl State {
             && net.len() == names.len()
             && checks.len() == n / gap
             && checks.iter().all(|c| c.net.len() <= names.len());
-        sound.then_some(Self {
-            n,
-            gap,
-            tip,
-            names,
-            net,
-            added,
-            removed,
-            checks,
-        })
+        sound.then_some(Self { n, gap, tip, names, net, added, removed, checks })
     }
 }
 
@@ -172,8 +156,6 @@ impl Reader<'_> {
         if n.checked_mul(8)? > self.0.len() {
             return None;
         }
-        (0..n)
-            .map(|_| Some(i64::from_le_bytes(self.take(8)?.try_into().ok()?)))
-            .collect()
+        (0..n).map(|_| Some(i64::from_le_bytes(self.take(8)?.try_into().ok()?))).collect()
     }
 }

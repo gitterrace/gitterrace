@@ -176,15 +176,8 @@ impl Payload {
         });
         let short = gitterrace_git::short_id(&sha);
         let id = repo.id();
-        let permalink = styled(
-            style,
-            origin,
-            id.as_deref(),
-            &repo.name(),
-            &sha,
-            path.as_deref(),
-            lines,
-        );
+        let permalink =
+            styled(style, origin, id.as_deref(), &repo.name(), &sha, path.as_deref(), lines);
         let title = title(kind, path.as_deref(), lines, short, &s.subject);
         let markdown = markdown(
             path.as_deref(),
@@ -320,10 +313,7 @@ fn cap(s: &str, max: usize) -> (String, bool) {
 
 /// One line: control characters (newlines included) become spaces, then capped.
 fn lossy_line(s: &str, max: usize) -> String {
-    let flat: String = s
-        .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
-        .collect();
+    let flat: String = s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
     cap(&flat, max).0
 }
 
@@ -398,11 +388,7 @@ fn markdown(
     let mut md = format!("**{}** @ {short}\n{link}\n", file_ref(p, lines));
     if let Some(t) = text {
         let lang = p.rsplit_once('.').map_or("", |(_, ext)| ext);
-        let snippet = t
-            .lines()
-            .take(MARKDOWN_LINES)
-            .collect::<Vec<_>>()
-            .join("\n");
+        let snippet = t.lines().take(MARKDOWN_LINES).collect::<Vec<_>>().join("\n");
         // Longer than any backtick run inside, so repo text cannot close the fence.
         let longest = snippet.split(|c| c != '`').map(str::len).max().unwrap_or(0);
         let fence = "`".repeat(longest.max(2) + 1);

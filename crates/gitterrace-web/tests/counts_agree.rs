@@ -66,11 +66,8 @@ fn count_before(body: &str, noun: &str) -> Option<u64> {
     while let Some(i) = body[from..].find(noun) {
         let at = from + i;
         let head = body[..at].trim_end().trim_end_matches("</b>").trim_end();
-        let digits: String = head
-            .chars()
-            .rev()
-            .take_while(|c| c.is_ascii_digit() || *c == ',')
-            .collect();
+        let digits: String =
+            head.chars().rev().take_while(|c| c.is_ascii_digit() || *c == ',').collect();
         if !digits.is_empty() {
             return Some(parse(&digits.chars().rev().collect::<String>()));
         }
@@ -84,11 +81,7 @@ async fn parts_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     let api = "/api/v1/insights";
     let s = data(router, &format!("{api}/summary?{q}")).await;
     let cur = &s["current"];
-    let (commits, add, del) = (
-        n(&cur["commits"]),
-        n(&cur["additions"]),
-        n(&cur["deletions"]),
-    );
+    let (commits, add, del) = (n(&cur["commits"]), n(&cur["additions"]), n(&cur["deletions"]));
     let r = data(router, &format!("{api}/activity?{q}")).await;
     let lb = data(router, &format!("{api}/label_breakdown?{q}")).await;
     let co = data(router, &format!("{api}/contributors?{q}")).await;
@@ -99,57 +92,17 @@ async fn parts_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
             fails.push(format!("{q}: {what} {got}, summary says {want}"));
         }
     };
-    check(
-        "commits over the bars",
-        sum(&r["series"], |p| n(&p["commits"])),
-        commits,
-    );
-    check(
-        "commits over the weekdays",
-        sum(&r["by_weekday"], n),
-        commits,
-    );
+    check("commits over the bars", sum(&r["series"], |p| n(&p["commits"])), commits);
+    check("commits over the weekdays", sum(&r["by_weekday"], n), commits);
     check("commits over the hours", sum(&r["by_hour"], n), commits);
-    check(
-        "commits over the punch card",
-        sum(&r["punch_card"], |d| sum(d, n)),
-        commits,
-    );
-    check(
-        "commits over the types",
-        sum(&lb, |l| n(&l["commits"])),
-        commits,
-    );
-    check(
-        "commits over the contributors",
-        sum(people, |p| n(&p["commits"])),
-        commits,
-    );
-    check(
-        "lines added over the bars",
-        sum(&r["series"], |p| n(&p["additions"])),
-        add,
-    );
-    check(
-        "lines added over the frequency",
-        sum(&fr, |w| n(&w["additions"])),
-        add,
-    );
-    check(
-        "lines removed over the frequency",
-        sum(&fr, |w| n(&w["deletions"])),
-        del,
-    );
-    check(
-        "lines added over the contributors",
-        sum(people, |p| n(&p["additions"])),
-        add,
-    );
-    check(
-        "lines removed over the contributors",
-        sum(people, |p| n(&p["deletions"])),
-        del,
-    );
+    check("commits over the punch card", sum(&r["punch_card"], |d| sum(d, n)), commits);
+    check("commits over the types", sum(&lb, |l| n(&l["commits"])), commits);
+    check("commits over the contributors", sum(people, |p| n(&p["commits"])), commits);
+    check("lines added over the bars", sum(&r["series"], |p| n(&p["additions"])), add);
+    check("lines added over the frequency", sum(&fr, |w| n(&w["additions"])), add);
+    check("lines removed over the frequency", sum(&fr, |w| n(&w["deletions"])), del);
+    check("lines added over the contributors", sum(people, |p| n(&p["additions"])), add);
+    check("lines removed over the contributors", sum(people, |p| n(&p["deletions"])), del);
     check(
         "authors over the contributors",
         people.as_array().map_or(0, Vec::len) as u64,
@@ -169,31 +122,11 @@ async fn pages_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     let cur = &s["current"];
     let (_, stats) = page(router, &format!("/stats?{q}")).await;
     if n(&cur["commits"]) > 0 {
-        check(
-            "/stats Commits",
-            pulse(&stats, "Commits without merges"),
-            n(&cur["commits"]),
-        );
-        check(
-            "/stats Authors",
-            pulse(&stats, "Authors"),
-            n(&cur["authors"]),
-        );
-        check(
-            "/stats Files changed",
-            pulse(&stats, "Files changed"),
-            n(&cur["files"]),
-        );
-        check(
-            "/stats Lines added",
-            pulse(&stats, "Lines added"),
-            n(&cur["additions"]),
-        );
-        check(
-            "/stats Lines removed",
-            pulse(&stats, "Lines removed"),
-            n(&cur["deletions"]),
-        );
+        check("/stats Commits", pulse(&stats, "Commits without merges"), n(&cur["commits"]));
+        check("/stats Authors", pulse(&stats, "Authors"), n(&cur["authors"]));
+        check("/stats Files changed", pulse(&stats, "Files changed"), n(&cur["files"]));
+        check("/stats Lines added", pulse(&stats, "Lines added"), n(&cur["additions"]));
+        check("/stats Lines removed", pulse(&stats, "Lines removed"), n(&cur["deletions"]));
         let fr = data(router, &format!("{api}/frequency?{q}")).await;
         check(
             "frequency Lines added",
@@ -205,11 +138,7 @@ async fn pages_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     let people = co["contributors"].as_array().expect("people");
     let (_, cp) = page(router, &format!("/stats/contributors?{q}&all=1")).await;
     if !people.is_empty() {
-        check(
-            "contributors KPI",
-            kpi(&cp, "Contributors"),
-            people.len() as u64,
-        );
+        check("contributors KPI", kpi(&cp, "Contributors"), people.len() as u64);
         check(
             "contributors New in period",
             kpi(&cp, "New in period"),
@@ -224,11 +153,7 @@ async fn pages_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     let ho = data(router, &format!("{api}/hotspots?{q}&limit=100000")).await;
     let (_, hp) = page(router, &format!("/stats/hotspots?{q}")).await;
     if n(&ho["total_changes"]) > 0 {
-        check(
-            "hotspots Changes",
-            kpi(&hp, "Changes"),
-            n(&ho["total_changes"]),
-        );
+        check("hotspots Changes", kpi(&hp, "Changes"), n(&ho["total_changes"]));
         check(
             "hotspots Files changed",
             kpi(&hp, "Files changed"),
@@ -238,21 +163,9 @@ async fn pages_agree(router: &axum::Router, q: &str, fails: &mut Vec<String>) {
     let ow = data(router, &format!("{api}/ownership?{q}")).await;
     let (_, op) = page(router, &format!("/stats/ownership?{q}")).await;
     if !ow["dirs"].as_array().is_none_or(Vec::is_empty) {
-        check(
-            "ownership Bus factor",
-            kpi(&op, "Bus factor"),
-            n(&ow["overall"]["bus_factor"]),
-        );
-        check(
-            "ownership Solo lines",
-            kpi(&op, "Solo lines"),
-            n(&ow["solo_lines"]),
-        );
-        check(
-            "ownership Stale lines",
-            kpi(&op, "Stale lines"),
-            n(&ow["stale_lines"]),
-        );
+        check("ownership Bus factor", kpi(&op, "Bus factor"), n(&ow["overall"]["bus_factor"]));
+        check("ownership Solo lines", kpi(&op, "Solo lines"), n(&ow["solo_lines"]));
+        check("ownership Stale lines", kpi(&op, "Stale lines"), n(&ow["stale_lines"]));
     }
 }
 
@@ -266,19 +179,12 @@ async fn contributors_agree(router: &axum::Router, q: &str, fails: &mut Vec<Stri
             .as_array()
             .expect("people")
             .iter()
-            .map(|p| {
-                (
-                    p["name"].as_str().unwrap_or_default().to_owned(),
-                    n(&p["commits"]),
-                )
-            })
+            .map(|p| (p["name"].as_str().unwrap_or_default().to_owned(), n(&p["commits"])))
             .collect()
     };
     let (a, b) = (pick(&plain, "authors"), pick(&insight, "contributors"));
     if a != b {
-        fails.push(format!(
-            "{q}: /contributors {a:?}, /insights/contributors {b:?}"
-        ));
+        fails.push(format!("{q}: /contributors {a:?}, /insights/contributors {b:?}"));
     }
 }
 
@@ -331,11 +237,7 @@ fn mixed(dir: &std::path::Path) -> std::path::PathBuf {
         .commit("feat: c");
     f.git(&["merge", "-q", "--no-ff", "-m", "merge side", "side"]);
     f.git(&["config", "user.name", "dependabot[bot]"]);
-    f.git(&[
-        "config",
-        "user.email",
-        "49699333+dependabot[bot]@users.noreply.github.com",
-    ]);
+    f.git(&["config", "user.email", "49699333+dependabot[bot]@users.noreply.github.com"]);
     let f = f
         .write("Cargo.toml", "1\n")
         .commit("chore(deps): bump")
@@ -377,16 +279,8 @@ async fn the_overview_and_the_api_agree() {
     let t = &repo["totals"];
     assert_eq!((n(&t["every_commits"]), n(&t["commits"])), (6, 3), "{repo}");
     assert_eq!(count_before(&ov, " author"), Some(n(&t["authors"])), "{ov}");
-    assert_eq!(
-        count_before(&ov, " commits"),
-        Some(n(&t["every_commits"])),
-        "{ov}"
-    );
-    assert_eq!(
-        count_before(&ov, " counted"),
-        Some(n(&t["commits"])),
-        "{ov} {repo}"
-    );
+    assert_eq!(count_before(&ov, " commits"), Some(n(&t["every_commits"])), "{ov}");
+    assert_eq!(count_before(&ov, " counted"), Some(n(&t["commits"])), "{ov} {repo}");
     assert_eq!(count_before(&ov, " by bots"), Some(2), "{ov}");
 }
 
@@ -437,9 +331,7 @@ async fn every_overview_number_names_its_population() {
     assert!(spans >= 5, "{line}");
     assert_eq!(
         line.matches("<span data-population=\"").count()
-            + line
-                .matches("<span class=\"muted\" data-population=\"")
-                .count(),
+            + line.matches("<span class=\"muted\" data-population=\"").count(),
         spans,
         "{line}"
     );
@@ -447,8 +339,5 @@ async fn every_overview_number_names_its_population() {
         line.starts_with("<p class=\"facts\"><span data-population=\"every\"><b>6</b>"),
         "{line}"
     );
-    assert!(
-        line.contains("data-population=\"counted\"><b>1</b> author"),
-        "{line}"
-    );
+    assert!(line.contains("data-population=\"counted\"><b>1</b> author"), "{line}");
 }

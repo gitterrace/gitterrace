@@ -6,13 +6,8 @@ use gitterrace_testkit::Fixture;
 
 use crate::{app::App, tests::get};
 
-const PAGES: [&str; 5] = [
-    "/stats",
-    "/stats/hotspots",
-    "/stats/ownership",
-    "/stats/contributors",
-    "/stats/languages",
-];
+const PAGES: [&str; 5] =
+    ["/stats", "/stats/hotspots", "/stats/ownership", "/stats/contributors", "/stats/languages"];
 
 /// A repository with one commit years ago and one today, so Week and All count differently.
 pub(crate) fn app(dir: &std::path::Path) -> Arc<App> {
@@ -32,23 +27,12 @@ fn period_choices(body: &str) -> Vec<(String, String, bool)> {
     let Some(seg) = body.split("aria-label=\"Period\" data-seg-select>").nth(1) else {
         return Vec::new();
     };
-    let seg = seg
-        .split("</span>")
-        .find(|s| s.contains("<a "))
-        .unwrap_or_default();
+    let seg = seg.split("</span>").find(|s| s.contains("<a ")).unwrap_or_default();
     seg.split("<a href=\"")
         .skip(1)
         .map(|a| {
-            let href = a
-                .split('"')
-                .next()
-                .unwrap_or_default()
-                .replace("&amp;", "&");
-            let on = a
-                .split('>')
-                .next()
-                .unwrap_or_default()
-                .contains("aria-current");
+            let href = a.split('"').next().unwrap_or_default().replace("&amp;", "&");
+            let on = a.split('>').next().unwrap_or_default().contains("aria-current");
             let label = a
                 .split_once('>')
                 .and_then(|(_, r)| r.split("</a>").next())

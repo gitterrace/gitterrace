@@ -81,11 +81,7 @@ pub(crate) fn search_commits_counted(
     a: &App,
     rev: &str,
     re: &Regex,
-) -> Result<(
-    Vec<gitterrace_git::CommitSummary>,
-    bool,
-    gitterrace_git::CommitScan,
-)> {
+) -> Result<(Vec<gitterrace_git::CommitSummary>, bool, gitterrace_git::CommitScan)> {
     let mut rows = Vec::new();
     let mut capped = false;
     let most = a.cfg().limits.search_commits;

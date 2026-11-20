@@ -23,10 +23,8 @@ pub(crate) fn section(fold: &ActivityFold) -> String {
         let (unit, weeks, sum) = &fold.frequency;
         let (unit, sum) = (*unit, *sum);
         let (add, del, rew) = (sum.additions, sum.deletions, sum.rewritten);
-        let points: Vec<_> = weeks
-            .iter()
-            .map(|w| (w.label.clone(), w.additions, w.deletions))
-            .collect();
+        let points: Vec<_> =
+            weeks.iter().map(|w| (w.label.clone(), w.additions, w.deletions)).collect();
         let rw = &fold.rework;
         let verdict = rw.points.iter().rev().find_map(|p| p.share).map_or_else(
             || "No changes in this selection.".to_owned(),
@@ -64,10 +62,7 @@ pub(crate) fn section(fold: &ActivityFold) -> String {
                 &format!("Additions and deletions per {}", unit.noun()),
             ),
             rework: charts::percent_line(
-                &rw.points
-                    .iter()
-                    .map(|p| (p.label.clone(), p.share))
-                    .collect::<Vec<_>>(),
+                &rw.points.iter().map(|p| (p.label.clone(), p.share)).collect::<Vec<_>>(),
             ),
             verdict,
         }

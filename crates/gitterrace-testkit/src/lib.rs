@@ -52,10 +52,8 @@ pub fn on_port(host: &str) -> String {
 fn global_config() -> &'static Path {
     static CONFIG: OnceLock<std::path::PathBuf> = OnceLock::new();
     CONFIG.get_or_init(|| {
-        let path = std::env::temp_dir().join(format!(
-            "gitterrace-testkit-{}.gitconfig",
-            std::process::id()
-        ));
+        let path = std::env::temp_dir()
+            .join(format!("gitterrace-testkit-{}.gitconfig", std::process::id()));
         std::fs::write(
             &path,
             "[user]\n\tname = T\n\temail = t@e.x\n[commit]\n\tgpgsign = false\n[tag]\n\tgpgsign = \
@@ -94,12 +92,7 @@ fn try_run_with(
                 .stderr(Stdio::piped())
                 .spawn()
                 .expect("run git");
-            child
-                .stdin
-                .take()
-                .expect("stdin")
-                .write_all(input)
-                .expect("write stdin");
+            child.stdin.take().expect("stdin").write_all(input).expect("write stdin");
             child.wait_with_output().expect("wait git")
         }
     };

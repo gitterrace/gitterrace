@@ -48,11 +48,7 @@ fn axis(max: u64) -> (Vec<Tick>, f64) {
 }
 
 fn tick(y: f64, label: String) -> Tick {
-    Tick {
-        y: P(y),
-        ty: P(y + 3.5),
-        label,
-    }
+    Tick { y: P(y), ty: P(y + 3.5), label }
 }
 
 /// Most value ticks a full-height axis shows, zero included. Not configurable: it follows the
@@ -128,16 +124,8 @@ fn x_labels(keys: &[&str]) -> Vec<XLabel> {
         .map(|i| (i, keys[i]))
         .map(|(i, k)| {
             let cx = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
-            let (x, anchor) = if cx > W - LABEL_PX / 2.0 {
-                (W, "end")
-            } else {
-                (cx, "middle")
-            };
-            XLabel {
-                x: P(x),
-                anchor,
-                text: (*k).to_owned(),
-            }
+            let (x, anchor) = if cx > W - LABEL_PX / 2.0 { (W, "end") } else { (cx, "middle") };
+            XLabel { x: P(x), anchor, text: (*k).to_owned() }
         })
         .collect()
 }
@@ -196,16 +184,7 @@ fn bars_with(name: &str, points: &[(String, u64)], links: Option<&[String]>, uni
         })
         .collect();
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
-    Bars {
-        f: frame(
-            text::bars(name, points, unit),
-            links.is_some(),
-            grid,
-            &keys,
-            bw,
-        ),
-        cols,
-    }
+    Bars { f: frame(text::bars(name, points, unit), links.is_some(), grid, &keys, bw), cols }
 }
 
 /// Stacked columns per bucket by the `SERIES` biggest labels (rest folded into `other`),
@@ -226,20 +205,13 @@ pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> 
         .map(|b| {
             let mut col = vec![0u64; names.len() + 1];
             for c in &b.counts {
-                let i = names
-                    .iter()
-                    .position(|n| *n == c.label)
-                    .unwrap_or(names.len());
+                let i = names.iter().position(|n| *n == c.label).unwrap_or(names.len());
                 col[i] += c.commits as u64;
             }
             col
         })
         .collect();
-    let max = cols
-        .iter()
-        .map(|c| c.iter().sum::<u64>())
-        .max()
-        .unwrap_or(0);
+    let max = cols.iter().map(|c| c.iter().sum::<u64>()).max().unwrap_or(0);
     let (grid, top) = axis(max);
     let sl = slot(cols.len());
     let bw = (sl * 0.62).min(48.0);
@@ -262,11 +234,7 @@ pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> 
                 .map(|(k, v)| {
                     let h = *v as f64 / top * plot;
                     y -= h;
-                    Seg {
-                        class: cat(k, names.len()),
-                        y: P(y),
-                        h: P(h),
-                    }
+                    Seg { class: cat(k, names.len()), y: P(y), h: P(h) }
                 })
                 .collect();
             StackCol {
@@ -283,13 +251,7 @@ pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> 
         series.push("other");
     }
     Stacked {
-        f: frame(
-            text::stacked(name, &keys, &series, &cols),
-            false,
-            grid,
-            &keys,
-            bw,
-        ),
+        f: frame(text::stacked(name, &keys, &series, &cols), false, grid, &keys, bw),
         cols: marks,
         legend: names
             .iter()
@@ -389,13 +351,7 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> PercentLine {
     }
     let keys: Vec<&str> = points.iter().map(|p| p.0.as_str()).collect();
     PercentLine {
-        f: frame(
-            text::percent_line("Rework share over time", points),
-            false,
-            grid,
-            &keys,
-            0.0,
-        ),
+        f: frame(text::percent_line("Rework share over time", points), false, grid, &keys, 0.0),
         points: readings,
         d,
     }
@@ -411,10 +367,7 @@ pub(crate) fn sparkline(values: &[u32], class: &str) -> Spark {
         let y = 20.0 - f64::from(*v) * 18.0 / f64::from(max);
         let _ = write!(pts, "{x:.1},{y:.1} ");
     }
-    Spark {
-        class: class.to_owned(),
-        points: pts.trim_end().to_owned(),
-    }
+    Spark { class: class.to_owned(), points: pts.trim_end().to_owned() }
 }
 
 /// One dot of [`scatter`].
@@ -436,10 +389,7 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
     // outliers to the top edge (their tooltip still has the real size).
     let mut ys: Vec<u64> = dots.iter().map(|d| d.y).collect();
     ys.sort_unstable();
-    let ymax = ys
-        .get(ys.len().saturating_sub(1) * 97 / 100)
-        .copied()
-        .unwrap_or(0);
+    let ymax = ys.get(ys.len().saturating_sub(1) * 97 / 100).copied().unwrap_or(0);
     let smax = dots.iter().map(|d| d.size).max().unwrap_or(1).max(1);
     let (grid, ytop) = axis(ymax);
     let (xstep, xtop_n) = ticks(xmax, 6);
@@ -462,10 +412,8 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
             r: P(5.0f64.mul_add((d.size as f64 / smax as f64).sqrt(), 3.0)),
         })
         .collect();
-    let named: Vec<(&str, u64, u64, u64)> = dots
-        .iter()
-        .map(|d| (d.name.as_str(), d.x, d.y, d.size))
-        .collect();
+    let named: Vec<(&str, u64, u64, u64)> =
+        dots.iter().map(|d| (d.name.as_str(), d.x, d.y, d.size)).collect();
     Scatter {
         f: frame(
             text::scatter("Change frequency against size", x_title, &named),
@@ -498,11 +446,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> Heatmap {
                 .iter()
                 .enumerate()
                 .map(|(hr, v)| HeatCell {
-                    level: if *v == 0 || max == 0 {
-                        0
-                    } else {
-                        (*v * 4).div_ceil(max).min(4)
-                    },
+                    level: if *v == 0 || max == 0 { 0 } else { (*v * 4).div_ceil(max).min(4) },
                     x: LEFT + hr * CELL,
                     tip: charttip::part(
                         &format!("{} {hr:02}:00", DAYS[d]),
@@ -519,10 +463,7 @@ pub(crate) fn heatmap(cells: &[[u32; 24]; 7], max: u32) -> Heatmap {
         w: LEFT + 24 * CELL,
         h: TOP + 7 * CELL,
         side: CELL - 4,
-        hours: (0..24)
-            .step_by(3)
-            .map(|hour| (LEFT + hour * CELL, format!("{hour:02}")))
-            .collect(),
+        hours: (0..24).step_by(3).map(|hour| (LEFT + hour * CELL, format!("{hour:02}"))).collect(),
         rows,
     }
 }
@@ -552,11 +493,7 @@ pub(crate) fn label_every(need: usize, quarters: bool) -> usize {
 
 /// Categorical class for series `k` of `named`; anything past the named ones is "other".
 pub(crate) fn cat(k: usize, named: usize) -> String {
-    if k >= named {
-        "c8".to_owned()
-    } else {
-        format!("c{}", k + 1)
-    }
+    if k >= named { "c8".to_owned() } else { format!("c{}", k + 1) }
 }
 
 /// Width percentage of `v` against `max`, for CSS bars.

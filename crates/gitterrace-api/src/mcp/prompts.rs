@@ -24,15 +24,8 @@ pub(super) struct ReviewArgs {
 /// The review recipe as prompt text. Plain text built from the arguments: no model and no
 /// network, the agent does the reading with the tools it names.
 pub(super) fn review_text(a: &ReviewArgs) -> String {
-    let head = a
-        .head
-        .as_deref()
-        .filter(|h| !h.is_empty())
-        .unwrap_or("HEAD");
-    let first = match (
-        a.worktree.unwrap_or(false),
-        a.base.as_deref().filter(|b| !b.is_empty()),
-    ) {
+    let head = a.head.as_deref().filter(|h| !h.is_empty()).unwrap_or("HEAD");
+    let first = match (a.worktree.unwrap_or(false), a.base.as_deref().filter(|b| !b.is_empty())) {
         (true, _) => "Call `worktree_diff` (scope `all`) to list the uncommitted files.".to_owned(),
         (false, Some(base)) => format!(
             "Call `compare` with base `{base}`, head `{head}` and three_dot true to list what \
@@ -42,9 +35,10 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
              `compare` with base, head and three_dot true."
             .to_owned(),
     };
-    let repo = a.repo.as_deref().map_or_else(String::new, |r| {
-        format!(" Pass repo `{r}` to every tool call.")
-    });
+    let repo = a
+        .repo
+        .as_deref()
+        .map_or_else(String::new, |r| format!(" Pass repo `{r}` to every tool call."));
     format!(
         "Review a change using only this server's read-only tools.{repo}\n\
          1. {first} If `truncated` is true, narrow it with `path` or read the file with \

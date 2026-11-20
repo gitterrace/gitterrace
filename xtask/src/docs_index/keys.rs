@@ -29,10 +29,7 @@ impl Keys {
         Self {
             sections: keys.iter().map(|k| k.section).collect(),
             ids: keys.iter().map(|k| k.id).collect(),
-            defaults: keys
-                .iter()
-                .map(|k| (k.id, k.default.trim_matches('"').to_owned()))
-                .collect(),
+            defaults: keys.iter().map(|k| (k.id, k.default.trim_matches('"').to_owned())).collect(),
             flags: cli_flags(),
             shown: shown_flags(),
         }
@@ -52,10 +49,7 @@ impl Keys {
                 Event::End(TagEnd::CodeBlock) => toml = false,
                 Event::Text(t) if toml => bad.extend(self.toml(path, &t)),
                 Event::Text(t) => {
-                    for line in t
-                        .lines()
-                        .filter(|l| l.trim_start().starts_with("git terrace"))
-                    {
+                    for line in t.lines().filter(|l| l.trim_start().starts_with("git terrace")) {
                         bad.extend(self.flags_in(path, line));
                     }
                 }
@@ -113,11 +107,7 @@ impl Keys {
             }
         }
         if let Some(readme) = texts.get("README.md") {
-            for f in self
-                .shown
-                .iter()
-                .filter(|f| !GLOBAL_CLAP.contains(&f.as_str()))
-            {
+            for f in self.shown.iter().filter(|f| !GLOBAL_CLAP.contains(&f.as_str())) {
                 if !readme.contains(&format!("--{f}")) {
                     bad.push(format!("README.md: the command list leaves out `--{f}`"));
                 }
@@ -167,9 +157,7 @@ impl Keys {
             };
             let id = format!("{s}.{}", name.trim());
             if !self.ids.contains(id.as_str()) {
-                bad.push(format!(
-                    "{path}: `{id}` in a toml example is not a config key"
-                ));
+                bad.push(format!("{path}: `{id}` in a toml example is not a config key"));
             }
         }
         bad
@@ -182,10 +170,7 @@ fn stated_default(after: &str) -> Option<String> {
     let inner = open.split(')').next().unwrap_or(open);
     let value = match inner.strip_prefix("default ") {
         Some(v) => v.split_whitespace().next()?,
-        None => inner
-            .strip_suffix(" by default")?
-            .split_whitespace()
-            .next()?,
+        None => inner.strip_suffix(" by default")?.split_whitespace().next()?,
     };
     Some(value.trim_matches(['`', '"', ',']).to_owned())
 }
@@ -249,16 +234,12 @@ mod tests {
         }
         let root = concat!(env!("CARGO_MANIFEST_DIR"), "/..");
         let mut stated = 0;
-        for doc in ["README.md", "CONTRIBUTING.md"]
-            .into_iter()
-            .map(str::to_owned)
-            .chain(
-                crate::out::files_in(&std::path::Path::new(root).join("docs"), "md")
-                    .expect("docs")
-                    .into_iter()
-                    .map(|f| format!("docs/{f}")),
-            )
-        {
+        for doc in ["README.md", "CONTRIBUTING.md"].into_iter().map(str::to_owned).chain(
+            crate::out::files_in(&std::path::Path::new(root).join("docs"), "md")
+                .expect("docs")
+                .into_iter()
+                .map(|f| format!("docs/{f}")),
+        ) {
             let text = std::fs::read_to_string(format!("{root}/{doc}")).expect("doc");
             assert_eq!(keys.defaults(&doc, &text), Vec::<String>::new());
             stated += prose(&text).matches("by default").count();

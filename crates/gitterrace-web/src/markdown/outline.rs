@@ -21,13 +21,7 @@ pub(crate) struct OutlineItem {
 impl OutlineItem {
     /// A document heading, whose id goes through `doc_id`.
     pub(crate) fn heading(level: u8, id: String, text: &str) -> Self {
-        Self {
-            level,
-            id,
-            text: text.to_owned(),
-            chrome: false,
-            kind: None,
-        }
+        Self { level, id, text: text.to_owned(), chrome: false, kind: None }
     }
 }
 
@@ -38,15 +32,9 @@ const OUTLINE_MIN: usize = 3;
 /// Empty when fewer than three remain.
 pub(crate) fn outline_items(all: &[OutlineItem]) -> Vec<&OutlineItem> {
     let h1s = all.iter().filter(|h| h.level == 1).count();
-    let kept: Vec<&OutlineItem> = all
-        .iter()
-        .filter(|h| (2..=3).contains(&h.level) || (h.level == 1 && h1s > 1))
-        .collect();
-    if kept.len() < OUTLINE_MIN {
-        Vec::new()
-    } else {
-        kept
-    }
+    let kept: Vec<&OutlineItem> =
+        all.iter().filter(|h| (2..=3).contains(&h.level) || (h.level == 1 && h1s > 1)).collect();
+    if kept.len() < OUTLINE_MIN { Vec::new() } else { kept }
 }
 
 /// One listed heading, as the template shows it: indent 0 or 1, the target id and the text.
@@ -81,28 +69,13 @@ fn outline_html(all: &[OutlineItem], rail: bool, icon_only: bool) -> String {
         .iter()
         .map(|h| OutlineLink {
             depth: u8::from(h.level > top),
-            id: if h.chrome {
-                h.id.clone()
-            } else {
-                crate::markdown::ids::doc_id(&h.id)
-            },
+            id: if h.chrome { h.id.clone() } else { crate::markdown::ids::doc_id(&h.id) },
             text: &h.text,
             kind: h.kind.map(|k| (k.label(), k.spoken())),
         })
         .collect::<Vec<_>>();
-    let kind_width = links
-        .iter()
-        .filter_map(|l| l.kind.map(|k| k.0.len()))
-        .max()
-        .unwrap_or(0);
-    OutlineMarkup {
-        rail,
-        icon_only,
-        links,
-        kind_width,
-    }
-    .render()
-    .unwrap_or_default()
+    let kind_width = links.iter().filter_map(|l| l.kind.map(|k| k.0.len())).max().unwrap_or(0);
+    OutlineMarkup { rail, icon_only, links, kind_width }.render().unwrap_or_default()
 }
 
 /// The wide-screen rail, "On this page". Empty below three headings.

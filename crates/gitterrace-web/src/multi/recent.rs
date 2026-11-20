@@ -45,10 +45,7 @@ impl Served {
         let (times, first) = repo.commit_times_since(&head, since).unwrap_or_default();
         // HEAD resolved, so there is history: when it reaches past the cap, cap the window.
         let first = first.or(Some(since - 1));
-        let last = repo
-            .log(&head, None, 0, 1)
-            .ok()
-            .and_then(|l| l.into_iter().next());
+        let last = repo.log(&head, None, 0, 1).ok().and_then(|l| l.into_iter().next());
         // Days end at local midnight of the newest commit's zone, as on the sidebar.
         let offset = last.as_ref().map_or(0, |c| c.author.offset);
         let day_end = spark::End::local(now, offset).day_end;

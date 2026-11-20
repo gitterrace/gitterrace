@@ -42,17 +42,9 @@ fn code_escapes() {
 fn number_column_width_follows_the_digit_count() {
     let digits = |n: usize| {
         let (h, _) = code_html(&cache(), "a.txt", &"x\n".repeat(n));
-        h.split("data-digits=\"")
-            .nth(1)
-            .unwrap()
-            .chars()
-            .next()
-            .unwrap()
+        h.split("data-digits=\"").nth(1).unwrap().chars().next().unwrap()
     };
-    assert_eq!(
-        (digits(5), digits(999), digits(1_000), digits(12_345)),
-        ('3', '3', '4', '5')
-    );
+    assert_eq!((digits(5), digits(999), digits(1_000), digits(12_345)), ('3', '3', '4', '5'));
 }
 
 #[test]
@@ -126,10 +118,7 @@ fn huge_diffs_fold_behind_a_load_button() {
         binary: false,
         additions: n as u32,
         deletions: 0,
-        hunks: vec![Hunk {
-            header: "@@".into(),
-            lines: lines(n),
-        }],
+        hunks: vec![Hunk { header: "@@".into(), lines: lines(n) }],
         lines: n as u32,
         rewritten: 0,
         code: CodeCounts::default(),
@@ -157,12 +146,7 @@ fn a_commit_landed_later_joins_the_day_it_landed() {
     use gitterrace_types::api::Signature;
     const DAY: i64 = 86_400;
     let now = 20 * DAY + 12 * 3600;
-    let sig = |time| Signature {
-        email: "a@x".to_owned(),
-        name: "A".to_owned(),
-        offset: 0,
-        time,
-    };
+    let sig = |time| Signature { email: "a@x".to_owned(), name: "A".to_owned(), offset: 0, time };
     // Newest first, as the log lists them: today, a rebase written yesterday but landed today,
     // then yesterday.
     let c = |id: &str, wrote: i64, landed: i64| CommitSummary {
@@ -178,10 +162,8 @@ fn a_commit_landed_later_joins_the_day_it_landed() {
         c("c", now - 2 * 3600, now - 2 * 3600),
         c("d", now - DAY - 3600, now - DAY - 3600),
     ];
-    let labels: Vec<String> = crate::views::day_groups(&list, now)
-        .into_iter()
-        .map(|g| g.label)
-        .collect();
+    let labels: Vec<String> =
+        crate::views::day_groups(&list, now).into_iter().map(|g| g.label).collect();
     assert_eq!(labels, ["Today", "Yesterday"]);
 }
 
@@ -195,12 +177,8 @@ fn a_monday_night_commit_lands_under_tuesday_and_counts_on_monday() {
     const BERLIN: i32 = 3600;
     // 2026-11-02 is a Monday.
     let monday = 20_759 * DAY;
-    let sig = |time| Signature {
-        email: "a@x".to_owned(),
-        name: "A".to_owned(),
-        offset: BERLIN,
-        time,
-    };
+    let sig =
+        |time| Signature { email: "a@x".to_owned(), name: "A".to_owned(), offset: BERLIN, time };
     // Local 23:30 Monday is 22:30 UTC Monday; the commit landed Tuesday 10:00 local.
     let wrote = monday + 22 * 3600 + 1800;
     let landed = monday + DAY + 9 * 3600;
@@ -234,12 +212,7 @@ fn no_day_heading_appears_twice_in_a_log() {
     let now = 40 * DAY;
     // A week in the order commits land: every third one was written two days before it landed
     // (rebased), the rest the moment they landed.
-    let sig = |time| Signature {
-        email: String::new(),
-        name: String::new(),
-        offset: 0,
-        time,
-    };
+    let sig = |time| Signature { email: String::new(), name: String::new(), offset: 0, time };
     let mut list = Vec::new();
     for (i, landed) in (0..7 * 24).map(|h| now - h * 3600).enumerate() {
         let wrote = if i % 3 == 0 { landed - 2 * DAY } else { landed };
@@ -251,10 +224,8 @@ fn no_day_heading_appears_twice_in_a_log() {
             subject: String::new(),
         });
     }
-    let labels: Vec<String> = crate::views::day_groups(&list, now)
-        .into_iter()
-        .map(|g| g.label)
-        .collect();
+    let labels: Vec<String> =
+        crate::views::day_groups(&list, now).into_iter().map(|g| g.label).collect();
     let mut seen = std::collections::HashSet::new();
     assert!(labels.iter().all(|l| seen.insert(l.clone())), "{labels:?}");
 }

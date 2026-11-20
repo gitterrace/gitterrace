@@ -72,11 +72,10 @@ impl<'s> Scan<'s> {
             self.idx_block = bi;
         }
         let at = (o - seg.idx_first[bi]) as usize * 8;
-        let b = self
-            .idx_bytes
-            .get(at..at + 8)
-            .and_then(|s| <[u8; 8]>::try_from(s).ok())
-            .ok_or_else(|| crate::seg::SegError::unreadable(seg.c.name(), 0, "row index short"))?;
+        let b =
+            self.idx_bytes.get(at..at + 8).and_then(|s| <[u8; 8]>::try_from(s).ok()).ok_or_else(
+                || crate::seg::SegError::unreadable(seg.c.name(), 0, "row index short"),
+            )?;
         Ok(u64::from_le_bytes(b))
     }
 
@@ -85,11 +84,8 @@ impl<'s> Scan<'s> {
         let seg = &self.src.segs[s];
         let name = seg.c.name();
         let at = self.offset(o)?;
-        let end = if o + 1 < seg.n {
-            self.offset(o + 1)?
-        } else {
-            *seg.row_starts.last().unwrap_or(&0)
-        };
+        let end =
+            if o + 1 < seg.n { self.offset(o + 1)? } else { *seg.row_starts.last().unwrap_or(&0) };
         if end <= at || end - at > MAX_RECORD as u64 {
             return Err(crate::seg::SegError::unreadable(name, at, "row offsets"));
         }
@@ -284,9 +280,7 @@ mod tests {
             })
             .sum();
         assert!(
-            disk.segs
-                .iter()
-                .any(|s| s.c.blocks(section::ROWS).len() > 1),
+            disk.segs.iter().any(|s| s.c.blocks(section::ROWS).len() > 1),
             "the fixture must span row blocks"
         );
         let mut scan = Scan::new(&disk, 0, disk.len, true);
@@ -322,19 +316,12 @@ mod tests {
             let ranks: Vec<Rank> = (0..disk.len).step_by(step).map(Rank).collect();
             let want: Vec<_> = ranks
                 .iter()
-                .map(|r| {
-                    disk.rows_for(vec![*r])
-                        .flat_map(|(_, f)| f)
-                        .collect::<Vec<_>>()
-                })
+                .map(|r| disk.rows_for(vec![*r]).flat_map(|(_, f)| f).collect::<Vec<_>>())
                 .collect();
             let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
             let got: Vec<_> = disk.rows_for(ranks.clone()).collect();
             let reads = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before;
-            assert!(
-                reads <= blocks,
-                "step {step}: {reads} block reads, {blocks} blocks"
-            );
+            assert!(reads <= blocks, "step {step}: {reads} block reads, {blocks} blocks");
             let got_ranks: Vec<Rank> = got.iter().map(|(r, _)| *r).collect();
             assert_eq!(got_ranks, ranks, "step {step}: every rank, in order");
             let got_rows: Vec<_> = got.into_iter().map(|(_, f)| f).collect();
@@ -360,25 +347,17 @@ mod tests {
         let reads_of = |f: &dyn Fn() -> usize| {
             let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
             let n = f();
-            (
-                crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before,
-                n,
-            )
+            (crate::seg::read::BLOCK_READS.with(std::cell::Cell::get) - before, n)
         };
         let pages: [(&str, &dyn Fn() -> usize); 3] = [
-            ("summary", &|| {
-                ins.period_summary(Period::All).current.commits as usize
-            }),
+            ("summary", &|| ins.period_summary(Period::All).current.commits as usize),
             ("files", &|| ins.file_churn(Period::All).len()),
             ("directories", &|| ins.dir_churn(Period::All).len()),
         ];
         for (page, f) in pages {
             let (reads, n) = reads_of(f);
             assert!(n > 0, "{page}: the fixture has data");
-            assert!(
-                reads <= 8 * blocks,
-                "{page}: {reads} block reads, {blocks} blocks"
-            );
+            assert!(reads <= 8 * blocks, "{page}: {reads} block reads, {blocks} blocks");
         }
         assert_eq!(disk.unreadable(), None);
         Ok(())
@@ -405,10 +384,7 @@ mod tests {
         let disk = open(dir.path())?.with_cache_bytes(1);
         let strings: usize = disk.deltas.iter().map(|c| c.toc().len()).sum();
         let blocks: usize = disk.segs.iter().map(|s| s.c.toc().len()).sum::<usize>() + strings;
-        assert!(
-            strings > 4,
-            "the fixture must span string blocks: {strings}"
-        );
+        assert!(strings > 4, "the fixture must span string blocks: {strings}");
         let ins = Insights::from_source(&disk, Options::default(), None);
         let before = crate::seg::read::BLOCK_READS.with(std::cell::Cell::get);
         let files = ins.file_churn(Period::All);

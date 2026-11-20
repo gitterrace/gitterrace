@@ -72,8 +72,7 @@ pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
 /// repository's router can show it inside the app shell (`lost::in_shell`).
 pub(crate) fn not_found(detail: &str) -> Response {
     let mut res = (StatusCode::NOT_FOUND, page(StatusCode::NOT_FOUND, detail)).into_response();
-    res.extensions_mut()
-        .insert(crate::lost::Missing(detail.to_owned()));
+    res.extensions_mut().insert(crate::lost::Missing(detail.to_owned()));
     res
 }
 

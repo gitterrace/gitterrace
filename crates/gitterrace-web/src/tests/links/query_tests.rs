@@ -57,9 +57,5 @@ async fn every_query_link_changes_the_page_it_lands_on() {
             dead.push(link.clone());
         }
     }
-    assert!(
-        dead.is_empty(),
-        "links whose query does nothing:\n{}",
-        dead.join("\n")
-    );
+    assert!(dead.is_empty(), "links whose query does nothing:\n{}", dead.join("\n"));
 }

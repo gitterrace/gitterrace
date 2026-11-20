@@ -17,17 +17,13 @@ fn the_docs_footer_is_project_then_legal_with_edit_after_source_and_version_last
     let mut seen = 0;
     for (path, html) in pages.iter().filter(|(p, _)| p.starts_with("docs/")) {
         let foot = footer_of(html).unwrap_or("");
-        let (project, legal) = foot
-            .split_once("<nav aria-label=\"Legal\" class=\"legal\">")
-            .unwrap_or_default();
+        let (project, legal) =
+            foot.split_once("<nav aria-label=\"Legal\" class=\"legal\">").unwrap_or_default();
         assert!(
             project.contains("<nav aria-label=\"Project\">") && legal.contains("/legal/"),
             "{path}: {foot}"
         );
-        assert!(
-            !project.contains("/legal/"),
-            "{path}: a legal link on the left"
-        );
+        assert!(!project.contains("/legal/"), "{path}: a legal link on the left");
         let hrefs = crate::site::attrs(foot, "href");
         let mut once = hrefs.clone();
         once.sort_unstable();

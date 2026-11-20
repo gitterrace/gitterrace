@@ -70,12 +70,7 @@ impl<'a> Walk<'a> {
     pub(crate) fn emit(&mut self, name: String, at: usize, kind: SymbolKind) {
         let line = self.toks[at].line;
         let depth = self.depth();
-        self.out.push(Symbol {
-            name,
-            line,
-            depth,
-            kind: Some(kind),
-        });
+        self.out.push(Symbol { name, line, depth, kind: Some(kind) });
     }
 
     /// The index past a balanced `open ... close` run starting at `k`, which holds `open`.
@@ -116,11 +111,7 @@ impl<'a> Walk<'a> {
             }
             // A header's own brackets (`impl AsRef<[u8]>`, `where F: Fn()`) keep the body pending.
             b'(' | b'[' => {
-                self.stack.push(Open {
-                    byte: p,
-                    container: false,
-                    class: false,
-                });
+                self.stack.push(Open { byte: p, container: false, class: false });
             }
             b'}' | b')' | b']' => {
                 let want = match p {

@@ -82,15 +82,7 @@ impl<'a> Counted<'a> {
     ) -> Self {
         let axis = cx.axis(scope);
         let span = crate::insights::scope::span_of(&days);
-        Self {
-            ins,
-            scope,
-            cx,
-            axis,
-            days,
-            span,
-            shifted,
-        }
+        Self { ins, scope, cx, axis, days, span, shifted }
     }
 
     /// The same scope one period earlier, for the "before" column. `None` for `All` and for a
@@ -263,14 +255,12 @@ impl<'a> Counted<'a> {
     }
 
     fn lines_of(&self, rows: &[FileRow]) -> Lines {
-        rows.iter()
-            .filter_map(|r| self.ins.row_lines(r))
-            .fold(Lines::default(), |mut o, l| {
-                o.add += l.add;
-                o.del += l.del;
-                o.rewritten += l.rewritten;
-                o
-            })
+        rows.iter().filter_map(|r| self.ins.row_lines(r)).fold(Lines::default(), |mut o, l| {
+            o.add += l.add;
+            o.del += l.del;
+            o.rewritten += l.rewritten;
+            o
+        })
     }
 }
 
@@ -285,10 +275,7 @@ mod tests {
     use crate::insights::{CountContext, Insights, Label, Options, Period, Scope, ScopeParams};
 
     fn scope(period: &str, path: Option<&str>) -> Scope {
-        let mut p = ScopeParams {
-            period: Some(period.to_owned()),
-            ..ScopeParams::default()
-        };
+        let mut p = ScopeParams { period: Some(period.to_owned()), ..ScopeParams::default() };
         p.select.q = path.map(|p| format!("path:{p}"));
         Scope::from_params(&p, Options::default(), Period::All).expect("scope")
     }
@@ -298,44 +285,24 @@ mod tests {
         let recs = chain();
         let ins = Insights::new(&recs, Options::default(), None);
         let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(MON + 100 * 86_400));
-        for s in [
-            scope("all", None),
-            scope("1m", None),
-            scope("all", Some("x.rs")),
-        ] {
+        for s in [scope("all", None), scope("1m", None), scope("all", Some("x.rs"))] {
             let c = ins.counted(&s, cx);
             let t = c.totals();
             assert_eq!(t.commits, c.ranks().len());
+            assert_eq!(t.commits, c.series().iter().map(|p| p.commits as usize).sum::<usize>());
+            assert_eq!(t.commits, c.per_person().iter().map(|p| p.commits).sum::<usize>());
             assert_eq!(
                 t.commits,
-                c.series().iter().map(|p| p.commits as usize).sum::<usize>()
+                c.per_label(Label::Kind).0.iter().map(|l| l.commits).sum::<usize>()
             );
-            assert_eq!(
-                t.commits,
-                c.per_person().iter().map(|p| p.commits).sum::<usize>()
-            );
-            assert_eq!(
-                t.commits,
-                c.per_label(Label::Kind)
-                    .0
-                    .iter()
-                    .map(|l| l.commits)
-                    .sum::<usize>()
-            );
-            assert_eq!(
-                t.commits,
-                c.sizes().iter().map(|b| b.commits).sum::<usize>()
-            );
+            assert_eq!(t.commits, c.sizes().iter().map(|b| b.commits).sum::<usize>());
             assert_eq!(t.commits as u32, c.when().by_hour.iter().sum::<u32>());
         }
         // All four commits, a path selection keeps the three touching x.rs with their lines.
         let all = ins.counted(&scope("all", None), cx).totals();
         assert_eq!((all.commits, all.authors, all.files), (4, 2, 2));
         let x = ins.counted(&scope("all", Some("x.rs")), cx).totals();
-        assert_eq!(
-            (x.commits, x.additions, x.deletions, x.files),
-            (3, 31, 3, 1)
-        );
+        assert_eq!((x.commits, x.additions, x.deletions, x.files), (3, 31, 3, 1));
     }
 
     #[test]

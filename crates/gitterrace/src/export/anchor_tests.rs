@@ -28,10 +28,7 @@ async fn exported_fragments_resolve_without_script() {
         .await
         .expect("export");
     let values = |html: &str, attr: &str| -> Vec<String> {
-        html.split(attr)
-            .skip(1)
-            .filter_map(|s| s.split('"').next().map(str::to_owned))
-            .collect()
+        html.split(attr).skip(1).filter_map(|s| s.split('"').next().map(str::to_owned)).collect()
     };
     let mut stack = vec![out.clone()];
     let mut seen_reference = false;

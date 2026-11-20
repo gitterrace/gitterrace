@@ -48,19 +48,12 @@ fn problems(attributes: &str, outs: &[Out]) -> Vec<String> {
     let mut bad = Vec::new();
     for doc in &docs {
         if !marks.contains(doc) {
-            bad.push(format!(
-                "{doc} is generated but {ATTRIBUTES} does not mark it {FLAG}"
-            ));
+            bad.push(format!("{doc} is generated but {ATTRIBUTES} does not mark it {FLAG}"));
         }
     }
-    for mark in marks
-        .iter()
-        .filter(|m| m.starts_with("docs/") && !m.contains('*'))
-    {
+    for mark in marks.iter().filter(|m| m.starts_with("docs/") && !m.contains('*')) {
         if Path::new(mark).extension().is_some_and(|e| e == "md") && !docs.contains(mark) {
-            bad.push(format!(
-                "{ATTRIBUTES} marks {mark} {FLAG}, but no generator writes it"
-            ));
+            bad.push(format!("{ATTRIBUTES} marks {mark} {FLAG}, but no generator writes it"));
         }
     }
     for pattern in BENCH {

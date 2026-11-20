@@ -97,15 +97,10 @@ fn entries(html: &str, kind: &str) -> Vec<Entry> {
     let list: Vec<serde_json::Value> = serde_json::from_str(&json).expect("menu json");
     let mut out: Vec<Entry> = ["Copy permalink", "Copy as markdown", "Send to\u{2026}"]
         .iter()
-        .map(|l| Entry {
-            label: (*l).to_owned(),
-            why: None,
-        })
+        .map(|l| Entry { label: (*l).to_owned(), why: None })
         .collect();
     for a in list {
-        let enabled = a["kinds"]
-            .as_array()
-            .is_some_and(|k| k.iter().any(|k| k == kind));
+        let enabled = a["kinds"].as_array().is_some_and(|k| k.iter().any(|k| k == kind));
         out.push(Entry {
             label: a["label"].as_str().unwrap_or_default().to_owned(),
             why: (!enabled).then(|| a["why"].as_str().unwrap_or_default().to_owned()),

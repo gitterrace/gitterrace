@@ -26,28 +26,14 @@ fn each_entry_goes_to_the_root_that_holds_it() {
     f.git(&["checkout", "-q", "--orphan", "other"]);
     f.git(&["rm", "-rq", "--cached", "."]);
     std::fs::remove_dir_all(tmp.path().join("lib")).expect("rm lib");
-    let f = f
-        .at("2024-02-01T12:00:00Z")
-        .write("a.txt", "a\n")
-        .commit("feat: new root");
+    let f = f.at("2024-02-01T12:00:00Z").write("a.txt", "a\n").commit("feat: new root");
     let new = f.git(&["rev-parse", "HEAD"]);
     let f = f.at("2024-03-01T12:00:00Z");
-    f.git(&[
-        "merge",
-        "-q",
-        "--allow-unrelated-histories",
-        "-m",
-        "merge",
-        "main",
-    ]);
+    f.git(&["merge", "-q", "--allow-unrelated-histories", "-m", "merge", "main"]);
     let repo = Repo::discover(tmp.path()).expect("open");
     let (got, complete) = by_name(&repo, "HEAD", "");
     assert!(complete);
-    assert_eq!(
-        got.get("lib"),
-        Some(&old),
-        "lib only ever lived in the old root"
-    );
+    assert_eq!(got.get("lib"), Some(&old), "lib only ever lived in the old root");
     assert_eq!(got.get("a.txt"), Some(&new));
 }
 

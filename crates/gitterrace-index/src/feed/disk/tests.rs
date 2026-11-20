@@ -39,19 +39,12 @@ fn fixture() -> Vec<CommitRecord> {
         if i % 5 == 0 {
             files.push(FileStat {
                 old: Some(format!("old/{}.rs", i % 4).into()),
-                code: Some(CodeStat {
-                    additions: 1,
-                    deletions: 0,
-                    rewritten: 0,
-                }),
+                code: Some(CodeStat { additions: 1, deletions: 0, rewritten: 0 }),
                 ..f(&format!("new/{i}.rs"), 2, 2)
             });
         }
         if i % 9 == 0 {
-            files.push(FileStat {
-                binary: true,
-                ..f("img.png", 0, 0)
-            });
+            files.push(FileStat { binary: true, ..f("img.png", 0, 0) });
         }
         if i == 13 {
             files.clear();
@@ -59,16 +52,8 @@ fn fixture() -> Vec<CommitRecord> {
         v.push(CommitRecord {
             id: oid(i),
             author: who.into(),
-            email: if who == "ann" {
-                "ANN@x.io".into()
-            } else {
-                format!("{who}@x.io")
-            },
-            time: if i == 30 {
-                4_000_000_000
-            } else {
-                1_700_000_000 + (i as i64) * 50_000
-            },
+            email: if who == "ann" { "ANN@x.io".into() } else { format!("{who}@x.io") },
+            time: if i == 30 { 4_000_000_000 } else { 1_700_000_000 + (i as i64) * 50_000 },
             offset: if i % 2 == 0 { 3600 } else { -19_800 },
             merge: i % 11 == 10,
             parents: (0..(i.min(1) + usize::from(i % 11 == 10)))
@@ -101,18 +86,12 @@ use super::testing::write_cache;
 fn open(dir: &Path, map: &IdentPairs) -> SegResult<DiskSource> {
     let store = Store::open(dir)?.ok_or_else(|| crate::seg::SegError::BadName("none".into()))?;
     DiskSource::open(store, &mut |pairs| {
-        Ok(pairs
-            .iter()
-            .map(|p| map.get(p).cloned().unwrap_or_else(|| p.clone()))
-            .collect())
+        Ok(pairs.iter().map(|p| map.get(p).cloned().unwrap_or_else(|| p.clone())).collect())
     })
 }
 
 /// Every trait method, both sides, over every id and rank plus out-of-range ones.
-#[expect(
-    clippy::many_single_char_names,
-    reason = "d and m are the two sides throughout"
-)]
+#[expect(clippy::many_single_char_names, reason = "d and m are the two sides throughout")]
 fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
     assert_eq!(d.len(), m.len(), "{case}: len");
     let n = m.len() as u32;
@@ -125,11 +104,7 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
             assert_eq!(d.find_commit(&id), m.find_commit(&id), "{case}: find {id}");
         }
     }
-    assert_eq!(
-        d.find_commit(&oid(99_999)),
-        Ok(None),
-        "{case}: absent commit"
-    );
+    assert_eq!(d.find_commit(&oid(99_999)), Ok(None), "{case}: absent commit");
     for range in [
         CommitRange::All,
         CommitRange::Ranks(3..17),
@@ -158,11 +133,7 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
     for p in 0..m.paths() as u32 {
         let s = m.path(PathId(p));
         assert_eq!(d.path(PathId(p)), s, "{case}: path {p}");
-        assert_eq!(
-            s.and_then(|s| d.path_id(&s)),
-            Some(PathId(p)),
-            "{case}: find {p}"
-        );
+        assert_eq!(s.and_then(|s| d.path_id(&s)), Some(PathId(p)), "{case}: find {p}");
     }
     // Postings are a full scan here (served from segments in production), so probe the
     // first 64 paths and the last, not 60k of the wide case.
@@ -177,18 +148,10 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
         let b: Vec<_> = m.postings(Posting::Path(id)).collect();
         assert_eq!(a, b, "{case}: path postings {p}");
     }
-    assert_eq!(
-        d.find_path("nope"),
-        m.find_path("nope"),
-        "{case}: absent path"
-    );
+    assert_eq!(d.find_path("nope"), m.find_path("nope"), "{case}: absent path");
     assert_eq!(d.idents(), m.idents(), "{case}: idents");
     for i in 0..=m.idents() as u32 {
-        assert_eq!(
-            d.ident(IdentId(i)),
-            m.ident(IdentId(i)),
-            "{case}: ident {i}"
-        );
+        assert_eq!(d.ident(IdentId(i)), m.ident(IdentId(i)), "{case}: ident {i}");
         let a: Vec<_> = d.postings(Posting::Author(IdentId(i))).collect();
         let b: Vec<_> = m.postings(Posting::Author(IdentId(i))).collect();
         assert_eq!(a, b, "{case}: author postings {i}");
@@ -200,11 +163,7 @@ fn assert_same(d: &dyn InsightsSource, m: &dyn InsightsSource, case: &str) {
             assert_eq!(d.find_label(&s), m.find_label(&s), "{case}: find label {s}");
         }
     }
-    assert_eq!(
-        d.find_label("chore"),
-        m.find_label("chore"),
-        "{case}: absent label"
-    );
+    assert_eq!(d.find_label("chore"), m.find_label("chore"), "{case}: absent label");
     let a: Vec<_> = d.rename_edges().collect();
     let b: Vec<_> = m.rename_edges().collect();
     assert_eq!(a, b, "{case}: rename edges");
@@ -243,11 +202,7 @@ fn disk_equals_memory_on_every_method() -> SegResult<()> {
     }
     for (name, recs) in cases {
         for edited in [false, true] {
-            let map = if edited {
-                mailmap(&recs)
-            } else {
-                IdentPairs::new()
-            };
+            let map = if edited { mailmap(&recs) } else { IdentPairs::new() };
             // Index::records hands the oracle clamped times, the disk clamps at read.
             let latest = 1_800_000_000;
             let mut shown = recs.clone();
@@ -331,11 +286,7 @@ fn corrupt_row_block_is_unreadable_never_wrong() -> SegResult<()> {
     assert!(disk.unreadable().is_some_and(|e| e.contains("crc")));
     assert_eq!(disk.rows_for(vec![Rank(0)]).count(), 0);
     let all: Vec<Rank> = (0..disk.len()).map(|r| Rank(r as u32)).collect();
-    assert_eq!(
-        disk.rows_for(all).count(),
-        0,
-        "a scan with rows stops at the bad block"
-    );
+    assert_eq!(disk.rows_for(all).count(), 0, "a scan with rows stops at the bad block");
     Ok(())
 }
 
@@ -438,10 +389,7 @@ fn hostile_commit_columns_are_unreadable() -> SegResult<()> {
         // value behind a valid crc is, like a crafted `ROWS` value, not detectable there.
         if (16..20).contains(&at_item) {
             let disk = open(dir.path(), &IdentPairs::new())?;
-            assert!(
-                disk.commits_in(CommitRange::All).next().is_none(),
-                "byte {at_item}"
-            );
+            assert!(disk.commits_in(CommitRange::All).next().is_none(), "byte {at_item}");
             assert!(disk.unreadable().is_some(), "byte {at_item}");
         }
     }
@@ -483,16 +431,8 @@ fn lookups_across_oid_blocks_find_every_commit() -> SegResult<()> {
     write_cache(dir.path(), &recs, &[])?;
     let disk = open(dir.path(), &IdentPairs::new())?;
     assert_eq!(disk.segs[0].oid_first.len(), 2, "two oid blocks");
-    for (i, r) in recs
-        .iter()
-        .enumerate()
-        .step_by(97)
-        .chain(recs.iter().enumerate().skip(44_990))
-    {
-        assert!(
-            disk.find_commit(&r.id).ok().flatten().is_some(),
-            "commit {i}"
-        );
+    for (i, r) in recs.iter().enumerate().step_by(97).chain(recs.iter().enumerate().skip(44_990)) {
+        assert!(disk.find_commit(&r.id).ok().flatten().is_some(), "commit {i}");
     }
     let mut ids: Vec<&str> = recs.iter().map(|r| r.id.as_str()).collect();
     ids.sort_unstable();

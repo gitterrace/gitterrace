@@ -86,20 +86,14 @@ impl Repos {
     /// A table of the one repository `state` reads, already open.
     pub(crate) fn single(state: ApiState) -> Self {
         let name = state.repo.name();
-        let me = McpRepo {
-            name: name.clone(),
-            path: state.repo.root(),
-            unavailable: None,
-        };
+        let me = McpRepo { name: name.clone(), path: state.repo.root(), unavailable: None };
         let r = Self::new("one repository".to_owned(), vec![me]);
         r.lock().push((name, state));
         r
     }
 
     fn lock(&self) -> std::sync::MutexGuard<'_, Vec<(String, ApiState)>> {
-        self.open
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.open.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// The table entry `repo` names: the only one when it is left out and there is one.
@@ -124,10 +118,7 @@ impl Repos {
             }
         };
         if let Some(why) = &found.unavailable {
-            return Err(ApiError::BadRequest(format!(
-                "repo {} is unavailable: {why}",
-                found.name
-            )));
+            return Err(ApiError::BadRequest(format!("repo {} is unavailable: {why}", found.name)));
         }
         Ok(found)
     }
@@ -149,15 +140,10 @@ impl Repos {
             }
         }
         let gate = {
-            let mut g = self
-                .gates
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            let mut g = self.gates.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             Arc::clone(g.entry(entry.name.clone()).or_default())
         };
-        let _one = gate
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let _one = gate.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((_, s)) = self.lock().iter().find(|(n, _)| *n == entry.name) {
             return Ok(s.clone());
         }
@@ -186,10 +172,7 @@ impl Repos {
     /// never builds an insights cache.
     pub(crate) fn list(&self, cfg: &Config) -> RepoList {
         let repos = self.list.iter().map(|r| row(r, cfg)).collect();
-        RepoList {
-            scope: self.scope.clone(),
-            repos,
-        }
+        RepoList { scope: self.scope.clone(), repos }
     }
 }
 
@@ -226,11 +209,7 @@ fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
                 .log("HEAD", None, 0, 1)
                 .ok()
                 .and_then(|v| v.into_iter().next())
-                .map(|c| LastCommit {
-                    id: c.id,
-                    subject: c.subject,
-                    time: c.committer.time,
-                });
+                .map(|c| LastCommit { id: c.id, subject: c.subject, time: c.committer.time });
         }
         Err(e) => out.error = Some(e.to_string()),
     }

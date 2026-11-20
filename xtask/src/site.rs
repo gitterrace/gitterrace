@@ -30,10 +30,7 @@ use shots::check_shots;
 
 const FONTS: [(&str, &str); 3] = [
     ("fraunces", "fraunces-latin-wght-normal.woff2"),
-    (
-        "bricolage-grotesque",
-        "bricolage-grotesque-latin-wght-normal.woff2",
-    ),
+    ("bricolage-grotesque", "bricolage-grotesque-latin-wght-normal.woff2"),
     ("jetbrains-mono", "jetbrains-mono-latin-wght-normal.woff2"),
 ];
 /// Where `generate` writes the website, relative to the repo root.
@@ -43,10 +40,7 @@ pub const SITE_DIR: &str = "target/site";
 /// Every `attr="value"` of `html`, in order.
 fn attrs<'a>(html: &'a str, attr: &str) -> Vec<&'a str> {
     let pat = format!(" {attr}=\"");
-    html.split(&pat)
-        .skip(1)
-        .filter_map(|r| r.split_once('"').map(|v| v.0))
-        .collect()
+    html.split(&pat).skip(1).filter_map(|r| r.split_once('"').map(|v| v.0)).collect()
 }
 
 pub fn at(rel: &str) -> String {
@@ -72,9 +66,9 @@ const PAGE_CSS: &str = include_str!("../templates/site.css");
 /// Whether `out` is a file of the built site rather than a tracked file.
 pub fn is_site(out: &Out) -> bool {
     match out {
-        Out::File { path, .. } | Out::Bytes { path, .. } => path
-            .strip_prefix(SITE_DIR)
-            .is_some_and(|p| p.starts_with('/')),
+        Out::File { path, .. } | Out::Bytes { path, .. } => {
+            path.strip_prefix(SITE_DIR).is_some_and(|p| p.starts_with('/'))
+        }
         Out::Block { .. } => false,
     }
 }
@@ -98,15 +92,9 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let read = |rel: &str| -> Result<String> {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
     };
-    let pkg = ws
-        .packages
-        .get("gitterrace")
-        .context("package gitterrace")?;
+    let pkg = ws.packages.get("gitterrace").context("package gitterrace")?;
     let mut outs = Vec::new();
-    outs.push(Out::file(
-        at("assets/site.css"),
-        css(&read(TOKENS)?, &read(MARKDOWN_CSS)?)?,
-    ));
+    outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?, &read(MARKDOWN_CSS)?)?));
     for (dir, file) in FONTS {
         let path = format!("vendor/schwarzwald/kit/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
@@ -218,9 +206,7 @@ fn sums(outs: &[Out]) -> std::collections::BTreeMap<String, String> {
 }
 
 fn has_ext(path: &str, ext: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 /// `body` with each `/assets/<file>` that `sums` knows followed by its `?v=`.
@@ -317,10 +303,7 @@ fn csp_hash(body: &str) -> String {
     use base64::Engine as _;
     use sha2::Digest as _;
     let sum = sha2::Sha256::digest(body.as_bytes());
-    format!(
-        "'sha256-{}'",
-        base64::engine::general_purpose::STANDARD.encode(sum)
-    )
+    format!("'sha256-{}'", base64::engine::general_purpose::STANDARD.encode(sum))
 }
 
 /// The files the static host reads beside the page: response headers, the 404 page, the
@@ -428,9 +411,7 @@ fn syntax_css(markdown: &str) -> Result<String> {
         .filter_map(|d| d.split_once(':'))
         .filter(|(k, _)| k.starts_with("--md-"))
         .collect();
-    let at = markdown
-        .find("/* syntax")
-        .context("markdown.css: no syntax block")?;
+    let at = markdown.find("/* syntax").context("markdown.css: no syntax block")?;
     let mut out = String::from("/* syntax: generated from the app's markdown.css */\n");
     for line in markdown[at..].lines().skip(1) {
         if !line.contains("[class~=s-") {
@@ -452,15 +433,9 @@ fn syntax_css(markdown: &str) -> Result<String> {
 /// The generated block of the app's tokens, with the font paths pointed at `assets/fonts/`,
 /// then the site's rules and the app's syntax colours.
 fn css(tokens: &str, markdown: &str) -> Result<String> {
-    let begin = tokens
-        .find("/* BEGIN generated")
-        .context("tokens.css begin marker")?;
-    let end = tokens
-        .find("/* END generated")
-        .context("tokens.css end marker")?;
-    let tail = tokens[end..]
-        .find("/* roles")
-        .context("tokens.css roles marker")?;
+    let begin = tokens.find("/* BEGIN generated").context("tokens.css begin marker")?;
+    let end = tokens.find("/* END generated").context("tokens.css end marker")?;
+    let tail = tokens[end..].find("/* roles").context("tokens.css roles marker")?;
     let generated = &tokens[begin..end];
     let roles = &tokens[end + tail..];
     let body = format!("{generated}{roles}").replace("/static/fonts/", "/assets/fonts/");

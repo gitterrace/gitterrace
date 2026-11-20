@@ -55,11 +55,7 @@ pub(super) fn touched_names(
 ) -> Vec<(String, Vec<String>)> {
     use gitterrace_index::feed::CommitRange;
     let name = |p: &str| -> Option<String> {
-        let rest = if dir.is_empty() {
-            p
-        } else {
-            p.strip_prefix(dir)?.strip_prefix('/')?
-        };
+        let rest = if dir.is_empty() { p } else { p.strip_prefix(dir)?.strip_prefix('/')? };
         Some(rest.split('/').next().unwrap_or(rest).to_owned())
     };
     let ranks: Vec<_> = src.commits_in(CommitRange::All).map(|c| c.rank).collect();

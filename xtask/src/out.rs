@@ -16,34 +16,20 @@ pub enum Out {
     Bytes { path: String, body: Vec<u8> },
     /// The text between `<!-- BEGIN GENERATED: <id> -->` and `<!-- END GENERATED: <id> -->` in a
     /// hand-written file.
-    Block {
-        path: String,
-        id: String,
-        body: String,
-    },
+    Block { path: String, id: String, body: String },
 }
 
 impl Out {
     pub fn file(path: impl Into<String>, body: impl Into<String>) -> Self {
-        Self::File {
-            path: path.into(),
-            body: body.into(),
-        }
+        Self::File { path: path.into(), body: body.into() }
     }
 
     pub fn bytes(path: impl Into<String>, body: Vec<u8>) -> Self {
-        Self::Bytes {
-            path: path.into(),
-            body,
-        }
+        Self::Bytes { path: path.into(), body }
     }
 
     pub fn block(path: impl Into<String>, id: impl Into<String>, body: impl Into<String>) -> Self {
-        Self::Block {
-            path: path.into(),
-            id: id.into(),
-            body: body.into(),
-        }
+        Self::Block { path: path.into(), id: id.into(), body: body.into() }
     }
 }
 
@@ -124,20 +110,11 @@ fn read(path: &Path) -> Result<Option<String>> {
 fn splice(text: &str, id: &str, body: &str) -> Result<String> {
     let begin = format!("<!-- BEGIN GENERATED: {id} -->\n");
     let end = format!("<!-- END GENERATED: {id} -->");
-    let start = text
-        .find(&begin)
-        .with_context(|| format!("no `{}` marker", begin.trim_end()))?
+    let start = text.find(&begin).with_context(|| format!("no `{}` marker", begin.trim_end()))?
         + begin.len();
-    let stop = start
-        + text[start..]
-            .find(&end)
-            .with_context(|| format!("no `{end}` marker"))?;
+    let stop = start + text[start..].find(&end).with_context(|| format!("no `{end}` marker"))?;
     let body = body.trim_end_matches('\n');
-    let filled = if body.is_empty() {
-        String::new()
-    } else {
-        format!("{body}\n\n")
-    };
+    let filled = if body.is_empty() { String::new() } else { format!("{body}\n\n") };
     Ok(format!("{}{filled}{}", &text[..start], &text[stop..]))
 }
 
@@ -286,9 +263,8 @@ pub fn unowned_blocks(root: &Path, outs: &[Out]) -> Result<Vec<String>> {
             continue;
         };
         for line in text.lines() {
-            if let Some(id) = line
-                .strip_prefix("<!-- BEGIN GENERATED: ")
-                .and_then(|r| r.strip_suffix(" -->"))
+            if let Some(id) =
+                line.strip_prefix("<!-- BEGIN GENERATED: ").and_then(|r| r.strip_suffix(" -->"))
                 && !owned.contains(&(path.as_str(), id))
             {
                 out.push(format!("{path}#{id} has no generator"));
@@ -313,10 +289,7 @@ mod tests {
         assert!(fence.contains(long.trim_end()), "fence kept");
         assert!(out.contains(&table), "table kept");
         assert!(out.contains(&format!("# {long}")), "heading kept");
-        assert!(
-            out.contains(&format!("`{}`", "x".repeat(120))),
-            "code span unbroken"
-        );
+        assert!(out.contains(&format!("`{}`", "x".repeat(120))), "code span unbroken");
         let prose = out.split("\n\n").next().expect("first paragraph");
         assert!(prose.lines().count() > 1);
         assert!(prose.lines().all(|l| l.chars().count() <= PROSE_WIDTH));
@@ -333,14 +306,8 @@ mod tests {
         );
         let out = wrap_markdown(&src);
         let first = out.split("\n\n").next().expect("paragraph");
-        assert!(
-            first.lines().all(|l| l.chars().count() <= PROSE_WIDTH),
-            "{out}"
-        );
-        assert!(
-            first.lines().all(|l| l.split(' ').count() > 1),
-            "one-word line:\n{out}"
-        );
+        assert!(first.lines().all(|l| l.chars().count() <= PROSE_WIDTH), "{out}");
+        assert!(first.lines().all(|l| l.split(' ').count() > 1), "one-word line:\n{out}");
         assert!(out.ends_with("\n\nNext.\n"), "{out}");
         let fits = "a short line\nanother short line\n";
         assert_eq!(wrap_markdown(fits), fits, "fitting lines stay as written");
@@ -380,14 +347,8 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         std::fs::write(tmp.path().join("README.md"), PAGE).expect("write");
         let outs = || vec![Out::block("README.md", "a", "fresh")];
-        assert_eq!(
-            apply(tmp.path(), outs(), Mode::Check).expect("check"),
-            ["README.md#a"]
-        );
-        assert_eq!(
-            std::fs::read_to_string(tmp.path().join("README.md")).expect("read"),
-            PAGE
-        );
+        assert_eq!(apply(tmp.path(), outs(), Mode::Check).expect("check"), ["README.md#a"]);
+        assert_eq!(std::fs::read_to_string(tmp.path().join("README.md")).expect("read"), PAGE);
         apply(tmp.path(), outs(), Mode::Write).expect("write");
         assert_eq!(
             apply(tmp.path(), outs(), Mode::Check).expect("check"),

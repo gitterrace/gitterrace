@@ -24,24 +24,11 @@ pub(super) enum CommandError {
     #[error("command[{index}]: {source}")]
     Piece { index: usize, source: PieceError },
     #[error("command[{index}]: {{{raw}}}: unknown modifier :{modifier}, known: :{known}")]
-    UnknownModifier {
-        index: usize,
-        raw: String,
-        modifier: String,
-        known: String,
-    },
+    UnknownModifier { index: usize, raw: String, modifier: String, known: String },
     #[error("command[{index}]: unknown placeholder {{{name}}}, known: {known}, var.NAME")]
-    UnknownPlaceholder {
-        index: usize,
-        name: String,
-        known: String,
-    },
+    UnknownPlaceholder { index: usize, name: String, known: String },
     #[error("command[{index}]: {{{name}}}: no var {var:?} in [action.vars]")]
-    NoVar {
-        index: usize,
-        name: String,
-        var: String,
-    },
+    NoVar { index: usize, name: String, var: String },
     #[error("command[0]: the program is literal, {{{raw}}} is not allowed there")]
     ProgramPlaceholder { raw: String },
     #[error(
@@ -83,14 +70,10 @@ pub fn pieces(element: &str) -> Result<Vec<Piece>, PieceError> {
                     name.push(c);
                 }
                 if !closed {
-                    return Err(PieceError::Unclosed {
-                        element: element.to_owned(),
-                    });
+                    return Err(PieceError::Unclosed { element: element.to_owned() });
                 }
                 if name.is_empty() || name.contains('{') {
-                    return Err(PieceError::Brace {
-                        element: element.to_owned(),
-                    });
+                    return Err(PieceError::Brace { element: element.to_owned() });
                 }
                 if !text.is_empty() {
                     out.push(Piece::Text(std::mem::take(&mut text)));
@@ -98,9 +81,7 @@ pub fn pieces(element: &str) -> Result<Vec<Piece>, PieceError> {
                 out.push(Piece::Field(name));
             }
             '}' => {
-                return Err(PieceError::Brace {
-                    element: element.to_owned(),
-                });
+                return Err(PieceError::Brace { element: element.to_owned() });
             }
             c => text.push(c),
         }
@@ -182,10 +163,7 @@ pub(super) fn check_command(
         // A value right after a literal option (`--notes {markdown}`) is that option's
         // argument, so the parser never reads it as an option.
         if opens_with_repo_value && !after_dashdash && !prev_option {
-            return Err(CommandError::NeedsGuard {
-                index: i,
-                element: el.clone(),
-            });
+            return Err(CommandError::NeedsGuard { index: i, element: el.clone() });
         }
         after_dashdash |= el == "--";
         prev_option = i > 0 && el.starts_with('-') && el != "--" && !el.contains('{');
@@ -199,10 +177,7 @@ mod tests {
 
     #[test]
     fn piece_errors_keep_their_text() {
-        assert_eq!(
-            pieces("a{b").expect_err("open").to_string(),
-            "\"a{b\": unclosed {"
-        );
+        assert_eq!(pieces("a{b").expect_err("open").to_string(), "\"a{b\": unclosed {");
         assert_eq!(
             pieces("a{}").expect_err("empty").to_string(),
             "\"a{}\": write a literal brace as {{ or }}"
@@ -215,34 +190,16 @@ mod tests {
 
     #[test]
     fn command_errors_keep_their_text() {
-        let e = CommandError::UnknownPlaceholder {
-            index: 2,
-            name: "x".into(),
-            known: "a, b".into(),
-        };
-        assert_eq!(
-            e.to_string(),
-            "command[2]: unknown placeholder {x}, known: a, b, var.NAME"
-        );
-        let e = CommandError::NoVar {
-            index: 1,
-            name: "var.v".into(),
-            var: "v".into(),
-        };
-        assert_eq!(
-            e.to_string(),
-            "command[1]: {var.v}: no var \"v\" in [action.vars]"
-        );
-        let e = CommandError::ProgramPlaceholder {
-            raw: "title".into(),
-        };
+        let e =
+            CommandError::UnknownPlaceholder { index: 2, name: "x".into(), known: "a, b".into() };
+        assert_eq!(e.to_string(), "command[2]: unknown placeholder {x}, known: a, b, var.NAME");
+        let e = CommandError::NoVar { index: 1, name: "var.v".into(), var: "v".into() };
+        assert_eq!(e.to_string(), "command[1]: {var.v}: no var \"v\" in [action.vars]");
+        let e = CommandError::ProgramPlaceholder { raw: "title".into() };
         assert_eq!(
             e.to_string(),
             "command[0]: the program is literal, {title} is not allowed there"
         );
-        assert_eq!(
-            StdinError("x".into()).to_string(),
-            "stdin = \"x\": use json, markdown or none"
-        );
+        assert_eq!(StdinError("x".into()).to_string(), "stdin = \"x\": use json, markdown or none");
     }
 }

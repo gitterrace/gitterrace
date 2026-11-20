@@ -11,10 +11,7 @@ use crate::wiring_tests::{app, repo};
 
 /// Gated routes no warmer serves, each with why it may start cold.
 const COLD_OK: &[(&str, &str)] = &[
-    (
-        "/api/v1/blame",
-        "the API blames through its own handle, one file a client names",
-    ),
+    ("/api/v1/blame", "the API blames through its own handle, one file a client names"),
     (
         "/api/v1/contributors",
         "the API reads the page's shared tables and builds nothing of its own",
@@ -31,10 +28,7 @@ const COLD_OK: &[(&str, &str)] = &[
 /// blame features, and every page the export seeds, is a warmer's or says why it starts cold.
 #[test]
 fn every_gated_page_has_a_warmer() {
-    let warmed: Vec<&str> = WARMERS
-        .iter()
-        .flat_map(|w| w.routes.iter().copied())
-        .collect();
+    let warmed: Vec<&str> = WARMERS.iter().flat_map(|w| w.routes.iter().copied()).collect();
     let gated = crate::features::FEATURE_ROUTES
         .iter()
         .filter(|(f, _)| matches!(f, Feature::Insights | Feature::Blame))
@@ -46,15 +40,9 @@ fn every_gated_page_has_a_warmer() {
             bare.push(route);
         }
     }
-    assert!(
-        bare.is_empty(),
-        "no warmer and no reason to start cold: {bare:?}"
-    );
+    assert!(bare.is_empty(), "no warmer and no reason to start cold: {bare:?}");
     for (route, _) in COLD_OK {
-        assert!(
-            !warmed.contains(route),
-            "{route} is warmed: drop it from COLD_OK"
-        );
+        assert!(!warmed.contains(route), "{route} is warmed: drop it from COLD_OK");
     }
 }
 
@@ -68,27 +56,14 @@ async fn the_first_page_after_ready_is_served_from_the_warm_up() {
     tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     gitterrace_testkit::wait::until("ready", || async { a.ready() }).await;
     let router = crate::routes::router(Arc::clone(&a));
-    let (renders, walks) = (
-        a.renders.load(Ordering::Relaxed),
-        a.chain_walks.load(Ordering::Relaxed),
-    );
+    let (renders, walks) =
+        (a.renders.load(Ordering::Relaxed), a.chain_walks.load(Ordering::Relaxed));
     assert!(renders > 0, "the warm-up rendered nothing before ready");
     let periods = super::HOTSPOT_PERIODS.iter().copied();
-    for page in crate::features::warm(&a.cfg(), Some(&a.name))
-        .into_iter()
-        .chain(periods)
-    {
+    for page in crate::features::warm(&a.cfg(), Some(&a.name)).into_iter().chain(periods) {
         let (status, body) = gitterrace_testkit::get(&router, page).await;
         assert_eq!(status, 200, "{page}: {body}");
-        assert_eq!(
-            a.renders.load(Ordering::Relaxed),
-            renders,
-            "{page} rendered cold"
-        );
+        assert_eq!(a.renders.load(Ordering::Relaxed), renders, "{page} rendered cold");
     }
-    assert_eq!(
-        a.chain_walks.load(Ordering::Relaxed),
-        walks,
-        "a chain walk after ready"
-    );
+    assert_eq!(a.chain_walks.load(Ordering::Relaxed), walks, "a chain walk after ready");
 }

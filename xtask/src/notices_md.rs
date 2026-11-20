@@ -15,18 +15,9 @@ const PATH: &str = "THIRD-PARTY-NOTICES";
 /// Each embedded third-party asset and the file holding its notice, in output order.
 const SOURCES: [(&str, &str); 4] = [
     ("Fraunces", "vendor/schwarzwald/kit/fonts/fraunces/OFL.txt"),
-    (
-        "Bricolage Grotesque",
-        "vendor/schwarzwald/kit/fonts/bricolage-grotesque/OFL.txt",
-    ),
-    (
-        "JetBrains Mono",
-        "vendor/schwarzwald/kit/fonts/jetbrains-mono/OFL.txt",
-    ),
-    (
-        "mermaid",
-        "crates/gitterrace-web/static/vendor/mermaid.LICENSE",
-    ),
+    ("Bricolage Grotesque", "vendor/schwarzwald/kit/fonts/bricolage-grotesque/OFL.txt"),
+    ("JetBrains Mono", "vendor/schwarzwald/kit/fonts/jetbrains-mono/OFL.txt"),
+    ("mermaid", "crates/gitterrace-web/static/vendor/mermaid.LICENSE"),
 ];
 
 pub fn render(root: &Path) -> Result<Out> {
@@ -82,39 +73,22 @@ mod tests {
                 .expect("assets.rs");
         let listed = |needle: &str| SOURCES.iter().any(|(_, f)| f.contains(needle));
         for dir in ["fraunces", "bricolage-grotesque", "jetbrains-mono"] {
-            assert!(
-                assets.contains(dir),
-                "{dir} no longer embedded: update this list"
-            );
+            assert!(assets.contains(dir), "{dir} no longer embedded: update this list");
         }
         // A font folder under the kit that assets.rs embeds needs a notice entry.
         let fonts = root.join("vendor/schwarzwald/kit/fonts");
         for entry in std::fs::read_dir(fonts).expect("fonts dir") {
-            let name = entry
-                .expect("entry")
-                .file_name()
-                .to_string_lossy()
-                .into_owned();
+            let name = entry.expect("entry").file_name().to_string_lossy().into_owned();
             if assets.contains(&format!("{name}/")) || assets.contains(&name) {
-                assert!(
-                    listed(&format!("fonts/{name}/")),
-                    "embedded font {name}: no notice"
-                );
+                assert!(listed(&format!("fonts/{name}/")), "embedded font {name}: no notice");
             }
         }
         // Every vendored script needs a LICENSE beside it, listed in SOURCES.
         let vendor = root.join("crates/gitterrace-web/static/vendor");
         for entry in std::fs::read_dir(vendor).expect("vendor dir") {
-            let name = entry
-                .expect("entry")
-                .file_name()
-                .to_string_lossy()
-                .into_owned();
+            let name = entry.expect("entry").file_name().to_string_lossy().into_owned();
             let stem = name.split('.').next().unwrap_or(&name);
-            assert!(
-                listed(&format!("vendor/{stem}.LICENSE")),
-                "vendored {name}: no notice"
-            );
+            assert!(listed(&format!("vendor/{stem}.LICENSE")), "vendored {name}: no notice");
         }
     }
 }

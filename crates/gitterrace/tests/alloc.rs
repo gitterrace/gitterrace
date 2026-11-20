@@ -23,11 +23,7 @@ fn probe(probe: &str, unset: &[&str], want: &str, what: &str) {
 fn the_binary_runs_with_zero_page_decay() {
     probe(
         "TEST_ALLOC_DECAY",
-        &[
-            "JEMALLOC_SYS_WITH_MALLOC_CONF",
-            "MALLOC_CONF",
-            "_RJEM_MALLOC_CONF",
-        ],
+        &["JEMALLOC_SYS_WITH_MALLOC_CONF", "MALLOC_CONF", "_RJEM_MALLOC_CONF"],
         "0 0 0 0",
         "dirty and muzzy decay of new arenas and arena 0, ms",
     );
@@ -63,10 +59,5 @@ fn the_binary_enables_thread_caches_only_inside_index_workers() {
 #[cfg(target_os = "linux")]
 #[test]
 fn the_binary_runs_with_transparent_huge_pages_disabled() {
-    probe(
-        "TEST_ALLOC_THP",
-        &[],
-        "true",
-        "PR_GET_THP_DISABLE of the binary",
-    );
+    probe("TEST_ALLOC_THP", &[], "true", "PR_GET_THP_DISABLE of the binary");
 }

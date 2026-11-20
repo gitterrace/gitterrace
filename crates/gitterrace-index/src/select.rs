@@ -34,11 +34,7 @@ impl Index {
             .ok()
             .flatten()
             .is_some_and(|t| t.trim_ascii() == rev.as_bytes() && store::oid_of(rev).is_some());
-        let order = if built {
-            Vec::new()
-        } else {
-            source.rev_list(rev)?
-        };
+        let order = if built { Vec::new() } else { source.rev_list(rev)? };
         let m = &store.manifest;
         // An unmerged set's order file is old order then new commits, not canonical, so the
         // fingerprint only matches after a merge: compare the sets.
@@ -46,9 +42,7 @@ impl Index {
             || m.commits as usize == order.len()
                 && store::load_order(&store).is_ok_and(|held| {
                     let held: HashSet<seg::Oid> = held.into_iter().collect();
-                    order
-                        .iter()
-                        .all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
+                    order.iter().all(|id| store::oid_of(id).is_some_and(|o| held.contains(&o)))
                 });
         if !same {
             return Ok(None);

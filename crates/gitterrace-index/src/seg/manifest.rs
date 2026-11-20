@@ -61,14 +61,8 @@ pub(crate) fn check_name(name: &str) -> SegResult<()> {
         && name.len() <= MAX_NAME
         && !name.contains("..")
         && name != "."
-        && name
-            .bytes()
-            .all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'));
-    if ok {
-        Ok(())
-    } else {
-        Err(SegError::BadName(name.to_owned()))
-    }
+        && name.bytes().all(|b| matches!(b, b'a'..=b'z' | b'0'..=b'9' | b'.' | b'-'));
+    if ok { Ok(()) } else { Err(SegError::BadName(name.to_owned())) }
 }
 
 fn put_name(b: &mut Vec<u8>, name: &str) -> SegResult<()> {
@@ -79,14 +73,11 @@ fn put_name(b: &mut Vec<u8>, name: &str) -> SegResult<()> {
 }
 
 fn count(n: usize) -> SegResult<u32> {
-    u32::try_from(n)
-        .ok()
-        .filter(|&n| n as usize <= MAX_TOC)
-        .ok_or(SegError::TooLong {
-            kind: "manifest list",
-            len: n,
-            max: MAX_TOC,
-        })
+    u32::try_from(n).ok().filter(|&n| n as usize <= MAX_TOC).ok_or(SegError::TooLong {
+        kind: "manifest list",
+        len: n,
+        max: MAX_TOC,
+    })
 }
 
 impl Manifest {
@@ -117,9 +108,8 @@ impl Manifest {
 
     pub fn decode(bytes: &[u8]) -> SegResult<Self> {
         let bad = |what| SegError::unreadable(MANIFEST, 0, what);
-        let (body, crc) = bytes
-            .split_at_checked(bytes.len().saturating_sub(4))
-            .ok_or_else(|| bad("short"))?;
+        let (body, crc) =
+            bytes.split_at_checked(bytes.len().saturating_sub(4)).ok_or_else(|| bad("short"))?;
         if bytes.len() < 4 || crc32fast::hash(body).to_le_bytes() != crc {
             return Err(bad("manifest crc"));
         }
@@ -147,12 +137,7 @@ impl Manifest {
         let mut live = Vec::with_capacity(n);
         for _ in 0..n {
             let kind = c.u8()?;
-            live.push(FileEntry {
-                kind,
-                name: name(&mut c)?,
-                len: c.u64()?,
-                footer_crc: c.u32()?,
-            });
+            live.push(FileEntry { kind, name: name(&mut c)?, len: c.u64()?, footer_crc: c.u32()? });
         }
         let n = c.u32()? as usize;
         if n > MAX_TOC {
@@ -165,14 +150,7 @@ impl Manifest {
         if !c.is_empty() {
             return Err(c.err("trailing bytes"));
         }
-        Ok(Self {
-            generation,
-            fingerprint,
-            commits,
-            shallow,
-            live,
-            retired,
-        })
+        Ok(Self { generation, fingerprint, commits, shallow, live, retired })
     }
 
     /// Reads `MANIFEST`. `Ok(None)` when there is none (a fresh cache).
@@ -336,12 +314,7 @@ mod tests {
             fingerprint: 0xdead_beef,
             commits: 42,
             shallow: 7,
-            live: vec![FileEntry {
-                kind: 1,
-                name: "seg-3-0.gts".into(),
-                len: 100,
-                footer_crc: 9,
-            }],
+            live: vec![FileEntry { kind: 1, name: "seg-3-0.gts".into(), len: 100, footer_crc: 9 }],
             retired: vec!["seg-2-0.gts".into()],
         }
     }
@@ -371,16 +344,10 @@ mod tests {
         for i in 0..b.len() {
             let mut x = b.clone();
             x[i] ^= 1;
-            assert!(
-                Manifest::decode(&x).is_err_and(|e| e.is_unreadable()),
-                "flip {i}"
-            );
+            assert!(Manifest::decode(&x).is_err_and(|e| e.is_unreadable()), "flip {i}");
         }
         for n in 0..b.len() {
-            assert!(
-                Manifest::decode(&b[..n]).is_err_and(|e| e.is_unreadable()),
-                "cut {n}"
-            );
+            assert!(Manifest::decode(&b[..n]).is_err_and(|e| e.is_unreadable()), "cut {n}");
         }
         Ok(())
     }
@@ -417,10 +384,7 @@ mod tests {
     fn crash_at_each_step_keeps_a_whole_manifest() -> SegResult<()> {
         for stop in 0..4 {
             let dir = tempfile::tempdir()?;
-            let mut old = Manifest {
-                generation: 1,
-                ..Manifest::default()
-            };
+            let mut old = Manifest { generation: 1, ..Manifest::default() };
             old.commit(dir.path())?;
             fs::write(dir.path().join("seg-2-0.gts"), b"x")?;
             let mut new = sample();
@@ -453,14 +417,8 @@ mod tests {
         assert!(m.clone().commit_with(dir.path(), &mut stop).is_err());
         assert_eq!(m.retired.len(), 0);
         assert!(!dir.path().join("seg-2-0.gts").exists());
-        assert_eq!(
-            Manifest::load(dir.path())?.map(|m| m.retired.len()),
-            Some(0)
-        );
-        assert_eq!(
-            strays(dir.path(), Some(&m))?,
-            ["MANIFEST.tmp", "seg-9-0.gts.tmp"]
-        );
+        assert_eq!(Manifest::load(dir.path())?.map(|m| m.retired.len()), Some(0));
+        assert_eq!(strays(dir.path(), Some(&m))?, ["MANIFEST.tmp", "seg-9-0.gts.tmp"]);
         Ok(())
     }
 
@@ -475,11 +433,7 @@ mod tests {
         m.live[0].len = 99;
         assert!(m.verify(dir.path()).is_err_and(|e| e.is_unreadable()));
         fs::remove_file(dir.path().join("seg-3-0.gts"))?;
-        assert!(
-            sample()
-                .verify(dir.path())
-                .is_err_and(|e| e.is_unreadable())
-        );
+        assert!(sample().verify(dir.path()).is_err_and(|e| e.is_unreadable()));
         Ok(())
     }
 }

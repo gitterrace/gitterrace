@@ -60,10 +60,7 @@ pub(crate) fn walk(
             continue;
         }
         // Absence reads the commit from git, so an error must not pass for it.
-        if let Some(r) = base
-            .find_commit(&id)
-            .map_err(crate::feed::SourceError::io)?
-        {
+        if let Some(r) = base.find_commit(&id).map_err(crate::feed::SourceError::io)? {
             met.push(r);
             continue;
         }
@@ -89,18 +86,13 @@ pub(crate) fn walk(
     }
     let shown = src.map_identities(rev, &raw)?;
     if shown.len() != raw.len() {
-        return Err(io::Error::other(
-            "identity map returned the wrong number of pairs",
-        ));
+        return Err(io::Error::other("identity map returned the wrong number of pairs"));
     }
     let mut ident_of: Vec<Option<IdentId>> = vec![None; raw.len()];
     for (k, i) in order.into_iter().enumerate() {
         let r = &recs[i];
         let rank = Rank(first.saturating_add(u32::try_from(k).unwrap_or(u32::MAX)));
-        let ix = raw_ix
-            .get(&(r.author.clone(), r.email.clone()))
-            .copied()
-            .unwrap_or(0);
+        let ix = raw_ix.get(&(r.author.clone(), r.email.clone())).copied().unwrap_or(0);
         let ident = *ident_of[ix].get_or_insert_with(|| f.ident_id(base, &shown[ix]));
         let kind = r.kind.as_deref().map(|k| f.label_id(base, k));
         let scope = r.scope.as_deref().map(|s| f.label_id(base, s));
@@ -118,8 +110,7 @@ pub(crate) fn walk(
                 binary: s.binary,
                 deleted: s.deleted,
             };
-            sums.add_row(&row)
-                .ok_or_else(|| io::Error::other(crate::seg::agg::SUM_OVER))?;
+            sums.add_row(&row).ok_or_else(|| io::Error::other(crate::seg::agg::SUM_OVER))?;
             files.push(row);
         }
         let row = CommitRow {
@@ -136,12 +127,7 @@ pub(crate) fn walk(
         let id: Arc<str> = r.id.as_str().into();
         f.ids.insert(Arc::clone(&id), k);
         let parents = r.parents.iter().map(|p| p.as_str().into()).collect();
-        f.rows.push(FreshRow {
-            row,
-            id,
-            parents,
-            files,
-        });
+        f.rows.push(FreshRow { row, id, parents, files });
     }
     Ok(Walk::Done(f, met))
 }
@@ -149,11 +135,8 @@ pub(crate) fn walk(
 /// Kahn over the unindexed commits alone, ready ones by (author time, id): they all come after
 /// the indexed part, which none of them is an ancestor of.
 fn topo(recs: &[CommitRecord]) -> Vec<usize> {
-    let pos: HashMap<&str, usize> = recs
-        .iter()
-        .enumerate()
-        .map(|(i, r)| (r.id.as_str(), i))
-        .collect();
+    let pos: HashMap<&str, usize> =
+        recs.iter().enumerate().map(|(i, r)| (r.id.as_str(), i)).collect();
     let mut waiting = vec![0usize; recs.len()];
     let mut children: Vec<Vec<usize>> = vec![Vec::new(); recs.len()];
     for (i, r) in recs.iter().enumerate() {
@@ -222,22 +205,14 @@ impl Fresh {
         let n = base.idents();
         for i in 0..n {
             let id = IdentId(next_id(i, 0));
-            if base
-                .ident(id)
-                .is_some_and(|(a, b)| *a == *shown.0 && *b == *shown.1)
-            {
+            if base.ident(id).is_some_and(|(a, b)| *a == *shown.0 && *b == *shown.1) {
                 return id;
             }
         }
-        if let Some(i) = self
-            .idents
-            .iter()
-            .position(|(a, b)| **a == *shown.0 && **b == *shown.1)
-        {
+        if let Some(i) = self.idents.iter().position(|(a, b)| **a == *shown.0 && **b == *shown.1) {
             return IdentId(next_id(n, i));
         }
-        self.idents
-            .push((shown.0.as_str().into(), shown.1.as_str().into()));
+        self.idents.push((shown.0.as_str().into(), shown.1.as_str().into()));
         IdentId(next_id(n, self.idents.len() - 1))
     }
 }

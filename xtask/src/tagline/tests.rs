@@ -61,9 +61,7 @@ fn redraw_keeps_the_committed_shape() {
     let out = redraw(&root, &svg).expect("redraw");
     let kinds = |s: &str| {
         let d = last_path(s).expect("path")[4].to_owned();
-        d.chars()
-            .filter(char::is_ascii_uppercase)
-            .collect::<String>()
+        d.chars().filter(char::is_ascii_uppercase).collect::<String>()
     };
     assert_eq!(kinds(&out), kinds(&svg));
 }

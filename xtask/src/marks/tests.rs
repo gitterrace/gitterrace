@@ -25,10 +25,7 @@ fn a_marked_generated_doc_passes() {
 #[test]
 fn a_generated_doc_without_a_mark_is_reported() {
     let a = attrs(&["docs/api.md"]);
-    let bad = problems(
-        &a,
-        &outs(&["docs/api.md", "docs/other.md", "docs/new.json"]),
-    );
+    let bad = problems(&a, &outs(&["docs/api.md", "docs/other.md", "docs/new.json"]));
     assert_eq!(bad.len(), 2, "{bad:?}");
     assert!(bad[0].starts_with("docs/other.md") && bad[1].starts_with("docs/new.json"));
 }
@@ -52,10 +49,7 @@ fn a_dropped_bench_pattern_is_reported() {
 
 #[test]
 fn a_comment_is_not_a_mark() {
-    assert_eq!(
-        marked("# docs/x.md linguist-generated\n"),
-        Vec::<&str>::new()
-    );
+    assert_eq!(marked("# docs/x.md linguist-generated\n"), Vec::<&str>::new());
 }
 
 /// The drift check: the tree's own `.gitattributes` marks what the generators write.

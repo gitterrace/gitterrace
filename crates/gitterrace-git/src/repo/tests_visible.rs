@@ -94,11 +94,7 @@ fn a_full_id_answers_only_for_a_commit_a_public_root_reaches() {
         ("main~2".to_owned(), &ids.old),
     ];
     for (rev, want) in &allowed {
-        assert_eq!(
-            repo.resolve(rev).ok().as_ref(),
-            Some(*want),
-            "{rev} refused"
-        );
+        assert_eq!(repo.resolve(rev).ok().as_ref(), Some(*want), "{rev} refused");
         assert!(repo.has(rev, None) || rev.len() != 40, "{rev} has");
     }
     let zeros = "0".repeat(40);
@@ -133,13 +129,7 @@ fn a_local_handle_still_reads_a_stash_by_its_id() {
     for rev in [&ids.stash, &ids.stash_index, &ids.dangling] {
         assert_eq!(repo.resolve(rev).ok().as_ref(), Some(rev), "{rev}");
     }
-    assert_eq!(
-        repo.blob(&ids.stash, "a.txt")
-            .expect("blob")
-            .text
-            .as_deref(),
-        Some("secret wip\n")
-    );
+    assert_eq!(repo.blob(&ids.stash, "a.txt").expect("blob").text.as_deref(), Some("secret wip\n"));
 }
 
 /// The reachable set follows the refs: a branch made at a hidden commit shows it, and
@@ -151,25 +141,12 @@ fn the_visible_set_follows_a_ref_that_moves_or_goes() {
     let repo = Repo::discover(d).expect("repo").committed_only();
     assert!(repo.resolve(&ids.dangling).is_err());
     git_at(d, T0, &["branch", "-q", "keep", &ids.dangling]);
-    assert_eq!(
-        repo.resolve(&ids.dangling).ok().as_ref(),
-        Some(&ids.dangling)
-    );
+    assert_eq!(repo.resolve(&ids.dangling).ok().as_ref(), Some(&ids.dangling));
     git_at(d, T0, &["branch", "-q", "-D", "keep"]);
-    assert!(
-        repo.resolve(&ids.dangling).is_err(),
-        "deleted ref still shows"
-    );
-    git_at(
-        d,
-        T0,
-        &["update-ref", "refs/remotes/origin/feat", &ids.stash],
-    );
+    assert!(repo.resolve(&ids.dangling).is_err(), "deleted ref still shows");
+    git_at(d, T0, &["update-ref", "refs/remotes/origin/feat", &ids.stash]);
     assert_eq!(repo.resolve(&ids.stash).ok().as_ref(), Some(&ids.stash));
-    assert!(
-        repo.resolve(&ids.remote_only).is_err(),
-        "moved ref keeps its old history"
-    );
+    assert!(repo.resolve(&ids.remote_only).is_err(), "moved ref keeps its old history");
 }
 
 /// One walk serves every later id while the refs stay put, and a ref or HEAD resolves
@@ -181,21 +158,13 @@ fn the_visible_set_is_walked_once_per_ref_state() {
     for rev in ["HEAD", "main", "v1~1", &ids.detached] {
         assert!(repo.resolve(rev).is_ok(), "{rev}");
     }
-    assert_eq!(
-        repo.visible.lock().expect("lock").len(),
-        0,
-        "a root needs no walk"
-    );
+    assert_eq!(repo.visible.lock().expect("lock").len(), 0, "a root needs no walk");
     assert!(repo.resolve(&ids.old).is_ok());
     let built = repo.visible.lock().expect("lock").len();
     assert!(built > 0, "an old id builds the set");
     for rev in [&ids.stash, &ids.tip, &ids.dangling, &ids.old] {
         let _resolved = repo.resolve(rev).is_ok();
-        assert_eq!(
-            repo.visible.lock().expect("lock").len(),
-            built,
-            "{rev} rewalked"
-        );
+        assert_eq!(repo.visible.lock().expect("lock").len(), built, "{rev} rewalked");
     }
 }
 
@@ -241,17 +210,8 @@ fn a_shared_prefix_refuses_the_unreachable_id_and_serves_the_reachable_one() {
     let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
     assert!(repo.resolve(&ids.old).is_ok(), "an old id builds the set");
     let dangling = gix::ObjectId::from_hex(ids.dangling.as_bytes()).expect("hex");
-    repo.visible
-        .lock()
-        .expect("lock")
-        .inject_collision(dangling);
-    assert!(
-        repo.resolve(&ids.dangling).is_err(),
-        "a shared prefix served a hidden commit"
-    );
+    repo.visible.lock().expect("lock").inject_collision(dangling);
+    assert!(repo.resolve(&ids.dangling).is_err(), "a shared prefix served a hidden commit");
     assert!(repo.resolve(&ids.stash).is_err(), "a stash leaked");
-    assert!(
-        repo.resolve(&ids.old).is_ok(),
-        "a shared prefix refused a reachable commit"
-    );
+    assert!(repo.resolve(&ids.old).is_ok(), "a shared prefix refused a reachable commit");
 }

@@ -87,9 +87,7 @@ impl Show for Option<usize> {
         self.map_or_else(|| "unset".to_owned(), |n| n.to_string())
     }
     fn from_toml(v: &toml::Value) -> Option<Self> {
-        v.as_integer()
-            .and_then(|i| usize::try_from(i).ok())
-            .map(Some)
+        v.as_integer().and_then(|i| usize::try_from(i).ok()).map(Some)
     }
 }
 
@@ -115,10 +113,7 @@ impl Show for Vec<String> {
         format!("{self:?}")
     }
     fn from_toml(v: &toml::Value) -> Option<Self> {
-        v.as_array()?
-            .iter()
-            .map(|x| x.as_str().map(str::to_owned))
-            .collect()
+        v.as_array()?.iter().map(|x| x.as_str().map(str::to_owned)).collect()
     }
 }
 

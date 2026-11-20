@@ -59,10 +59,7 @@ pub fn tool_on(cfg: &Config, repo: Option<&str>, tool: &str) -> bool {
 impl McpServer {
     /// A server with every feature on; [`McpServer::with_config`] applies `[features]`.
     pub fn new(state: ApiState) -> Self {
-        Self {
-            repos: Arc::new(Repos::single(state)),
-            cfg: Arc::new(Config::default()),
-        }
+        Self { repos: Arc::new(Repos::single(state)), cfg: Arc::new(Config::default()) }
     }
 
     /// A server over the repositories in `list`, each opened on first use. `scope` says where
@@ -94,16 +91,11 @@ impl McpServer {
         let entry = match self.repos.pick(repo.as_deref()) {
             Ok(e) => e.clone(),
             Err(e) => {
-                return Ok(CallToolResult::error(vec![ContentBlock::text(
-                    e.to_string(),
-                )]));
+                return Ok(CallToolResult::error(vec![ContentBlock::text(e.to_string())]));
             }
         };
         // Overrides are keyed by folder name, as `[repo.NAME]` is for the web.
-        let folder = entry
-            .path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned());
+        let folder = entry.path.file_name().map(|n| n.to_string_lossy().into_owned());
         if !tool_on(&self.cfg, folder.as_deref(), tool) {
             return Ok(CallToolResult::error(vec![ContentBlock::text(format!(
                 "the {tool} tool is switched off in [features] for {}",
@@ -318,11 +310,7 @@ impl McpServer {
         Parameters(a): Parameters<ShowArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("show_commit", a.repo.clone(), move |s| {
-            s.commit(
-                &a.id,
-                a.diff.unwrap_or(true),
-                Some(a.max_lines.unwrap_or(400)),
-            )
+            s.commit(&a.id, a.diff.unwrap_or(true), Some(a.max_lines.unwrap_or(400)))
         })
         .await
     }
@@ -340,10 +328,7 @@ impl McpServer {
         self.run("compare", a.repo.clone(), move |s| {
             s.compare(
                 &a.base,
-                a.head
-                    .as_deref()
-                    .filter(|h| !h.is_empty())
-                    .unwrap_or("HEAD"),
+                a.head.as_deref().filter(|h| !h.is_empty()).unwrap_or("HEAD"),
                 a.path.as_deref(),
                 a.three_dot.unwrap_or(false),
                 Some(a.max_lines.unwrap_or(400)),
@@ -363,10 +348,7 @@ impl McpServer {
         Parameters(a): Parameters<WorktreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("worktree_diff", a.repo.clone(), move |s| {
-            s.worktree_diff(
-                a.scope.as_deref().unwrap_or("all"),
-                Some(a.max_lines.unwrap_or(400)),
-            )
+            s.worktree_diff(a.scope.as_deref().unwrap_or("all"), Some(a.max_lines.unwrap_or(400)))
         })
         .await
     }
@@ -394,10 +376,8 @@ impl McpServer {
         &self,
         Parameters(a): Parameters<TreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.run("list_tree", a.repo.clone(), move |s| {
-            s.tree(a.rev.as_deref(), a.path.as_deref())
-        })
-        .await
+        self.run("list_tree", a.repo.clone(), move |s| s.tree(a.rev.as_deref(), a.path.as_deref()))
+            .await
     }
 
     /// Per-line authorship of a file: the commit, author and time that last changed each line.
@@ -410,10 +390,7 @@ impl McpServer {
         &self,
         Parameters(a): Parameters<BlameArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        self.run("blame", a.repo.clone(), move |s| {
-            s.blame(a.rev.as_deref(), &a.path)
-        })
-        .await
+        self.run("blame", a.repo.clone(), move |s| s.blame(a.rev.as_deref(), &a.path)).await
     }
 
     /// Files of the head tree that change most for their size (changes, lines, authors, last
@@ -430,10 +407,8 @@ impl McpServer {
             select: gitterrace_index::Selection { q: a.query },
             ..Params::default()
         };
-        self.run("hotspots", a.repo.clone(), move |s| {
-            s.insight("hotspots", a.rev.as_deref(), &p)
-        })
-        .await
+        self.run("hotspots", a.repo.clone(), move |s| s.insight("hotspots", a.rev.as_deref(), &p))
+            .await
     }
 
     /// Contributors (identities merged, bots left out) with commits, lines, first and last commit
@@ -463,19 +438,14 @@ impl McpServer {
             select: gitterrace_index::Selection { q: a.query },
             ..Params::default()
         };
-        self.run("activity", a.repo.clone(), move |s| {
-            s.insight("activity", a.rev.as_deref(), &p)
-        })
-        .await
+        self.run("activity", a.repo.clone(), move |s| s.insight("activity", a.rev.as_deref(), &p))
+            .await
     }
 }
 
 /// Stdin and stdout, with a line limit on what is read.
 fn stdio() -> (LineBound<tokio::io::Stdin>, tokio::io::Stdout) {
-    (
-        LineBound::new(tokio::io::stdin(), MAX_LINE_BYTES),
-        tokio::io::stdout(),
-    )
+    (LineBound::new(tokio::io::stdin(), MAX_LINE_BYTES), tokio::io::stdout())
 }
 
 /// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
@@ -506,10 +476,7 @@ pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Res
         .serve(stdio())
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?;
-    running
-        .waiting()
-        .await
-        .map_err(|e| ApiError::Task(e.to_string()))?;
+    running.waiting().await.map_err(|e| ApiError::Task(e.to_string()))?;
     Ok(())
 }
 
@@ -527,10 +494,7 @@ pub async fn serve_mcp_repos(
         .serve(stdio())
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?;
-    running
-        .waiting()
-        .await
-        .map_err(|e| ApiError::Task(e.to_string()))?;
+    running.waiting().await.map_err(|e| ApiError::Task(e.to_string()))?;
     Ok(())
 }
 

@@ -70,10 +70,7 @@ pub use stats::{DirChurn, DirTally, FileChurn, FileTally, Label, LabelBucket, La
 pub(crate) use gitterrace_git::DAY;
 
 /// Which paths and commits count.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "independent switches, one per option"
-)]
+#[expect(clippy::struct_excessive_bools, reason = "independent switches, one per option")]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Options {
     /// Extra globs (`fnmatch` style, matched against the full path and the file name).
@@ -204,11 +201,7 @@ impl<'a> Insights<'a> {
 
     fn with(src: Src<'a>, opts: Options, d: Arc<Derived>) -> Self {
         let newest = *d.newest.get_or_init(|| {
-            src.get()
-                .commits_in(CommitRange::All)
-                .map(|c| c.time)
-                .max()
-                .unwrap_or(0)
+            src.get().commits_in(CommitRange::All).map(|c| c.time).max().unwrap_or(0)
         });
         // The scan's answer when no commit is past the clock: the newest time.
         let now = if newest <= feed::Clock::now(&feed::SystemClock) && newest >= 0 {
@@ -246,13 +239,9 @@ impl<'a> Insights<'a> {
 
     #[cfg(any(test, feature = "oracle"))]
     fn count_walk(&self, rows: bool) {
-        self.d
-            .walks
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.d.walks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         if rows {
-            self.d
-                .row_walks
-                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.d.row_walks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
@@ -272,8 +261,7 @@ impl<'a> Insights<'a> {
     /// the per-id table, decided once for all paths in parallel; a path it never saw (an
     /// untracked or brand-new name) is decided on its own.
     pub(crate) fn skips_head(&self, path: &str) -> bool {
-        self.head_id(path)
-            .map_or_else(|| self.d.filter.skips(path), |id| self.skips_id(id))
+        self.head_id(path).map_or_else(|| self.d.filter.skips(path), |id| self.skips_id(id))
     }
 
     /// [`InsightsSource::path_id`] remembered per set: head names are asked for by every
@@ -303,20 +291,14 @@ impl<'a> Insights<'a> {
 
     /// True when path statistics leave path `id` out.
     pub fn skips_id(&self, id: PathId) -> bool {
-        self.skip_table()
-            .get(id.0 as usize)
-            .copied()
-            .unwrap_or(false)
+        self.skip_table().get(id.0 as usize).copied().unwrap_or(false)
     }
 
     fn skip_table(&self) -> &[bool] {
         self.d.skip.get_or_init(|| {
             let src = self.source();
             let paths: Vec<Arc<str>> = (0..src.paths())
-                .map(|i| {
-                    src.path(PathId(u32::try_from(i).unwrap_or(u32::MAX)))
-                        .unwrap_or_default()
-                })
+                .map(|i| src.path(PathId(u32::try_from(i).unwrap_or(u32::MAX))).unwrap_or_default())
                 .collect();
             decide_all(&paths, &self.d.filter)
         })
@@ -330,16 +312,9 @@ impl<'a> Insights<'a> {
     /// Lines of one file row under the whitespace option, whether or not the path filter
     /// would skip it.
     pub fn row_lines_unfiltered(&self, row: &FileRow) -> Lines {
-        let (add, del, rewritten) = if self.opts.count_whitespace {
-            (row.add, row.del, row.rewritten)
-        } else {
-            row.code()
-        };
-        Lines {
-            add,
-            del,
-            rewritten,
-        }
+        let (add, del, rewritten) =
+            if self.opts.count_whitespace { (row.add, row.del, row.rewritten) } else { row.code() };
+        Lines { add, del, rewritten }
     }
 
     /// Person index of a raw identity.
@@ -360,18 +335,12 @@ impl<'a> Insights<'a> {
             return Lines::default();
         }
         let rank = c.rank;
-        self.commit_lines()
-            .get(rank.0 as usize)
-            .copied()
-            .unwrap_or_default()
+        self.commit_lines().get(rank.0 as usize).copied().unwrap_or_default()
     }
 
     /// The tip index, built on first use (the server's ready warm-up asks for it).
     pub(crate) fn tip_index(&self) -> Option<&files::TipIndex> {
-        self.d
-            .tip
-            .get_or_init(|| files::TipIndex::build(self.source()))
-            .as_ref()
+        self.d.tip.get_or_init(|| files::TipIndex::build(self.source())).as_ref()
     }
 
     /// Builds the tables the per-file pages share, so the first visitor after the warm-up
@@ -384,9 +353,7 @@ impl<'a> Insights<'a> {
     }
 
     pub(crate) fn follow(&self) -> &files::Follow {
-        self.d
-            .follow
-            .get_or_init(|| files::Follow::build(self.source()))
+        self.d.follow.get_or_init(|| files::Follow::build(self.source()))
     }
 }
 
@@ -441,10 +408,7 @@ impl Derived {
             }
         }
         let names: Vec<(Arc<str>, Arc<str>)> = (0..per_ident.len())
-            .map(|i| {
-                src.ident(IdentId(u32::try_from(i).unwrap_or(u32::MAX)))
-                    .unwrap_or_default()
-            })
+            .map(|i| src.ident(IdentId(u32::try_from(i).unwrap_or(u32::MAX))).unwrap_or_default())
             .collect();
         let people = People::from_counts(
             names

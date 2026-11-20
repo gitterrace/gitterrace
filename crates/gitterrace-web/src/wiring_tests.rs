@@ -48,15 +48,8 @@ async fn limits_text_kb_and_raw_mb_change_what_a_file_shows() {
     assert!(body.contains("class=\"code"), "3 KiB shows by default");
     let small = with(|c| c.limits.text_kb = 1);
     let (_, body) = get(&router(&p, small), "/blob/HEAD/mid.txt").await;
-    assert!(
-        body.contains("File too large to display"),
-        "text_kb = 1 refuses it"
-    );
-    let (_, body) = get(
-        &router(&p, with(|c| c.limits.text_kb = 1)),
-        "/blame/HEAD/mid.txt",
-    )
-    .await;
+    assert!(body.contains("File too large to display"), "text_kb = 1 refuses it");
+    let (_, body) = get(&router(&p, with(|c| c.limits.text_kb = 1)), "/blame/HEAD/mid.txt").await;
     assert!(body.contains("too large"));
 
     let big = "x\n".repeat(600 * 1024);
@@ -67,10 +60,7 @@ async fn limits_text_kb_and_raw_mb_change_what_a_file_shows() {
     assert_eq!(s, 200);
     let tiny = with(|c| c.limits.raw_mb = 1);
     let (s, body) = get(&router(&p, tiny), "/raw/HEAD/big.txt").await;
-    assert_eq!(
-        s, 404,
-        "1.2 MB is over 1 MiB, and 413 would name the request"
-    );
+    assert_eq!(s, 404, "1.2 MB is over 1 MiB, and 413 would name the request");
     assert!(body.contains("limits.raw_mb"), "{body}");
 }
 
@@ -97,13 +87,7 @@ async fn raw_etag_is_the_blob_id_and_honours_if_none_match() {
     };
     let first = send(None).await;
     assert_eq!(first.status().as_u16(), 200);
-    let tag = first
-        .headers()
-        .get("etag")
-        .expect("etag")
-        .to_str()
-        .expect("ascii")
-        .to_owned();
+    let tag = first.headers().get("etag").expect("etag").to_str().expect("ascii").to_owned();
     // 40 hex chars of the blob id, quoted.
     assert_eq!(tag.len(), 42, "{tag}");
     let tag: &'static str = Box::leak(tag.into_boxed_str());
@@ -142,10 +126,7 @@ async fn newest_commit(r: &Router) -> String {
 async fn generated_files_fold_in_the_diff_and_sort_last_in_search() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = Fixture::init(&dir.path().join("g"))
-        .write(
-            ".gitattributes",
-            "gen.rs linguist-generated\nkeep/yarn.lock -linguist-generated\n",
-        )
+        .write(".gitattributes", "gen.rs linguist-generated\nkeep/yarn.lock -linguist-generated\n")
         .write("Cargo.lock", "needle\n")
         .write("gen.rs", "needle\n")
         .write("main.rs", "needle\n")
@@ -157,25 +138,17 @@ async fn generated_files_fold_in_the_diff_and_sort_last_in_search() {
     let id = newest_commit(&r).await;
     let (_, page) = get(&r, &format!("/commit/{id}")).await;
     let section = |path: &str| {
-        let at = page
-            .find(&format!("data-path=\"{path}\""))
-            .expect("section");
+        let at = page.find(&format!("data-path=\"{path}\"")).expect("section");
         let rest = &page[at..];
         rest[..rest.find("</section>").expect("end")].to_owned()
     };
     for folded in ["Cargo.lock", "gen.rs"] {
         let s = section(folded);
-        assert!(
-            s.contains(">Generated</span>") && s.contains("data-load-diff"),
-            "{s}"
-        );
+        assert!(s.contains(">Generated</span>") && s.contains("data-load-diff"), "{s}");
     }
     for open in ["main.rs", "keep/yarn.lock"] {
         let s = section(open);
-        assert!(
-            !s.contains("Generated") && !s.contains("data-load-diff"),
-            "{s}"
-        );
+        assert!(!s.contains("Generated") && !s.contains("data-load-diff"), "{s}");
     }
     let (_, hits) = get(&r, "/search?q=needle").await;
     let pos = |path: &str| hits.find(&format!("data-path=\"{path}\"")).expect(path);
@@ -198,10 +171,7 @@ async fn limits_diff_fold_lines_folds_a_big_file_diff() {
     assert!(!open.contains("data-load-diff"));
     let fold = with(|c| c.limits.diff_fold_lines = 1);
     let (_, folded) = get(&router(&p, fold), &format!("/commit/{id}")).await;
-    assert!(
-        folded.contains("data-load-diff"),
-        "two changed lines fold at 1"
-    );
+    assert!(folded.contains("data-load-diff"), "two changed lines fold at 1");
 }
 
 #[tokio::test]
@@ -216,10 +186,7 @@ async fn display_theme_and_dates_change_the_page() {
     });
     let (_, body) = get(&router(&p, dark), "/log/HEAD").await;
     assert!(body.contains("<html lang=\"en\" data-theme=\"dark\">"));
-    assert!(
-        !body.contains("just now") && !body.contains("ago"),
-        "dates are absolute"
-    );
+    assert!(!body.contains("just now") && !body.contains("ago"), "dates are absolute");
 }
 
 /// `display.sidebar = []` drops the sidebar and lets the files take the full width.
@@ -274,11 +241,7 @@ fn insights_defaults_follow_the_config_and_the_repo_override() {
     .config;
     let d = app(&p, cfg).defaults();
     assert!(d.bots && d.generated);
-    assert_eq!(
-        d.exclude,
-        ["*.lock", "docs/**"],
-        "only this repository's override joins"
-    );
+    assert_eq!(d.exclude, ["*.lock", "docs/**"], "only this repository's override joins");
     assert_eq!(d.period, Some(gitterrace_index::Period::Quarter));
 }
 
@@ -300,18 +263,11 @@ async fn insights_defaults_reach_the_pages() {
     assert!(body.contains("Bots"), "{body}");
     let on = |label: &str, state: &str| {
         let at = body.find(label).expect(label);
-        body[at..]
-            .chars()
-            .take(400)
-            .collect::<String>()
-            .contains(state)
+        body[at..].chars().take(400).collect::<String>().contains(state)
     };
     assert!(on("Generated files", "counted") && on("Bots", "counted"));
     let (_, plain) = get(&router(&p, Config::default()), "/stats/hotspots").await;
-    assert!(
-        !plain.contains("Exclude"),
-        "the URL's own exclude row stays off"
-    );
+    assert!(!plain.contains("Exclude"), "the URL's own exclude row stays off");
 }
 
 #[test]
@@ -353,10 +309,7 @@ async fn index_build_on_start_waits_for_demand_when_off() {
     gitterrace_testkit::wait::pause(Duration::from_millis(700)).await;
     assert!(!a.ready(), "nothing builds until a page needs the index");
     let head = a.repo.resolve("HEAD").expect("head");
-    assert!(
-        a.source(&head).expect("source").is_none(),
-        "asking is the demand"
-    );
+    assert!(a.source(&head).expect("source").is_none(), "asking is the demand");
     gitterrace_testkit::wait::until("the demand starts the build", || async { a.ready() }).await;
 
     let on = app(&p, Config::default());
@@ -431,14 +384,8 @@ fn resources_cache_mb_sizes_the_code_cache() {
     use crate::views::{CodeMemo, code_memo_has as has, code_memo_put as put};
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
-    assert_eq!(
-        app(&p, with(|c| c.resources.cache_mb = 8)).code_cache_bytes(),
-        3 << 19
-    );
-    assert_eq!(
-        app(&p, with(|c| c.resources.cache_mb = 64)).code_cache_bytes(),
-        12 << 20
-    );
+    assert_eq!(app(&p, with(|c| c.resources.cache_mb = 8)).code_cache_bytes(), 3 << 19);
+    assert_eq!(app(&p, with(|c| c.resources.cache_mb = 64)).code_cache_bytes(), 12 << 20);
     // A roomy cache keeps both; one file over an eighth of the cache is not kept at all.
     let text = "fn a() {}\n".repeat(200);
     let mut m = CodeMemo::default();
@@ -468,20 +415,14 @@ async fn raw_budget_blocks_a_third_concurrent_reader_until_a_body_is_sent() {
     );
     let r = crate::routes::router(Arc::clone(&a));
     let send = |r: Router| async move {
-        let req = Request::get("/raw/HEAD/mid.txt")
-            .body(Body::empty())
-            .expect("req");
+        let req = Request::get("/raw/HEAD/mid.txt").body(Body::empty()).expect("req");
         r.oneshot(req).await.expect("response")
     };
     // Unread bodies: each still holds its share of the budget.
     let first = send(r.clone()).await;
     let second = send(r.clone()).await;
     assert_eq!(first.status(), 200);
-    assert_eq!(
-        a.env.raw_budget.available_permits(),
-        0,
-        "two readers fill it"
-    );
+    assert_eq!(a.env.raw_budget.available_permits(), 0, "two readers fill it");
     let third = tokio::spawn(send(r.clone()));
     gitterrace_testkit::wait::pause(Duration::from_millis(100)).await;
     assert!(!third.is_finished(), "the third waits before reading");
@@ -493,11 +434,7 @@ async fn raw_budget_blocks_a_third_concurrent_reader_until_a_body_is_sent() {
         .expect("task");
     assert_eq!(third.status(), 200);
     drop((second, third));
-    assert_eq!(
-        a.env.raw_budget.available_permits(),
-        2,
-        "every share comes back"
-    );
+    assert_eq!(a.env.raw_budget.available_permits(), 2, "every share comes back");
 }
 
 #[test]

@@ -98,12 +98,7 @@ impl<'a> Tally<'a> {
     /// The tally as `state` left it, for a chain that goes on from its tip.
     fn restore(&mut self, state: &State) {
         self.names.clone_from(&state.names);
-        self.slot = state
-            .names
-            .iter()
-            .enumerate()
-            .map(|(i, n)| (n.clone(), i))
-            .collect();
+        self.slot = state.names.iter().enumerate().map(|(i, n)| (n.clone(), i)).collect();
         self.net.clone_from(&state.net);
         self.added = state.added;
         self.removed = state.removed;
@@ -111,10 +106,7 @@ impl<'a> Tally<'a> {
 
     fn check(&self, src: &dyn InsightsSource, rank: Rank) -> Check {
         Check {
-            id: src
-                .commit_id(rank)
-                .map(|s| s.to_string())
-                .unwrap_or_default(),
+            id: src.commit_id(rank).map(|s| s.to_string()).unwrap_or_default(),
             net: self.net.clone(),
             added: self.added,
             removed: self.removed,
@@ -141,13 +133,7 @@ impl Skeleton {
     }
 
     fn empty() -> Self {
-        Self {
-            n: 0,
-            langs: Vec::new(),
-            gap: MIN_GAP,
-            marks: Vec::new(),
-            fixed: HashMap::new(),
-        }
+        Self { n: 0, langs: Vec::new(), gap: MIN_GAP, marks: Vec::new(), fixed: HashMap::new() }
     }
 
     fn grow(
@@ -155,10 +141,7 @@ impl Skeleton {
         filter: &PathFilter,
         base: Option<&State>,
     ) -> Option<(Self, State)> {
-        let newest = src
-            .len()
-            .checked_sub(1)
-            .map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
+        let newest = src.len().checked_sub(1).map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
         // Newest first down to the saved tip, or to the root. One walk: each step decodes a
         // record and looks its parent up.
         let mut fresh: Vec<Rank> = Vec::new();
@@ -204,15 +187,7 @@ impl Skeleton {
                 checks.push((r, tally.check(src, r)));
             }
         });
-        Some(Self::assemble(
-            src,
-            filter,
-            (n, gap),
-            tally,
-            checks,
-            &snaps,
-            newest,
-        ))
+        Some(Self::assemble(src, filter, (n, gap), tally, checks, &snaps, newest))
     }
 
     /// The skeleton and state of a chain of `n` commits: `tally` after all of them and the
@@ -230,17 +205,10 @@ impl Skeleton {
         let mark = |rank: Rank, net: &[i64], added: u64, removed: u64| {
             let mut row = net.to_vec();
             row.resize(tally.names.len(), 0);
-            Mark {
-                rank,
-                lines: fold.apply(&row),
-                added,
-                removed,
-            }
+            Mark { rank, lines: fold.apply(&row), added, removed }
         };
-        let mut marks: Vec<Mark> = checks
-            .iter()
-            .map(|(r, c)| mark(*r, &c.net, c.added, c.removed))
-            .collect();
+        let mut marks: Vec<Mark> =
+            checks.iter().map(|(r, c)| mark(*r, &c.net, c.added, c.removed)).collect();
         // The last gap, when the chain ends inside it, is marked at the tip.
         if n % gap != 0
             && let Some(r) = newest
@@ -255,21 +223,12 @@ impl Skeleton {
                 (*pos, point(src, *r, fold.apply(&row), *added, *removed))
             })
             .collect();
-        let mut sk = Self {
-            n,
-            langs: fold.langs,
-            gap,
-            marks,
-            fixed,
-        };
+        let mut sk = Self { n, langs: fold.langs, gap, marks, fixed };
         sk.resolve_missing(src, filter);
         let state = State {
             n,
             gap,
-            tip: newest
-                .and_then(|r| src.commit_id(r))
-                .map(|s| s.to_string())
-                .unwrap_or_default(),
+            tip: newest.and_then(|r| src.commit_id(r)).map(|s| s.to_string()).unwrap_or_default(),
             names: tally.names,
             net: tally.net,
             added: tally.added,

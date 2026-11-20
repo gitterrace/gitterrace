@@ -91,11 +91,7 @@ pub(crate) fn resolve(
         .iter()
         .filter(|(id, _)| *id == link.id)
         .map(|(_, p)| p)
-        .chain(
-            found
-                .iter()
-                .filter(|p| !roots.contains(p) || p.join(".git").exists()),
-        )
+        .chain(found.iter().filter(|p| !roots.contains(p) || p.join(".git").exists()))
         .filter_map(|p| Repo::discover(p).ok())
         .filter(|r| r.id().as_deref() == Some(link.id.as_str()))
         .collect();
@@ -103,17 +99,10 @@ pub(crate) fn resolve(
         return Err(OpenError::Unknown(link.id));
     };
     for r in &clones {
-        let Some(full) = r
-            .resolve(&link.sha)
-            .ok()
-            .filter(|f| f.starts_with(&link.sha))
-        else {
+        let Some(full) = r.resolve(&link.sha).ok().filter(|f| f.starts_with(&link.sha)) else {
             continue;
         };
-        let mut l = Link {
-            sha: full.clone(),
-            ..link
-        };
+        let mut l = Link { sha: full.clone(), ..link };
         let mut note = None;
         if !r.has(&full, l.path.as_deref()) {
             note = Some(format!(
@@ -124,11 +113,7 @@ pub(crate) fn resolve(
             l.path = None;
             l.lines = None;
         }
-        return Ok(Target {
-            clone: r.root(),
-            path: l.go(""),
-            note,
-        });
+        return Ok(Target { clone: r.root(), path: l.go(""), note });
     }
     Ok(Target {
         clone: first.root(),
@@ -185,10 +170,7 @@ pub(super) fn show(
     let addr = ensure_server(&target.clone, configured, state.as_deref(), &mut |c, a| {
         spawn_server(c, a, state.as_deref(), config_dir)
     })?;
-    if let Some(hint) = std::env::current_exe()
-        .ok()
-        .and_then(|e| crate::handler::stale_hint(&e))
-    {
+    if let Some(hint) = std::env::current_exe().ok().and_then(|e| crate::handler::stale_hint(&e)) {
         eprintln!("gitterrace: {hint}");
     }
     let url = format!("http://{addr}{}", target.path);
@@ -231,10 +213,7 @@ pub(crate) fn join_running(
     }
     for (root, repo) in roots.iter().zip(&repos) {
         let base = add_repo(addr, state, repo).map_err(|why| {
-            anyhow::anyhow!(
-                "the server on {addr} could not add {}: {why}",
-                root.display()
-            )
+            anyhow::anyhow!("the server on {addr} could not add {}: {why}", root.display())
         })?;
         eprintln!("gitterrace: added to the server already running: http://{addr}{base}");
     }
@@ -311,10 +290,7 @@ fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<Strin
     match secret_request(addr, state, "POST", &AddBody { path: root })? {
         (202 | 409, v) => Ok(v.base.unwrap_or_else(|| "/".to_owned())),
         (404 | 405, _) => Err(ServerError::NoAdding),
-        (status, v) => Err(ServerError::Status {
-            status,
-            reason: v.why(),
-        }),
+        (status, v) => Err(ServerError::Status { status, reason: v.why() }),
     }
 }
 
@@ -351,9 +327,7 @@ pub(crate) fn remove_running(
         let repo =
             Repo::discover(Path::new(target)).with_context(|| format!("opening {target}"))?;
         let root = repo.root();
-        RemoveBody::Path {
-            path: root.canonicalize().unwrap_or(root),
-        }
+        RemoveBody::Path { path: root.canonicalize().unwrap_or(root) }
     } else {
         RemoveBody::Name { name: target }
     };
@@ -386,10 +360,7 @@ fn remove_repo(
         (200, v) => Ok(Removed::Done(v.name.unwrap_or_default())),
         (404, v) if v.error.is_some() => Ok(Removed::NotServed),
         (404 | 405, _) => Err(ServerError::NoRemoving),
-        (status, v) => Err(ServerError::Status {
-            status,
-            reason: v.why(),
-        }),
+        (status, v) => Err(ServerError::Status { status, reason: v.why() }),
     }
 }
 
@@ -413,9 +384,7 @@ impl RepoReply {
 
     /// The `error` of a JSON reply, or the start of the reply itself.
     fn why(&self) -> String {
-        self.error
-            .clone()
-            .unwrap_or_else(|| self.text.chars().take(200).collect())
+        self.error.clone().unwrap_or_else(|| self.text.chars().take(200).collect())
     }
 }
 
@@ -476,10 +445,7 @@ fn spawn_server(
     if let Some(d) = config_dir {
         cmd.arg("--config").arg(d);
     }
-    cmd.arg("serve")
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(log);
+    cmd.arg("serve").stdin(Stdio::null()).stdout(Stdio::null()).stderr(log);
     #[cfg(unix)]
     {
         // Its own process group, so closing the terminal that ran `open` leaves it running.
@@ -518,10 +484,8 @@ fn identify(addr: SocketAddr, state: Option<&Path>) -> Listener {
     // A timeout after a partial read still leaves the bytes to judge.
     let _partial = s.take(64 * 1024).read_to_end(&mut buf);
     let text = String::from_utf8_lossy(&buf);
-    let want = format!(
-        "{{\"proof\":\"{}\"}}",
-        gitterrace_actions::token_proof(&secret, nonce.as_str())
-    );
+    let want =
+        format!("{{\"proof\":\"{}\"}}", gitterrace_actions::token_proof(&secret, nonce.as_str()));
     let body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
     if text.starts_with("HTTP/1.1 200") && body.trim() == want {
         Listener::Gitterrace
@@ -563,10 +527,8 @@ fn loopback(a: SocketAddr) -> SocketAddr {
 
 /// `~/x` against `$HOME`; anything else as written.
 fn expand(p: &str) -> PathBuf {
-    gitterrace_config::home_dir().map_or_else(
-        || PathBuf::from(p),
-        |home| gitterrace_config::expand_tilde(p, &home),
-    )
+    gitterrace_config::home_dir()
+        .map_or_else(|| PathBuf::from(p), |home| gitterrace_config::expand_tilde(p, &home))
 }
 
 /// The platform's URL opener. The URL is built here from validated parts and starts with

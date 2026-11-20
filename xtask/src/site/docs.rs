@@ -50,11 +50,7 @@ impl<'a> Links<'a> {
         let (file, anchor) = dest.split_once('#').unwrap_or((dest, ""));
         let dir = Path::new(from).parent().unwrap_or_else(|| Path::new(""));
         let target = normalize(&dir.join(file));
-        let hash = if anchor.is_empty() {
-            String::new()
-        } else {
-            format!("#{anchor}")
-        };
+        let hash = if anchor.is_empty() { String::new() } else { format!("#{anchor}") };
         match self.pages.get(&target) {
             Some(page) => format!("/{page}{hash}"),
             None if image => format!("{}/raw/main/{target}", self.repo),
@@ -109,11 +105,7 @@ pub fn slug(heading: &str) -> String {
 /// Fails when two elements of one page share an id, so a link cannot mean two places.
 pub fn check_unique_ids(path: &str, html: &str) -> Result<()> {
     let mut seen = std::collections::BTreeSet::new();
-    for id in html
-        .split(" id=\"")
-        .skip(1)
-        .filter_map(|r| r.split_once('"').map(|v| v.0))
-    {
+    for id in html.split(" id=\"").skip(1).filter_map(|r| r.split_once('"').map(|v| v.0)) {
         if !seen.insert(id) {
             anyhow::bail!("{path}: more than one heading has the id {id}");
         }
@@ -164,28 +156,20 @@ pub(super) fn body(
     let mut heading: Option<(HeadingLevel, String)> = None;
     for ev in Parser::new_ext(text, gitterrace_web::markdown_options()) {
         let ev = match ev {
-            Event::Start(Tag::Link {
-                link_type,
-                dest_url,
-                title,
-                id,
-            }) => Event::Start(Tag::Link {
+            Event::Start(Tag::Link { link_type, dest_url, title, id }) => Event::Start(Tag::Link {
                 link_type,
                 dest_url: CowStr::from(links.rewrite(from, &dest_url, false)),
                 title,
                 id,
             }),
-            Event::Start(Tag::Image {
-                link_type,
-                dest_url,
-                title,
-                id,
-            }) => Event::Start(Tag::Image {
-                link_type,
-                dest_url: CowStr::from(links.rewrite(from, &dest_url, true)),
-                title,
-                id,
-            }),
+            Event::Start(Tag::Image { link_type, dest_url, title, id }) => {
+                Event::Start(Tag::Image {
+                    link_type,
+                    dest_url: CowStr::from(links.rewrite(from, &dest_url, true)),
+                    title,
+                    id,
+                })
+            }
             Event::Html(h) => Event::Html(CowStr::from(links.rewrite_html(from, &h))),
             ev => ev,
         };
@@ -256,10 +240,7 @@ pub(super) fn code_block(code: &str, lang: &str) -> String {
     const MOST: usize = 64 * 1024;
     let lang = lang.split_whitespace().next().unwrap_or("");
     let body = gitterrace_web::highlight_block(code, lang, MOST).unwrap_or_else(|| esc(code));
-    format!(
-        "<pre><code class=\"language-{}\">{body}</code></pre>\n",
-        esc(lang)
-    )
+    format!("<pre><code class=\"language-{}\">{body}</code></pre>\n", esc(lang))
 }
 
 /// `text` escaped for HTML text and attribute values.
@@ -302,9 +283,8 @@ fn wrap_wide(html: &str) -> String {
 
 /// The tags a table is built of: a newline before one is whitespace a table drops, so a table
 /// row with no spaces can still break between its cells.
-const TABLE_TAGS: [&str; 10] = [
-    "<thead", "</thead", "<tbody", "</tbody", "<tr", "</tr", "<th", "</th", "<td", "</td",
-];
+const TABLE_TAGS: [&str; 10] =
+    ["<thead", "</thead", "<tbody", "</tbody", "<tr", "</tr", "<th", "</th", "<td", "</td"];
 
 /// One line broken at spaces outside tags, or before a table tag, each piece at most `width`
 /// wide where it can be.
@@ -362,8 +342,7 @@ pub(super) fn outline(h2s: &[(String, String)]) -> String {
         line += n;
     }
     // The filter field's attributes go on two lines; whitespace between attributes is free.
-    out.trim_end()
-        .replace("\" aria-label=\"Filter", "\"\naria-label=\"Filter")
+    out.trim_end().replace("\" aria-label=\"Filter", "\"\naria-label=\"Filter")
 }
 
 /// The docs index page, `templates/docs_index.html`.
@@ -419,18 +398,13 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
         let text = read(rel)?;
         let title = title_of(rel, &text)?;
         let path = page_path(stem(rel));
-        if docs
-            .iter()
-            .any(|d: &(&str, String, String, &str, String, &str)| d.1 == path)
-        {
+        if docs.iter().any(|d: &(&str, String, String, &str, String, &str)| d.1 == path) {
             anyhow::bail!("{rel}: another document is already the page {path}");
         }
         docs.push((rel, path, title, what, text, group));
     }
-    let order: Vec<(String, String, String)> = docs
-        .iter()
-        .map(|(_, p, t, .., g)| (p.clone(), t.clone(), (*g).to_owned()))
-        .collect();
+    let order: Vec<(String, String, String)> =
+        docs.iter().map(|(_, p, t, .., g)| (p.clone(), t.clone(), (*g).to_owned())).collect();
     let mut titles = Vec::new();
     for (rel, path, title, what, text, _) in docs {
         let mut h2s = Vec::new();
@@ -442,11 +416,8 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
             id
         })?;
         let rail = outline(&h2s);
-        let (heads, scripts) = if rail.is_empty() {
-            (Vec::new(), Vec::new())
-        } else {
-            (h2s, vec![outline_script()])
-        };
+        let (heads, scripts) =
+            if rail.is_empty() { (Vec::new(), Vec::new()) } else { (h2s, vec![outline_script()]) };
         let nav = docnav::nav(&order, &path, &heads);
         let html = page(
             site,
@@ -530,11 +501,7 @@ fn legal_pages(
 /// The index line of what a document covers, as a sentence for its meta description.
 pub(super) fn sentence(what: &str) -> String {
     let what = what.replace('`', "");
-    if what.ends_with('.') {
-        what
-    } else {
-        format!("{what}.")
-    }
+    if what.ends_with('.') { what } else { format!("{what}.") }
 }
 
 #[cfg(test)]
@@ -552,15 +519,9 @@ mod tests {
         let html = body(text, "docs/x.md", &links, &mut |_, h| slug(h)).expect("body");
         let blocks: Vec<&str> = html.split("<pre>").skip(1).collect();
         assert_eq!(blocks.len(), 3, "{html}");
-        assert!(
-            blocks[0].starts_with("<code class=\"language-toml\">"),
-            "{html}"
-        );
+        assert!(blocks[0].starts_with("<code class=\"language-toml\">"), "{html}");
         assert!(blocks[0].contains("class=\"s-"), "{html}");
-        assert!(
-            blocks[1].starts_with("<code class=\"language-bash\">"),
-            "{html}"
-        );
+        assert!(blocks[1].starts_with("<code class=\"language-bash\">"), "{html}");
         assert!(blocks[1].contains("class=\"s-"), "{html}");
         assert!(!blocks[2].contains("s-"), "{html}");
         assert!(blocks[2].contains("&lt;b&gt;"), "{html}");

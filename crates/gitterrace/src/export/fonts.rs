@@ -64,11 +64,7 @@ mod tests {
             "@font-face{src:url(/static/fonts/fraunces.woff2) format(\"woff2\")}\
              @font-face{src:url(/static/fonts/none.woff2)}",
         );
-        assert!(
-            css.contains("url(data:font/woff2;base64,"),
-            "{}",
-            &css[..80]
-        );
+        assert!(css.contains("url(data:font/woff2;base64,"), "{}", &css[..80]);
         assert!(!css.contains("fraunces.woff2"));
         assert!(css.ends_with("@font-face{src:url(/static/fonts/none.woff2)}"));
     }
@@ -104,9 +100,6 @@ mod tests {
         let base = include_str!("../../../gitterrace-web/templates/_base.html");
         let out = drop_font_preloads(base);
         assert!(!out.contains("as=\"font\""), "a font preload stayed");
-        assert!(
-            !out.contains("type=\"font/woff2\""),
-            "a preload left text behind"
-        );
+        assert!(!out.contains("type=\"font/woff2\""), "a preload left text behind");
     }
 }

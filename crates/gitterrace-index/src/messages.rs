@@ -112,11 +112,7 @@ impl Item {
         } else {
             None
         };
-        Ok(Self {
-            time,
-            parents,
-            text,
-        })
+        Ok(Self { time, parents, text })
     }
 }
 
@@ -170,9 +166,7 @@ impl MessageColumn {
     /// A file that disagrees with its toc is unreadable.
     pub fn of(store: Store) -> SegResult<Option<Self>> {
         let commits = store.manifest.commits;
-        let Store {
-            messages, order, ..
-        } = store;
+        let Store { messages, order, .. } = store;
         let Some(order) = order else {
             return Ok(None);
         };
@@ -186,29 +180,17 @@ impl MessageColumn {
                 items += u64::from(e.items);
             }
             if items != u64::from(f.items()) {
-                return Err(SegError::unreadable(
-                    f.name(),
-                    0,
-                    "item count differs from toc",
-                ));
+                return Err(SegError::unreadable(f.name(), 0, "item count differs from toc"));
             }
             total += items;
         }
         if total > u64::from(commits) {
-            return Err(SegError::unreadable(
-                "MANIFEST",
-                0,
-                "message column longer than the set",
-            ));
+            return Err(SegError::unreadable("MANIFEST", 0, "message column longer than the set"));
         }
         if messages.is_empty() || total < u64::from(commits) {
             return Ok(None);
         }
-        Ok(Some(Self {
-            files: messages,
-            order,
-            commits,
-        }))
+        Ok(Some(Self { files: messages, order, commits }))
     }
 
     pub const fn commits(&self) -> u32 {
@@ -225,25 +207,15 @@ impl MessageColumn {
                     self.order.read_block(e, &mut buf)?;
                     *cache = Some((first, buf));
                 }
-                let bytes = cache
-                    .as_ref()
-                    .map(|(_, b)| b.as_slice())
-                    .unwrap_or_default();
+                let bytes = cache.as_ref().map(|(_, b)| b.as_slice()).unwrap_or_default();
                 let at = (rank - first) as usize * 20;
-                let mut c = Cursor::new(
-                    bytes.get(at..).unwrap_or_default(),
-                    self.order.name(),
-                    e.offset,
-                );
+                let mut c =
+                    Cursor::new(bytes.get(at..).unwrap_or_default(), self.order.name(), e.offset);
                 return c.array::<20>();
             }
             first = first.saturating_add(e.items);
         }
-        Err(SegError::unreadable(
-            self.order.name(),
-            0,
-            "rank past the order",
-        ))
+        Err(SegError::unreadable(self.order.name(), 0, "rank past the order"))
     }
 
     /// The commits matching `query`, newest first as `git log` (and the walk commit search ran
@@ -279,10 +251,7 @@ impl MessageColumn {
                 }
             }
         }
-        Ok(Some(MessageHits {
-            capped: total > ids.len(),
-            ids,
-        }))
+        Ok(Some(MessageHits { capped: total > ids.len(), ids }))
     }
 
     /// Every item in rank order, for a merge that rewrites the column.
@@ -425,8 +394,7 @@ fn scan_block(
         let item = Item::decode(&mut cur, commits)?;
         part.time.push(item.time);
         part.parents.extend(&item.parents);
-        part.ends
-            .push(u32::try_from(part.parents.len()).unwrap_or(u32::MAX));
+        part.ends.push(u32::try_from(part.parents.len()).unwrap_or(u32::MAX));
         let hit = if let Some((name, email, message)) = item.text {
             let key = (name, email);
             if !names.contains_key(&key) {
@@ -481,10 +449,7 @@ fn walk(scan: &Scan, tip: u32) -> impl Iterator<Item = u32> + '_ {
     let mut heap = BinaryHeap::new();
     if let Some(s) = seen.get_mut(tip as usize) {
         *s = true;
-        heap.push(Queued {
-            time: scan.time[tip as usize],
-            rank: tip,
-        });
+        heap.push(Queued { time: scan.time[tip as usize], rank: tip });
     }
     std::iter::from_fn(move || {
         let q = heap.pop()?;
@@ -495,10 +460,7 @@ fn walk(scan: &Scan, tip: u32) -> impl Iterator<Item = u32> + '_ {
                 && !*s
             {
                 *s = true;
-                heap.push(Queued {
-                    time: scan.time[p as usize],
-                    rank: p,
-                });
+                heap.push(Queued { time: scan.time[p as usize], rank: p });
             }
         }
         Some(q.rank)

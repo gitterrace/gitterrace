@@ -18,15 +18,7 @@ pub fn follow_oracle(repo: &std::path::Path) -> BTreeMap<String, Vec<String>> {
     for file in git(repo, &["ls-files"]).lines() {
         let log = git(
             repo,
-            &[
-                "log",
-                "--follow",
-                "--no-merges",
-                "--name-status",
-                "--format=%H",
-                "--",
-                file,
-            ],
+            &["log", "--follow", "--no-merges", "--name-status", "--format=%H", "--", file],
         );
         let mut life = Vec::new();
         let mut commit = String::new();
@@ -54,11 +46,7 @@ pub fn built(repo: &std::path::Path) -> std::sync::Arc<gitterrace_index::DiskSet
     let index = Index::open(&r).expect("index");
     index.update(&r, "HEAD", &|_| {}).expect("build");
     let tip = git(repo, &["rev-parse", "HEAD"]);
-    index
-        .disk_source(&r, &tip)
-        .expect("open")
-        .expect("the built tip has a set")
-        .unchecked()
+    index.disk_source(&r, &tip).expect("open").expect("the built tip has a set").unchecked()
 }
 
 #[test]
@@ -67,12 +55,7 @@ fn the_rename_chain_has_every_case() {
     let r = RenameChain::build(dir.path());
     let files = git(&r.repo, &["ls-files"]);
     let files: Vec<&str> = files.lines().collect();
-    assert_eq!(
-        files,
-        [
-            "c.rs", "d.rs", "foo.rs", "keep.rs", "r.rs", "y2.rs", "z2.rs"
-        ]
-    );
+    assert_eq!(files, ["c.rs", "d.rs", "foo.rs", "keep.rs", "r.rs", "y2.rs", "z2.rs"]);
     let renames = git(&r.repo, &["log", "--format=", "--name-status", "-M"]);
     for pair in ["a.rs\tb.rs", "b.rs\tc.rs", "x.rs\ty.rs", "Foo.rs\tfoo.rs"] {
         assert!(renames.contains(pair), "rename {pair}: {renames}");
@@ -84,10 +67,7 @@ fn the_rename_chain_has_every_case() {
     assert_eq!(when, "2024-01-31 23:30:00 -0800");
     let oracle = follow_oracle(&r.repo);
     let len = |f: &str| oracle[f].len();
-    assert_eq!(
-        (len("c.rs"), len("d.rs"), len("foo.rs"), len("r.rs")),
-        (8, 1, 3, 2)
-    );
+    assert_eq!((len("c.rs"), len("d.rs"), len("foo.rs"), len("r.rs")), (8, 1, 3, 2));
     // The fork: the add of x2, the history before it, goes to y2 only, in git too.
     let add = &oracle["y2.rs"][2];
     assert!(!oracle["z2.rs"].contains(add), "{oracle:?}");
@@ -97,23 +77,11 @@ fn the_rename_chain_has_every_case() {
 fn the_merge_author_has_no_other_commit_that_day() {
     let dir = tempfile::tempdir().expect("tmp");
     let m = MergeWithAuthor::build(dir.path());
-    let who = git(
-        &m.repo,
-        &[
-            "show",
-            "-s",
-            "--format=%an %ad %p",
-            "--date=short",
-            &m.merge,
-        ],
-    );
+    let who = git(&m.repo, &["show", "-s", "--format=%an %ad %p", "--date=short", &m.merge]);
     let parts: Vec<&str> = who.split(' ').collect();
     assert_eq!(parts.len(), 4, "a two-parent merge: {who}");
     assert_eq!(&parts[..2], ["Mia", "2024-03-04"]);
-    let mia = git(
-        &m.repo,
-        &["log", "--no-merges", "--author=Mia", "--format=%H"],
-    );
+    let mia = git(&m.repo, &["log", "--no-merges", "--author=Mia", "--format=%H"]);
     assert!(mia.is_empty(), "Mia has a non-merge commit: {mia}");
 }
 
@@ -152,19 +120,11 @@ fn life_touches(repo: &std::path::Path) -> BTreeMap<String, u64> {
     assert_eq!(canon.len() - paths, touches.len(), "CANON = paths + lives");
     let mut out = BTreeMap::new();
     for file in git(repo, &["ls-files"]).lines() {
-        let id = set
-            .find_path(file)
-            .expect("path lookup reads")
-            .expect("tip file has a path id")
-            .0;
+        let id = set.find_path(file).expect("path lookup reads").expect("tip file has a path id").0;
         let held = canon[id as usize];
         assert_ne!(held & (1 << 31), 0, "{file} holds a life");
         let life = (held & !(1 << 31)) as usize;
-        assert_eq!(
-            canon[paths + life],
-            id | (1 << 31),
-            "{file} names its live life"
-        );
+        assert_eq!(canon[paths + life], id | (1 << 31), "{file} names its live life");
         out.insert(file.to_owned(), touches[life]);
     }
     out
@@ -217,9 +177,8 @@ fn incremental_append_equals_full_rebuild() {
     for step in [3, 5] {
         let cache = dir.path().join(format!("appended-{step}"));
         appended(&r.repo, &cache, step);
-        let store = gitterrace_index::seg::read::Store::open(&cache)
-            .expect("store")
-            .expect("a set");
+        let store =
+            gitterrace_index::seg::read::Store::open(&cache).expect("store").expect("a set");
         assert!(store.segments.len() > 1, "step {step} built by appends");
         let got = gitterrace_index::seg::canon::dump(&store).expect("dump");
         let src = Repo::discover(&r.repo).expect("repo");
@@ -229,11 +188,7 @@ fn incremental_append_equals_full_rebuild() {
             .expect("open")
             .expect("set")
             .unchecked();
-        let records: Vec<_> = disk
-            .base()
-            .records()
-            .collect::<Result<_, _>>()
-            .expect("records");
+        let records: Vec<_> = disk.base().records().collect::<Result<_, _>>().expect("records");
         let want = gitterrace_index::seg::canon::canon_of(&records);
         assert_eq!(got, want, "step {step}");
     }

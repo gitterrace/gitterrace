@@ -63,11 +63,7 @@ fn kinds() -> String {
     let rows: Vec<String> = KINDS
         .iter()
         .map(|(k, doc)| {
-            format!(
-                "`{}` ({})",
-                kind_name(*k),
-                doc.trim_end_matches('.').to_lowercase()
-            )
+            format!("`{}` ({})", kind_name(*k), doc.trim_end_matches('.').to_lowercase())
         })
         .collect();
     format!("{}.\n", rows.join(", "))
@@ -77,14 +73,7 @@ fn payload() -> String {
     let mut s =
         String::from("| Field | Type | Always there | Description |\n| --- | --- | --- | --- |\n");
     for f in PAYLOAD_FIELDS {
-        let _ = writeln!(
-            s,
-            "| `{}` | {} | {} | {} |",
-            f.name,
-            f.ty,
-            yes(f.required),
-            f.doc
-        );
+        let _ = writeln!(s, "| `{}` | {} | {} | {} |", f.name, f.ty, yes(f.required), f.doc);
     }
     s
 }
@@ -185,10 +174,7 @@ pub const TABLE_ROW_MAX: usize = 100;
 
 /// The first sentence of `about`, cut at a word to fit `budget` columns.
 fn summary(about: &str, budget: usize) -> String {
-    let first = about
-        .split_once(". ")
-        .map_or(about, |(f, _)| f)
-        .trim_end_matches('.');
+    let first = about.split_once(". ").map_or(about, |(f, _)| f).trim_end_matches('.');
     if first.chars().count() <= budget {
         return first.to_owned();
     }
@@ -235,11 +221,7 @@ fn send() -> String {
     }
     let denied: Vec<String> = DENIED_SCHEMES.iter().map(|d| format!("`{d}:`")).collect();
     let _ = writeln!(s, "\nRefused schemes: {}.\n", denied.join(", "));
-    s.push_str(&key_table(
-        "`[[send]]`",
-        "One Send to target: a `url` template.",
-        &SEND_KEYS,
-    ));
+    s.push_str(&key_table("`[[send]]`", "One Send to target: a `url` template.", &SEND_KEYS));
     s
 }
 
@@ -298,13 +280,8 @@ fn action_keys() -> String {
 fn script_table(scripts: &[Script]) -> String {
     let mut s = String::from("| Script | Does | Needs |\n| --- | --- | --- |\n");
     for sc in scripts {
-        let _ = writeln!(
-            s,
-            "| [`{f}`](actions/{f}) | {} | {} |",
-            sc.summary,
-            sc.needs,
-            f = sc.file
-        );
+        let _ =
+            writeln!(s, "| [`{f}`](actions/{f}) | {} | {} |", sc.summary, sc.needs, f = sc.file);
     }
     s
 }
@@ -313,12 +290,7 @@ fn script_table(scripts: &[Script]) -> String {
 fn log_filter() -> String {
     let mut s = String::from("| Syntax | Matches |\n| --- | --- |\n");
     for k in gitterrace_index::query::KEYWORDS {
-        let _ = writeln!(
-            s,
-            "| `{}` | {} |",
-            k.syntax.replace('|', "\\|"),
-            k.description
-        );
+        let _ = writeln!(s, "| `{}` | {} |", k.syntax.replace('|', "\\|"), k.description);
     }
     s.push_str("\nA period is `1w`, `1m`, `3m` or `1y`, counted back from the newest commit.\n");
     s
@@ -395,10 +367,7 @@ mod tests {
                 .find(|(name, _)| *name == id)
                 .map_or(TABLE_ROW_MAX, |(_, cap)| *cap);
             if widest > cap {
-                let row = body
-                    .lines()
-                    .find(|l| l.chars().count() == widest)
-                    .unwrap_or("");
+                let row = body.lines().find(|l| l.chars().count() == widest).unwrap_or("");
                 bad.push(format!(
                     "{path} [{id}]: widest row is {widest} columns, cap {cap}: {}",
                     row.chars().take(40).collect::<String>()
@@ -410,10 +379,6 @@ mod tests {
                 ));
             }
         }
-        assert!(
-            bad.is_empty(),
-            "generated table rows too wide:\n{}",
-            bad.join("\n")
-        );
+        assert!(bad.is_empty(), "generated table rows too wide:\n{}", bad.join("\n"));
     }
 }

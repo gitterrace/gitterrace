@@ -21,13 +21,10 @@ fn page_faults(u: &str, body: &str, prefix: Option<&str>) -> Vec<String> {
         let before = &body[..at];
         if !(before.ends_with('"') || before.ends_with('\'') || before.ends_with('=')) {
             // Cut points searched for: the asset can sit at the page's end, past a multibyte char.
-            let from = (0..=at.saturating_sub(30))
-                .rev()
-                .find(|&i| body.is_char_boundary(i))
-                .unwrap_or(0);
-            let to = (at + 20..=body.len())
-                .find(|&i| body.is_char_boundary(i))
-                .unwrap_or(body.len());
+            let from =
+                (0..=at.saturating_sub(30)).rev().find(|&i| body.is_char_boundary(i)).unwrap_or(0);
+            let to =
+                (at + 20..=body.len()).find(|&i| body.is_char_boundary(i)).unwrap_or(body.len());
             let near = &body[from..to.min(body.len())];
             bad.push(format!("{u}: an asset under a prefix: {near}"));
         }
@@ -55,9 +52,7 @@ fn related_logs(html: &str, served: &[&str]) -> (Vec<String>, String) {
     let Some(i) = html.find(OPEN) else {
         return (Vec::new(), html.to_owned());
     };
-    let end = html[i..]
-        .find("</span>")
-        .map_or(html.len(), |e| i + e + "</span>".len());
+    let end = html[i..].find("</span>").map_or(html.len(), |e| i + e + "</span>".len());
     let mut span = html[i..end].to_owned();
     let mut hrefs = Vec::new();
     for name in served {
@@ -101,10 +96,7 @@ async fn every_crawled_page_keeps_the_page_rules() {
     gitterrace_testkit::git(dir.path(), &["clone", "-q", from, to]);
     let router = crate::multi_router(vec![a.clone(), b]).expect("router");
     gitterrace_testkit::wait::until("the Related line on alpha's log", || async {
-        fetch(&router, "/r/alpha/log/HEAD", "localhost")
-            .await
-            .1
-            .contains("class=\"related\"")
+        fetch(&router, "/r/alpha/log/HEAD", "localhost").await.1.contains("class=\"related\"")
     })
     .await;
     let (s, idx) = fetch(&router, "/", "localhost").await;
@@ -222,34 +214,19 @@ async fn a_versioned_asset_is_immutable_and_an_unversioned_one_revalidates() {
     let dir = tempfile::tempdir().expect("tmp");
     let r: Router = crate::app_router(fixture("r", dir.path())).expect("router");
     for (uri, want) in [
-        (
-            crate::asset_url("app.css"),
-            "public, max-age=31536000, immutable",
-        ),
+        (crate::asset_url("app.css"), "public, max-age=31536000, immutable"),
         ("/static/app.css".to_owned(), "no-cache"),
         ("/static/app.css?v=old".to_owned(), "no-cache"),
     ] {
-        let req = Request::get(&uri)
-            .header("host", "localhost")
-            .body(Body::empty())
-            .expect("req");
+        let req = Request::get(&uri).header("host", "localhost").body(Body::empty()).expect("req");
         let res = r.clone().oneshot(req).await.expect("send");
-        let cache = res
-            .headers()
-            .get("cache-control")
-            .and_then(|v| v.to_str().ok())
-            .unwrap_or_default();
+        let cache =
+            res.headers().get("cache-control").and_then(|v| v.to_str().ok()).unwrap_or_default();
         assert_eq!((res.status().as_u16(), cache), (200, want), "{uri}");
     }
     let (_, page) = gitterrace_testkit::page(&r, "/").await;
     let v = format!("?v={}", crate::asset_version());
     let (_, css) = fetch(&r, &crate::asset_url("tokens.css"), "localhost").await;
-    assert!(
-        css.contains(&format!(".woff2{v})")),
-        "fonts carry the version"
-    );
-    assert!(
-        page.contains(&format!("app.js{v}")),
-        "pages link the versioned URL"
-    );
+    assert!(css.contains(&format!(".woff2{v})")), "fonts carry the version");
+    assert!(page.contains(&format!("app.js{v}")), "pages link the versioned URL");
 }

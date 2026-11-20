@@ -26,9 +26,8 @@ pub fn router(state: ApiState) -> Router {
         .iter()
         .fold(Router::new(), |r, e| {
             let params = e.params;
-            let route = (e.route)().layer(middleware::from_fn(move |req, next| {
-                known_params(params, req, next)
-            }));
+            let route = (e.route)()
+                .layer(middleware::from_fn(move |req, next| known_params(params, req, next)));
             r.route(e.path, route)
         })
         .layer(middleware::from_fn_with_state(state.clone(), etag))
@@ -72,11 +71,7 @@ async fn known_params(
     match unknown {
         Some(k) => {
             let known: Vec<&str> = params.iter().map(|p| p.name).collect();
-            let known = if known.is_empty() {
-                "none".to_owned()
-            } else {
-                known.join(", ")
-            };
+            let known = if known.is_empty() { "none".to_owned() } else { known.join(", ") };
             ApiError::BadRequest(format!(
                 "unknown parameter `{k}`. Known: {known}. Select commits with `q`"
             ))
@@ -121,10 +116,7 @@ async fn etag(
 
 fn insight_rows() -> Vec<InsightRow> {
     insights::list()
-        .map(|(name, summary)| InsightRow {
-            name: name.to_owned(),
-            summary: summary.to_owned(),
-        })
+        .map(|(name, summary)| InsightRow { name: name.to_owned(), summary: summary.to_owned() })
         .collect()
 }
 
@@ -156,11 +148,7 @@ pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> IndexResponse 
         })
         .collect();
     let insights = if insights { insight_rows() } else { Vec::new() };
-    IndexResponse {
-        endpoints,
-        insights,
-        version: 1,
-    }
+    IndexResponse { endpoints, insights, version: 1 }
 }
 
 pub(crate) async fn repo(State(s): State<ApiState>) -> Reply<RepoResponse> {
@@ -206,10 +194,7 @@ pub(crate) async fn commit(
     Path(id): Path<String>,
     Query(q): Query<CommitQuery>,
 ) -> Reply<CommitResponse> {
-    blocking(&s, move |s| {
-        s.commit(&id, q.diff.unwrap_or(true), q.max_lines)
-    })
-    .await
+    blocking(&s, move |s| s.commit(&id, q.diff.unwrap_or(true), q.max_lines)).await
 }
 
 #[derive(Deserialize)]
@@ -231,13 +216,7 @@ pub(crate) async fn compare(
         .ok_or_else(|| ApiError::BadRequest("missing query parameter: base".into()))?;
     let head = q.head.unwrap_or_else(|| "HEAD".to_owned());
     blocking(&s, move |s| {
-        s.compare(
-            &base,
-            &head,
-            q.path.as_deref(),
-            q.three_dot.unwrap_or(false),
-            q.max_lines,
-        )
+        s.compare(&base, &head, q.path.as_deref(), q.three_dot.unwrap_or(false), q.max_lines)
     })
     .await
 }
@@ -252,10 +231,7 @@ pub(crate) async fn worktree(
     State(s): State<ApiState>,
     Query(q): Query<WorktreeQuery>,
 ) -> Reply<WorktreeResponse> {
-    blocking(&s, move |s| {
-        s.worktree_diff(q.scope.as_deref().unwrap_or("all"), q.max_lines)
-    })
-    .await
+    blocking(&s, move |s| s.worktree_diff(q.scope.as_deref().unwrap_or("all"), q.max_lines)).await
 }
 
 #[derive(Deserialize)]
@@ -291,10 +267,7 @@ pub(crate) async fn blob(
     Query(q): Query<FileQuery>,
 ) -> Reply<BlobResponse> {
     let path = need_path(&q)?;
-    blocking(&s, move |s| {
-        s.blob(q.rev.as_deref(), &path, q.start_line, q.limit)
-    })
-    .await
+    blocking(&s, move |s| s.blob(q.rev.as_deref(), &path, q.start_line, q.limit)).await
 }
 
 pub(crate) async fn blame(
@@ -314,9 +287,7 @@ pub(crate) async fn contributors(
 }
 
 pub(crate) async fn insight_list() -> Json<InsightList> {
-    Json(InsightList {
-        insights: insight_rows(),
-    })
+    Json(InsightList { insights: insight_rows() })
 }
 
 #[derive(Deserialize)]

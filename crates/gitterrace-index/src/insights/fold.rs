@@ -92,13 +92,8 @@ mod tests {
     use crate::insights::{ScopeParams, Selection};
 
     fn scope(period: &str, path: Option<&str>) -> Scope {
-        let mut p = ScopeParams {
-            period: Some(period.to_owned()),
-            ..ScopeParams::default()
-        };
-        p.select = Selection {
-            q: path.map(|p| format!("path:{p}")),
-        };
+        let mut p = ScopeParams { period: Some(period.to_owned()), ..ScopeParams::default() };
+        p.select = Selection { q: path.map(|p| format!("path:{p}")) };
         Scope::from_params(&p, Options::default(), Period::All).expect("scope")
     }
 
@@ -113,11 +108,7 @@ mod tests {
             let c = ins.counted(&s, cx);
             let before = ins.walks();
             let f = c.activity_fold();
-            assert_eq!(
-                ins.walks() - before,
-                1,
-                "walks of the counted set for one fold"
-            );
+            assert_eq!(ins.walks() - before, 1, "walks of the counted set for one fold");
             let (summary, rhythm) = c.activity();
             assert_eq!(f.summary, summary);
             assert_eq!(f.rhythm, rhythm);

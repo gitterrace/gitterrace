@@ -25,11 +25,7 @@ const MAGIC: &[(usize, &[u8], &str)] = &[
     (0, b"\x7fELF", "ELF executable"),
     (0, b"MZ", "Windows executable"),
     (0, b"\xcf\xfa\xed\xfe", "Mach-O executable"),
-    (
-        0,
-        b"\xca\xfe\xba\xbe",
-        "Mach-O universal binary or Java class",
-    ),
+    (0, b"\xca\xfe\xba\xbe", "Mach-O universal binary or Java class"),
     (0, b"\0asm", "WebAssembly module"),
     (0, b"glTF", "glTF binary model"),
     (0, b"wOFF", "WOFF font"),
@@ -40,11 +36,7 @@ const MAGIC: &[(usize, &[u8], &str)] = &[
     (0, b"\x89PNG", "PNG image"),
     (0, b"GIF8", "GIF image"),
     (0, b"\xff\xd8\xff", "JPEG image"),
-    (
-        0,
-        b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1",
-        "Microsoft Office (legacy) document",
-    ),
+    (0, b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1", "Microsoft Office (legacy) document"),
     (0, b"PAR1", "Parquet file"),
     (0, b"\x93NUMPY", "NumPy array"),
     (0, b"\x89HDF\r\n\x1a\n", "HDF5 file"),
@@ -131,10 +123,7 @@ mod tests {
 
     #[test]
     fn magic_names_the_format_whatever_the_extension() {
-        assert_eq!(
-            describe("data.bin", b"SQLite format 3\0rest"),
-            "SQLite database"
-        );
+        assert_eq!(describe("data.bin", b"SQLite format 3\0rest"), "SQLite database");
         assert_eq!(describe("a.txt", b"\x7fELF\x02"), "ELF executable");
         assert_eq!(describe("backup", &at(257, b"ustar")), "tar archive");
     }

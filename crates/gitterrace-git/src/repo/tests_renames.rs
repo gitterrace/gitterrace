@@ -21,28 +21,17 @@ fn merged_moves(d: &std::path::Path, n: usize, edited: usize) {
     git_at(d, T0, &["checkout", "-q", "-b", "side"]);
     fs::create_dir(d.join("moved")).expect("mkdir");
     for i in 0..n {
-        fs::rename(
-            d.join(format!("a/{i:03}.txt")),
-            d.join(format!("moved/{i:03}.txt")),
-        )
-        .expect("move");
+        fs::rename(d.join(format!("a/{i:03}.txt")), d.join(format!("moved/{i:03}.txt")))
+            .expect("move");
     }
     for i in 0..edited {
-        write(
-            d,
-            &format!("moved/{i:03}.txt"),
-            &format!("{}edited\n", numbered(20 + i)),
-        );
+        write(d, &format!("moved/{i:03}.txt"), &format!("{}edited\n", numbered(20 + i)));
     }
     commit(d, "move everything");
     git_at(d, T0, &["checkout", "-q", "main"]);
     write(d, "other.txt", "x\n");
     commit(d, "main moves on");
-    git_at(
-        d,
-        T0,
-        &["merge", "-q", "--no-ff", "-m", "merge side", "side"],
-    );
+    git_at(d, T0, &["merge", "-q", "--no-ff", "-m", "merge side", "side"]);
     fs::rename(d.join("other.txt"), d.join("other2.txt")).expect("rename");
     write(d, "moved/001.txt", &format!("{}more\n", numbered(21)));
     fs::rename(d.join("moved/001.txt"), d.join("moved/one.txt")).expect("rename");
@@ -52,9 +41,7 @@ fn merged_moves(d: &std::path::Path, n: usize, edited: usize) {
 /// Changes of `id` as (kind, path, old path), sorted.
 fn kinds(repo: &Repo, id: &str, renames: Renames) -> Vec<String> {
     let gix = repo.repo();
-    let commit = gix
-        .find_commit(repo.full_id(&gix, id).expect("id"))
-        .expect("commit");
+    let commit = gix.find_commit(repo.full_id(&gix, id).expect("id")).expect("commit");
     let mut cache = crate::diff::resource_cache(&gix).expect("cache");
     let files = crate::diff::changes_with(
         &gix,
@@ -66,10 +53,8 @@ fn kinds(repo: &Repo, id: &str, renames: Renames) -> Vec<String> {
         renames,
     )
     .expect("diff");
-    let mut out: Vec<String> = files
-        .iter()
-        .map(|f| format!("{:?} {} {:?}", f.kind, f.path, f.old_path))
-        .collect();
+    let mut out: Vec<String> =
+        files.iter().map(|f| format!("{:?} {} {:?}", f.kind, f.path, f.old_path)).collect();
     out.sort();
     out
 }
@@ -85,9 +70,7 @@ fn non_merge_commits_diff_the_same_for_the_index_and_for_pages() {
     let gix = repo.repo();
     let mut checked = 0;
     for id in repo.rev_list("HEAD").expect("rev_list") {
-        let commit = gix
-            .find_commit(repo.full_id(&gix, &id).expect("id"))
-            .expect("commit");
+        let commit = gix.find_commit(repo.full_id(&gix, &id).expect("id")).expect("commit");
         if commit.parent_ids().nth(1).is_some() {
             continue;
         }
@@ -127,10 +110,7 @@ fn a_large_merge_pairs_only_identical_renames_for_the_index() {
         let index = kinds(&repo, merge, Renames::Index);
         let pages = kinds(&repo, merge, Renames::Full);
         let first = "Renamed moved/000.txt Some(\"a/000.txt\")".to_owned();
-        assert!(
-            pages.contains(&first),
-            "pages pair the edited move: {pages:?}"
-        );
+        assert!(pages.contains(&first), "pages pair the edited move: {pages:?}");
         assert_eq!(index.contains(&first), paired_edit, "n {n}: {index:?}");
         let renamed = |v: &[String]| v.iter().filter(|k| k.starts_with("Renamed")).count();
         assert_eq!(renamed(&pages), n);

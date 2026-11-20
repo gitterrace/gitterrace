@@ -34,25 +34,14 @@ async fn main() -> anyhow::Result<()> {
     // An index child runs its update and exits here, before any argument is parsed.
     gitterrace_web::index_child();
     let cli = Cli::parse();
-    let path = cli
-        .paths
-        .first()
-        .cloned()
-        .unwrap_or_else(|| PathBuf::from("."));
+    let path = cli.paths.first().cloned().unwrap_or_else(|| PathBuf::from("."));
     // stdout carries the MCP protocol, so logs always go to stderr.
     // Color only for a person at a terminal: NO_COLOR (any non-empty value) and a piped stderr
     // get plain lines. Export progress redraws one line only on a terminal, with no escape codes.
-    tracing_subscriber::fmt()
-        .with_writer(std::io::stderr)
-        .with_ansi(use_color())
-        .init();
+    tracing_subscriber::fmt().with_writer(std::io::stderr).with_ansi(use_color()).init();
     let dir = gitterrace_config::config_dir(cli.config.as_deref());
-    let flags = Flags {
-        dir: dir.clone(),
-        addr: cli.addr,
-        no_watch: cli.no_watch,
-        public: cli.public,
-    };
+    let flags =
+        Flags { dir: dir.clone(), addr: cli.addr, no_watch: cli.no_watch, public: cli.public };
     let loaded = flags.load().context("reading config.toml")?;
     for w in &loaded.warnings {
         tracing::warn!("config: {w}");
@@ -66,10 +55,7 @@ async fn main() -> anyhow::Result<()> {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {
             let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
-            let actions = dir
-                .clone()
-                .filter(|_| !cli.no_actions)
-                .map(|d| d.join("actions.toml"));
+            let actions = dir.clone().filter(|_| !cli.no_actions).map(|d| d.join("actions.toml"));
             let m = &loaded.config.multi;
             let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
             if !loaded.config.server.is_public
@@ -129,10 +115,7 @@ fn init(config: Option<&std::path::Path>) -> anyhow::Result<()> {
         gitterrace_config::config_dir(config).context("no config folder: set --config or HOME")?;
     let files = [
         ("config.toml", gitterrace_config::template()),
-        (
-            "actions.toml",
-            gitterrace_actions::Config::STARTER.to_owned(),
-        ),
+        ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
     ];
     for (path, state) in init_in(&dir, &files)? {
         println!("{}: {state}", path.display());
@@ -217,16 +200,7 @@ async fn export_cmd(
     cmd: Command,
     config: &gitterrace_config::Config,
 ) -> anyhow::Result<()> {
-    let Command::Export {
-        out,
-        force,
-        commits,
-        file_kb,
-        export_pages,
-        quiet,
-        project,
-    } = cmd
-    else {
+    let Command::Export { out, force, commits, file_kb, export_pages, quiet, project } = cmd else {
         anyhow::bail!("export_cmd runs the export command only");
     };
     let scope = &export::Scope {
@@ -275,10 +249,7 @@ mod tests {
     fn files() -> [(&'static str, String); 2] {
         [
             ("config.toml", gitterrace_config::template()),
-            (
-                "actions.toml",
-                gitterrace_actions::Config::STARTER.to_owned(),
-            ),
+            ("actions.toml", gitterrace_actions::Config::STARTER.to_owned()),
         ]
     }
 
@@ -321,10 +292,7 @@ mod tests {
         let done = init_in(tmp.path(), &files()).expect("init");
         assert_eq!(done[0].1, "written");
         assert_eq!(done[1].1, "kept");
-        assert_eq!(
-            std::fs::read_to_string(tmp.path().join("actions.toml")).expect("read"),
-            "mine"
-        );
+        assert_eq!(std::fs::read_to_string(tmp.path().join("actions.toml")).expect("read"), "mine");
         assert_eq!(mode(&tmp.path().join("config.toml")), 0o600);
     }
 }

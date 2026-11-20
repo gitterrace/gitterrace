@@ -63,10 +63,7 @@ fn dead(pages: &[(String, String)], files: &[String], links: &[(String, String)]
     let bad = unresolved(&probe, files);
     links
         .iter()
-        .filter(|(_, l)| {
-            bad.iter()
-                .any(|b| b.starts_with(&format!("app-links.html: {l}:")))
-        })
+        .filter(|(_, l)| bad.iter().any(|b| b.starts_with(&format!("app-links.html: {l}:"))))
         .map(|(f, l)| format!("{f}: {SITE}{l}"))
         .collect()
 }
@@ -89,12 +86,7 @@ fn redirects_file() -> String {
 fn redirect_sources(body: &str) -> Vec<String> {
     body.lines()
         .filter(|l| !l.starts_with('#'))
-        .filter_map(|l| {
-            l.split_whitespace()
-                .next()?
-                .strip_prefix('/')
-                .map(str::to_owned)
-        })
+        .filter_map(|l| l.split_whitespace().next()?.strip_prefix('/').map(str::to_owned))
         .collect()
 }
 
@@ -120,10 +112,7 @@ fn a_planted_dead_site_link_is_reported() {
         ("e.rs".to_owned(), "/install.bash".to_owned()),
     ];
     let bad = dead(&pages, &files, &links).join("\n");
-    assert!(
-        bad.contains("a.rs:") && bad.contains("b.rs:") && bad.contains("e.rs:"),
-        "{bad}"
-    );
+    assert!(bad.contains("a.rs:") && bad.contains("b.rs:") && bad.contains("e.rs:"), "{bad}");
     assert!(!bad.contains("c.rs:") && !bad.contains("d.rs:"), "{bad}");
     assert_eq!(
         site_links("x = \"https://gitterrace.dev/docs/using/#a\"; y = 'https://gitterrace.dev'"),

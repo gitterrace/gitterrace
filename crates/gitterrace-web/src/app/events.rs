@@ -134,9 +134,7 @@ impl Watch {
         self.started = want;
         let Some((secs, os)) = want else { return };
         let scope = self.scope;
-        self.start(app, os, move |a, on| {
-            scope.start(&a.repo, Duration::from_secs(secs), os, on)
-        });
+        self.start(app, os, move |a, on| scope.start(&a.repo, Duration::from_secs(secs), os, on));
     }
 
     /// Runs `start` on a blocking thread. With OS events (`os`) the watch polls until it is
@@ -201,10 +199,7 @@ impl Watch {
     /// Whether checks run on a timer because events are unavailable.
     pub(crate) fn polling(&self) -> bool {
         self.polling.load(Ordering::Acquire)
-            || self
-                .run
-                .as_ref()
-                .is_some_and(|r| r.starting.load(Ordering::Acquire))
+            || self.run.as_ref().is_some_and(|r| r.starting.load(Ordering::Acquire))
     }
 }
 
@@ -222,9 +217,7 @@ impl Drop for Watch {
 /// whole app alive meanwhile. The nudger holds no app, so nothing waits for this thread.
 fn retire<T: Send + 'static>(nudger: Option<T>) {
     let Some(n) = nudger else { return };
-    let spawned = std::thread::Builder::new()
-        .name("fs-nudge-stop".into())
-        .spawn(move || drop(n));
+    let spawned = std::thread::Builder::new().name("fs-nudge-stop".into()).spawn(move || drop(n));
     if let Err(e) = spawned {
         tracing::warn!("stopping a file watcher on its own thread failed: {e}");
     }
@@ -314,21 +307,16 @@ mod tests {
             let (go, wait) = std::sync::mpsc::channel::<()>();
             w.start(&a, true, move |a, on| {
                 wait.recv().ok();
-                a.repo
-                    .git_events(std::time::Duration::from_secs(5), false, on)
+                a.repo.git_events(std::time::Duration::from_secs(5), false, on)
             });
-            assert!(
-                w.polling(),
-                "{scope:?}: no check runs while the start is slow"
-            );
+            assert!(w.polling(), "{scope:?}: no check runs while the start is slow");
             go.send(()).expect("release the start");
             assert!(up(&w).await, "{scope:?}: the start never came up");
             assert!(w.take(), "{scope:?}: no look once the watch is up");
             let (go, wait) = std::sync::mpsc::channel::<()>();
             w.start(&a, true, move |a, on| {
                 wait.recv().ok();
-                a.repo
-                    .git_events(std::time::Duration::from_secs(5), false, on)
+                a.repo.git_events(std::time::Duration::from_secs(5), false, on)
             });
             let late = w.run.clone().expect("a run");
             // As if `follow` had started it: the stop below is a change of settings.

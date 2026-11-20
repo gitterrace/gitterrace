@@ -103,27 +103,19 @@ impl Peers {
     /// Warm-ups run so far on the peers in the table.
     #[cfg(test)]
     fn walks(&self) -> usize {
-        self.snapshot()
-            .iter()
-            .map(|p| p.walks.load(Ordering::Relaxed))
-            .sum()
+        self.snapshot().iter().map(|p| p.walks.load(Ordering::Relaxed)).sum()
     }
 }
 
 impl Peer {
     /// The cached set, or none while a warm-up holds the lock or it is cold.
     fn cached(&self) -> Roots {
-        self.roots
-            .try_lock()
-            .map(|g| g.1.clone())
-            .unwrap_or_default()
+        self.roots.try_lock().map(|g| g.1.clone()).unwrap_or_default()
     }
 
     /// When the set was last stored. Never waits either: a set being stored counts as fresh.
     fn warmed(&self) -> Option<Instant> {
-        self.roots
-            .try_lock()
-            .map_or_else(|_| Some(Instant::now()), |g| g.0)
+        self.roots.try_lock().map_or_else(|_| Some(Instant::now()), |g| g.0)
     }
 
     /// Updates the set from a handle opened from its path for this walk alone. A repository
@@ -201,21 +193,9 @@ mod tests {
     #[test]
     fn only_warm_served_peers_that_share_a_root_are_related() {
         let tmp = tempfile::tempdir().expect("tmp");
-        let (a, b, c) = (
-            tmp.path().join("a"),
-            tmp.path().join("b"),
-            tmp.path().join("c"),
-        );
+        let (a, b, c) = (tmp.path().join("a"), tmp.path().join("b"), tmp.path().join("c"));
         repo(&a, "root");
-        git(
-            tmp.path(),
-            &[
-                "clone",
-                "-q",
-                a.to_str().expect("utf8"),
-                b.to_str().expect("utf8"),
-            ],
-        );
+        git(tmp.path(), &["clone", "-q", a.to_str().expect("utf8"), b.to_str().expect("utf8")]);
         repo(&c, "other");
         let peers = Peers::default();
         for (n, p) in [("a", &a), ("b", &b), ("c", &c)] {

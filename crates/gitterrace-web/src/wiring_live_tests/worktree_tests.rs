@@ -25,10 +25,7 @@ async fn worktree_fragments_refuse_ignored_and_git_paths() {
     assert!(ok.contains("changed now"), "{ok}");
     for bad in ["prod.env", ".git/config", "d/../small.txt"] {
         let (_, body) = get(&r, &format!("/worktree/diff/{bad}")).await;
-        assert!(
-            !body.contains("SECRET") && !body.contains("[core]"),
-            "{bad}: {body}"
-        );
+        assert!(!body.contains("SECRET") && !body.contains("[core]"), "{bad}: {body}");
         assert!(body.contains("No longer changed"), "{bad}: {body}");
     }
 }
@@ -110,11 +107,7 @@ async fn worktree_blob_shows_an_untracked_file_and_hides_it_on_a_public_server()
     let (_, list) = get(&r, "/worktree").await;
     assert!(list.contains("/worktree/blob/fresh.rs\""), "{list}");
     for bad in [".git/config", "mid.txt", "d/../fresh.rs"] {
-        assert_eq!(
-            get(&r, &format!("/worktree/blob/{bad}")).await.0,
-            404,
-            "{bad}"
-        );
+        assert_eq!(get(&r, &format!("/worktree/blob/{bad}")).await.0, 404, "{bad}");
     }
     let public = router(&p, with(|c| c.server.is_public = true));
     assert_eq!(get(&public, "/worktree/blob/fresh.rs").await.0, 404);
@@ -136,19 +129,13 @@ async fn worktree_raw_holds_the_raw_budget_until_a_body_is_sent() {
     );
     let r = crate::routes::router(Arc::clone(&a));
     let send = |r: Router| async move {
-        let req = Request::get("/worktree/raw/w.txt")
-            .body(Body::empty())
-            .expect("req");
+        let req = Request::get("/worktree/raw/w.txt").body(Body::empty()).expect("req");
         r.oneshot(req).await.expect("response")
     };
     let first = send(r.clone()).await;
     let second = send(r.clone()).await;
     assert_eq!(first.status(), 200);
-    assert_eq!(
-        a.env.raw_budget.available_permits(),
-        0,
-        "two readers fill it"
-    );
+    assert_eq!(a.env.raw_budget.available_permits(), 0, "two readers fill it");
     let third = tokio::spawn(send(r.clone()));
     gitterrace_testkit::wait::pause(Duration::from_millis(100)).await;
     assert!(!third.is_finished(), "the third waits before reading");
@@ -160,11 +147,7 @@ async fn worktree_raw_holds_the_raw_budget_until_a_body_is_sent() {
         .expect("task");
     assert_eq!(third.status(), 200);
     drop((second, third));
-    assert_eq!(
-        a.env.raw_budget.available_permits(),
-        2,
-        "every share comes back"
-    );
+    assert_eq!(a.env.raw_budget.available_permits(), 2, "every share comes back");
 }
 
 /// A file `.gitattributes` at HEAD marks generated folds on the working tree page as on a
@@ -185,17 +168,13 @@ async fn generated_files_fold_in_the_working_tree_by_the_attributes_at_head() {
     let r = router(&p, Config::default());
     let (_, page) = get(&r, "/worktree").await;
     let sect = |path: &str| {
-        let at = page
-            .find(&format!("data-path=\"{path}\""))
-            .unwrap_or_else(|| panic!("{path} section"));
+        let at =
+            page.find(&format!("data-path=\"{path}\"")).unwrap_or_else(|| panic!("{path} section"));
         page[at..at + page[at..].find("</section>").expect("end")].to_owned()
     };
     let generated = sect("gen.json");
     assert!(generated.contains("class=\"tag\">Generated"), "{generated}");
-    assert!(
-        generated.contains("data-load-diff=\"/r/r/worktree/diff/gen.json\""),
-        "{generated}"
-    );
+    assert!(generated.contains("data-load-diff=\"/r/r/worktree/diff/gen.json\""), "{generated}");
     assert!(!generated.contains("\"a\": 1"), "{generated}");
     let hand = sect("hand.rs");
     assert!(!hand.contains("Generated"), "{hand}");
@@ -213,22 +192,13 @@ async fn worktree_scope_tabs_filter_files_and_keep_scope_in_links() {
     std::fs::write(p.join("loose.txt"), "u\n").expect("write");
     let r = router(&p, Config::default());
     let (_, all) = get(&r, "/worktree").await;
-    assert!(
-        all.contains("staged.txt") && all.contains("loose.txt"),
-        "{all}"
-    );
+    assert!(all.contains("staged.txt") && all.contains("loose.txt"), "{all}");
     let (_, st) = get(&r, "/worktree?scope=staged").await;
-    assert!(
-        st.contains("staged.txt") && !st.contains("loose.txt"),
-        "{st}"
-    );
+    assert!(st.contains("staged.txt") && !st.contains("loose.txt"), "{st}");
     assert!(st.contains("/worktree?scope=unstaged"), "{st}");
     assert!(st.contains("Staged (1)") && st.contains("All (2)"), "{st}");
     let (_, un) = get(&r, "/worktree?scope=unstaged").await;
-    assert!(
-        un.contains("loose.txt") && !un.contains("staged.txt"),
-        "{un}"
-    );
+    assert!(un.contains("loose.txt") && !un.contains("staged.txt"), "{un}");
 }
 
 /// The scope tabs sit in the page head: one tab row on the page, the current scope marked.
@@ -240,9 +210,6 @@ async fn the_working_tree_page_has_one_tab_row_in_its_head() {
     let r = router(&p, Config::default());
     let (_, body) = get(&r, "/worktree").await;
     assert_eq!(body.matches("<nav class=\"tabs\"").count(), 1, "{body}");
-    assert!(
-        body.contains("Staged (0)") && body.contains("Unstaged (1)"),
-        "{body}"
-    );
+    assert!(body.contains("Staged (0)") && body.contains("Unstaged (1)"), "{body}");
     assert!(body.contains("aria-current=\"page\""), "{body}");
 }

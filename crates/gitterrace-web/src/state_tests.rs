@@ -70,28 +70,16 @@ async fn git_state_pages_and_banner() {
     let app = ready_app(&p);
     let (s, body) = get(&app, "/refs").await;
     assert_eq!(s, 200);
-    assert!(
-        body.contains(">side</a>") && body.contains("default"),
-        "{body}"
-    );
-    assert!(
-        body.contains("/compare?base=main&#38;head=side"),
-        "ahead links to compare"
-    );
+    assert!(body.contains(">side</a>") && body.contains("default"), "{body}");
+    assert!(body.contains("/compare?base=main&#38;head=side"), "ahead links to compare");
     assert!(body.contains("Release one") && body.contains("/tag/v1"));
     let (s, body) = get(&app, "/tag/v1").await;
     assert!(s == 200 && body.contains("notes here") && body.contains("Tagged by"));
     assert_eq!(get(&app, "/tag/nope").await.0, 404);
     let (_, body) = get(&app, "/refs").await;
-    assert!(
-        body.contains("/wt</code>") && body.contains("/log/side"),
-        "{body}"
-    );
+    assert!(body.contains("/wt</code>") && body.contains("/log/side"), "{body}");
     assert!(body.contains("stash@{0}") && body.contains("wip stash"));
-    assert!(
-        body.contains("id=\"headstate\" hidden>"),
-        "the banner is hidden on a branch"
-    );
+    assert!(body.contains("id=\"headstate\" hidden>"), "the banner is hidden on a branch");
     let head = app.repo.resolve("HEAD").expect("head");
     git(&p, &["checkout", "-q", "--detach"]);
     let (_, body) = get(&app, "/").await;
@@ -114,18 +102,12 @@ async fn rev_is_preserved_by_every_link() {
     let app = ready_app(&p);
     // A ref a few commits off HEAD is served from the segments at once, no indexing page.
     let (s, body) = get(&app, "/stats?rev=side").await;
-    assert!(
-        s == 200 && !body.contains("data-progress"),
-        "side shows the indexing page: {body}"
-    );
+    assert!(s == 200 && !body.contains("data-progress"), "side shows the indexing page: {body}");
     let (_, main) = get(&app, "/stats").await;
     let (_, side) = get(&app, "/stats?rev=side").await;
     assert!(side.contains("only on side") && !main.contains("only on side"));
     let (_, side) = get(&app, "/?rev=side").await;
-    assert!(
-        side.contains("side.txt"),
-        "overview lists the selected ref's files"
-    );
+    assert!(side.contains("side.txt"), "overview lists the selected ref's files");
     let mut todo = vec!["/?rev=side".to_owned(), "/stats?rev=side".to_owned()];
     let mut seen = std::collections::HashSet::new();
     let mut lost = Vec::new();
@@ -199,20 +181,10 @@ async fn every_route_is_read_only() {
 #[cfg(unix)]
 async fn crawl_read_only(router: &axum::Router, actions: bool) {
     let router = router.clone();
-    let mut todo = vec![
-        "/".to_owned(),
-        "/r/alpha/".to_owned(),
-        "/api/repos".to_owned(),
-    ];
+    let mut todo = vec!["/".to_owned(), "/r/alpha/".to_owned(), "/api/repos".to_owned()];
     todo.extend(
-        [
-            "/api/v1/repo",
-            "/api/v1/refs",
-            "/api/progress",
-            "/api/refs",
-            "/api/files/HEAD",
-        ]
-        .map(|p| format!("/r/alpha{p}")),
+        ["/api/v1/repo", "/api/v1/refs", "/api/progress", "/api/refs", "/api/files/HEAD"]
+            .map(|p| format!("/r/alpha{p}")),
     );
     let mut seen = std::collections::HashSet::new();
     let mut writable = Vec::new();
@@ -252,11 +224,7 @@ async fn crawl_read_only(router: &axum::Router, actions: bool) {
         }
     }
     assert!(seen.len() > 20, "crawl too shallow: {}", seen.len());
-    assert!(
-        writable.is_empty(),
-        "routes accept writes:\n{}",
-        writable.join("\n")
-    );
+    assert!(writable.is_empty(), "routes accept writes:\n{}", writable.join("\n"));
 }
 
 #[cfg(unix)]
@@ -280,9 +248,8 @@ async fn public_server_shows_committed_history_only() {
     std::fs::write(p.join("dirty.txt"), "dirty-secret\n").expect("write");
     let cfg = actions_tests::config_dir(actions_tests::ECHO);
     let env = crate::app::Env::new(public_cfg());
-    let router = crate::build(&p, None, Some(&cfg.path().join("actions.toml")), &env)
-        .expect("router")
-        .0;
+    let router =
+        crate::build(&p, None, Some(&cfg.path().join("actions.toml")), &env).expect("router").0;
     let root = std::fs::canonicalize(&p).expect("canon");
     let leaks = [
         root.to_string_lossy().into_owned(),
@@ -338,11 +305,7 @@ async fn public_server_shows_committed_history_only() {
             bad.push(format!("{u}: {s}"));
         }
     }
-    for (m, u) in [
-        ("POST", crate::actions::RUN_PATH),
-        ("POST", "/_repos"),
-        ("PUT", "/"),
-    ] {
+    for (m, u) in [("POST", crate::actions::RUN_PATH), ("POST", "/_repos"), ("PUT", "/")] {
         let res = router
             .clone()
             .oneshot(
@@ -383,16 +346,9 @@ async fn a_busy_port_names_the_address_and_a_hint() {
     let p = fixture("alpha", dir.path());
     let taken = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = taken.local_addr().expect("addr");
-    let e = crate::serve_in(
-        vec![p],
-        addr,
-        None,
-        gitterrace_config::Config::default(),
-        None,
-        None,
-    )
-    .await
-    .expect_err("bound a taken port");
+    let e = crate::serve_in(vec![p], addr, None, gitterrace_config::Config::default(), None, None)
+        .await
+        .expect_err("bound a taken port");
     let msg = e.to_string();
     assert_eq!(e.kind(), std::io::ErrorKind::AddrInUse);
     assert!(msg.contains(&addr.to_string()), "{msg}");
@@ -405,16 +361,9 @@ async fn a_reachable_bind_needs_public() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = fixture("alpha", dir.path());
     let addr: std::net::SocketAddr = "0.0.0.0:0".parse().expect("addr");
-    let e = crate::serve_in(
-        vec![p],
-        addr,
-        None,
-        gitterrace_config::Config::default(),
-        None,
-        None,
-    )
-    .await
-    .expect_err("served without public");
+    let e = crate::serve_in(vec![p], addr, None, gitterrace_config::Config::default(), None, None)
+        .await
+        .expect_err("served without public");
     assert!(e.to_string().contains("--public"), "{e}");
 }
 
@@ -427,10 +376,7 @@ async fn not_found_keeps_the_shell_and_offers_next_steps() {
     let app = ready_app(&p);
     let (s, body) = get(&app, "/blob/v1/src/nope.c").await;
     assert_eq!(s, 404);
-    assert!(
-        body.contains("class=\"tabnav\"") && body.contains("id=\"q\""),
-        "{body}"
-    );
+    assert!(body.contains("class=\"tabnav\"") && body.contains("id=\"q\""), "{body}");
     assert!(body.contains("No file at src/nope.c on v1"), "{body}");
     assert!(body.contains("Search for nope.c") && body.contains("/history/src/nope.c"));
     assert!(body.contains("/tree/v1\">Back to the tree of v1"), "{body}");
@@ -452,18 +398,11 @@ async fn refs_reads_only_the_rows_it_shows() {
     let dir = tempfile::tempdir().expect("tmp");
     let mut f = Fixture::init(&dir.path().join("many"));
     for i in 0..20 {
-        f = f
-            .write("a.txt", &format!("{i}\n"))
-            .commit(&format!("feat: c{i}"));
+        f = f.write("a.txt", &format!("{i}\n")).commit(&format!("feat: c{i}"));
     }
     let p = f.path().to_owned();
-    let tips: Vec<String> = (0..20)
-        .map(|i| {
-            git(&p, &["rev-parse", &format!("HEAD~{i}")])
-                .trim()
-                .to_owned()
-        })
-        .collect();
+    let tips: Vec<String> =
+        (0..20).map(|i| git(&p, &["rev-parse", &format!("HEAD~{i}")]).trim().to_owned()).collect();
     let lines: Vec<String> = (0..1000)
         .map(|i| {
             let tip = &tips[i % tips.len()];
@@ -478,21 +417,12 @@ async fn refs_reads_only_the_rows_it_shows() {
     let reads = app.repo.row_reads() - before;
     let shown = crate::routes::REFS_SHOWN as u64;
     // Per shown row: one commit read, and for a branch one divergence walk.
-    assert!(
-        reads <= 3 * shown,
-        "{reads} reads for {shown} rows shown of 2001 refs"
-    );
+    assert!(reads <= 3 * shown, "{reads} reads for {shown} rows shown of 2001 refs");
     assert!(body.contains("1,000 tags, 100 shown."), "honest tag count");
-    assert!(
-        body.contains("1,001 branches, 100 shown."),
-        "honest branch count"
-    );
+    assert!(body.contains("1,001 branches, 100 shown."), "honest branch count");
     assert!(body.contains("Show all 1,000 tags"));
     let (s, all) = get(&app, "/refs?all=1").await;
     assert_eq!(s, 200);
-    assert!(
-        all.contains("/tag/t0999") && all.contains("/log/b0999"),
-        "all rows on ?all=1"
-    );
+    assert!(all.contains("/tag/t0999") && all.contains("/log/b0999"), "all rows on ?all=1");
     assert!(!all.contains("shown."), "no cut on ?all=1");
 }

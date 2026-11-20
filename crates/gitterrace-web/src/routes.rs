@@ -92,10 +92,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .merge(assets())
         .fallback(crate::error::fallback)
         .with_state(Arc::clone(&app))
-        .layer(axum::middleware::from_fn_with_state(
-            app,
-            crate::lost::in_shell,
-        ))
+        .layer(axum::middleware::from_fn_with_state(app, crate::lost::in_shell))
 }
 
 /// Makes `?rev=` the selected ref for everything the request renders.
@@ -179,10 +176,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
             None
         };
         let counted = totals.as_ref().map(|t| {
-            format!(
-                "{} {} by {} {}",
-                t.commits, t.commits_noun, t.authors, t.authors_noun
-            )
+            format!("{} {} by {} {}", t.commits, t.commits_noun, t.authors, t.authors_noun)
         });
         Ok(OverviewPage {
             head: crate::pagehead::overview_head(
@@ -191,10 +185,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
                 upstream.as_ref(),
                 counted.as_deref(),
             ),
-            c: Chrome {
-                md: about.as_ref().is_some_and(|d| d.markdown),
-                ..c
-            },
+            c: Chrome { md: about.as_ref().is_some_and(|d| d.markdown), ..c },
             totals,
             about,
             entries: views::entries(&rev, "", &list),
@@ -235,13 +226,7 @@ fn overview_numbers(a: &App, head: &str, src: &crate::insights::Src) -> Numbers 
         counted: t.commits_figure().population().as_str(),
         commits: fmt::thousands(commits),
         commits_noun: fmt::noun(commits, "commit", "commits"),
-        merges: apart(
-            merges,
-            e.bots.value(),
-            t.commits,
-            commits,
-            a.defaults().bots,
-        ),
+        merges: apart(merges, e.bots.value(), t.commits, commits, a.defaults().bots),
         authors: fmt::thousands(t.authors),
         authors_noun: fmt::noun(t.authors, "author", "authors"),
         files: fmt::thousands(t.files),
@@ -291,11 +276,7 @@ async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<Str
     let p = blocking(&app, move |a| {
         let all = a.repo.refs()?;
         let now = fmt::now();
-        let limit = if q.all.as_deref() == Some("1") {
-            usize::MAX
-        } else {
-            REFS_SHOWN
-        };
+        let limit = if q.all.as_deref() == Some("1") { usize::MAX } else { REFS_SHOWN };
         let total = |k: RefKind| all.iter().filter(|r| r.kind == k).count();
         let tags = views::ref_rows(a, &all, RefKind::Tag, now, limit)?;
         let branches = crate::gitstate::branch_rows(a, &all, limit)?;
@@ -303,28 +284,16 @@ async fn refs(State(app): Shared, Query(q): Query<RefsQuery>) -> Result<Html<Str
         let cut = |k: RefKind, shown: usize, one: &'static str, many: &'static str| {
             let n = total(k);
             (n > shown).then(|| RefsCut {
-                said: format!(
-                    "{}, {} shown.",
-                    fmt::count(n, one, many),
-                    fmt::thousands(shown)
-                ),
+                said: format!("{}, {} shown.", fmt::count(n, one, many), fmt::thousands(shown)),
                 href: fmt::href("/refs?all=1"),
                 label: format!("Show all {}", fmt::count(n, one, many)),
             })
         };
         let branches_cut = cut(RefKind::Branch, branches.len(), "branch", "branches");
         let tags_cut = cut(RefKind::Tag, tags.len(), "tag", "tags");
-        let remotes_cut = cut(
-            RefKind::Remote,
-            remotes.len(),
-            "remote branch",
-            "remote branches",
-        );
+        let remotes_cut = cut(RefKind::Remote, remotes.len(), "remote branch", "remote branches");
         let (worktrees, stashes) = if crate::gitstate::local_state(a) {
-            (
-                crate::gitstate::worktree_rows(a)?,
-                crate::gitstate::stash_rows(a)?,
-            )
+            (crate::gitstate::worktree_rows(a)?, crate::gitstate::stash_rows(a)?)
         } else {
             (Vec::new(), Vec::new())
         };
@@ -499,9 +468,8 @@ async fn worktree(
         }
         let files = gitterrace_git::worktree_diff_scoped(&a.repo, scope)?;
         let tabs = crate::worktree_scope::tabs(scope, gitterrace_git::worktree_counts(&a.repo)?);
-        let (adds, dels) = files
-            .iter()
-            .fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
+        let (adds, dels) =
+            files.iter().fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
         let stats: Vec<WorktreeFileRow> = files
             .iter()
             .enumerate()

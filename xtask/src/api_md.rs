@@ -50,18 +50,8 @@ pub fn render() -> Out {
     s.push_str("\n## HTTP (`/api/v1`)\n\n| Endpoint | Query | Returns |\n| --- | --- | --- |\n");
     let mut generator = gitterrace_api::schema_generator();
     for e in ENDPOINTS {
-        let query = e
-            .params
-            .iter()
-            .map(|p| format!("`{}`", p.name))
-            .collect::<Vec<_>>()
-            .join(", ");
-        let _ = writeln!(
-            s,
-            "| `GET {}` | {query} | {} |",
-            e.path,
-            e.returns(&mut generator)
-        );
+        let query = e.params.iter().map(|p| format!("`{}`", p.name)).collect::<Vec<_>>().join(", ");
+        let _ = writeln!(s, "| `GET {}` | {query} | {} |", e.path, e.returns(&mut generator));
     }
     s.push_str(&parameters());
 
@@ -101,17 +91,9 @@ pub fn render() -> Out {
         let ro = if t.read_only { "" } else { " Not read-only." };
         // The untrusted-content warning is said once above; the tool description keeps it,
         // since that is what the model reads.
-        let desc = t
-            .description
-            .replace('\n', " ")
-            .replace(UNTRUSTED, "")
-            .trim_end()
-            .to_owned();
-        let args = if params.is_empty() {
-            String::new()
-        } else {
-            format!(" Parameters: {params}.")
-        };
+        let desc = t.description.replace('\n', " ").replace(UNTRUSTED, "").trim_end().to_owned();
+        let args =
+            if params.is_empty() { String::new() } else { format!(" Parameters: {params}.") };
         let item = format!("`{}`: {desc}{ro}{args}", t.name);
         let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
     }
@@ -136,11 +118,7 @@ fn prompts_section() -> String {
             })
             .collect::<Vec<_>>()
             .join(", ");
-        let args = if params.is_empty() {
-            String::new()
-        } else {
-            format!(" Arguments: {params}.")
-        };
+        let args = if params.is_empty() { String::new() } else { format!(" Arguments: {params}.") };
         let desc = p.description.replace('\n', " ").trim_end().to_owned();
         let item = format!("`{}`: {desc}{args}", p.name);
         let _ = writeln!(s, "{}", crate::out::wrap_item(&item));
@@ -203,10 +181,7 @@ fn same(a: &Param, b: &Param) -> bool {
 fn ends_with(params: &[Param], tail: &[Param]) -> bool {
     !tail.is_empty()
         && params.len() >= tail.len()
-        && params[params.len() - tail.len()..]
-            .iter()
-            .zip(tail)
-            .all(|(a, b)| same(a, b))
+        && params[params.len() - tail.len()..].iter().zip(tail).all(|(a, b)| same(a, b))
 }
 
 /// The longest run of parameters at the end of two or more endpoints, identical in name, type
@@ -242,13 +217,8 @@ mod tests {
             .iter()
             .filter(|t| t.description.replace('\n', " ").contains(UNTRUSTED))
             .count();
-        assert!(
-            carrying >= 4,
-            "the tools no longer carry the exact warning: {carrying}"
-        );
-        let Out::File { body, .. } = render() else {
-            panic!("api.md is a file")
-        };
+        assert!(carrying >= 4, "the tools no longer carry the exact warning: {carrying}");
+        let Out::File { body, .. } = render() else { panic!("api.md is a file") };
         assert_eq!(body.matches("untrusted").count(), 1, "{body}");
     }
 
@@ -256,23 +226,13 @@ mod tests {
     /// endpoint is still described on the page, and the shared list says each only once.
     #[test]
     fn every_endpoint_parameter_is_described_once_shared_or_own() {
-        let Out::File { body, .. } = render() else {
-            panic!("api.md is a file")
-        };
-        let params = body
-            .split("### Parameters")
-            .nth(1)
-            .expect("a parameters section");
+        let Out::File { body, .. } = render() else { panic!("api.md is a file") };
+        let params = body.split("### Parameters").nth(1).expect("a parameters section");
         let params = params.split("\n## ").next().unwrap_or(params);
         for e in ENDPOINTS {
             for p in e.params {
                 let item = format!("- `{}` ({}", p.name, p.ty);
-                assert!(
-                    params.contains(&item),
-                    "{} `{}` is not described",
-                    e.path,
-                    p.name
-                );
+                assert!(params.contains(&item), "{} `{}` is not described", e.path, p.name);
             }
         }
         for p in shared_tail() {

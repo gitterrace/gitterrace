@@ -53,18 +53,10 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
     (Feature::Live, &["/events"]),
     (
         Feature::Actions,
-        &[
-            "/_actions/status",
-            "/_actions/run",
-            "/_send/targets",
-            "/r/{name}/_send/targets",
-        ],
+        &["/_actions/status", "/_actions/run", "/_send/targets", "/r/{name}/_send/targets"],
     ),
     (Feature::RepoAdmin, &["/_repos"]),
-    (
-        Feature::Settings,
-        &["/_settings", "/_settings/file", "/_settings/check"],
-    ),
+    (Feature::Settings, &["/_settings", "/_settings/file", "/_settings/check"]),
     (Feature::Picker, &["/api/repos"]),
     (Feature::Mermaid, &[crate::MERMAID_JS]),
 ];
@@ -84,13 +76,8 @@ pub(crate) const INSIGHT_ROUTES: &[(&str, &str)] = &[
 const API: &str = "/api/v1";
 
 /// Features JS reads from the `gt-off` meta: they own a key, a menu entry or a fetch.
-const SCRIPTED: [Feature; 5] = [
-    Feature::Search,
-    Feature::Insights,
-    Feature::Raw,
-    Feature::Actions,
-    Feature::Picker,
-];
+const SCRIPTED: [Feature; 5] =
+    [Feature::Search, Feature::Insights, Feature::Raw, Feature::Actions, Feature::Picker];
 
 /// The features a route needs, every one of them on.
 pub(crate) fn features_of(route: &str) -> impl Iterator<Item = Feature> + '_ {
@@ -122,11 +109,7 @@ fn is_api_index(route: &str) -> bool {
 
 /// Route layer of one repository's pages and API.
 pub(crate) async fn repo_gate(State(app): State<Arc<App>>, req: Request, next: Next) -> Response {
-    let Some(route) = req
-        .extensions()
-        .get::<MatchedPath>()
-        .map(|m| m.as_str().to_owned())
-    else {
+    let Some(route) = req.extensions().get::<MatchedPath>().map(|m| m.as_str().to_owned()) else {
         return next.run(req).await;
     };
     let cfg = app.cfg();
@@ -151,11 +134,7 @@ pub(crate) async fn server_gate(State(env): State<Env>, req: Request, next: Next
         .extensions()
         .get::<MatchedPath>()
         .is_none_or(|m| route_on(&env.cfg(), None, m.as_str()));
-    if on {
-        next.run(req).await
-    } else {
-        absent().await
-    }
+    if on { next.run(req).await } else { absent().await }
 }
 
 /// What one page may show: the features off for its repository and the insights pages in
@@ -170,25 +149,16 @@ pub(crate) struct Effective {
 
 impl Effective {
     pub(crate) fn of(cfg: &Config, repo: Option<&str>) -> Self {
-        let off: Vec<Feature> = Feature::ALL
-            .into_iter()
-            .filter(|f| !cfg.feature_on(*f, repo))
-            .collect();
-        let chosen_off = off
-            .iter()
-            .copied()
-            .filter(|f| !(cfg.server.is_public && f.is_local_only()))
-            .collect();
+        let off: Vec<Feature> =
+            Feature::ALL.into_iter().filter(|f| !cfg.feature_on(*f, repo)).collect();
+        let chosen_off =
+            off.iter().copied().filter(|f| !(cfg.server.is_public && f.is_local_only())).collect();
         let pages = cfg
             .insight_pages(repo)
             .into_iter()
             .filter_map(|p| INSIGHT_PAGES.iter().copied().find(|q| *q == p))
             .collect();
-        Self {
-            off,
-            pages,
-            chosen_off,
-        }
+        Self { off, pages, chosen_off }
     }
 }
 
@@ -223,11 +193,7 @@ pub(crate) fn on(f: Feature) -> bool {
 /// `fmt::href(path)` when `f` is on for the page being rendered, else empty: a template shows
 /// the link only when it is not empty.
 pub(crate) fn href_if(f: Feature, path: &str) -> String {
-    if on(f) {
-        crate::fmt::href(path)
-    } else {
-        String::new()
-    }
+    if on(f) { crate::fmt::href(path) } else { String::new() }
 }
 
 /// The insights pages of the page being rendered, in tab order.
@@ -237,10 +203,7 @@ pub(crate) fn pages() -> Vec<&'static str> {
 
 /// The web route of the insights page `page`.
 pub(crate) fn page_route(page: &str) -> Option<&'static str> {
-    INSIGHT_ROUTES
-        .iter()
-        .find(|(p, r)| *p == page && !r.starts_with(API))
-        .map(|(_, r)| *r)
+    INSIGHT_ROUTES.iter().find(|(p, r)| *p == page && !r.starts_with(API)).map(|(_, r)| *r)
 }
 
 /// The link of the insights page named `page`, empty when it is not served.
@@ -274,10 +237,7 @@ pub(crate) fn scripted_off() -> String {
 
 /// The unfiltered pages to render ahead of visitors: [`crate::WARM_PAGES`] without those off.
 pub(crate) fn warm(cfg: &Config, repo: Option<&str>) -> Vec<&'static str> {
-    crate::WARM_PAGES
-        .into_iter()
-        .filter(|p| route_on(cfg, repo, p))
-        .collect()
+    crate::WARM_PAGES.into_iter().filter(|p| route_on(cfg, repo, p)).collect()
 }
 
 #[cfg(test)]

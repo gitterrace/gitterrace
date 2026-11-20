@@ -63,10 +63,8 @@ impl Writer {
             return Ok(());
         }
         if self.blocks == self.limit {
-            let full = std::mem::replace(
-                &mut self.w,
-                open_file(&self.dir, self.generation, self.next)?,
-            );
+            let full =
+                std::mem::replace(&mut self.w, open_file(&self.dir, self.generation, self.next)?);
             self.next += 1;
             self.blocks = 0;
             self.done.push(full.finish()?);

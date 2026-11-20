@@ -4,10 +4,7 @@ use tower::ServiceExt;
 
 /// GETs `uri` from a copy of `router` as a request for `localhost`; returns status and body.
 pub async fn get(router: &Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri)
-        .header("host", "localhost")
-        .body(Body::empty())
-        .expect("request");
+    let req = Request::get(uri).header("host", "localhost").body(Body::empty()).expect("request");
     let res = router.clone().oneshot(req).await.expect("response");
     let status = res.status().as_u16();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
@@ -22,10 +19,7 @@ pub async fn page(router: &Router, uri: &str) -> (u16, String) {
 
 /// The `/r/NAME` prefix of the lone repository `router` serves, read from where `/` forwards.
 pub async fn base(router: &Router) -> String {
-    let req = Request::get("/")
-        .header("host", "localhost")
-        .body(Body::empty())
-        .expect("request");
+    let req = Request::get("/").header("host", "localhost").body(Body::empty()).expect("request");
     let res = router.clone().oneshot(req).await.expect("response");
     let to = res
         .headers()
@@ -44,20 +38,12 @@ pub fn repeated_header_destinations(body: &str) -> Vec<String> {
         .and_then(|h| h.split("</header>").next())
         .and_then(|h| h.split("class=\"tools\"").nth(1))
         .unwrap_or_default();
-    let meta = body
-        .split("name=\"gt-settings\" content=\"")
-        .nth(1)
-        .and_then(|m| m.split('"').next());
-    let dests = head
-        .split(" href=\"")
-        .skip(1)
-        .filter_map(|p| p.split('"').next())
-        .chain(meta);
+    let meta =
+        body.split("name=\"gt-settings\" content=\"").nth(1).and_then(|m| m.split('"').next());
+    let dests = head.split(" href=\"").skip(1).filter_map(|p| p.split('"').next()).chain(meta);
     let mut seen = std::collections::BTreeSet::new();
-    let twice: std::collections::BTreeSet<String> = dests
-        .filter(|d| !d.is_empty() && !seen.insert(*d))
-        .map(str::to_owned)
-        .collect();
+    let twice: std::collections::BTreeSet<String> =
+        dests.filter(|d| !d.is_empty() && !seen.insert(*d)).map(str::to_owned).collect();
     twice.into_iter().collect()
 }
 

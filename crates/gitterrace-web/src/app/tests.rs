@@ -27,9 +27,7 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     let repo = gitterrace_git::Repo::discover(path).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     let key = app.memo_key("t", Some("q=type:fix"));
@@ -44,9 +42,7 @@ fn memo_key_moves_with_head_and_index_and_the_source_follows() {
     let moved = app.memo_key("t", Some("q=type:fix"));
     assert_ne!(key, moved, "moving HEAD must change the memo key");
     assert!(app.memo_get(&moved).is_none());
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     let second = crate::tests::unchecked_src(&app, &head);
@@ -67,33 +63,21 @@ fn overview_totals_are_computed_once_per_tip() {
     let repo = gitterrace_git::Repo::discover(path).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let opts = || app.defaults().into_options();
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
     assert_eq!(app.totals(&head, &*src, opts()).counted.commits, 1);
     let empty = gitterrace_index::feed::MemorySource::new(&[]);
-    assert_eq!(
-        app.totals(&head, &empty, opts()).counted.commits,
-        1,
-        "repeat must hit the memo"
-    );
+    assert_eq!(app.totals(&head, &empty, opts()).counted.commits, 1, "repeat must hit the memo");
 
     std::fs::write(path.join("a.txt"), "2\n").expect("write");
     git(path, &["commit", "-qam", "fix: two"]);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
-    assert_eq!(
-        app.totals(&head, &*src, opts()).counted.commits,
-        2,
-        "a new tip recomputes"
-    );
+    assert_eq!(app.totals(&head, &*src, opts()).counted.commits, 2, "a new tip recomputes");
 }
 
 #[test]
@@ -108,10 +92,7 @@ fn racing_callers_share_one_source() {
         .into_iter()
         .map(|t| t.join().expect("join"))
         .collect();
-    assert!(
-        sets.iter().all(|s| s.len() == 1),
-        "every caller reads the set"
-    );
+    assert!(sets.iter().all(|s| s.len() == 1), "every caller reads the set");
     // Racers may each open the set (it is a pread view, cheap); once one is kept, all share it.
     let kept = crate::tests::unchecked_src(&app, &head);
     let again = crate::tests::unchecked_src(&app, &head);
@@ -132,21 +113,12 @@ fn alternating_selected_commits_each_read_the_segment_set() {
     let repo = gitterrace_git::Repo::discover(path).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     for _ in 0..3 {
         assert_eq!(crate::tests::unchecked_src(&app, &head).len(), 2);
-        assert_eq!(
-            app.source(&first)
-                .expect("source")
-                .expect("ready")
-                .unchecked()
-                .len(),
-            1
-        );
+        assert_eq!(app.source(&first).expect("source").expect("ready").unchecked().len(), 1);
     }
 }
 
@@ -171,19 +143,9 @@ fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
     assert!(!app.release_idle(Duration::from_secs(3600)), "in use");
     assert!(weak.upgrade().is_some(), "kept while browsed");
     assert!(app.release_idle(Duration::ZERO));
-    assert!(
-        weak.upgrade().is_none(),
-        "an idle app still holds its source"
-    );
-    assert_eq!(
-        tables(),
-        0,
-        "an idle app still holds the tables built over it"
-    );
-    assert!(
-        !app.source_held(),
-        "an idle app still holds its insights source"
-    );
+    assert!(weak.upgrade().is_none(), "an idle app still holds its source");
+    assert_eq!(tables(), 0, "an idle app still holds the tables built over it");
+    assert!(!app.source_held(), "an idle app still holds its insights source");
     let again = crate::tests::unchecked_src(&app, &head);
     assert_eq!(again.len(), 1);
 }
@@ -199,9 +161,7 @@ fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
     let repo = gitterrace_git::Repo::discover(path).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     (dir, app, head)
@@ -217,10 +177,7 @@ fn an_unreadable_cache_drops_every_memoized_page() {
     app.memo_put(page.clone(), "built over a failing read");
     assert!(app.memo_get(&page).is_some());
     app.unreadable_now().expect("rebuild");
-    assert!(
-        app.memo_get(&page).is_none(),
-        "a page memo survived the rebuild"
-    );
+    assert!(app.memo_get(&page).is_none(), "a page memo survived the rebuild");
 }
 
 /// Every per-request cache is empty after an idle release, whichever page filled it. The
@@ -251,18 +208,12 @@ fn an_idle_release_empties_every_cache() {
 fn an_idle_release_empties_blame_and_highlighted_code() {
     let (_dir, app, head) = one_commit_app();
     let _ = app.repo.blame(&head, "a.rs").expect("blame");
-    assert!(
-        app.repo.blame_is_cached(&head, "a.rs"),
-        "the blame was kept"
-    );
+    assert!(app.repo.blame_is_cached(&head, "a.rs"), "the blame was kept");
     let r = crate::views::Render::test(1 << 20);
     let text = "fn released_on_idle() {}\n";
     let _ = crate::views::code_html(&r, "idle.rs", text);
     assert!(app.release_idle(Duration::ZERO));
-    assert!(
-        !app.repo.blame_is_cached(&head, "a.rs"),
-        "the blame survived the idle release"
-    );
+    assert!(!app.repo.blame_is_cached(&head, "a.rs"), "the blame survived the idle release");
     assert!(
         !crate::views::code_is_cached(&r, "idle.rs", text),
         "a highlighted file survived the idle release"
@@ -277,9 +228,8 @@ fn warm_up_reads_do_not_delay_the_release() {
     const IDLE: Duration = Duration::from_secs(3600);
     let (_dir, app, head) = one_commit_app();
     let set_back = || {
-        let past = Instant::now()
-            .checked_sub(Duration::from_hours(24))
-            .expect("a clock past one day");
+        let past =
+            Instant::now().checked_sub(Duration::from_hours(24)).expect("a clock past one day");
         *app.records_used.lock().expect("lock") = past;
     };
     set_back();
@@ -288,16 +238,10 @@ fn warm_up_reads_do_not_delay_the_release() {
         let src = crate::tests::unchecked_src(&app, &head);
         app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     }
-    assert!(
-        app.release_idle(IDLE),
-        "the warm-up kept the caches as if a visitor had read them"
-    );
+    assert!(app.release_idle(IDLE), "the warm-up kept the caches as if a visitor had read them");
     set_back();
     let _ = crate::tests::unchecked_src(&app, &head);
-    assert!(
-        !app.release_idle(IDLE),
-        "a visitor's read did not count as use"
-    );
+    assert!(!app.release_idle(IDLE), "a visitor's read did not count as use");
 }
 
 /// A history with renames, a dir rename, deletes, an untouched-path merge, a merge that
@@ -365,9 +309,7 @@ fn tangled() -> (tempfile::TempDir, App) {
     let repo = gitterrace_git::Repo::discover(p).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     (dir, app)
 }
@@ -399,9 +341,8 @@ fn indexed_path_history_matches_the_walk() {
         for d in ["", "d", "e", "f"] {
             let names =
                 |v: Vec<LastCommit>| -> Vec<_> { v.into_iter().map(|l| (l.name, l.id)).collect() };
-            let walked = gitterrace_git::last_commits(&app.repo, tip, d, Duration::MAX)
-                .expect("walk")
-                .0;
+            let walked =
+                gitterrace_git::last_commits(&app.repo, tip, d, Duration::MAX).expect("walk").0;
             let indexed = app.last_commits(tip, d).expect("indexed");
             let indexed = names((*indexed).clone());
             assert_eq!(indexed, names(walked), "dir {d:?} at {tip}");
@@ -420,9 +361,7 @@ fn path_log_is_memoized_per_tip_and_generation() {
     assert!(Arc::ptr_eq(&first, &again), "a repeat must hit the memo");
     std::fs::write(dir.path().join("d/a2"), "4\n").expect("write");
     git(dir.path(), &["commit", "-qam", "four"]);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     let head2 = app.repo.resolve("HEAD").expect("head");
     let moved = app.path_log(&head2, "d/a2").expect("log").expect("ready");
     let newest = moved.ids.first();
@@ -445,17 +384,10 @@ fn a_missing_tree_cuts_the_path_log_to_a_correct_prefix() {
     let repo = gitterrace_git::Repo::discover(p).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
-    let walked = app
-        .repo
-        .log(&head, Some("f"), 0, 3)
-        .expect("log")
-        .into_iter()
-        .len();
+    let walked = app.repo.log(&head, Some("f"), 0, 3).expect("log").into_iter().len();
     let spec = format!("HEAD~4^{}tree{}", '{', '}');
     let tree = git(p, &["rev-parse", &spec]);
     let (dir2, file) = tree.trim().split_at(2);
@@ -488,9 +420,7 @@ fn last_commit_cache_follows_history_not_tree_and_skips_cut_walks() {
     let repo = gitterrace_git::Repo::discover(path).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = App::new(repo, index);
-    let cut = app
-        .last_commits_within(&on_main, "d", std::time::Duration::ZERO)
-        .expect("cut");
+    let cut = app.last_commits_within(&on_main, "d", std::time::Duration::ZERO).expect("cut");
     assert!(cut.is_empty());
     let main = app.last_commits(&on_main, "d").expect("main");
     assert_eq!(main.first().map(|c| c.id.as_str()), Some(on_main.as_str()));

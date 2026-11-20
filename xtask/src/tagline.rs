@@ -42,18 +42,12 @@ struct Pen {
 }
 
 fn ntos(v: f64) -> String {
-    format!("{v:.2}")
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .to_owned()
+    format!("{v:.2}").trim_end_matches('0').trim_end_matches('.').to_owned()
 }
 
 impl Pen {
     fn at(&self, x: f32, y: f32) -> (f64, f64) {
-        (
-            self.scale * f64::from(x) + self.x,
-            -self.scale * f64::from(y) + BASELINE,
-        )
+        (self.scale * f64::from(x) + self.x, -self.scale * f64::from(y) + BASELINE)
     }
 
     fn pt((x, y): (f64, f64)) -> String {
@@ -107,12 +101,7 @@ impl OutlinePen for Pen {
 
     fn curve_to(&mut self, x1: f32, y1: f32, x2: f32, y2: f32, x3: f32, y3: f32) {
         let (c1, c2, p) = (self.at(x1, y1), self.at(x2, y2), self.at(x3, y3));
-        self.cmds.push(format!(
-            "C{} {} {}",
-            Self::pt(c1),
-            Self::pt(c2),
-            Self::pt(p)
-        ));
+        self.cmds.push(format!("C{} {} {}", Self::pt(c1), Self::pt(c2), Self::pt(p)));
         self.last_cmd = 'C';
         self.last = Some(p);
         self.line_end = false;
@@ -134,10 +123,7 @@ fn outline(root: &Path, text: &str) -> Result<String> {
     let woff = std::fs::read(root.join(FONT)).with_context(|| format!("reading {FONT}"))?;
     let ttf = wuff::decompress_woff2(&woff).context("decoding the font")?;
     let font = FontRef::new(&ttf).context("parsing the font")?;
-    anyhow::ensure!(
-        font.axes().iter().any(|a| a.tag() == "wght"),
-        "the font has no wght axis"
-    );
+    anyhow::ensure!(font.axes().iter().any(|a| a.tag() == "wght"), "the font has no wght axis");
     let location = font.axes().location([("wght", WEIGHT)]);
     let loc = LocationRef::from(&location);
     let scale = SIZE / f64::from(font.metrics(Size::unscaled(), loc).units_per_em);
@@ -154,9 +140,7 @@ fn outline(root: &Path, text: &str) -> Result<String> {
         line_end: false,
     };
     for ch in text.chars() {
-        let id = charmap
-            .map(ch)
-            .with_context(|| format!("no glyph for {ch:?}"))?;
+        let id = charmap.map(ch).with_context(|| format!("no glyph for {ch:?}"))?;
         glyphs
             .get(id)
             .with_context(|| format!("no outline for {ch:?}"))?
@@ -170,12 +154,10 @@ fn outline(root: &Path, text: &str) -> Result<String> {
 }
 
 fn sha(d: &str) -> String {
-    Sha256::digest(d.as_bytes())
-        .iter()
-        .fold(String::new(), |mut s, b| {
-            let _ = write!(s, "{b:02x}");
-            s
-        })
+    Sha256::digest(d.as_bytes()).iter().fold(String::new(), |mut s, b| {
+        let _ = write!(s, "{b:02x}");
+        s
+    })
 }
 
 fn escape(text: &str) -> String {
@@ -191,9 +173,7 @@ fn last_path(svg: &str) -> Result<regex::Captures<'_>> {
         r#"<path fill="(#[0-9a-f]{6})""#,
         r#"(?: data-text="([^"]*)" data-sha="([0-9a-f]{64})")? d="([^"]*)"/>"#
     ))?;
-    path.captures_iter(svg)
-        .last()
-        .context("no tagline path in the header")
+    path.captures_iter(svg).last().context("no tagline path in the header")
 }
 
 /// Fails unless the header's last path spells [`TAGLINE`] and its digest matches its data, so
@@ -204,14 +184,8 @@ pub fn verify(svg: &str) -> Result<()> {
     let (Some(text), Some(digest)) = (text, digest) else {
         anyhow::bail!("the tagline path has no data-text and data-sha");
     };
-    ensure!(
-        unescape(text.as_str()) == TAGLINE,
-        "the drawn tagline is not TAGLINE"
-    );
-    ensure!(
-        digest.as_str() == sha(d),
-        "the tagline's data-sha does not match its path"
-    );
+    ensure!(unescape(text.as_str()) == TAGLINE, "the drawn tagline is not TAGLINE");
+    ensure!(digest.as_str() == sha(d), "the tagline's data-sha does not match its path");
     Ok(())
 }
 

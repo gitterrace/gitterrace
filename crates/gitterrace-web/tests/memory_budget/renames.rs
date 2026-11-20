@@ -20,10 +20,7 @@ fn idle_stays_in_budget_with_many_renames() {
     }
     let dir = tempfile::tempdir().expect("tmp");
     synthetic::build_renames(dir.path(), 20_000, 9);
-    let s = Server::start(
-        dir.path(),
-        "renames::idle_stays_in_budget_with_many_renames",
-    );
+    let s = Server::start(dir.path(), "renames::idle_stays_in_budget_with_many_renames");
     let base = s.base();
     s.wait_ready(&base);
     s.wait_released(&base, 0);
@@ -34,9 +31,5 @@ fn idle_stays_in_budget_with_many_renames() {
     s.wait_released(&base, before);
     let idle = s.dirty();
     writeln!(std::io::stderr(), "many renames: idle {} MB", idle / MB).expect("stderr");
-    assert!(
-        idle <= BUDGET_MB * MB,
-        "idle {} MB, budget {BUDGET_MB} MB",
-        idle / MB
-    );
+    assert!(idle <= BUDGET_MB * MB, "idle {} MB, budget {BUDGET_MB} MB", idle / MB);
 }

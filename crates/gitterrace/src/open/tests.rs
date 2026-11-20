@@ -18,11 +18,7 @@ fn repo(dir: &Path) -> (std::path::PathBuf, String, String) {
     git(dir, &["commit", "-qm", "root"]);
     let head = git(dir, &["rev-parse", "HEAD"]);
     let root = git(dir, &["rev-list", "--max-parents=0", "HEAD"]);
-    (
-        dir.canonicalize().expect("canon"),
-        root[..12].to_owned(),
-        head,
-    )
+    (dir.canonicalize().expect("canon"), root[..12].to_owned(), head)
 }
 
 #[test]
@@ -33,19 +29,13 @@ fn resolves_registered_and_root_clones() {
     let want = format!("/go/{id}/{head}/src/a.rs#L2-L3");
 
     let got = resolve(&link, &[(id.clone(), a.clone())], &[], 2, &[]).expect("registered");
-    assert_eq!(
-        (got.clone, got.path, got.note),
-        (a.clone(), want.clone(), None)
-    );
+    assert_eq!((got.clone, got.path, got.note), (a.clone(), want.clone(), None));
 
     let got = resolve(&link, &[], &[t.path().to_owned()], 2, &[]).expect("root");
     assert_eq!((got.clone, got.path), (a.clone(), want.clone()));
 
     let go = format!("http://127.0.0.1:9/go/{id}/{head}/src/a.rs#L2-L3");
-    assert_eq!(
-        resolve(&go, &[(id, a)], &[], 2, &[]).expect("go").path,
-        want
-    );
+    assert_eq!(resolve(&go, &[(id, a)], &[], 2, &[]).expect("go").path, want);
 }
 
 #[test]
@@ -54,13 +44,7 @@ fn unknown_id_missing_commit_and_missing_path() {
     let (a, id, head) = repo(&t.path().join("a"));
     let other = format!("gitterrace://000000000000/{head}");
     assert!(matches!(
-        resolve(
-            &other,
-            &[("000000000000".to_owned(), a.clone())],
-            &[t.path().to_owned()],
-            2,
-            &[]
-        ),
+        resolve(&other, &[("000000000000".to_owned(), a.clone())], &[t.path().to_owned()], 2, &[]),
         Err(OpenError::Unknown(_))
     ));
     let behind = format!("gitterrace://{id}/{}", "f".repeat(40));
@@ -97,10 +81,7 @@ fn serve_listener(repos: Vec<std::path::PathBuf>, l: TcpListener, state: Option<
     let held = state.map(Path::to_path_buf);
     let state = held.clone();
     std::thread::spawn(move || {
-        let rt = tokio::runtime::Builder::new_multi_thread()
-            .enable_all()
-            .build()
-            .expect("rt");
+        let rt = tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("rt");
         rt.block_on(async move {
             let l = tokio::net::TcpListener::from_std(l).expect("listener");
             gitterrace_web::serve_on(
@@ -155,11 +136,7 @@ fn open_never_starts_a_second_server_when_one_answers_on_the_address() {
     let addr = serve_fresh(vec![a.clone(), b], Some(&state));
     let probe_of = |p: &Path| {
         let r = Repo::discover(p).expect("repo");
-        format!(
-            "/go/{}/{}",
-            r.id().expect("id"),
-            r.resolve("HEAD").expect("head")
-        )
+        format!("/go/{}/{}", r.id().expect("id"), r.resolve("HEAD").expect("head"))
     };
 
     // (1) a served repository is joined, in multi mode with its /r/<name>/ prefix.
@@ -171,11 +148,7 @@ fn open_never_starts_a_second_server_when_one_answers_on_the_address() {
     .expect("join");
     assert_eq!((got, started.len()), (addr, 0));
     let repo = Repo::discover(&a).expect("repo");
-    let probe = format!(
-        "/go/{}/{}",
-        repo.id().expect("id"),
-        repo.resolve("HEAD").expect("head")
-    );
+    let probe = format!("/go/{}/{}", repo.id().expect("id"), repo.resolve("HEAD").expect("head"));
     assert!(serves(addr, &probe));
 
     // (2) a repository the server lacks is added to it: same address, nothing started,
@@ -260,11 +233,7 @@ fn a_second_serve_joins_the_running_server() {
     assert!(!join_running(addr, std::slice::from_ref(&b), None).expect("no secret"));
     assert!(join_running(addr, std::slice::from_ref(&b), Some(&state)).expect("join"));
     let r = Repo::discover(&b).expect("repo");
-    let probe = format!(
-        "/go/{}/{}",
-        r.id().expect("id"),
-        r.resolve("HEAD").expect("head")
-    );
+    let probe = format!("/go/{}/{}", r.id().expect("id"), r.resolve("HEAD").expect("head"));
     assert!(serves(addr, &probe));
     let foreign = TcpListener::bind("127.0.0.1:0").expect("bind");
     let faddr = foreign.local_addr().expect("addr");
@@ -273,11 +242,7 @@ fn a_second_serve_joins_the_running_server() {
 
 fn probe_of(p: &Path) -> String {
     let r = Repo::discover(p).expect("repo");
-    format!(
-        "/go/{}/{}",
-        r.id().expect("id"),
-        r.resolve("HEAD").expect("head")
-    )
+    format!("/go/{}/{}", r.id().expect("id"), r.resolve("HEAD").expect("head"))
 }
 
 /// Guard class: joining several roots is all or nothing up to the first add, and never
@@ -299,10 +264,7 @@ fn a_partial_join_adds_nothing_and_never_binds() {
 
     let err = join_running(addr, &[b.clone(), plain], Some(&state));
     assert!(err.is_err(), "a bad root is an error, not a bind");
-    assert!(
-        !serves(addr, &probe_of(&b)),
-        "nothing added before the bad root"
-    );
+    assert!(!serves(addr, &probe_of(&b)), "nothing added before the bad root");
 
     #[cfg(unix)]
     {
@@ -319,9 +281,7 @@ fn a_partial_join_adds_nothing_and_never_binds() {
             let got = join_running(addr, &[b, c], Some(&state));
             std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o755))
                 .expect("chmod");
-            let why = got
-                .expect_err("a refused add is an error, not a bind")
-                .to_string();
+            let why = got.expect_err("a refused add is an error, not a bind").to_string();
             assert!(why.contains("could not add"), "{why}");
         }
     }
@@ -345,9 +305,7 @@ fn a_mimic_of_the_status_reply_is_not_gitterrace() {
         for mut s in fake.incoming().flatten() {
             let mut buf = [0u8; 4096];
             let n = s.read(&mut buf).unwrap_or(0);
-            log.lock()
-                .expect("lock")
-                .push_str(&String::from_utf8_lossy(&buf[..n]));
+            log.lock().expect("lock").push_str(&String::from_utf8_lossy(&buf[..n]));
             let body = r#"{"note":null,"proof":"x"}"#;
             let reply = format!(
                 "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: \
@@ -407,32 +365,20 @@ fn a_range_spec_tells_two_dots_from_three() {
 
 #[test]
 fn server_errors_keep_their_text() {
-    assert_eq!(
-        ServerError::NoState.to_string(),
-        "no state folder to read its secret from"
-    );
+    assert_eq!(ServerError::NoState.to_string(), "no state folder to read its secret from");
     assert_eq!(ServerError::NoAnswer.to_string(), "no answer");
     assert_eq!(
         ServerError::NoAdding.to_string(),
         "it predates adding repositories or does not allow it"
     );
-    assert_eq!(
-        ServerError::NoRemoving.to_string(),
-        "it predates removing repositories"
-    );
-    let e = ServerError::Status {
-        status: 422,
-        reason: "no".into(),
-    };
+    assert_eq!(ServerError::NoRemoving.to_string(), "it predates removing repositories");
+    let e = ServerError::Status { status: 422, reason: "no".into() };
     assert_eq!(e.to_string(), "HTTP 422: no");
 }
 
 #[test]
 fn request_bodies_keep_their_bytes() {
-    let add = serde_json::to_string(&AddBody {
-        path: Path::new("/r"),
-    })
-    .expect("json");
+    let add = serde_json::to_string(&AddBody { path: Path::new("/r") }).expect("json");
     assert_eq!(add, serde_json::json!({ "path": "/r" }).to_string());
     let by_name = serde_json::to_string(&RemoveBody::Name { name: "n" }).expect("json");
     assert_eq!(by_name, serde_json::json!({ "name": "n" }).to_string());

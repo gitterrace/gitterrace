@@ -58,10 +58,7 @@ async fn a_far_revision_asks_for_a_reindex_and_holds_nothing() {
     assert_eq!(status, 200);
     assert!(body.contains("need a reindex"), "far page missing: {body}");
     assert!(body.contains("indexed branch"), "{body}");
-    assert!(
-        !body.contains("data-progress"),
-        "indexing page instead: {body}"
-    );
+    assert!(!body.contains("data-progress"), "indexing page instead: {body}");
 
     let (status, api) = page(&router, "/api/v1/insights/summary?rev=far").await;
     assert_eq!(status, 409, "{api}");

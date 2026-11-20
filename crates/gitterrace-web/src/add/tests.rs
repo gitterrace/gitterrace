@@ -24,11 +24,7 @@ pub(super) async fn send(
     req: axum::http::request::Builder,
     body: String,
 ) -> (u16, String) {
-    let res = r
-        .clone()
-        .oneshot(req.body(Body::from(body)).expect("req"))
-        .await
-        .expect("res");
+    let res = r.clone().oneshot(req.body(Body::from(body)).expect("req")).await.expect("res");
     let s = res.status().as_u16();
     let b = res.into_body().collect().await.expect("body").to_bytes();
     (s, String::from_utf8_lossy(&b).into_owned())
@@ -94,26 +90,14 @@ async fn adds_and_guards(several: bool) {
     let same = post(tok).header("sec-fetch-site", "same-origin");
     assert_eq!(send(&r, same, body(&b)).await.0, 403, "fetch metadata");
     let (_, list) = get(&r, "/api/repos").await;
-    assert_eq!(
-        list.matches("\"href\"").count(),
-        start_len,
-        "nothing added yet"
-    );
+    assert_eq!(list.matches("\"href\"").count(), start_len, "nothing added yet");
 
     let plain = tmp.path().join("plain");
     std::fs::create_dir_all(&plain).expect("dir");
     let plain = plain.canonicalize().expect("canon");
     assert_eq!(send(&r, post(tok), body(&plain)).await.0, 400, "no repo");
-    assert_eq!(
-        send(&r, post(tok), body(&b.join("src"))).await.0,
-        400,
-        "inside one"
-    );
-    assert_eq!(
-        send(&r, post(tok), body(Path::new("rel"))).await.0,
-        400,
-        "relative"
-    );
+    assert_eq!(send(&r, post(tok), body(&b.join("src"))).await.0, 400, "inside one");
+    assert_eq!(send(&r, post(tok), body(Path::new("rel"))).await.0, 400, "relative");
     #[cfg(unix)]
     {
         let link = tmp.path().join("link");
@@ -123,12 +107,7 @@ async fn adds_and_guards(several: bool) {
     }
     // Spelled as text: on Windows `b` is a verbatim `\\?\` path, and `join("../a")` folds the
     // `..` there, which sent `b` itself and was rightly added.
-    let dot_dot = PathBuf::from(format!(
-        "{}{}..{}a",
-        b.display(),
-        MAIN_SEPARATOR,
-        MAIN_SEPARATOR
-    ));
+    let dot_dot = PathBuf::from(format!("{}{}..{}a", b.display(), MAIN_SEPARATOR, MAIN_SEPARATOR));
     assert_eq!(send(&r, post(tok), body(&dot_dot)).await.0, 400, "dot-dot");
 
     let (s, js) = send(&r, post(tok), body(&b)).await;
@@ -140,32 +119,18 @@ async fn adds_and_guards(several: bool) {
     assert_eq!(v["base"], format!("/r/{name}/"), "{js}");
     let (s, page) = opened(&r, &format!("/r/{name}/")).await;
     assert_eq!(s, 200);
-    assert!(
-        page.contains(&format!("/r/{name}/tree/")),
-        "links carry the prefix"
-    );
-    assert_eq!(
-        get(&r, &format!("/r/{name}/blob/HEAD/src/a.rs")).await.0,
-        200
-    );
+    assert!(page.contains(&format!("/r/{name}/tree/")), "links carry the prefix");
+    assert_eq!(get(&r, &format!("/r/{name}/blob/HEAD/src/a.rs")).await.0, 200);
     assert_eq!(get(&r, "/r/a/").await.0, 200, "the first keeps its URL");
     let (_, list) = get(&r, "/api/repos").await;
     assert!(list.contains(&format!("\"/r/{name}/\"")), "{list}");
     // A permalink to the added repository resolves.
     let repo = gitterrace_git::Repo::discover(&b).expect("repo");
-    let go = format!(
-        "/go/{}/{}",
-        repo.id().expect("id"),
-        repo.resolve("HEAD").expect("head")
-    );
+    let go = format!("/go/{}/{}", repo.id().expect("id"), repo.resolve("HEAD").expect("head"));
     assert_eq!(get(&r, &go).await.0, 302);
 
     let (s, js) = send(&r, post(tok), body(&b)).await;
-    assert_eq!(
-        (s, js.contains(&format!("\"name\":\"{name}\""))),
-        (409, true),
-        "{js}"
-    );
+    assert_eq!((s, js.contains(&format!("\"name\":\"{name}\""))), (409, true), "{js}");
     let (s, js) = send(&r, post(tok), body(&first)).await;
     assert_eq!(s, 409, "a startup repository: {js}");
     assert!(js.contains("\"base\":\"/r/a/\""), "{js}");
@@ -185,11 +150,7 @@ async fn the_challenge_proves_the_secret_without_sending_it() {
     let (r, _) = crate::build_server(vec![first], None, None, &env, Some(token), None).expect("r");
     let (s, js) = get(&r, "/_repos?nonce=n1").await;
     let want = gitterrace_actions::token_proof(&secret, "n1");
-    assert_eq!(
-        (s, js.contains(&want), js.contains(&secret)),
-        (200, true, false),
-        "{js}"
-    );
+    assert_eq!((s, js.contains(&want), js.contains(&secret)), (200, true, false), "{js}");
     let browser = Request::get("/_repos?nonce=n1")
         .header("host", gitterrace_testkit::on_port("localhost"))
         .header("sec-fetch-site", "same-origin");
@@ -285,10 +246,7 @@ async fn an_addition_that_will_not_open_is_refused_and_forgotten() {
     std::fs::set_permissions(&git_dir, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     assert_eq!(status, 422, "{js}");
     assert!(js.contains("cannot open the repository"), "{js}");
-    assert!(
-        !get(&server, "/api/repos").await.1.contains("/r/b/"),
-        "listed"
-    );
+    assert!(!get(&server, "/api/repos").await.1.contains("/r/b/"), "listed");
     assert_eq!(get(&server, "/r/b/").await.0, 404, "not served");
     let recorded = std::fs::read_to_string(state.join("repos.json")).unwrap_or_default();
     assert!(!recorded.contains(b.to_str().expect("utf8")), "{recorded}");
@@ -326,10 +284,7 @@ async fn an_addition_answers_before_the_repository_opens() {
     let (status, js) = sent.await.expect("add");
     assert_eq!(status, 202, "{js}");
     assert!(js.contains("\"base\":\"/r/b/\""), "{js}");
-    assert!(
-        get(&r, "/api/repos").await.1.contains("/r/b/"),
-        "listed at once"
-    );
+    assert!(get(&r, "/api/repos").await.1.contains("/r/b/"), "listed at once");
     lock.unlock().expect("release");
     ready(&r, "/r/b").await;
 }
@@ -355,10 +310,7 @@ async fn an_addition_shows_indexing_until_it_opens() {
     let (status, page) = get(&r, "/r/b/").await;
     assert_eq!(status, 503, "{page}");
     let (_, home) = get(&r, "/").await;
-    assert!(
-        home.contains("indexing"),
-        "the home page shows the state: {home}"
-    );
+    assert!(home.contains("indexing"), "the home page shows the state: {home}");
     lock.unlock().expect("release");
     ready(&r, "/r/b").await;
     assert_eq!(get(&r, "/r/b/").await.0, 200);
@@ -385,11 +337,7 @@ async fn a_removal_during_the_opening_stays_removed() {
         .header("host", gitterrace_testkit::on_port("localhost"))
         .header(TOKEN_HEADER, &secret);
     assert_eq!(send(&r, del, r#"{"name":"b"}"#.into()).await.0, 200);
-    assert_eq!(
-        send(&r, post(Some(&secret)), body(&b)).await.0,
-        202,
-        "added again"
-    );
+    assert_eq!(send(&r, post(Some(&secret)), body(&b)).await.0, 202, "added again");
     lock.unlock().expect("release");
     ready(&r, "/r/b").await;
     assert_eq!(get(&r, "/r/b/").await.0, 200, "the new entry serves");
@@ -404,10 +352,7 @@ async fn no_token_no_route() {
     let (r, _) = crate::build_server(vec![a], None, None, &env, None, None).expect("r");
     // Unmounted, so the request reaches no handler: the page router's 404 (or 405).
     let status = send(&r, post(Some("x")), body(&b)).await.0;
-    assert!(
-        status == 404 || status == 405,
-        "added without a token route: {status}"
-    );
+    assert!(status == 404 || status == 405, "added without a token route: {status}");
 }
 
 /// The hrefs of `html` that stay on this server.
@@ -440,35 +385,21 @@ async fn links_handed_out_survive_a_join_and_a_restart() {
     let state = t.path().join("state");
     let a = repo(&t.path().join("a"), "a root");
     let b = repo(&t.path().join("b"), "b root");
-    let id = gitterrace_git::Repo::discover(&a)
-        .expect("repo")
-        .id()
-        .expect("id");
+    let id = gitterrace_git::Repo::discover(&a).expect("repo").id().expect("id");
     let head = gitterrace_testkit::git(&a, &["rev-parse", "HEAD"]);
-    let go = [
-        format!("/go/{id}/{head}"),
-        format!("/go/{id}/{head}/src/a.rs"),
-    ];
+    let go = [format!("/go/{id}/{head}"), format!("/go/{id}/{head}/src/a.rs")];
 
     let (alone, secret) = server(vec![a.clone()], &state);
     ready(&alone, "/r/a").await;
     let mut urls: Vec<String> = Vec::new();
-    for page in [
-        "/r/a/",
-        "/r/a/log/HEAD",
-        "/r/a/refs",
-        "/r/a/blob/HEAD/src/a.rs",
-    ] {
+    for page in ["/r/a/", "/r/a/log/HEAD", "/r/a/refs", "/r/a/blob/HEAD/src/a.rs"] {
         let (s, html) = get(&alone, page).await;
         assert_eq!(s, 200, "{page}");
         for l in local_links(&html) {
             // The guard on the class: no page of a lone repository links outside its
             // prefix except to the server's own routes, which never move.
             let server_route = l == "/" || l.starts_with("/static/") || l.starts_with("/go/");
-            assert!(
-                l.starts_with("/r/a/") || server_route,
-                "{page} links {l} outside /r/a/"
-            );
+            assert!(l.starts_with("/r/a/") || server_route, "{page} links {l} outside /r/a/");
             if l.starts_with("/r/a/") && !urls.contains(&l) {
                 urls.push(l);
             }
@@ -516,10 +447,7 @@ async fn ready(r: &axum::Router, prefix: &str) {
 
 /// The `<main>` of a page: what it shows, without the header around it.
 fn main_of(html: &str) -> &str {
-    html.split_once("<main")
-        .map_or(html, |(_, m)| m)
-        .split_once("</main>")
-        .map_or("", |(m, _)| m)
+    html.split_once("<main").map_or(html, |(_, m)| m).split_once("</main>").map_or("", |(m, _)| m)
 }
 
 async fn location(r: &axum::Router, uri: &str) -> Option<String> {
@@ -533,8 +461,5 @@ async fn location(r: &axum::Router, uri: &str) -> Option<String> {
         )
         .await
         .expect("res");
-    res.headers()
-        .get("location")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned)
+    res.headers().get("location").and_then(|v| v.to_str().ok()).map(str::to_owned)
 }

@@ -8,10 +8,7 @@ use std::fmt::Write as _;
 fn pins() -> Vec<(String, String, String)> {
     let mut out: Vec<(String, String, String)> = Vec::new();
     let quoted = |l: &str, key: &str| {
-        l.trim()
-            .strip_prefix(key)
-            .and_then(|t| t.split('\'').next())
-            .map(str::to_owned)
+        l.trim().strip_prefix(key).and_then(|t| t.split('\'').next()).map(str::to_owned)
     };
     for line in include_str!("../../scripts/lib/corpus-lib.mjs").lines() {
         if let Some(n) = line.strip_prefix("  ").and_then(|l| l.strip_suffix(": {")) {
@@ -53,14 +50,8 @@ fn shot_repos() -> Vec<(String, String)> {
     let mut name = String::new();
     for line in include_str!("../../scripts/release/site/site-shots-run.mjs").lines() {
         let l = line.trim();
-        if let Some(n) = l
-            .strip_prefix("{ name: '")
-            .or_else(|| l.strip_prefix("name: '"))
-        {
-            n.split('\'')
-                .next()
-                .unwrap_or_default()
-                .clone_into(&mut name);
+        if let Some(n) = l.strip_prefix("{ name: '").or_else(|| l.strip_prefix("name: '")) {
+            n.split('\'').next().unwrap_or_default().clone_into(&mut name);
         }
         if let Some(r) = l.split("path: '/r/").nth(1) {
             let repo = r.split('/').next().unwrap_or_default();
@@ -107,14 +98,8 @@ mod tests {
     fn the_credit_links_the_pinned_trees_and_the_screenshots_folder() {
         let c = credit_md();
         assert!(c.contains("[The screenshots](docs/screenshots/)"), "{c}");
-        assert!(
-            c.contains("[jq](https://github.com/jqlang/jq/tree/jq-1.8.2)"),
-            "{c}"
-        );
-        assert!(
-            c.contains("[ripgrep](https://github.com/BurntSushi/ripgrep/tree/15.2.0)"),
-            "{c}"
-        );
+        assert!(c.contains("[jq](https://github.com/jqlang/jq/tree/jq-1.8.2)"), "{c}");
+        assert!(c.contains("[ripgrep](https://github.com/BurntSushi/ripgrep/tree/15.2.0)"), "{c}");
     }
 
     /// The gallery shows every shot with both schemes and the pinned tree it was taken from.

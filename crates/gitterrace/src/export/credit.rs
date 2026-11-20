@@ -30,10 +30,8 @@ impl License {
         if let Some(id) = self.id {
             return format!("{} license", esc(id));
         }
-        let href = format!(
-            "{prefix}/blob/HEAD/{}",
-            gitterrace_git::percent_encode_path(&self.file)
-        );
+        let href =
+            format!("{prefix}/blob/HEAD/{}", gitterrace_git::percent_encode_path(&self.file));
         format!("<a href=\"{}\">license</a>", esc(&href))
     }
 }
@@ -46,11 +44,7 @@ impl Credit {
             .ok()
             .and_then(|c| origin_url(&c));
         let origin = origin_override.and_then(public_https).or(from_config);
-        Self {
-            name: name.to_owned(),
-            license: find_license(repo, head),
-            origin,
-        }
+        Self { name: name.to_owned(), license: find_license(repo, head), origin }
     }
 
     /// The footer element to place at the end of a page of the site under `prefix`.
@@ -117,9 +111,7 @@ fn find_license(repo: &Repo, head: &str) -> Option<License> {
 /// size is checked before the content is read, so a huge or highly compressible blob is
 /// never inflated.
 fn license_bytes(repo: &Repo, head: &str, file: &str) -> Option<Vec<u8>> {
-    let raw = repo
-        .raw_blob(head, file, |_, size| size > MAX_LICENSE as u64)
-        .ok()?;
+    let raw = repo.raw_blob(head, file, |_, size| size > MAX_LICENSE as u64).ok()?;
     #[cfg(test)]
     if raw.bytes.is_some() {
         tests::LICENSE_READS.with(|n| n.set(n.get() + 1));
@@ -136,11 +128,7 @@ fn is_license_name(name: &str) -> bool {
 
 /// Names a license by marker phrases in its text; `None` when it is none of the common ones.
 fn detect(text: &str) -> Option<&'static str> {
-    let flat = text
-        .to_lowercase()
-        .split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ");
+    let flat = text.to_lowercase().split_whitespace().collect::<Vec<_>>().join(" ");
     let head: String = flat.chars().take(TITLE_CHARS).collect();
     if head.contains("lesser general public license") {
         return Some(if head.contains("version 3") {
@@ -178,11 +166,7 @@ fn detect(text: &str) -> Option<&'static str> {
     }
     if flat.contains("redistribution and use in source and binary forms") {
         let three = flat.contains("neither the name") || flat.contains("endorse or promote");
-        return Some(if three {
-            "BSD-3-Clause"
-        } else {
-            "BSD-2-Clause"
-        });
+        return Some(if three { "BSD-3-Clause" } else { "BSD-2-Clause" });
     }
     None
 }
@@ -211,39 +195,31 @@ fn origin_url(config: &str) -> Option<String> {
 /// without credentials, port or `.git`. Local paths, other schemes and hosts that are not
 /// public names (no dot, an IP address, a local suffix) give `None`.
 fn public_https(url: &str) -> Option<String> {
-    let (host, path) = if let Some(rest) = url
-        .strip_prefix("https://")
-        .or_else(|| url.strip_prefix("ssh://"))
-    {
-        let (auth, path) = rest.split_once('/')?;
-        let host = auth.rsplit_once('@').map_or(auth, |(_, h)| h);
-        (host.split(':').next()?, path)
-    } else if url.contains("://") || url.starts_with(['/', '.', '~']) {
-        return None;
-    } else {
-        // scp-like: user@host:owner/repo
-        let (auth, path) = url.split_once(':')?;
-        (auth.rsplit_once('@').map_or(auth, |(_, h)| h), path)
-    };
+    let (host, path) =
+        if let Some(rest) = url.strip_prefix("https://").or_else(|| url.strip_prefix("ssh://")) {
+            let (auth, path) = rest.split_once('/')?;
+            let host = auth.rsplit_once('@').map_or(auth, |(_, h)| h);
+            (host.split(':').next()?, path)
+        } else if url.contains("://") || url.starts_with(['/', '.', '~']) {
+            return None;
+        } else {
+            // scp-like: user@host:owner/repo
+            let (auth, path) = url.split_once(':')?;
+            (auth.rsplit_once('@').map_or(auth, |(_, h)| h), path)
+        };
     let host = host.to_ascii_lowercase();
     let path = path.trim_matches('/');
     let path = path.strip_suffix(".git").unwrap_or(path);
     let host_ok = host.contains('.')
         && !host.starts_with(['.', '-'])
-        && host
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        && host.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
         && !host.chars().all(|c| c.is_ascii_digit() || c == '.')
         && !["local", "localhost", "internal", "lan", "home", "corp"]
             .iter()
             .any(|s| host.rsplit('.').next() == Some(s));
     let path_ok = !path.is_empty()
-        && path
-            .split('/')
-            .all(|s| !s.is_empty() && s != "." && s != "..")
-        && path
-            .chars()
-            .all(|c| c.is_ascii_alphanumeric() || "._~-/".contains(c));
+        && path.split('/').all(|s| !s.is_empty() && s != "." && s != "..")
+        && path.chars().all(|c| c.is_ascii_alphanumeric() || "._~-/".contains(c));
     (host_ok && path_ok).then(|| format!("https://{host}/{path}"))
 }
 

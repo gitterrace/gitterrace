@@ -111,10 +111,7 @@ fn skip(
     let Some(Ok(rel)) = work.map(|w| p.strip_prefix(w)) else {
         return true;
     };
-    if is_dir
-        && p.file_name()
-            .is_some_and(|n| WORK_SKIP.iter().any(|s| n == *s))
-    {
+    if is_dir && p.file_name().is_some_and(|n| WORK_SKIP.iter().any(|s| n == *s)) {
         return true;
     }
     // Another repository nested inside is not ours to scan.

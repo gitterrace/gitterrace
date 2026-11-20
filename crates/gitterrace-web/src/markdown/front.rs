@@ -5,9 +5,7 @@ use askama::Template;
 /// Splits a leading `---` block from the document. Returns the block body and the rest.
 /// An unterminated block is not front matter.
 pub(super) fn split_front_matter(src: &str) -> Option<(&str, &str)> {
-    let rest = src
-        .strip_prefix("---\n")
-        .or_else(|| src.strip_prefix("---\r\n"))?;
+    let rest = src.strip_prefix("---\n").or_else(|| src.strip_prefix("---\r\n"))?;
     let mut offset = 0;
     for line in rest.split_inclusive('\n') {
         if line.trim_end() == "---" {
@@ -79,10 +77,5 @@ struct FrontMatter<'a> {
 /// HTML for the front matter block: a key/value table, or the raw text as code.
 /// Added after sanitizing, so the template escapes every piece.
 pub(super) fn front_matter_html(block: &str) -> String {
-    FrontMatter {
-        rows: parse_front_matter(block),
-        block,
-    }
-    .render()
-    .unwrap_or_default()
+    FrontMatter { rows: parse_front_matter(block), block }.render().unwrap_or_default()
 }

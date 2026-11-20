@@ -22,28 +22,16 @@ impl When {
     pub(crate) fn new(text: String, time: i64, offset: i32) -> Self {
         let tip = date(time, offset);
         if tip == UNKNOWN_DATE {
-            return Self {
-                text,
-                ..Self::default()
-            };
+            return Self { text, ..Self::default() };
         }
         let zone = if offset == 0 {
             "UTC".to_owned()
         } else {
             let a = offset.unsigned_abs();
-            format!(
-                "{}{:02}:{:02}",
-                if offset < 0 { '-' } else { '+' },
-                a / 3600,
-                a % 3600 / 60
-            )
+            format!("{}{:02}:{:02}", if offset < 0 { '-' } else { '+' }, a / 3600, a % 3600 / 60)
         };
         let tip = format!("{tip} {zone}");
-        Self {
-            text,
-            datetime: iso(time),
-            tip,
-        }
+        Self { text, datetime: iso(time), tip }
     }
 
     /// No date at all, such as a repository without commits.

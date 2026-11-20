@@ -43,13 +43,7 @@ pub struct Workspace {
 pub fn load(root: &Path) -> Result<Workspace> {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
     let out = Command::new(cargo)
-        .args([
-            "metadata",
-            "--no-deps",
-            "--offline",
-            "--format-version",
-            "1",
-        ])
+        .args(["metadata", "--no-deps", "--offline", "--format-version", "1"])
         .current_dir(root)
         .output()
         .context("running cargo metadata")?;
@@ -58,10 +52,8 @@ pub fn load(root: &Path) -> Result<Workspace> {
     }
     let meta: Value = serde_json::from_slice(&out.stdout).context("cargo metadata output")?;
     let list = meta["packages"].as_array().context("packages")?;
-    let members: BTreeSet<String> = list
-        .iter()
-        .filter_map(|p| p["name"].as_str().map(str::to_owned))
-        .collect();
+    let members: BTreeSet<String> =
+        list.iter().filter_map(|p| p["name"].as_str().map(str::to_owned)).collect();
     let mut packages = BTreeMap::new();
     for p in list {
         let name = p["name"].as_str().context("name")?.to_owned();
@@ -70,11 +62,7 @@ pub fn load(root: &Path) -> Result<Workspace> {
             .as_array()
             .into_iter()
             .flatten()
-            .filter(|t| {
-                t["kind"]
-                    .as_array()
-                    .is_some_and(|k| k.iter().any(|k| k == "bin"))
-            })
+            .filter(|t| t["kind"].as_array().is_some_and(|k| k.iter().any(|k| k == "bin")))
             .filter_map(|t| t["name"].as_str().map(str::to_owned))
             .collect();
         let deps = p["dependencies"]
@@ -101,10 +89,7 @@ pub fn load(root: &Path) -> Result<Workspace> {
             },
         );
     }
-    let tap = meta["metadata"]["dist"]["tap"]
-        .as_str()
-        .unwrap_or_default()
-        .to_owned();
+    let tap = meta["metadata"]["dist"]["tap"].as_str().unwrap_or_default().to_owned();
     let dist = &meta["metadata"]["dist"];
     let targets = dist["targets"]
         .as_array()
@@ -118,10 +103,7 @@ pub fn load(root: &Path) -> Result<Workspace> {
         packages,
         tap,
         targets,
-        windows_archive: dist["windows-archive"]
-            .as_str()
-            .unwrap_or_default()
-            .to_owned(),
+        windows_archive: dist["windows-archive"].as_str().unwrap_or_default().to_owned(),
         demo: demo["url"].as_str().unwrap_or_default().to_owned(),
         demo_repos: demo_repos(demo),
     })
@@ -189,9 +171,7 @@ mod tests {
     use super::*;
 
     fn root() -> &'static Path {
-        Path::new(env!("CARGO_MANIFEST_DIR"))
-            .parent()
-            .expect("xtask sits in the workspace")
+        Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("xtask sits in the workspace")
     }
 
     fn read(rel: &str) -> String {
@@ -215,14 +195,8 @@ mod tests {
                 pinned.push((name.take().expect("a tag inside a pin"), tag));
             }
         }
-        assert!(
-            !ws.demo_repos.is_empty(),
-            "no [workspace.metadata.demo] repos"
-        );
-        assert_eq!(
-            ws.demo_repos, pinned,
-            "Cargo.toml demo repos vs scripts/lib/corpus-lib.mjs"
-        );
+        assert!(!ws.demo_repos.is_empty(), "no [workspace.metadata.demo] repos");
+        assert_eq!(ws.demo_repos, pinned, "Cargo.toml demo repos vs scripts/lib/corpus-lib.mjs");
     }
 
     /// The demo's Cloudflare route serves the URL the README and the site link.
@@ -232,10 +206,7 @@ mod tests {
         let host = ws.demo.strip_prefix("https://").expect("demo url is https");
         let conf = read("deploy/demo/wrangler.toml");
         let route = format!("routes = [{{ pattern = \"{host}\", custom_domain = true }}]");
-        assert!(
-            conf.contains(&route),
-            "deploy/demo/wrangler.toml lacks {route}"
-        );
+        assert!(conf.contains(&route), "deploy/demo/wrangler.toml lacks {route}");
         assert!(conf.contains("directory = \"../../target/demo\""));
     }
 }

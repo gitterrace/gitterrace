@@ -24,18 +24,12 @@ fn assets(body: &str) -> Vec<&str> {
 #[tokio::test]
 async fn code_and_commit_pages_link_no_script_or_style_that_loads_on_first_use() {
     let dir = tempfile::tempdir().expect("tmp");
-    let fx = Fixture::init(&dir.path().join("r"))
-        .write("src/a.rs", "fn a() {}\n")
-        .commit("feat: a");
+    let fx =
+        Fixture::init(&dir.path().join("r")).write("src/a.rs", "fn a() {}\n").commit("feat: a");
     let sha = fx.git(&["rev-parse", "HEAD"]);
     let app = router(fx.path(), Config::default());
     let commit = format!("/commit/{}", sha.trim());
-    for path in [
-        "/blob/HEAD/src/a.rs",
-        commit.as_str(),
-        "/log/HEAD",
-        "/search?q=a",
-    ] {
+    for path in ["/blob/HEAD/src/a.rs", commit.as_str(), "/log/HEAD", "/search?q=a"] {
         let (status, body) = get(&app, path).await;
         assert_eq!(status, 200, "{path}");
         let linked = assets(&body);
@@ -46,24 +40,16 @@ async fn code_and_commit_pages_link_no_script_or_style_that_loads_on_first_use()
         for page_only in ["settings.css", "insights.css", "graph.css"] {
             assert!(!linked.contains(&page_only), "{path} links {page_only}");
         }
-        assert!(
-            body.contains("id=\"actpage\""),
-            "{path}: the page trigger is rendered"
-        );
+        assert!(body.contains("id=\"actpage\""), "{path}: the page trigger is rendered");
     }
     let (_, body) = get(&app, &commit).await;
-    assert!(
-        body.contains("id=\"actcommit\""),
-        "the commit trigger is rendered"
-    );
+    assert!(body.contains("id=\"actcommit\""), "the commit trigger is rendered");
 }
 
 #[tokio::test]
 async fn every_asset_loaded_on_first_use_is_served() {
     let dir = tempfile::tempdir().expect("tmp");
-    let fx = Fixture::init(&dir.path().join("r"))
-        .write("a", "a\n")
-        .commit("feat: a");
+    let fx = Fixture::init(&dir.path().join("r")).write("a", "a\n").commit("feat: a");
     let app = router(fx.path(), Config::default());
     for lazy in crate::LAZY_ASSETS {
         assert_eq!(get(&app, lazy).await.0, 200, "{lazy}");

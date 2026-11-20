@@ -44,22 +44,12 @@ pub(crate) struct Change {
 impl Change {
     /// The settings were reloaded: pages rendered before it show stale values. Carries no chrome.
     pub(crate) fn config(v: u64) -> Self {
-        Self {
-            kinds: vec![CONFIG],
-            v,
-            banner: None,
-            dirty: false,
-        }
+        Self { kinds: vec![CONFIG], v, banner: None, dirty: false }
     }
 
     /// A repository joined or left the server: the switcher and the home change. No chrome.
     pub(crate) fn repos(v: u64) -> Self {
-        Self {
-            kinds: vec![REPOS],
-            v,
-            banner: None,
-            dirty: false,
-        }
+        Self { kinds: vec![REPOS], v, banner: None, dirty: false }
     }
 }
 
@@ -75,19 +65,10 @@ pub(crate) struct Mode {
 
 impl Mode {
     /// Lists of commits and anything that follows HEAD.
-    pub(crate) const NOTICE: Self = Self {
-        how: "notice",
-        on: "head refs",
-    };
+    pub(crate) const NOTICE: Self = Self { how: "notice", on: "head refs" };
     /// Branches, tags, stashes and worktrees are all counted on the refs page.
-    pub(crate) const REFS: Self = Self {
-        how: "notice",
-        on: "head refs stash worktrees",
-    };
-    pub(crate) const WORKTREE: Self = Self {
-        how: "refresh",
-        on: "head refs index worktree",
-    };
+    pub(crate) const REFS: Self = Self { how: "notice", on: "head refs stash worktrees" };
+    pub(crate) const WORKTREE: Self = Self { how: "refresh", on: "head refs index worktree" };
 
     /// A page about a full commit id never changes.
     pub(crate) fn pinned_to(rev: &str) -> bool {
@@ -108,8 +89,7 @@ pub(crate) struct WorktreeWatch(Arc<App>);
 
 impl WorktreeWatch {
     pub(crate) fn new(app: &Arc<App>) -> Self {
-        app.wt_watchers
-            .fetch_add(1, std::sync::atomic::Ordering::AcqRel);
+        app.wt_watchers.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
         app.wake.notify_one();
         Self(Arc::clone(app))
     }
@@ -117,9 +97,7 @@ impl WorktreeWatch {
 
 impl Drop for WorktreeWatch {
     fn drop(&mut self) {
-        self.0
-            .wt_watchers
-            .fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
+        self.0.wt_watchers.fetch_sub(1, std::sync::atomic::Ordering::AcqRel);
     }
 }
 
@@ -143,32 +121,19 @@ struct Full<'a> {
 
 fn change_event<T: Serialize>(body: &T) -> Event {
     // Both bodies are plain strings and bools, which always serialize.
-    Event::default()
-        .event("change")
-        .data(serde_json::to_string(body).unwrap_or_default())
+    Event::default().event("change").data(serde_json::to_string(body).unwrap_or_default())
 }
 
 fn event(c: &Change) -> Event {
     if c.kinds == [CONFIG] || c.kinds == [REPOS] {
-        return change_event(&Bare {
-            kinds: &c.kinds,
-            v: c.v.to_string(),
-        });
+        return change_event(&Bare { kinds: &c.kinds, v: c.v.to_string() });
     }
-    change_event(&Full {
-        banner: &c.banner,
-        dirty: c.dirty,
-        kinds: &c.kinds,
-        v: c.v.to_string(),
-    })
+    change_event(&Full { banner: &c.banner, dirty: c.dirty, kinds: &c.kinds, v: c.v.to_string() })
 }
 
 /// A change for a stream that missed some: everything may have moved, the chrome is unknown.
 fn everything(v: u64) -> Event {
-    change_event(&Bare {
-        kinds: &ALL,
-        v: v.to_string(),
-    })
+    change_event(&Bare { kinds: &ALL, v: v.to_string() })
 }
 
 struct Stream {
@@ -206,9 +171,7 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
     // A page that was rendered before the newest change missed it, which also covers a
     // reconnect after a pause.
     let now = app.version();
-    let behind =
-        q.v.and_then(|v| v.parse::<u64>().ok())
-            .is_some_and(|v| v != now);
+    let behind = q.v.and_then(|v| v.parse::<u64>().ok()).is_some_and(|v| v != now);
     let state = Stream {
         rx,
         stop: app.stop.clone(),
@@ -239,13 +202,9 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
             }
         }
     });
-    let mut res = Sse::new(body)
-        .keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb"))
-        .into_response();
-    res.headers_mut().insert(
-        header::CACHE_CONTROL,
-        header::HeaderValue::from_static("no-store"),
-    );
+    let mut res =
+        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
+    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
     res
 }
 
@@ -264,10 +223,7 @@ pub(crate) fn home_events(env: &Env, q: &EventsQuery) -> Response {
     let rx = env.home.subscribe();
     // A home rendered before the newest list change missed it, which also covers a reconnect.
     let now = env.home_version();
-    let behind =
-        q.v.as_deref()
-            .and_then(|v| v.parse::<u64>().ok())
-            .is_some_and(|v| v != now);
+    let behind = q.v.as_deref().and_then(|v| v.parse::<u64>().ok()).is_some_and(|v| v != now);
     let state = HomeStream {
         rx,
         stop: env.stopping(),
@@ -298,12 +254,8 @@ pub(crate) fn home_events(env: &Env, q: &EventsQuery) -> Response {
             }
         }
     });
-    let mut res = Sse::new(body)
-        .keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb"))
-        .into_response();
-    res.headers_mut().insert(
-        header::CACHE_CONTROL,
-        header::HeaderValue::from_static("no-store"),
-    );
+    let mut res =
+        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
+    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
     res
 }

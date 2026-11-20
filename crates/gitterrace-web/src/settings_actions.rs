@@ -41,12 +41,7 @@ pub(crate) struct CardField {
 }
 
 fn row_keys(keys: &[Item]) -> Vec<RowKey> {
-    keys.iter()
-        .map(|k| RowKey {
-            name: k.name,
-            ty: k.ty,
-        })
-        .collect()
+    keys.iter().map(|k| RowKey { name: k.name, ty: k.ty }).collect()
 }
 
 /// The lists of `text`, `None` when it is not TOML.
@@ -54,27 +49,17 @@ pub(crate) fn lists(text: &str) -> Option<Vec<List>> {
     let mut out = Vec::new();
     for (name, keys) in LISTS {
         let rows = gitterrace_config::rows(text, name, &row_keys(keys))?;
-        let cards: Vec<Card> = rows
-            .iter()
-            .enumerate()
-            .map(|(i, r)| card(name, i, keys, r))
-            .collect();
+        let cards: Vec<Card> =
+            rows.iter().enumerate().map(|(i, r)| card(name, i, keys, r)).collect();
         let blank = card(name, cards.len(), keys, &[]);
-        out.push(List {
-            name,
-            rows: cards,
-            blank,
-        });
+        out.push(List { name, rows: cards, blank });
     }
     Some(out)
 }
 
 fn card(list: &str, i: usize, keys: &[Item], set: &[(&'static str, String)]) -> Card {
     let get = |k: &str| set.iter().find(|(n, _)| *n == k).map(|(_, v)| v.as_str());
-    let title = get("label")
-        .or_else(|| get("id"))
-        .unwrap_or("New")
-        .to_owned();
+    let title = get("label").or_else(|| get("id")).unwrap_or("New").to_owned();
     let fields = keys
         .iter()
         .map(|k| {
@@ -97,11 +82,7 @@ fn card(list: &str, i: usize, keys: &[Item], set: &[(&'static str, String)]) -> 
             }
         })
         .collect();
-    Card {
-        id: format!("{list}.{i}"),
-        title,
-        fields,
-    }
+    Card { id: format!("{list}.{i}"), title, fields }
 }
 
 /// The TOML literal a form input means for `list.N.name`, by the key's type in the schema.
@@ -156,15 +137,8 @@ mod tests {
     fn rows_show_their_values_and_number_from_zero() {
         let l = lists(FILE).expect("toml");
         let action = &l[1].rows[0];
-        assert_eq!(
-            (action.id.as_str(), action.title.as_str()),
-            ("action.0", "Edit")
-        );
-        let kinds = action
-            .fields
-            .iter()
-            .find(|f| f.name == "kinds")
-            .expect("kinds");
+        assert_eq!((action.id.as_str(), action.title.as_str()), ("action.0", "Edit"));
+        let kinds = action.fields.iter().find(|f| f.name == "kinds").expect("kinds");
         assert_eq!((kinds.kind, kinds.value.as_str()), ("list", "file\nline"));
         assert_eq!(l[0].blank.id, "send.1");
         assert!(lists("[[send]\n").is_none());
@@ -185,28 +159,16 @@ mod tests {
     #[test]
     fn vars_input_uses_the_loader_rules_and_the_kv_kind() {
         let l = lists(FILE).expect("toml");
-        let vars = l[1]
-            .blank
-            .fields
-            .iter()
-            .find(|f| f.name == "vars")
-            .expect("vars");
+        let vars = l[1].blank.fields.iter().find(|f| f.name == "vars").expect("vars");
         assert_eq!(vars.kind, "kv");
         assert_eq!(
             literal("action.0.vars", "a = 1\nb_2 = x").as_deref(),
             Ok("{ a = \"1\", b_2 = \"x\" }")
         );
         let bad = literal("action.0.vars", "Bad-Name = x").expect_err("name");
-        assert!(
-            bad.contains("action.0.vars") && bad.contains("vars."),
-            "{bad}"
-        );
+        assert!(bad.contains("action.0.vars") && bad.contains("vars."), "{bad}");
         let many = (0..33).fold(String::new(), |acc, i| acc + &format!("v{i} = x\n"));
-        assert!(
-            literal("action.0.vars", &many)
-                .expect_err("many")
-                .contains("at most 32")
-        );
+        assert!(literal("action.0.vars", &many).expect_err("many").contains("at most 32"));
     }
 
     #[test]
@@ -214,28 +176,17 @@ mod tests {
         let text = "version = 1\n# mine\n[[action]]\nid = \"e\" # id\nlabel = \"E\"\n\
                     command = [\"x\"]\n\n[action.vars]\nold = \"1\"\n";
         let l = lists(text).expect("toml");
-        let v = l[1].rows[0]
-            .fields
-            .iter()
-            .find(|f| f.name == "vars")
-            .expect("vars");
+        let v = l[1].rows[0].fields.iter().find(|f| f.name == "vars").expect("vars");
         assert_eq!(v.value, "old = 1");
         let c = gitterrace_config::Change {
             id: "action.0.vars".into(),
             value: literal("action.0.vars", "old = 1\nnew = q\"\\z").ok(),
         };
         let out = gitterrace_config::apply(text, &[c]).expect("apply");
-        assert!(
-            out.contains("# mine") && out.contains("id = \"e\" # id"),
-            "{out}"
-        );
+        assert!(out.contains("# mine") && out.contains("id = \"e\" # id"), "{out}");
         assert!(out.contains("command = [\"x\"]"), "{out}");
         let back = lists(&out).expect("toml");
-        let v = back[1].rows[0]
-            .fields
-            .iter()
-            .find(|f| f.name == "vars")
-            .expect("vars");
+        let v = back[1].rows[0].fields.iter().find(|f| f.name == "vars").expect("vars");
         assert_eq!(v.value, "new = q\"\\z\nold = 1");
     }
 

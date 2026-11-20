@@ -74,10 +74,7 @@ struct MemoCounts {
 
 impl CountMemo {
     pub(crate) fn new(cap: usize) -> Self {
-        Self {
-            map: std::sync::Mutex::default(),
-            cap,
-        }
+        Self { map: std::sync::Mutex::default(), cap }
     }
 
     fn get(&self, key: &MemoKey) -> Option<Counted> {
@@ -136,15 +133,7 @@ pub(crate) fn changes(
     text_limit: u64,
 ) -> Result<Vec<FileDiff>> {
     let mut cache = resource_cache(repo)?;
-    changes_with(
-        repo,
-        commit,
-        with_hunks,
-        text_limit,
-        &mut cache,
-        None,
-        Renames::Full,
-    )
+    changes_with(repo, commit, with_hunks, text_limit, &mut cache, None, Renames::Full)
 }
 
 /// The blob cache a tree diff needs. Building it reads attributes and, in a bare clone,
@@ -162,10 +151,7 @@ pub(crate) fn resource_cache(repo: &gix::Repository) -> Result<gix::diff::blob::
         },
     };
     let attrs = repo
-        .attributes_only(
-            &index,
-            gix::worktree::stack::state::attributes::Source::IdMapping,
-        )
+        .attributes_only(&index, gix::worktree::stack::state::attributes::Source::IdMapping)
         .map_err(git)?
         .detach();
     gix::diff::resource_cache(
@@ -248,21 +234,14 @@ fn first_parent_tree<'r>(
     if is_shallow_boundary(repo, commit.id) {
         return Ok(None);
     }
-    let tree = parent
-        .object()
-        .and_then(gix::Object::peel_to_commit)
-        .map_err(git)?
-        .tree()
-        .map_err(git)?;
+    let tree =
+        parent.object().and_then(gix::Object::peel_to_commit).map_err(git)?.tree().map_err(git)?;
     Ok(Some(tree))
 }
 
 /// Whether `id` is listed in the repository's shallow file.
 pub(crate) fn is_shallow_boundary(repo: &gix::Repository, id: gix::ObjectId) -> bool {
-    repo.shallow_commits()
-        .ok()
-        .flatten()
-        .is_some_and(|ids| ids.iter().any(|s| *s == id))
+    repo.shallow_commits().ok().flatten().is_some_and(|ids| ids.iter().any(|s| *s == id))
 }
 
 /// The `index`th file of a commit's [`raw_changes`] with hunks, diffing only that file's blobs.
@@ -275,9 +254,7 @@ pub(crate) fn change_at(
     raw.iter()
         .filter(|c| !is_tree(c))
         .nth(index)
-        .map_or(Ok(None), |c| {
-            file_diff(repo, c.clone(), true, text_limit, None)
-        })
+        .map_or(Ok(None), |c| file_diff(repo, c.clone(), true, text_limit, None))
 }
 
 /// Whether a change is to a tree entry, which the file list leaves out.
@@ -293,16 +270,12 @@ const fn is_tree(change: &ChangeDetached) -> bool {
 /// Old and new mode of a change that altered it, e.g. a file made executable.
 fn mode_change(change: &ChangeDetached) -> Option<(u16, u16)> {
     match change {
-        ChangeDetached::Modification {
-            previous_entry_mode,
-            entry_mode,
-            ..
-        } => Some((previous_entry_mode.value(), entry_mode.value())),
-        ChangeDetached::Rewrite {
-            source_entry_mode,
-            entry_mode,
-            ..
-        } => Some((source_entry_mode.value(), entry_mode.value())),
+        ChangeDetached::Modification { previous_entry_mode, entry_mode, .. } => {
+            Some((previous_entry_mode.value(), entry_mode.value()))
+        }
+        ChangeDetached::Rewrite { source_entry_mode, entry_mode, .. } => {
+            Some((source_entry_mode.value(), entry_mode.value()))
+        }
         _ => None,
     }
     .filter(|(a, b)| a != b)
@@ -324,32 +297,12 @@ fn file_diff(
     };
     let modes = mode_change(&change);
     let (path, old_path, kind, old_id, new_id, diffable) = match change {
-        ChangeDetached::Addition {
-            location,
-            entry_mode,
-            id,
-            ..
-        } => (
-            location,
-            None,
-            ChangeKind::Added,
-            None,
-            Some(id),
-            !entry_mode.is_commit(),
-        ),
-        ChangeDetached::Deletion {
-            location,
-            entry_mode,
-            id,
-            ..
-        } => (
-            location,
-            None,
-            ChangeKind::Deleted,
-            Some(id),
-            None,
-            !entry_mode.is_commit(),
-        ),
+        ChangeDetached::Addition { location, entry_mode, id, .. } => {
+            (location, None, ChangeKind::Added, None, Some(id), !entry_mode.is_commit())
+        }
+        ChangeDetached::Deletion { location, entry_mode, id, .. } => {
+            (location, None, ChangeKind::Deleted, Some(id), None, !entry_mode.is_commit())
+        }
         ChangeDetached::Modification {
             location,
             previous_entry_mode,
@@ -426,10 +379,7 @@ fn counts(
     } else if !with_hunks && pure_move {
         // Rename tracking found identical content: a pure move, nothing changed.
         let lines = line_count(bytes(blob(repo, new_id)?.as_ref()));
-        Counted {
-            lines,
-            ..Counted::empty(false)
-        }
+        Counted { lines, ..Counted::empty(false) }
     } else {
         let old = blob(repo, old_id)?;
         let new = blob(repo, new_id)?;
@@ -454,8 +404,7 @@ fn bytes<'a>(object: Option<&'a gix::Object<'_>>) -> &'a [u8] {
 
 /// Whether the blob is over `limit` bytes, from its header alone.
 fn too_large(repo: &gix::Repository, id: Option<gix::ObjectId>, limit: u64) -> bool {
-    id.and_then(|id| repo.find_header(id).ok())
-        .is_some_and(|h| h.size() > limit)
+    id.and_then(|id| repo.find_header(id).ok()).is_some_and(|h| h.size() > limit)
 }
 
 pub(crate) fn is_binary(data: &[u8]) -> bool {
@@ -477,16 +426,11 @@ pub(crate) fn line_count(data: &[u8]) -> u32 {
 
 /// Sum over change blocks of the smaller side: lines that replaced existing lines.
 fn rewritten(diff: &Diff) -> u32 {
-    diff.hunks()
-        .map(|h| (h.before.end - h.before.start).min(h.after.end - h.after.start))
-        .sum()
+    diff.hunks().map(|h| (h.before.end - h.before.start).min(h.after.end - h.after.start)).sum()
 }
 
 fn squash(line: &[u8]) -> Vec<u8> {
-    line.iter()
-        .copied()
-        .filter(|b| !b.is_ascii_whitespace())
-        .collect()
+    line.iter().copied().filter(|b| !b.is_ascii_whitespace()).collect()
 }
 
 /// The counts of `diff` with whitespace ignored, like `git diff -w`, and blank lines dropped.
@@ -498,25 +442,15 @@ fn code_counts(input: &InternedInput<&[u8]>, diff: &Diff) -> CodeCounts {
     for h in diff.hunks() {
         // The ranges come from gix: one past the tokens is skipped, never a panic on a page.
         let (Some(before), Some(after)) = (
-            input
-                .before
-                .get(h.before.start as usize..h.before.end as usize),
-            input
-                .after
-                .get(h.after.start as usize..h.after.end as usize),
+            input.before.get(h.before.start as usize..h.before.end as usize),
+            input.after.get(h.after.start as usize..h.after.end as usize),
         ) else {
             continue;
         };
-        let before: Vec<Vec<u8>> = before
-            .iter()
-            .map(|t| squash(line(t)))
-            .filter(|l| !l.is_empty())
-            .collect();
-        let after: Vec<Vec<u8>> = after
-            .iter()
-            .map(|t| squash(line(t)))
-            .filter(|l| !l.is_empty())
-            .collect();
+        let before: Vec<Vec<u8>> =
+            before.iter().map(|t| squash(line(t))).filter(|l| !l.is_empty()).collect();
+        let after: Vec<Vec<u8>> =
+            after.iter().map(|t| squash(line(t))).filter(|l| !l.is_empty()).collect();
         if before.is_empty() || after.is_empty() {
             out.deletions += u32::try_from(before.len()).unwrap_or(u32::MAX);
             out.additions += u32::try_from(after.len()).unwrap_or(u32::MAX);
@@ -542,26 +476,15 @@ fn count(old: &[u8], new: &[u8], with_hunks: bool) -> Counted {
     let mut diff = Diff::compute(Algorithm::Myers, &input);
     let (additions, deletions) = (diff.count_additions(), diff.count_removals());
     let rewritten = rewritten(&diff);
-    let code = if additions + deletions == 0 {
-        CodeCounts::default()
-    } else {
-        code_counts(&input, &diff)
-    };
+    let code =
+        if additions + deletions == 0 { CodeCounts::default() } else { code_counts(&input, &diff) };
     let hunks = if with_hunks {
         diff.postprocess_lines(&input);
         build_hunks(old, new, &diff)
     } else {
         Vec::new()
     };
-    Counted {
-        additions,
-        deletions,
-        binary: false,
-        hunks,
-        lines: line_count(new),
-        rewritten,
-        code,
-    }
+    Counted { additions, deletions, binary: false, hunks, lines: line_count(new), rewritten, code }
 }
 
 #[cfg(test)]

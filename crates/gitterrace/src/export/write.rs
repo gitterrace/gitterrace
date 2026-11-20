@@ -71,9 +71,7 @@ pub(super) fn write_page(
         eprintln!("skipping {path:?}: not a plain file name");
         return Ok(false);
     };
-    let root = out
-        .canonicalize()
-        .with_context(|| format!("resolving {}", out.display()))?;
+    let root = out.canonicalize().with_context(|| format!("resolving {}", out.display()))?;
     // `target` drops `..`, but a symlink already inside `out` could still lead
     // elsewhere. Walk down one component at a time and refuse before creating
     // anything: checking after `create_dir_all` would already have written
@@ -85,9 +83,8 @@ pub(super) fn write_page(
             if !dir.exists() {
                 std::fs::create_dir(&dir).with_context(|| format!("creating {}", dir.display()))?;
             }
-            let real = dir
-                .canonicalize()
-                .with_context(|| format!("resolving {}", dir.display()))?;
+            let real =
+                dir.canonicalize().with_context(|| format!("resolving {}", dir.display()))?;
             anyhow::ensure!(
                 real.starts_with(&root),
                 "refusing to write {} outside {}",
@@ -145,11 +142,7 @@ pub(crate) async fn fetch_within(
         .header(axum::http::header::HOST, "localhost")
         .body(Body::empty())
         .context("building a request")?;
-    let res = router
-        .clone()
-        .oneshot(req)
-        .await
-        .context("routing a request")?;
+    let res = router.clone().oneshot(req).await.context("routing a request")?;
     let status = res.status();
     let content_type = res
         .headers()

@@ -27,12 +27,7 @@ pub fn located(text: &str, e: &ConfigError) -> Located {
         ConfigError::Read { .. } | ConfigError::File { .. } => (None, None),
     };
     let (line, col) = at.map_or((0, 0), |o| line_col(text, o));
-    Located {
-        line,
-        col,
-        key,
-        msg: e.to_string(),
-    }
+    Located { line, col, key, msg: e.to_string() }
 }
 
 /// Whether `text` is TOML at all, with the place of the first syntax error. For a file whose own
@@ -40,12 +35,7 @@ pub fn located(text: &str, e: &ConfigError) -> Located {
 pub fn syntax(text: &str) -> Result<(), Located> {
     Document::parse(text).map(drop).map_err(|e| {
         let (line, col) = e.span().map_or((0, 0), |s| line_col(text, s.start));
-        Located {
-            line,
-            col,
-            key: None,
-            msg: e.message().to_owned(),
-        }
+        Located { line, col, key: None, msg: e.message().to_owned() }
     })
 }
 

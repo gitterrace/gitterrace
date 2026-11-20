@@ -91,11 +91,7 @@ pub(super) async fn tree(
                 ..views::chrome_at(a, "files", &rev)
             },
             about,
-            title: if path.is_empty() {
-                rev.clone()
-            } else {
-                path.clone()
-            },
+            title: if path.is_empty() { rev.clone() } else { path.clone() },
             head: tree_head(&rev, &path, &list),
             entries: views::entries(&rev, &path, &list),
             path_enc: fmt::enc_path(&path),
@@ -111,20 +107,15 @@ pub(super) async fn tree(
 /// A folder's page head: its path as the title, what it holds as the tagline, and its history
 /// as the action.
 fn tree_head(rev: &str, path: &str, list: &[gitterrace_git::TreeEntry]) -> PageHead {
-    let dirs = list
-        .iter()
-        .filter(|e| e.kind == gitterrace_git::TreeEntryKind::Dir)
-        .count();
+    let dirs = list.iter().filter(|e| e.kind == gitterrace_git::TreeEntryKind::Dir).count();
     let files = list.len() - dirs;
     let said = match (dirs, files) {
         (0, 0) => "An empty folder".to_owned(),
         (0, f) => fmt::count(f, "file", "files"),
         (d, 0) => fmt::count(d, "folder", "folders"),
-        (d, f) => format!(
-            "{} and {}",
-            fmt::count(d, "folder", "folders"),
-            fmt::count(f, "file", "files")
-        ),
+        (d, f) => {
+            format!("{} and {}", fmt::count(d, "folder", "folders"), fmt::count(f, "file", "files"))
+        }
     };
     let r = fmt::enc_seg(rev);
     let mut actions = vec![Action {
@@ -142,10 +133,7 @@ fn tree_head(rev: &str, path: &str, list: &[gitterrace_git::TreeEntry]) -> PageH
         &format!("/search?rev={r}&glob={}", fmt::enc_seg(&format!("{path}/"))),
     );
     if !path.is_empty() && !search.is_empty() {
-        actions.push(Action {
-            label: "Search here",
-            href: search,
-        });
+        actions.push(Action { label: "Search here", href: search });
     }
     PageHead {
         crumbs: views::crumbs(rev, path, false),
@@ -183,9 +171,7 @@ struct BlobPage {
 
 fn is_markdown(path: &str) -> bool {
     let lower = path.to_ascii_lowercase();
-    [".md", ".markdown", ".mdown"]
-        .iter()
-        .any(|e| lower.ends_with(e))
+    [".md", ".markdown", ".mdown"].iter().any(|e| lower.ends_with(e))
 }
 
 /// The highlighted chunks a big blob's first paint left plain; `nav.js` swaps them in.
@@ -214,8 +200,7 @@ pub(super) async fn blob(
         // the bytes.
         let (b, bytes) =
             if crate::media::kind(&path).is_some() || crate::filetype::wants_bytes(&path) {
-                a.repo
-                    .blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
+                a.repo.blob_with_bytes(&id, &path, a.cfg().limits.preview_mb << 20)?
             } else {
                 (a.repo.blob(&id, &path)?, Vec::new())
             };
@@ -242,9 +227,7 @@ pub(super) async fn worktree_blob(
     .await?;
     match p {
         Some(p) => Ok(page(&p)?.into_response()),
-        None => Ok(crate::error::not_found(
-            "This file is not a changed file of the working tree.",
-        )),
+        None => Ok(crate::error::not_found("This file is not a changed file of the working tree.")),
     }
 }
 
@@ -263,10 +246,7 @@ fn blob_links(a: &App, at: BlobAt<'_>, path: &str) -> (String, Chrome) {
             crate::features::href_if(Feature::Raw, &format!("/raw/{}/{pe}", fmt::enc_seg(r))),
             views::chrome_at(a, "files", r),
         ),
-        BlobAt::Worktree => (
-            fmt::href(&format!("/worktree/raw/{pe}")),
-            views::chrome(a, "files"),
-        ),
+        BlobAt::Worktree => (fmt::href(&format!("/worktree/raw/{pe}")), views::chrome(a, "files")),
     }
 }
 
@@ -322,17 +302,12 @@ fn blob_page(
         }
         _ => Vec::new(),
     };
-    let outline_rail = doc.as_ref().map_or_else(
-        || markdown::outline_rail(&symbols),
-        |d| markdown::outline_rail(&d.outline),
-    );
+    let outline_rail = doc
+        .as_ref()
+        .map_or_else(|| markdown::outline_rail(&symbols), |d| markdown::outline_rail(&d.outline));
     let mut said = fmt::size(b.size);
     if let Some(t) = text {
-        let _ = write!(
-            said,
-            " \u{b7} {}",
-            fmt::count(t.lines().count(), "line", "lines")
-        );
+        let _ = write!(said, " \u{b7} {}", fmt::count(t.lines().count(), "line", "lines"));
     }
     let base_head = match at {
         BlobAt::Rev(r) => crate::pagehead::file_head(r, &path, FileView::File, Tagline::of(&said)),
@@ -345,11 +320,7 @@ fn blob_page(
         // A source file's path stays in view while its lines scroll; a document's own card
         // head pins instead.
         pin: doc.is_none() && media.is_none() && table.is_none(),
-        tools: if doc.is_none() {
-            markdown::outline_menu(&symbols, false)
-        } else {
-            String::new()
-        },
+        tools: if doc.is_none() { markdown::outline_menu(&symbols, false) } else { String::new() },
         ..base_head
     };
     let head = (doc.is_some() || table.is_some()).then(|| DocHead {
@@ -363,10 +334,7 @@ fn blob_page(
     });
     let rendered = doc.map(|d| d.html).or(table);
     BlobPage {
-        c: Chrome {
-            md: rendered.is_some(),
-            ..chrome
-        },
+        c: Chrome { md: rendered.is_some(), ..chrome },
         rendered,
         outline_rail,
         head,
@@ -531,20 +499,13 @@ pub(crate) fn blame_warm_list(
     let mut scored: Vec<(u64, &str)> = files
         .iter()
         .filter_map(|f| {
-            let t = src
-                .path_id(&f.path)
-                .and_then(|id| touches.get(&id).copied())
-                .unwrap_or(0);
+            let t = src.path_id(&f.path).and_then(|id| touches.get(&id).copied()).unwrap_or(0);
             (t > u64::from(f.lines) && f.lines > 0)
                 .then_some((u64::from(f.lines) * t, f.path.as_str()))
         })
         .collect();
     scored.sort_unstable_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(b.1)));
-    scored
-        .into_iter()
-        .take(n)
-        .map(|(_, p)| p.to_owned())
-        .collect()
+    scored.into_iter().take(n).map(|(_, p)| p.to_owned()).collect()
 }
 
 /// Blames the costliest files at HEAD into the repository's bounded blame cache, one at a time

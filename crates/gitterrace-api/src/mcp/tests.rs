@@ -17,10 +17,7 @@ fn server(config: &str) -> (tempfile::TempDir, McpServer) {
 }
 
 fn text(res: &rmcp::model::CallToolResult) -> String {
-    res.content
-        .iter()
-        .filter_map(|c| c.as_text().map(|t| t.text.clone()))
-        .collect()
+    res.content.iter().filter_map(|c| c.as_text().map(|t| t.text.clone())).collect()
 }
 
 /// The refusal is in the call path, not only in the table `tool_on` reads: a tool the config
@@ -29,9 +26,7 @@ fn text(res: &rmcp::model::CallToolResult) -> String {
 async fn a_called_tool_is_refused_when_its_switch_is_off() {
     let (_d, off) = server("[features]\napi_enabled = false\n");
     let res = off
-        .repo_overview(rmcp::handler::server::wrapper::Parameters(
-            super::RepoArgs::default(),
-        ))
+        .repo_overview(rmcp::handler::server::wrapper::Parameters(super::RepoArgs::default()))
         .await
         .expect("a result, not a protocol error");
     assert_eq!(res.is_error, Some(true), "{}", text(&res));
@@ -39,9 +34,7 @@ async fn a_called_tool_is_refused_when_its_switch_is_off() {
 
     let (_d, on) = server("");
     let res = on
-        .repo_overview(rmcp::handler::server::wrapper::Parameters(
-            super::RepoArgs::default(),
-        ))
+        .repo_overview(rmcp::handler::server::wrapper::Parameters(super::RepoArgs::default()))
         .await
         .expect("result");
     assert_ne!(res.is_error, Some(true), "{}", text(&res));
@@ -58,11 +51,7 @@ fn fixture(root: &std::path::Path, name: &str, msg: &str) -> std::path::PathBuf 
 }
 
 fn entry(name: &str, path: std::path::PathBuf) -> super::McpRepo {
-    super::McpRepo {
-        name: name.to_owned(),
-        path,
-        unavailable: None,
-    }
+    super::McpRepo { name: name.to_owned(), path, unavailable: None }
 }
 
 /// Two repositories, the second with blame off, and one recorded folder that is gone.
@@ -89,10 +78,7 @@ async fn list_repos_names_every_repository_in_scope_with_its_last_commit() {
     let repos = v["repos"].as_array().expect("repos");
     assert_eq!(repos.len(), 3);
     assert_eq!(repos[0]["name"], "alpha");
-    assert!(
-        repos[0].get("path").is_none(),
-        "a host path would reach the model"
-    );
+    assert!(repos[0].get("path").is_none(), "a host path would reach the model");
     assert_eq!(repos[0]["last_commit"]["subject"], "feat: alpha one");
     assert_eq!(repos[1]["head_branch"], "main");
     assert_eq!(repos[2]["available"], false);
@@ -127,11 +113,9 @@ async fn a_missing_or_unknown_repo_is_refused_with_the_names_in_scope() {
             repo: repo.map(str::to_owned),
         })
     };
-    for (repo, want) in [
-        (None, "pass repo"),
-        (Some("../alpha"), "unknown repo"),
-        (Some("gone"), "unavailable"),
-    ] {
+    for (repo, want) in
+        [(None, "pass repo"), (Some("../alpha"), "unknown repo"), (Some("gone"), "unavailable")]
+    {
         let res = s.repo_overview(call(repo)).await.expect("result");
         assert_eq!(res.is_error, Some(true), "{}", text(&res));
         assert!(text(&res).contains(want), "{repo:?}: {}", text(&res));
@@ -266,14 +250,7 @@ fn review_prompt_names_the_tools_of_each_form() {
         ..crate::mcp::prompts::ReviewArgs::default()
     });
     for (text, first) in [(&range, "compare"), (&tree, "worktree_diff")] {
-        for tool in [
-            first,
-            "hotspots",
-            "contributors",
-            "blame",
-            "read_file",
-            "untrusted",
-        ] {
+        for tool in [first, "hotspots", "contributors", "blame", "read_file", "untrusted"] {
             assert!(text.contains(tool), "{tool}");
         }
     }

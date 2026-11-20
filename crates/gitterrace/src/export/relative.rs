@@ -10,11 +10,7 @@ const FILE_PREFIXES: [&str; 3] = ["/static/", "/raw/", "/snapshot.css"];
 /// `is_page` is true for HTML (written as `<path>/index.html`), false for a stylesheet.
 pub(super) fn relativize(body: &str, path: &str, is_page: bool) -> String {
     let segments = path.split('/').filter(|s| !s.is_empty()).count();
-    let ups = if is_page {
-        segments
-    } else {
-        segments.saturating_sub(1)
-    };
+    let ups = if is_page { segments } else { segments.saturating_sub(1) };
     let up = "../".repeat(ups);
     let mut out = String::with_capacity(body.len() + body.len() / 8);
     let mut rest = body;
@@ -60,11 +56,7 @@ fn rewrite(raw: &str, up: &str) -> String {
     };
     // A page at the root with nothing to climb still needs a path that is not a bare name
     // starting with a colon-bearing segment: `./` keeps it a relative path.
-    let rel = if up.is_empty() {
-        format!("./{rel}")
-    } else {
-        rel
-    };
+    let rel = if up.is_empty() { format!("./{rel}") } else { rel };
     format!("{rel}{tail}")
 }
 
@@ -96,11 +88,7 @@ mod tests {
     #[test]
     fn stylesheet_urls_are_relative_to_the_stylesheet() {
         assert_eq!(
-            relativize(
-                "b{background:url('/static/vendor/f.woff2')}",
-                "/static/app.css",
-                false
-            ),
+            relativize("b{background:url('/static/vendor/f.woff2')}", "/static/app.css", false),
             "b{background:url('../static/vendor/f.woff2')}"
         );
     }

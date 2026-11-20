@@ -16,12 +16,10 @@ fn column(dir: &Path) -> Vec<Vec<u8>> {
 }
 
 fn segments(dir: &Path) -> usize {
-    Manifest::load(dir).ok().flatten().map_or(0, |m| {
-        m.live
-            .iter()
-            .filter(|f| f.kind == Kind::Segment as u8)
-            .count()
-    })
+    Manifest::load(dir)
+        .ok()
+        .flatten()
+        .map_or(0, |m| m.live.iter().filter(|f| f.kind == Kind::Segment as u8).count())
 }
 
 /// Appends then the background merge: the merged column is byte for byte a fresh build's,
@@ -33,17 +31,14 @@ fn a_merged_column_equals_a_fresh_one_byte_for_byte() {
         gitterrace_testkit::Fixture::init(&dir.path().join("repo")).at("2024-01-01T00:00:00Z");
     let mut tips = Vec::new();
     for i in 0..12 {
-        f = f
-            .write(&format!("f{}", i % 3), &format!("{i}\n"))
-            .commit(&format!("fix: step {i}"));
+        f = f.write(&format!("f{}", i % 3), &format!("{i}\n")).commit(&format!("fix: step {i}"));
         tips.push(f.git(&["rev-parse", "HEAD"]));
     }
     let repo = Repo::discover(f.path()).expect("repo");
     let one = dir.path().join("one");
     let a = Index::open_dir(one.clone()).expect("index");
     a.set_message_index(true);
-    a.update(&repo, tips.last().expect("tip"), &|_| {})
-        .expect("one step");
+    a.update(&repo, tips.last().expect("tip"), &|_| {}).expect("one step");
     let want = column(&one);
     assert_eq!(want.len(), 1);
 
@@ -73,10 +68,7 @@ fn hostile_items_error_not_panic() {
     it.encode(&mut raw);
     let ok = Item::decode(&mut Cursor::new(&raw, "t", 0), 2).expect("round trip");
     assert_eq!(ok, it);
-    assert!(
-        Item::decode(&mut Cursor::new(&raw, "t", 0), 1).is_err(),
-        "parent past the set"
-    );
+    assert!(Item::decode(&mut Cursor::new(&raw, "t", 0), 1).is_err(), "parent past the set");
     for cut in 0..raw.len() {
         assert!(Item::decode(&mut Cursor::new(&raw[..cut], "t", 0), 2).is_err());
     }
@@ -118,12 +110,8 @@ fn history(dir: &Path, n: usize) -> (Repo, String) {
 }
 
 fn items(dir: &Path) -> Vec<super::Item> {
-    let store = crate::seg::read::Store::open(dir)
-        .expect("open")
-        .expect("set");
-    let col = super::MessageColumn::of(store)
-        .expect("column")
-        .expect("whole");
+    let store = crate::seg::read::Store::open(dir).expect("open").expect("set");
+    let col = super::MessageColumn::of(store).expect("column").expect("whole");
     col.items().expect("items")
 }
 
@@ -184,9 +172,5 @@ fn a_failed_message_block_stops_the_text_stream() {
     let r = idx.update(&src, &tip, &|_| {});
     super::writer::TEST_FAIL_AT.with(|f| f.set(None));
     assert!(r.is_err(), "the update reports the failed block");
-    assert_eq!(
-        src.1.get(),
-        2,
-        "the stream stops at the push whose block failed"
-    );
+    assert_eq!(src.1.get(), 2, "the stream stops at the push whose block failed");
 }

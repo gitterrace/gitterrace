@@ -88,17 +88,9 @@ fn today_line(today: u32, last: Option<&CommitSummary>, now: i64) -> String {
         return "No commits yet".to_owned();
     };
     if today > 0 {
-        format!(
-            "{} today, last: {}",
-            fmt::count(today, "commit", "commits"),
-            c.subject
-        )
+        format!("{} today, last: {}", fmt::count(today, "commit", "commits"), c.subject)
     } else {
-        format!(
-            "Quiet today. Last commit {}: {}",
-            fmt::ago(c.author.time, now).text,
-            c.subject
-        )
+        format!("Quiet today. Last commit {}: {}", fmt::ago(c.author.time, now).text, c.subject)
     }
 }
 
@@ -149,11 +141,7 @@ pub(super) async fn index(
         let live = follows_list(&table).then(|| table.env.home_version());
         let served = table.snapshot();
         let reads = in_order(&served, |s| {
-            (
-                s.recent(now),
-                show_tree.then(|| s.known_dirty()),
-                s.insights_state(),
-            )
+            (s.recent(now), show_tree.then(|| s.known_dirty()), s.insights_state())
         });
         let rows: Vec<IndexRow> = served
             .iter()
@@ -168,10 +156,8 @@ pub(super) async fn index(
                     name: s.name.clone(),
                     hidden: !matches(&s.name, &q),
                     when: c.map_or_else(crate::when::When::none, |c| fmt::ago(c.author.time, now)),
-                    commit_href: c.map_or_else(
-                        || href.clone(),
-                        |c| format!("/r/{}/commit/{}", s.name, c.id),
-                    ),
+                    commit_href: c
+                        .map_or_else(|| href.clone(), |c| format!("/r/{}/commit/{}", s.name, c.id)),
                     spark: polyline(counts, peak),
                     total,
                     today: today_line(r.today, c, now),
@@ -196,11 +182,7 @@ pub(super) async fn index(
         let sub = format!(
             "{}, {} today",
             fmt::count(rows.len(), "repository", "repositories"),
-            fmt::count(
-                rows.iter().map(|r| r.commits_today).sum::<u32>(),
-                "commit",
-                "commits"
-            )
+            fmt::count(rows.iter().map(|r| r.commits_today).sum::<u32>(), "commit", "commits")
         );
         let shown = rows.iter().filter(|r| !r.hidden).count();
         IndexPage {
@@ -227,11 +209,7 @@ fn shows_tree(table: &Table) -> bool {
 
 /// Whether an open home hears the list change: the live feature's stream is local only.
 fn follows_list(table: &Table) -> bool {
-    !table.env.public()
-        && table
-            .env
-            .cfg()
-            .feature_on(gitterrace_config::Feature::Live, None)
+    !table.env.public() && table.env.cfg().feature_on(gitterrace_config::Feature::Live, None)
 }
 
 /// `/_dirty`, fetched by `home.js` after the rows render, so a cold status scan of every
@@ -258,15 +236,9 @@ pub(super) async fn dirty(State(table): State<Arc<Table>>) -> Response {
     })
     .await
     .unwrap_or_default();
-    let map: serde_json::Map<String, serde_json::Value> = names
-        .into_iter()
-        .map(|n| (n, serde_json::Value::Bool(true)))
-        .collect();
-    (
-        [(axum::http::header::CACHE_CONTROL, "no-store")],
-        axum::Json(map),
-    )
-        .into_response()
+    let map: serde_json::Map<String, serde_json::Value> =
+        names.into_iter().map(|n| (n, serde_json::Value::Bool(true))).collect();
+    ([(axum::http::header::CACHE_CONTROL, "no-store")], axum::Json(map)).into_response()
 }
 
 #[cfg(test)]

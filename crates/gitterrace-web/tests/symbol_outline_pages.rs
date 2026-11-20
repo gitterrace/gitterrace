@@ -58,9 +58,7 @@ fn source_pages_with_their_symbol_outline_match_the_oracle() {
     let answers = rt.block_on(async {
         let f = FILES
             .iter()
-            .fold(Fixture::init(&dir.path().join("repo")), |f, (p, body)| {
-                f.write(p, body)
-            })
+            .fold(Fixture::init(&dir.path().join("repo")), |f, (p, body)| f.write(p, body))
             .at("2024-03-01T10:00:00Z")
             .commit("feat: one file per outlined language");
         let router = gitterrace_web::app_router(f.path()).expect("router");

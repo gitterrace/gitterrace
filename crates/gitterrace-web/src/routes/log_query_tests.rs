@@ -35,14 +35,7 @@ fn history(dir: &std::path::Path) -> std::path::PathBuf {
         };
         f = f.write(path, &format!("{i}\n"));
         f.git(&["add", "-A"]);
-        f.git(&[
-            "commit",
-            "-q",
-            "--author",
-            who,
-            "-m",
-            &format!("{kind}: change {i} login"),
-        ]);
+        f.git(&["commit", "-q", "--author", who, "-m", &format!("{kind}: change {i} login")]);
     }
     f.path().to_path_buf()
 }
@@ -68,9 +61,7 @@ fn indexed_pages_walk_no_git_and_match_the_walk() {
         assert!(w.walked > 0 && w.walked <= WALK_CAP, "{q}: {w:?}");
     }
     let warm = app(&p);
-    warm.index
-        .update(&warm.repo, "HEAD", &|_| {})
-        .expect("update");
+    warm.index.update(&warm.repo, "HEAD", &|_| {}).expect("update");
     warm.mark_ready();
     for (q, (want, _)) in QUERIES.iter().zip(&walked) {
         let (got, work) = ids(&warm, q);
@@ -78,10 +69,7 @@ fn indexed_pages_walk_no_git_and_match_the_walk() {
         assert!(!want.is_empty(), "{q} selects something");
         let words = m(q).words().len();
         // Only message words read git, and only for the candidates the index kept.
-        assert!(
-            words > 0 || work.walked == 0,
-            "{q} walked git with the index ready: {work:?}"
-        );
+        assert!(words > 0 || work.walked == 0, "{q} walked git with the index ready: {work:?}");
         assert!(work.walked <= 12 && work.rows <= 12, "{q}: {work:?}");
     }
 }

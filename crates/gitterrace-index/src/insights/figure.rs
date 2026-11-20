@@ -29,10 +29,7 @@ impl Figure {
 
     /// The wire form, for the API and MCP.
     pub const fn item(self) -> gitterrace_types::api::FigureItem {
-        gitterrace_types::api::FigureItem {
-            population: self.population,
-            value: self.value,
-        }
+        gitterrace_types::api::FigureItem { population: self.population, value: self.value }
     }
 }
 
@@ -92,10 +89,7 @@ mod tests {
         recs[3].merge = true;
         let ins = Insights::new(&recs, Options::default(), None);
         let e = ins.every_totals();
-        assert_eq!(
-            (e.commits.value(), e.merges.value(), e.bots.value()),
-            (6, 1, 2)
-        );
+        assert_eq!((e.commits.value(), e.merges.value(), e.bots.value()), (6, 1, 2));
         assert_eq!(e.commits.population(), Population::Every);
         let c = ins.period_summary(Period::All).current.commits_figure();
         assert_eq!((c.value(), c.population()), (3, Population::Counted));

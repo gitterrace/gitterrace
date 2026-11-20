@@ -85,9 +85,7 @@ pub fn apply(text: &str, changes: &[Change]) -> Result<String, Located> {
 
 /// The `[[list]]` rows, added at the end when the text has none.
 fn rows_mut<'a>(doc: &'a mut DocumentMut, list: &str) -> Option<&'a mut ArrayOfTables> {
-    let item = doc
-        .entry(list)
-        .or_insert_with(|| Item::ArrayOfTables(ArrayOfTables::new()));
+    let item = doc.entry(list).or_insert_with(|| Item::ArrayOfTables(ArrayOfTables::new()));
     item.as_array_of_tables_mut()
 }
 
@@ -116,10 +114,7 @@ mod tests {
     use crate::edit::{Change, apply};
 
     fn set(id: &str, v: &str) -> Change {
-        Change {
-            id: id.into(),
-            value: Some(v.into()),
-        }
+        Change { id: id.into(), value: Some(v.into()) }
     }
 
     const FILE: &str = "# my settings\n\n[server]\n# how many\nlive_streams = 5 # few\n\
@@ -129,32 +124,17 @@ mod tests {
     fn a_save_keeps_comments_and_key_order() {
         let out = apply(FILE, &[set("server.live_streams", "9")]).expect("apply");
         assert_eq!(out, FILE.replace("= 5 ", "= 9 "));
-        let out = apply(
-            FILE,
-            &[set("server.hosts", "[\"h\"]"), set("links.style", "\"go\"")],
-        )
-        .expect("apply");
-        assert!(
-            out.starts_with(FILE.split("\n[display]").next().expect("head")),
-            "{out}"
-        );
-        assert!(
-            out.contains("is_public = false\nhosts = [\"h\"]\n"),
-            "{out}"
-        );
+        let out = apply(FILE, &[set("server.hosts", "[\"h\"]"), set("links.style", "\"go\"")])
+            .expect("apply");
+        assert!(out.starts_with(FILE.split("\n[display]").next().expect("head")), "{out}");
+        assert!(out.contains("is_public = false\nhosts = [\"h\"]\n"), "{out}");
         assert!(out.ends_with("[links]\nstyle = \"go\"\n"), "{out}");
     }
 
     #[test]
     fn a_removed_key_leaves_the_rest() {
-        let out = apply(
-            FILE,
-            &[Change {
-                id: "server.is_public".into(),
-                value: None,
-            }],
-        )
-        .expect("apply");
+        let out =
+            apply(FILE, &[Change { id: "server.is_public".into(), value: None }]).expect("apply");
         assert_eq!(out, FILE.replace("is_public = false\n", ""));
     }
 
@@ -165,28 +145,15 @@ mod tests {
     fn list_rows_change_add_and_go_keeping_comments() {
         let out = apply(ACTIONS, &[set("action.0.label", "\"Ay\"")]).expect("apply");
         assert_eq!(out, ACTIONS.replace("\"A\" #", "\"Ay\" #"));
-        let out = apply(
-            ACTIONS,
-            &[set("action.2.id", "\"c\""), set("action.2.label", "\"C\"")],
-        )
-        .expect("add");
+        let out = apply(ACTIONS, &[set("action.2.id", "\"c\""), set("action.2.label", "\"C\"")])
+            .expect("add");
         assert!(out.starts_with(ACTIONS), "{out}");
-        assert!(
-            out.ends_with("[[action]]\nid = \"c\"\nlabel = \"C\"\n"),
-            "{out}"
-        );
-        let gone = Change {
-            id: "action.1".into(),
-            value: None,
-        };
+        assert!(out.ends_with("[[action]]\nid = \"c\"\nlabel = \"C\"\n"), "{out}");
+        let gone = Change { id: "action.1".into(), value: None };
         let out = apply(ACTIONS, &[gone]).expect("remove");
         assert!(out.contains("# mine") && !out.contains("\"b\""), "{out}");
         for c in [set("action.5.id", "\"x\""), set("version.0.id", "\"x\"")] {
-            assert!(
-                apply(ACTIONS, std::slice::from_ref(&c)).is_err(),
-                "{}",
-                c.id
-            );
+            assert!(apply(ACTIONS, std::slice::from_ref(&c)).is_err(), "{}", c.id);
         }
     }
 
@@ -194,11 +161,7 @@ mod tests {
     fn bad_input_is_refused_with_its_place() {
         let e = apply("[watch\n", &[]).expect_err("syntax");
         assert_eq!(e.line, 1);
-        for c in [
-            set("watch", "1"),
-            set("a.b.c", "1"),
-            set("watch.enabled", "1 2"),
-        ] {
+        for c in [set("watch", "1"), set("a.b.c", "1"), set("watch.enabled", "1 2")] {
             let e = apply(FILE, std::slice::from_ref(&c)).expect_err(&c.id);
             assert_eq!(e.key.as_deref(), Some(c.id.as_str()));
         }

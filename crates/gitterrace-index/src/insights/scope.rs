@@ -141,13 +141,7 @@ impl Scope {
         if let Some((_, w)) = m.words().first() {
             return Err(ScopeError::Words(w.clone()));
         }
-        Ok(Self {
-            period,
-            range,
-            sel: Selection::of(&q),
-            m,
-            opts: p.options.apply(defaults),
-        })
+        Ok(Self { period, range, sel: Selection::of(&q), m, opts: p.options.apply(defaults) })
     }
 
     pub const fn period(&self) -> Period {
@@ -164,11 +158,7 @@ impl Scope {
     pub fn query_text(&self) -> String {
         let period = (self.period != Period::All).then(|| format!("after:{}", self.period));
         let sel = self.sel.q.clone();
-        [period, sel]
-            .into_iter()
-            .flatten()
-            .collect::<Vec<_>>()
-            .join(" ")
+        [period, sel].into_iter().flatten().collect::<Vec<_>>().join(" ")
     }
 
     pub const fn selection(&self) -> &Selection {
@@ -236,8 +226,7 @@ impl Scope {
     ) -> impl Iterator<Item = &'r FileRow> + 'r {
         let m = self.m.clone();
         let all = !m.has_path();
-        rows.iter()
-            .filter(move |f| all || src.path(f.path).is_some_and(|n| m.row(&n)))
+        rows.iter().filter(move |f| all || src.path(f.path).is_some_and(|n| m.row(&n)))
     }
 }
 
@@ -298,18 +287,10 @@ impl CountContext {
             hi = Some(hi.map_or(d, |x| x.max(d)));
         }
         match (anchor_day, lo, hi) {
-            (Some(anchor_day), Some(first_day), Some(last_day)) => Self {
-                now,
-                anchor_day,
-                first_day,
-                last_day,
-            },
-            _ => Self {
-                now,
-                anchor_day: 0,
-                first_day: 1,
-                last_day: 0,
-            },
+            (Some(anchor_day), Some(first_day), Some(last_day)) => {
+                Self { now, anchor_day, first_day, last_day }
+            }
+            _ => Self { now, anchor_day: 0, first_day: 1, last_day: 0 },
         }
     }
 
@@ -337,10 +318,7 @@ impl CountContext {
     /// anchor day, `All` every day. A `from`/`to` range narrows either.
     pub fn days(&self, s: &Scope) -> RangeInclusive<i64> {
         let (first, last) = s.period.days().map_or((i64::MIN, i64::MAX), |d| {
-            (
-                self.anchor_day.saturating_add(1).saturating_sub(d),
-                self.anchor_day,
-            )
+            (self.anchor_day.saturating_add(1).saturating_sub(d), self.anchor_day)
         });
         let (lo, hi) = s.range.unwrap_or((i64::MIN, i64::MAX));
         first.max(lo)..=last.min(hi)
@@ -351,20 +329,12 @@ impl CountContext {
         if self.last_day < self.first_day {
             return TimeAxis::for_period(Some(s.period), 1, 0);
         }
-        let last = if s.period.days().is_some() {
-            self.anchor_day
-        } else {
-            self.last_day
-        };
+        let last = if s.period.days().is_some() { self.anchor_day } else { self.last_day };
         if s.range.is_none() {
             return TimeAxis::for_period(Some(s.period), self.first_day, last);
         }
         let d = self.days(s);
-        TimeAxis::for_period(
-            None,
-            (*d.start()).max(self.first_day),
-            (*d.end()).min(self.last_day),
-        )
+        TimeAxis::for_period(None, (*d.start()).max(self.first_day), (*d.end()).min(self.last_day))
     }
 
     /// Author times that may hold one of `s`'s local days: the days widened by two days on
@@ -385,10 +355,7 @@ pub(crate) const fn span_of(days: &RangeInclusive<i64>) -> Range<i64> {
     let hi = if *days.end() == i64::MAX {
         i64::MAX
     } else {
-        days.end()
-            .saturating_add(1)
-            .saturating_mul(DAY)
-            .saturating_add(margin)
+        days.end().saturating_add(1).saturating_mul(DAY).saturating_add(margin)
     };
     lo..hi
 }
@@ -420,8 +387,7 @@ pub(super) fn reference_day_at(src: &dyn InsightsSource, now: i64) -> Option<i64
             oldest = Some(c);
         }
     }
-    best.or(oldest)
-        .map(|c| feed::local_day_of(c.time, c.offset))
+    best.or(oldest).map(|c| feed::local_day_of(c.time, c.offset))
 }
 
 #[cfg(test)]
@@ -470,19 +436,10 @@ mod tests {
         let s = scope(&[("q", "  path:/src/ ")]).expect("ok");
         assert_eq!(s.period(), Period::Month);
         assert_eq!(s.selection().q.as_deref(), Some("path:src"));
-        assert!(matches!(
-            scope(&[("q", "a | b")]),
-            Err(ScopeError::Query(_))
-        ));
+        assert!(matches!(scope(&[("q", "a | b")]), Err(ScopeError::Query(_))));
         assert!(matches!(scope(&[("q", "fix")]), Err(ScopeError::Words(_))));
-        assert!(matches!(
-            scope(&[("period", "2w")]),
-            Err(ScopeError::Period(_))
-        ));
-        assert!(matches!(
-            scope(&[("from", "2026-02-30")]),
-            Err(ScopeError::Date(..))
-        ));
+        assert!(matches!(scope(&[("period", "2w")]), Err(ScopeError::Period(_))));
+        assert!(matches!(scope(&[("from", "2026-02-30")]), Err(ScopeError::Date(..))));
         assert!(matches!(
             scope(&[("from", "2026-03-02"), ("to", "2026-03-01")]),
             Err(ScopeError::Order(..))
@@ -520,28 +477,18 @@ mod tests {
             let src = MemorySource::new(&recs);
             let cx = CountContext::new(&src, &FixedClock(MON + 1000 * 86_400));
             let count = |merges: bool| {
-                let o = Options {
-                    include_merges: merges,
-                    include_bots: true,
-                    ..Options::default()
-                };
+                let o =
+                    Options { include_merges: merges, include_bots: true, ..Options::default() };
                 let ins = Insights::new(&recs, o.clone(), None);
                 let s = Scope::from_params(&ScopeParams::default(), o, Period::All).expect("scope");
-                let n = src
-                    .commits_in(CommitRange::All)
-                    .filter(|c| s.admits(&ins, &cx, c))
-                    .count();
+                let n = src.commits_in(CommitRange::All).filter(|c| s.admits(&ins, &cx, c)).count();
                 let lines = ins.counted(&s, cx).totals();
                 (n, lines.commits, lines.additions, lines.files)
             };
             let (off, on) = (count(false), count(true));
             assert_eq!(on.0, off.0 + 1, "the merge is admitted with the option");
             assert_eq!(on.1, off.1 + 1, "and counted as a commit");
-            assert_eq!(
-                (on.2, on.3),
-                (off.2, off.3),
-                "lines and files are unchanged"
-            );
+            assert_eq!((on.2, on.3), (off.2, off.3), "lines and files are unchanged");
         }
     }
 }

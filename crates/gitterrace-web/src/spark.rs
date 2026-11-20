@@ -34,22 +34,10 @@ struct Rung {
 /// Finest first. A month rung is never reached: weeks hold `MAX` buckets up to ten months,
 /// past both callers' caps.
 const LADDER: [Rung; 4] = [
-    Rung {
-        secs: HOUR,
-        per: "hour",
-    },
-    Rung {
-        secs: 6 * HOUR,
-        per: "6 hours",
-    },
-    Rung {
-        secs: DAY,
-        per: "day",
-    },
-    Rung {
-        secs: WEEK,
-        per: "week",
-    },
+    Rung { secs: HOUR, per: "hour" },
+    Rung { secs: 6 * HOUR, per: "6 hours" },
+    Rung { secs: DAY, per: "day" },
+    Rung { secs: WEEK, per: "week" },
 ];
 
 /// Commit counts over the fitted window, oldest bucket first.
@@ -80,18 +68,11 @@ pub(crate) struct End {
 impl End {
     /// The end of the day holding `now` in a zone `offset` seconds east of UTC.
     pub(crate) const fn local(now: i64, offset: i32) -> Self {
-        Self {
-            now,
-            day_end: (local_day_of(now, offset) + 1) * DAY - offset as i64,
-        }
+        Self { now, day_end: (local_day_of(now, offset) + 1) * DAY - offset as i64 }
     }
 
     const fn of(self, rung: &Rung) -> i64 {
-        if rung.secs >= DAY {
-            self.day_end
-        } else {
-            self.now
-        }
+        if rung.secs >= DAY { self.day_end } else { self.now }
     }
 }
 
@@ -118,11 +99,7 @@ pub(crate) fn series(
             counts[last - back] += 1;
         }
     }
-    Series {
-        counts,
-        per: rung.per,
-        span: span_words(rung, n),
-    }
+    Series { counts, per: rung.per, span: span_words(rung, n) }
 }
 
 /// The rung and bucket count for a history from `first` to `end`: the finest rung with at most
@@ -133,10 +110,7 @@ fn fit(first: i64, end: End, cap: i64) -> (&'static Rung, i64) {
         let span = (end.of(r) - 1 - first).max(0);
         (span / r.secs + 1).min((cap / r.secs).max(1))
     };
-    let rung = LADDER
-        .iter()
-        .find(|r| count(r) <= MAX)
-        .unwrap_or(&LADDER[LADDER.len() - 1]);
+    let rung = LADDER.iter().find(|r| count(r) <= MAX).unwrap_or(&LADDER[LADDER.len() - 1]);
     (rung, count(rung))
 }
 
@@ -180,24 +154,14 @@ mod tests {
         let rung = fit(now - age, AT, CAP).0;
         let start = AT.of(rung) - i64::try_from(n).expect("n") * rung.secs;
         if age < CAP {
-            assert!(
-                start <= now - age,
-                "age {age}: first commit before bucket 0"
-            );
+            assert!(start <= now - age, "age {age}: first commit before bucket 0");
             assert!(
                 start + rung.secs > now - age,
                 "age {age}: bucket 0 is time before the first commit"
             );
-            assert!(
-                s.counts[0] > 0,
-                "age {age}: leading empty bucket {:?}",
-                s.counts
-            );
+            assert!(s.counts[0] > 0, "age {age}: leading empty bucket {:?}", s.counts);
         }
-        assert!(
-            s.counts[n - 1] > 0,
-            "age {age}: now is not in the last bucket"
-        );
+        assert!(s.counts[n - 1] > 0, "age {age}: now is not in the last bucket");
         assert_eq!(
             s.counts.iter().sum::<u32>() as usize,
             times.iter().filter(|t| **t >= start).count(),
@@ -217,11 +181,7 @@ mod tests {
         let s = check(2 * DAY, MIN as usize);
         assert_eq!(s.label(), "Commits per 6 hours, last 2 days");
         let s = check(2 * DAY + 7 * HOUR, MIN as usize);
-        assert_eq!(
-            s.label(),
-            "Commits per 6 hours, last 3 days",
-            "days round up"
-        );
+        assert_eq!(s.label(), "Commits per 6 hours, last 3 days", "days round up");
     }
 
     #[test]
@@ -240,12 +200,7 @@ mod tests {
     fn five_years_is_capped() {
         let s = check(5 * 365 * DAY, MIN as usize);
         assert_eq!(s.label(), "Commits per week, last 26 weeks");
-        let s = series(
-            history(5 * 365 * DAY),
-            Some(NOW - 5 * 365 * DAY),
-            AT,
-            12 * WEEK,
-        );
+        let s = series(history(5 * 365 * DAY), Some(NOW - 5 * 365 * DAY), AT, 12 * WEEK);
         assert_eq!(s.label(), "Commits per week, last 12 weeks");
     }
 
@@ -283,12 +238,7 @@ mod tests {
     fn day_buckets_are_local_days() {
         let first = AT.now - 12 * DAY;
         let midnight = AT.day_end - DAY;
-        let s = series(
-            [first, midnight - HOUR / 2, midnight + HOUR / 2],
-            Some(first),
-            AT,
-            CAP,
-        );
+        let s = series([first, midnight - HOUR / 2, midnight + HOUR / 2], Some(first), AT, CAP);
         assert_eq!(s.per, "day");
         let n = s.counts.len();
         assert_eq!((s.counts[n - 2], s.counts[n - 1]), (1, 1), "{:?}", s.counts);

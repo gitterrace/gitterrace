@@ -53,23 +53,13 @@ impl ContainerWriter {
     /// order, which the reader checks.
     pub fn block(&mut self, section: u16, items: u32, payload: &[u8]) -> SegResult<()> {
         if payload.len() > MAX_BLOCK {
-            return Err(SegError::TooLong {
-                kind: "block",
-                len: payload.len(),
-                max: MAX_BLOCK,
-            });
+            return Err(SegError::TooLong { kind: "block", len: payload.len(), max: MAX_BLOCK });
         }
         if self.toc.len() >= MAX_TOC {
-            return Err(SegError::TooLong {
-                kind: "toc",
-                len: self.toc.len() + 1,
-                max: MAX_TOC,
-            });
+            return Err(SegError::TooLong { kind: "toc", len: self.toc.len() + 1, max: MAX_TOC });
         }
         if self.toc.last().is_some_and(|l| l.section > section) {
-            return Err(SegError::BadName(format!(
-                "section {section} after a higher one"
-            )));
+            return Err(SegError::BadName(format!("section {section} after a higher one")));
         }
         let items_total = self.items.checked_add(items);
         let items_total = items_total.ok_or(SegError::TooLong {
@@ -80,13 +70,7 @@ impl ContainerWriter {
         let len = u32::try_from(payload.len()).unwrap_or(u32::MAX);
         self.out.write_all(payload)?;
         let crc = crc32fast::hash(payload);
-        self.toc.push(TocEntry {
-            section,
-            items,
-            offset: self.offset,
-            len,
-            crc,
-        });
+        self.toc.push(TocEntry { section, items, offset: self.offset, len, crc });
         self.offset += u64::from(len);
         self.items = items_total;
         Ok(())
@@ -115,10 +99,7 @@ impl ContainerWriter {
         let footer = footer.encode();
         self.out.write_all(&toc)?;
         self.out.write_all(&footer)?;
-        let file = self
-            .out
-            .into_inner()
-            .map_err(|e| SegError::Io(e.into_error()))?;
+        let file = self.out.into_inner().map_err(|e| SegError::Io(e.into_error()))?;
         file.sync_all()?;
         drop(file);
         if !hook(Step::FileWritten(self.name.clone())) {
@@ -163,12 +144,8 @@ mod tests {
     #[test]
     fn hostile_writer_inputs_error_not_panic() -> SegResult<()> {
         let dir = tempfile::tempdir()?;
-        let mut w = ContainerWriter::new(
-            dir.path(),
-            "seg-1-0.gts",
-            Kind::Segment,
-            StringBase::default(),
-        )?;
+        let mut w =
+            ContainerWriter::new(dir.path(), "seg-1-0.gts", Kind::Segment, StringBase::default())?;
         assert!(w.block(1, 1, &vec![0; MAX_BLOCK + 1]).is_err());
         w.block(2, 1, b"x")?;
         assert!(w.block(1, 1, b"x").is_err());

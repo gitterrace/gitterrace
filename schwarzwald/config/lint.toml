@@ -62,6 +62,7 @@ allow = [
   "_typos.toml",
   "cliff.toml",
   "ruff.toml",
+  "rustfmt.toml",
   "sgconfig.yml",
   # Editor and type checker configs, plus the web toolchain manifests
   "jsconfig.json",

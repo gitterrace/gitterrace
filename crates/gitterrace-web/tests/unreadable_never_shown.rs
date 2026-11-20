@@ -20,10 +20,7 @@ fn repo(dir: &Path) -> std::path::PathBuf {
     let mut f = Fixture::init(&dir.join("r")).at("2024-02-01T10:00:00Z");
     for i in 0..12 {
         f = f
-            .write(
-                &format!("src/f{}.rs", i % 4),
-                &format!("fn f() {{ {i} }}\n"),
-            )
+            .write(&format!("src/f{}.rs", i % 4), &format!("fn f() {{ {i} }}\n"))
             .commit(&format!("feat(core): change {i}"));
     }
     f.path().to_owned()
@@ -34,17 +31,10 @@ fn repo(dir: &Path) -> std::path::PathBuf {
 /// history, halfway through its build.
 fn corrupt(cache: &Path) {
     use gitterrace_index::seg::format::section;
-    let store = gitterrace_index::seg::read::Store::open(cache)
-        .expect("open")
-        .expect("a set");
+    let store = gitterrace_index::seg::read::Store::open(cache).expect("open").expect("a set");
     let mut flips: Vec<(String, u64)> = Vec::new();
     for c in &store.segments {
-        for sec in [
-            section::COMMITS,
-            section::ROWS,
-            section::AUTHOR_DAY,
-            section::PATH_AUTHOR,
-        ] {
+        for sec in [section::COMMITS, section::ROWS, section::AUTHOR_DAY, section::PATH_AUTHOR] {
             for e in c.blocks(sec) {
                 flips.push((c.name().to_owned(), e.offset + u64::from(e.len / 2)));
             }
@@ -117,10 +107,7 @@ fn a_cache_that_fails_a_read_is_never_shown_as_data() {
     });
     for (t, (status, body)) in &clean {
         assert_eq!(*status, 200, "{t} answers on a clean cache");
-        assert!(
-            !body.contains("data-progress"),
-            "{t} shows data on a clean cache"
-        );
+        assert!(!body.contains("data-progress"), "{t} shows data on a clean cache");
     }
     let mut shown = Vec::new();
     for t in targets() {
@@ -134,8 +121,5 @@ fn a_cache_that_fails_a_read_is_never_shown_as_data() {
             shown.push(format!("{t}: status {status}"));
         }
     }
-    assert!(
-        shown.is_empty(),
-        "answers built over an unreadable cache were shown: {shown:#?}"
-    );
+    assert!(shown.is_empty(), "answers built over an unreadable cache were shown: {shown:#?}");
 }

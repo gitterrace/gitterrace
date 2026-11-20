@@ -118,9 +118,7 @@ impl Repo {
             for (id, _, t) in history {
                 touched.insert(self.full_id(&repo, id)?, *t);
             }
-            let (tip, _, _) = history
-                .first()
-                .ok_or_else(|| Error::Git("empty history".into()))?;
+            let (tip, _, _) = history.first().ok_or_else(|| Error::Git("empty history".into()))?;
             Ok((self.full_id(&repo, tip)?, touched))
         };
         let listed =
@@ -138,12 +136,7 @@ impl Repo {
         let tip = self.resolve_id(&repo, rev)?;
         let mailmap = ident::mailmap(&repo, tip);
         ids.iter()
-            .map(|id| {
-                summary(
-                    &repo.find_commit(self.full_id(&repo, id)?).map_err(git)?,
-                    &mailmap,
-                )
-            })
+            .map(|id| summary(&repo.find_commit(self.full_id(&repo, id)?).map_err(git)?, &mailmap))
             .collect()
     }
 
@@ -174,11 +167,7 @@ impl Repo {
             out.push(info.object().map_err(git)?.author().map_err(git)?.seconds());
         }
         let whole = parents.iter().all(|p| seen.contains(p));
-        let first = if whole {
-            out.iter().copied().min()
-        } else {
-            None
-        };
+        let first = if whole { out.iter().copied().min() } else { None };
         Ok((out, first))
     }
 
@@ -224,15 +213,9 @@ impl Repo {
         let oid = self.resolve_id(&repo, id)?;
         let commit = repo.find_commit(oid).map_err(git)?;
         let mailmap = ident::mailmap(&repo, oid);
-        let message = commit
-            .message_raw()
-            .map_err(git)?
-            .to_str_lossy()
-            .into_owned();
-        let body = message
-            .split_once('\n')
-            .map(|(_, rest)| rest.trim().to_string())
-            .unwrap_or_default();
+        let message = commit.message_raw().map_err(git)?.to_str_lossy().into_owned();
+        let body =
+            message.split_once('\n').map(|(_, rest)| rest.trim().to_string()).unwrap_or_default();
         Ok(CommitDetail {
             summary: summary(&commit, &mailmap)?,
             body,
@@ -265,10 +248,8 @@ impl Repo {
             let mut cache = crate::diff::resource_cache(repo)?;
             crate::diff::raw_changes(repo, commit, &mut cache, crate::diff::Renames::Full)
         };
-        self.change_memo().map_or_else(
-            || diff().map(std::sync::Arc::new),
-            |memo| memo.get(commit.id, diff),
-        )
+        self.change_memo()
+            .map_or_else(|| diff().map(std::sync::Arc::new), |memo| memo.get(commit.id, diff))
     }
 
     /// Summaries of exactly these commits, in order. Each commit is mapped through its own
@@ -279,14 +260,11 @@ impl Repo {
             std::collections::HashMap::new();
         ids.iter()
             .map(|id| {
-                self.row_reads
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.row_reads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 let oid = self.full_id(&repo, id)?;
                 let commit = repo.find_commit(oid).map_err(git)?;
                 let blob = ident::mailmap_blob(&repo, oid);
-                let map = maps
-                    .entry(blob)
-                    .or_insert_with(|| ident::parse_mailmap(&repo, blob));
+                let map = maps.entry(blob).or_insert_with(|| ident::parse_mailmap(&repo, blob));
                 summary(&commit, map)
             })
             .collect()
@@ -299,12 +277,7 @@ impl Repo {
         let repo = self.repo();
         let none = gix::mailmap::Snapshot::default();
         ids.iter()
-            .map(|id| {
-                summary(
-                    &repo.find_commit(self.full_id(&repo, id)?).map_err(git)?,
-                    &none,
-                )
-            })
+            .map(|id| summary(&repo.find_commit(self.full_id(&repo, id)?).map_err(git)?, &none))
             .collect()
     }
 
@@ -326,10 +299,7 @@ impl Repo {
                     time: "",
                 };
                 let got = map.resolve(sig);
-                (
-                    got.name.to_str_lossy().into_owned(),
-                    got.email.to_str_lossy().into_owned(),
-                )
+                (got.name.to_str_lossy().into_owned(), got.email.to_str_lossy().into_owned())
             })
             .collect())
     }
@@ -379,11 +349,7 @@ impl Repo {
         crate::diff::stream(
             ids,
             workers,
-            crate::diff::Window {
-                first: &merges,
-                budget: self.budget.as_ref(),
-                ..NUMSTAT_WINDOW
-            },
+            crate::diff::Window { first: &merges, budget: self.budget.as_ref(), ..NUMSTAT_WINDOW },
             || {
                 let mut repo = self.repo();
                 // Ten workers each keeping the shared 128 MB cache cost over 1 GB; the
@@ -434,9 +400,7 @@ fn merge_positions(repo: &gix::Repository, ids: &[String]) -> Vec<usize> {
         }
         Some(repo.find_commit(oid).ok()?.parent_ids().count())
     };
-    (0..ids.len())
-        .filter(|&i| parents(&ids[i]).is_some_and(|n| n > 1))
-        .collect()
+    (0..ids.len()).filter(|&i| parents(&ids[i]).is_some_and(|n| n > 1)).collect()
 }
 
 /// Heap bytes one index result holds, roughly: what the reorder window budgets.
@@ -451,13 +415,7 @@ fn result_bytes(s: &CommitSummary, files: &[crate::FileDiff]) -> usize {
 
 fn summary(commit: &gix::Commit<'_>, mailmap: &gix::mailmap::Snapshot) -> Result<CommitSummary> {
     let message = commit.message_raw().map_err(git)?;
-    let subject = message
-        .lines()
-        .next()
-        .unwrap_or_default()
-        .to_str_lossy()
-        .trim()
-        .to_string();
+    let subject = message.lines().next().unwrap_or_default().to_str_lossy().trim().to_string();
     Ok(CommitSummary {
         id: commit.id.to_string(),
         parents: commit.parent_ids().map(|p| p.to_string()).collect(),

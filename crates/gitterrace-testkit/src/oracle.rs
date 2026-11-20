@@ -39,13 +39,7 @@ pub fn frozen(name: &str) -> bool {
     }
     let exe = std::env::current_exe().expect("test binary");
     let status = std::process::Command::new(exe)
-        .args([
-            name,
-            "--exact",
-            "--nocapture",
-            "--test-threads=1",
-            "--include-ignored",
-        ])
+        .args([name, "--exact", "--nocapture", "--test-threads=1", "--include-ignored"])
         .env(NOW_VAR, FROZEN_NOW.to_string())
         .status()
         .expect("run child");
@@ -75,10 +69,7 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
         };
     let jane = ("Jane Doe", "jane@x.io");
     let bob = ("Bob", "bob@y.io");
-    let bot = (
-        "dependabot[bot]",
-        "49699333+dependabot[bot]@users.noreply.github.com",
-    );
+    let bot = ("dependabot[bot]", "49699333+dependabot[bot]@users.noreply.github.com");
     let f = step(
         f,
         "2023-06-01T10:00:00Z",
@@ -86,13 +77,8 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
         &[("src/lib.rs", "fn a() {}\nfn b() {}\n")],
         "feat(core): year",
     );
-    let f = step(
-        f,
-        "2024-01-15T10:00:00Z",
-        bot,
-        &[("Cargo.lock", "a\nb\nc\n")],
-        "chore(deps): bump",
-    );
+    let f =
+        step(f, "2024-01-15T10:00:00Z", bot, &[("Cargo.lock", "a\nb\nc\n")], "chore(deps): bump");
     let f = step(
         f,
         "2024-02-20T10:00:00Z",
@@ -115,13 +101,7 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
         "style(core): blank line",
     );
     let f = if mailmap == Mailmap::CaseFold {
-        step(
-            f,
-            "2024-03-06T10:00:00Z",
-            ("Bob", "Bob@Y.io"),
-            &[("docs/y.md", "y\n")],
-            "docs: case",
-        )
+        step(f, "2024-03-06T10:00:00Z", ("Bob", "Bob@Y.io"), &[("docs/y.md", "y\n")], "docs: case")
     } else {
         f
     };
@@ -129,30 +109,19 @@ pub fn matrix_repo(dir: &Path, mailmap: Mailmap) -> (std::path::PathBuf, Values)
         f,
         "2024-03-08T10:00:00Z",
         jane,
-        &[
-            ("src/lib.rs", "fn a() {}\n\nfn b() { 1 }\n"),
-            ("docs/x.md", "d\n"),
-        ],
+        &[("src/lib.rs", "fn a() {}\n\nfn b() { 1 }\n"), ("docs/x.md", "d\n")],
         "fix(core): week",
     );
     let edited = "Jane Doe <jane@x.io> <old@x.io>\nBob B <bob@y.io> Bob <bob@y.io>\n";
     let folded = format!("{edited}Bob B <bob@y.io> <BOB@y.IO>\n");
     let f = match mailmap {
         Mailmap::AsIs => f,
-        Mailmap::Edited => step(
-            f,
-            "2024-03-09T10:00:00Z",
-            jane,
-            &[(".mailmap", edited)],
-            "docs: edit mailmap",
-        ),
-        Mailmap::CaseFold => step(
-            f,
-            "2024-03-09T10:00:00Z",
-            jane,
-            &[(".mailmap", &folded)],
-            "docs: edit mailmap",
-        ),
+        Mailmap::Edited => {
+            step(f, "2024-03-09T10:00:00Z", jane, &[(".mailmap", edited)], "docs: edit mailmap")
+        }
+        Mailmap::CaseFold => {
+            step(f, "2024-03-09T10:00:00Z", jane, &[(".mailmap", &folded)], "docs: edit mailmap")
+        }
     };
     let repo = f.path().to_owned();
     let values = Values {
@@ -235,11 +204,7 @@ async fn capture_with(
             let key = format!("{t}?{q}");
             let (status, body) = page(router, &key).await;
             let body = normalize(&body);
-            let v = if status == 200 {
-                body
-            } else {
-                format!("status {status}\n{body}")
-            };
+            let v = if status == 200 { body } else { format!("status {status}\n{body}") };
             out.insert(key, v);
         }
     }
@@ -407,9 +372,7 @@ fn unversioned(body: &str) -> String {
     while let Some(at) = rest.find("?v=") {
         out.push_str(&rest[..at + 3]);
         rest = &rest[at + 3..];
-        let end = rest
-            .find(|c: char| !c.is_ascii_hexdigit())
-            .unwrap_or(rest.len());
+        let end = rest.find(|c: char| !c.is_ascii_hexdigit()).unwrap_or(rest.len());
         out.push('_');
         rest = &rest[end..];
     }
@@ -438,10 +401,8 @@ pub fn digest(body: &str) -> String {
 pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
     // An asset URL carries the build's `?v=`, which moves with any script or stylesheet edit:
     // the goldens hold what a page says, so the version is read as one placeholder.
-    let answers: BTreeMap<String, String> = answers
-        .iter()
-        .map(|(k, v)| (k.clone(), unversioned(v)))
-        .collect();
+    let answers: BTreeMap<String, String> =
+        answers.iter().map(|(k, v)| (k.clone(), unversioned(v))).collect();
     let answers = &answers;
     let mut text = String::new();
     for (k, v) in answers {
@@ -460,24 +421,17 @@ pub fn check(golden: &Path, dump: &Path, answers: &BTreeMap<String, String>) {
         // Only the reference build blesses: today's code, never the code under test. Each line
         // keeps the exact digest and the digest of the body with equal-time runs sorted, so a
         // later implementation may order ties differently and nothing else.
-        let header: String = std::env::var("TEST_ORACLE_REASON")
-            .map(|r| format!("# {r}\n"))
-            .unwrap_or_default();
+        let header: String =
+            std::env::var("TEST_ORACLE_REASON").map(|r| format!("# {r}\n")).unwrap_or_default();
         std::fs::create_dir_all(golden.parent().expect("parent")).expect("mkdir");
         std::fs::write(golden, format!("{header}{text}")).expect("write golden");
         return;
     }
     let want = std::fs::read_to_string(golden).unwrap_or_else(|e| {
-        panic!(
-            "{}: {e}. Run with TEST_BLESS=1 on today's code",
-            golden.display()
-        )
+        panic!("{}: {e}. Run with TEST_BLESS=1 on today's code", golden.display())
     });
-    let want: BTreeMap<&str, (&str, &str)> = want
-        .lines()
-        .filter(|l| !l.starts_with('#'))
-        .filter_map(golden_line)
-        .collect();
+    let want: BTreeMap<&str, (&str, &str)> =
+        want.lines().filter(|l| !l.starts_with('#')).filter_map(golden_line).collect();
     let mut bad: Vec<String> = Vec::new();
     let mut ties: Vec<String> = Vec::new();
     let mut keys: std::collections::BTreeSet<&str> = want.keys().copied().collect();

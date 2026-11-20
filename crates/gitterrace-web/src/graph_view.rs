@@ -42,14 +42,8 @@ pub(crate) fn place(history: &[(String, Vec<String>)], from: usize, to: usize) -
             parents: parents
                 .iter()
                 .map(|p| match pos.get(p.as_str()) {
-                    Some(&at) if at > here => Parent {
-                        id: at,
-                        far: at - here > FAR_ROWS,
-                    },
-                    _ => Parent {
-                        id: u32::MAX,
-                        far: true,
-                    },
+                    Some(&at) if at > here => Parent { id: at, far: at - here > FAR_ROWS },
+                    _ => Parent { id: u32::MAX, far: true },
                 })
                 .collect(),
         };
@@ -68,13 +62,7 @@ pub(crate) fn columns(rows: &[Placed]) -> u16 {
 
 /// The rightmost column a row draws in.
 fn reach(p: &Placed) -> u16 {
-    p.top
-        .iter()
-        .chain(&p.bottom)
-        .flat_map(|s| [s.from, s.to])
-        .chain([p.col])
-        .max()
-        .unwrap_or(0)
+    p.top.iter().chain(&p.bottom).flat_map(|s| [s.from, s.to]).chain([p.col]).max().unwrap_or(0)
 }
 
 /// One piece of line: its SVG path data and classes.
@@ -97,10 +85,7 @@ pub(crate) fn lane(color: u32) -> &'static str {
         0 => 0,
         c => 1 + (c - 1) % 5,
     };
-    LANES
-        .get(usize::try_from(i).unwrap_or(0))
-        .copied()
-        .unwrap_or("k0")
+    LANES.get(usize::try_from(i).unwrap_or(0)).copied().unwrap_or("k0")
 }
 
 /// One row's cell, as `graph_cell.html` draws it.
@@ -138,11 +123,7 @@ impl HtmlSafe for Cell {}
 /// rows with the same hidden columns reads as one count.
 pub(crate) fn cell(p: &Placed, above: Option<&Placed>, width: u16, merge: bool) -> Cell {
     let was = above.map(hidden);
-    let halves = p
-        .top
-        .iter()
-        .map(|s| (*s, 0))
-        .chain(p.bottom.iter().map(|s| (*s, H / 2)));
+    let halves = p.top.iter().map(|s| (*s, 0)).chain(p.bottom.iter().map(|s| (*s, H / 2)));
     Cell {
         w: u32::from(width) * COL,
         paths: halves.map(|(seg, y0)| line(seg, y0)).collect(),
@@ -154,11 +135,7 @@ pub(crate) fn cell(p: &Placed, above: Option<&Placed>, width: u16, merge: bool) 
             (false, false) => "",
         },
         off: hide(p.col),
-        edge: FOLDS
-            .iter()
-            .filter(|&&(keep, _)| p.col >= keep)
-            .map(|&(_, cls)| cls)
-            .collect(),
+        edge: FOLDS.iter().filter(|&&(keep, _)| p.col >= keep).map(|&(_, cls)| cls).collect(),
         cx: x(p.col),
         lane: lane(p.color),
         tip: false,
@@ -215,11 +192,7 @@ fn line(seg: Seg, y0: u32) -> Line {
     } else {
         format!("M{a} {y0}C{a} {m} {b} {m} {b} {y1}")
     };
-    Line {
-        d,
-        cls,
-        k: lane(seg.color),
-    }
+    Line { d, cls, k: lane(seg.color) }
 }
 
 /// A piece of line's classes: `main` on the first-parent chain, and the folds that hide it.
@@ -239,12 +212,7 @@ mod tests {
 
     fn h(rows: &[(&str, &[&str])]) -> Vec<(String, Vec<String>)> {
         rows.iter()
-            .map(|(id, ps)| {
-                (
-                    (*id).to_owned(),
-                    ps.iter().map(|p| (*p).to_owned()).collect(),
-                )
-            })
+            .map(|(id, ps)| ((*id).to_owned(), ps.iter().map(|p| (*p).to_owned()).collect()))
             .collect()
     }
 
@@ -315,10 +283,7 @@ mod tests {
                     l.d.split(|ch: char| !ch.is_ascii_digit())
                         .filter_map(|n| n.parse().ok())
                         .collect();
-                let reach_x = nums
-                    .iter()
-                    .step_by(2)
-                    .take(if l.d.contains('C') { 4 } else { 1 });
+                let reach_x = nums.iter().step_by(2).take(if l.d.contains('C') { 4 } else { 1 });
                 let reach_x = reach_x.copied().max().unwrap_or(0);
                 let cap = |k: u16| u32::from(k) * COL;
                 assert!(reach_x < cap(3) || l.cls.contains("xn"), "row {i}: {l:?}");
@@ -334,11 +299,7 @@ mod tests {
             }
             assert_eq!(c.edge.is_empty(), p.col < 3, "row {i}: {:?}", c.edge);
             if i > 1 && hidden(p) == hidden(&rows[i - 1]) {
-                assert!(
-                    c.folds.is_empty(),
-                    "row {i} repeats its count: {:?}",
-                    c.folds
-                );
+                assert!(c.folds.is_empty(), "row {i} repeats its count: {:?}", c.folds);
             }
         }
     }

@@ -48,10 +48,7 @@ fn shown(body: &str) -> String {
 
 #[test]
 fn numbers_are_read_with_commas_and_decimals() {
-    assert_eq!(
-        numbers("Rust is 62.0% of 66,500 lines."),
-        ["62.0", "66,500"]
-    );
+    assert_eq!(numbers("Rust is 62.0% of 66,500 lines."), ["62.0", "66,500"]);
     assert_eq!(numbers("3 people. 25 directories."), ["3", "25"]);
 }
 
@@ -70,13 +67,9 @@ async fn every_lead_states_numbers_the_page_shows() {
     let router = gitterrace_web::app_router(f.path()).expect("router");
     gitterrace_testkit::oracle::ready(&router).await;
     let mut fails = Vec::new();
-    for p in [
-        "/stats",
-        "/stats/contributors",
-        "/stats/hotspots",
-        "/stats/ownership",
-        "/stats/languages",
-    ] {
+    for p in
+        ["/stats", "/stats/contributors", "/stats/hotspots", "/stats/ownership", "/stats/languages"]
+    {
         let (status, body) = page(&router, p).await;
         assert_eq!(status, 200, "{p}");
         let Some(l) = lead(&body) else {

@@ -17,31 +17,15 @@ use serde::{Deserialize, Serialize};
 use crate::config::{Piece, PieceError, pieces};
 
 /// Placeholders the page fills, in the order the docs list them.
-pub const SEND_FIELDS: [&str; 7] = [
-    "title",
-    "notes",
-    "permalink",
-    "path",
-    "lines",
-    "sha",
-    "repo",
-];
+pub const SEND_FIELDS: [&str; 7] = ["title", "notes", "permalink", "path", "lines", "sha", "repo"];
 
 /// Placeholders a `lookup` template may hold: only the commit's own ids.
 pub const LOOKUP_FIELDS: [&str; 2] = ["sha", "short"];
 
 /// Schemes refused even though they look like an app scheme: each runs code, reads local
 /// data or reaches browser internals.
-pub const DENIED_SCHEMES: [&str; 8] = [
-    "javascript",
-    "data",
-    "file",
-    "vbscript",
-    "blob",
-    "about",
-    "chrome",
-    "view-source",
-];
+pub const DENIED_SCHEMES: [&str; 8] =
+    ["javascript", "data", "file", "vbscript", "blob", "about", "chrome", "view-source"];
 
 /// One part of a template as the page receives it: `{"lit": "..."}` is copied as is,
 /// `{"ph": "title"}` is replaced by the encoded value.
@@ -68,10 +52,8 @@ impl Target {
     /// Filled with [`fill`]'s rule, so the id is percent-encoded.
     pub fn lookup_url(&self, sha: &str) -> Option<String> {
         let short: String = sha.chars().take(7).collect();
-        let values = BTreeMap::from([
-            ("sha".to_owned(), sha.to_owned()),
-            ("short".to_owned(), short),
-        ]);
+        let values =
+            BTreeMap::from([("sha".to_owned(), sha.to_owned()), ("short".to_owned(), short)]);
         self.lookup.as_deref().map(|p| fill(p, &values))
     }
 
@@ -136,17 +118,9 @@ pub(crate) enum SendError {
     #[error("{key}: {source}")]
     Template { key: String, source: PieceError },
     #[error("{key}: {{{field}}}: no vars.{var}")]
-    NoVar {
-        key: String,
-        field: String,
-        var: String,
-    },
+    NoVar { key: String, field: String, var: String },
     #[error("{key}: unknown placeholder {{{field}}}, known: {known}, var.<name>")]
-    UnknownPlaceholder {
-        key: String,
-        field: String,
-        known: String,
-    },
+    UnknownPlaceholder { key: String, field: String, known: String },
     #[error("{key}: the scheme must be literal, before any placeholder")]
     SchemeNotLiteral { key: String },
     #[error("{key}: bad scheme {scheme:?}")]
@@ -176,12 +150,7 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, SendError> {
         .as_deref()
         .map(|t| template_parts(&raw.vars, "lookup", t, &LOOKUP_FIELDS))
         .transpose()?;
-    Ok(Target {
-        id: raw.id,
-        label: raw.label,
-        parts,
-        lookup,
-    })
+    Ok(Target { id: raw.id, label: raw.label, parts, lookup })
 }
 
 /// Splits `template` into parts: `{var.NAME}` is inserted verbatim, a name in `allowed`
@@ -197,10 +166,9 @@ fn template_parts(
         Some(Part::Lit(l)) => l.push_str(s),
         _ => parts.push(Part::Lit(s.to_owned())),
     };
-    for piece in pieces(template).map_err(|source| SendError::Template {
-        key: key.to_owned(),
-        source,
-    })? {
+    for piece in
+        pieces(template).map_err(|source| SendError::Template { key: key.to_owned(), source })?
+    {
         match piece {
             Piece::Text(t) => push_lit(&mut parts, &t),
             Piece::Field(f) => {
@@ -237,32 +205,22 @@ fn template_parts(
 fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), SendError> {
     let (scheme, rest) = prefix
         .split_once(':')
-        .ok_or_else(|| SendError::SchemeNotLiteral {
-            key: key.to_owned(),
-        })?;
+        .ok_or_else(|| SendError::SchemeNotLiteral { key: key.to_owned() })?;
     let lower = scheme.to_ascii_lowercase();
     let well_formed = lower.bytes().next().is_some_and(|b| b.is_ascii_lowercase())
         && lower
             .bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b"+.-".contains(&b));
     if !well_formed {
-        return Err(SendError::BadScheme {
-            key: key.to_owned(),
-            scheme: scheme.to_owned(),
-        });
+        return Err(SendError::BadScheme { key: key.to_owned(), scheme: scheme.to_owned() });
     }
     if DENIED_SCHEMES.contains(&lower.as_str()) {
-        return Err(SendError::DeniedScheme {
-            key: key.to_owned(),
-            scheme: lower,
-        });
+        return Err(SendError::DeniedScheme { key: key.to_owned(), scheme: lower });
     }
     let after = rest.strip_prefix("//").unwrap_or(rest);
     let host_end = after.find(['/', '?', '#']);
     if has_placeholder && host_end.is_none() {
-        return Err(SendError::PlaceholderInHost {
-            key: key.to_owned(),
-        });
+        return Err(SendError::PlaceholderInHost { key: key.to_owned() });
     }
     if lower == "http" {
         let authority = &after[..host_end.unwrap_or(after.len())];
@@ -272,13 +230,9 @@ fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), Se
             |v6| v6.split(']').next().unwrap_or_default(),
         );
         let loopback = host.eq_ignore_ascii_case("localhost")
-            || host
-                .parse::<std::net::IpAddr>()
-                .is_ok_and(|ip| ip.is_loopback());
+            || host.parse::<std::net::IpAddr>().is_ok_and(|ip| ip.is_loopback());
         if !loopback {
-            return Err(SendError::PlainHttp {
-                key: key.to_owned(),
-            });
+            return Err(SendError::PlainHttp { key: key.to_owned() });
         }
     }
     Ok(())
@@ -295,10 +249,7 @@ mod tests {
     use crate::config::{Config, ConfigError};
 
     fn load(body: &str) -> Result<Config, ConfigError> {
-        Config::parse(
-            &format!("version = 1\n[[send]]\nid = \"s\"\n{body}"),
-            Path::new("/"),
-        )
+        Config::parse(&format!("version = 1\n[[send]]\nid = \"s\"\n{body}"), Path::new("/"))
     }
 
     fn url(u: &str) -> Result<Config, ConfigError> {
@@ -307,40 +258,20 @@ mod tests {
 
     #[test]
     fn send_errors_keep_their_text() {
-        assert_eq!(
-            SendError::VarValue("v".into()).to_string(),
-            "vars.v: one line, at most 4 KiB"
-        );
-        assert_eq!(
-            SendError::Label.to_string(),
-            "label must be 1 to 80 characters"
-        );
-        let e = SendError::NoVar {
-            key: "url".into(),
-            field: "var.v".into(),
-            var: "v".into(),
-        };
+        assert_eq!(SendError::VarValue("v".into()).to_string(), "vars.v: one line, at most 4 KiB");
+        assert_eq!(SendError::Label.to_string(), "label must be 1 to 80 characters");
+        let e = SendError::NoVar { key: "url".into(), field: "var.v".into(), var: "v".into() };
         assert_eq!(e.to_string(), "url: {var.v}: no vars.v");
         let e = SendError::PlainHttp { key: "url".into() };
-        assert_eq!(
-            e.to_string(),
-            "url: http is allowed only for loopback. Use https"
-        );
+        assert_eq!(e.to_string(), "url: http is allowed only for loopback. Use https");
     }
 
     #[test]
     fn scheme_table() {
         // Written out, not DENIED_SCHEMES: dropping an entry there must fail here.
-        for s in [
-            "javascript",
-            "data",
-            "file",
-            "vbscript",
-            "blob",
-            "about",
-            "chrome",
-            "view-source",
-        ] {
+        for s in
+            ["javascript", "data", "file", "vbscript", "blob", "about", "chrome", "view-source"]
+        {
             let e = url(&format!("{s}:x?t={{title}}")).expect_err(s);
             assert!(e.to_string().contains("refused"), "{s}: {e}");
             let upper = s.to_ascii_uppercase();
@@ -416,21 +347,13 @@ mod tests {
         let mut values = BTreeMap::new();
         values.insert("title".to_owned(), "a&b #1 ?/ + \u{e9}\u{1f600}".to_owned());
         values.insert("notes".to_owned(), "x=1&issue[title]=evil".to_owned());
-        for id in [
-            "gitlab-issue",
-            "gitlab-issue-self-hosted",
-            "gitlab-merge-request",
-        ] {
+        for id in ["gitlab-issue", "gitlab-issue-self-hosted", "gitlab-merge-request"] {
             let t = c.sends.iter().find(|t| t.id == id).expect(id);
             let got = fill(&t.parts, &values);
             let query = got.split_once('?').expect("query").1;
             assert!(!query.contains(['#', '?', '/', ' ', '+']), "{id}: {got}");
             let n = query.split('&').count();
-            assert_eq!(
-                n,
-                if id.ends_with("request") { 3 } else { 2 },
-                "{id}: {got}"
-            );
+            assert_eq!(n, if id.ends_with("request") { 3 } else { 2 }, "{id}: {got}");
             assert!(got.contains("a%26b%20%231%20%3F%2F%20%2B%20%C3%A9%F0%9F%98%80"));
         }
     }
@@ -468,11 +391,7 @@ mod tests {
 
     #[test]
     fn lookup_allows_only_the_commit_ids() {
-        let ok = |l: &str| {
-            load(&format!(
-                "label = \"S\"\nurl = \"mailto:x\"\nlookup = {l:?}\n"
-            ))
-        };
+        let ok = |l: &str| load(&format!("label = \"S\"\nurl = \"mailto:x\"\nlookup = {l:?}\n"));
         assert!(ok("https://h.test/s?q={sha}&s={short}").is_ok());
         for bad in [
             "https://h.test/s?q={title}",
@@ -510,10 +429,7 @@ mod tests {
             t.lookup_url("a&b#c").as_deref(),
             Some("https://h.test/s?q=a%26b%23c&s=a%26b%23c")
         );
-        assert_eq!(
-            url("mailto:x").expect("load").sends[0].lookup_url("abc"),
-            None
-        );
+        assert_eq!(url("mailto:x").expect("load").sends[0].lookup_url("abc"), None);
     }
 
     #[test]
@@ -523,10 +439,7 @@ mod tests {
              lookup = \"{var.base}/s?q={sha}\"\nvars = { base = \"https://u@h.test:8080\" }\n",
         )
         .expect("load");
-        assert_eq!(
-            c.sends[0].lookup_site("abc").as_deref(),
-            Some("h.test:8080")
-        );
+        assert_eq!(c.sends[0].lookup_site("abc").as_deref(), Some("h.test:8080"));
     }
 
     /// Every starter issue target has a commit search, and a lookup holds only the commit's ids.
@@ -550,10 +463,7 @@ mod tests {
     fn hostile_values_stay_in_their_component() {
         let c = url("https://h.test/new?title={title}&body={notes}").expect("load");
         let mut values = BTreeMap::new();
-        values.insert(
-            "title".to_owned(),
-            "a&admin=1#frag?x=/../\n\u{e9}\u{1f600}".to_owned(),
-        );
+        values.insert("title".to_owned(), "a&admin=1#frag?x=/../\n\u{e9}\u{1f600}".to_owned());
         values.insert("notes".to_owned(), "-rf +".to_owned());
         let got = fill(&c.sends[0].parts, &values);
         let query = got.split_once('?').expect("query").1;

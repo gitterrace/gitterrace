@@ -101,10 +101,7 @@ fn resident_memory_is_flat_with_history() -> SegResult<()> {
     let (k10, p10) = footprint(400_000)?;
     let ceiling = 14 * MIB;
     for (n, k, p) in [(40_000, k1, p1), (400_000, k10, p10)] {
-        assert!(
-            k <= ceiling && p <= ceiling,
-            "{n} commits: kept {k}, peak {p}"
-        );
+        assert!(k <= ceiling && p <= ceiling, "{n} commits: kept {k}, peak {p}");
     }
     Ok(())
 }

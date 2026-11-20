@@ -37,10 +37,7 @@ mod tests {
         let mut u = Unpacker::new().expect("decoder");
         assert!(u.unpack(&z, 1 << 20) == Some(raw.clone()), "round trip");
         let small = b"short".to_vec();
-        assert!(
-            u.unpack(&pack(&small).expect("pack"), 100) == Some(small),
-            "small"
-        );
+        assert!(u.unpack(&pack(&small).expect("pack"), 100) == Some(small), "small");
         assert!(u.unpack(&z, 1000).is_none(), "over the bound");
         assert!(u.unpack(&z[..z.len() / 2], 1 << 20).is_none(), "cut");
         assert!(u.unpack(&[0xff; 32], 1 << 20).is_none(), "not a frame");

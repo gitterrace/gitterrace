@@ -10,11 +10,7 @@ use std::{
 mod stamp;
 
 fn git(args: &[&str]) -> Option<Output> {
-    Command::new("git")
-        .args(args)
-        .output()
-        .ok()
-        .filter(|o| o.status.success())
+    Command::new("git").args(args).output().ok().filter(|o| o.status.success())
 }
 
 fn version(base: &str) -> String {

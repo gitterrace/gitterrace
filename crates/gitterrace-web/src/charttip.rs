@@ -25,11 +25,7 @@ pub(crate) fn share(part: u64, total: u64) -> String {
 /// that would round to 0 is `<1%`, the rest is a whole percent.
 pub(crate) fn percent(f: f64) -> String {
     let p = f.clamp(0.0, 1.0) * 100.0;
-    if p > 0.0 && p < 0.5 {
-        "<1%".to_owned()
-    } else {
-        format!("{p:.0}%")
-    }
+    if p > 0.0 && p < 0.5 { "<1%".to_owned() } else { format!("{p:.0}%") }
 }
 
 /// "mark: 12 commits", for a single-series mark whose value is its column total.
@@ -39,12 +35,7 @@ pub(crate) fn value(mark: &str, n: u64, u: Unit) -> String {
 
 /// "mark: 41,230 lines (62%) of 66,500", for one part of a column.
 pub(crate) fn part(mark: &str, n: u64, total: u64, u: Unit) -> String {
-    format!(
-        "{mark}: {} ({}) of {}",
-        count(n, u.0, u.1),
-        share(n, total),
-        thousands(total)
-    )
+    format!("{mark}: {} ({}) of {}", count(n, u.0, u.1), share(n, total), thousands(total))
 }
 
 /// "mark: 40 commits: feat 20 (50%), fix 20 (50%)", a column with every part and its share.
@@ -83,11 +74,7 @@ mod tests {
     #[test]
     fn a_breakdown_lists_every_part_with_its_share() {
         assert_eq!(
-            breakdown(
-                "Q1 2026",
-                &[("feat", 30), ("fix", 10), ("docs", 0)],
-                COMMITS
-            ),
+            breakdown("Q1 2026", &[("feat", 30), ("fix", 10), ("docs", 0)], COMMITS),
             "Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"
         );
         assert_eq!(breakdown("Q2", &[("feat", 0)], COMMITS), "Q2: 0 commits");

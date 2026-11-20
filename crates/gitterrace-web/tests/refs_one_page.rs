@@ -10,21 +10,15 @@ async fn location(router: &axum::Router, uri: &str) -> (u16, String) {
         .body(axum::body::Body::empty())
         .expect("request");
     let res = router.clone().oneshot(req).await.expect("answer");
-    let loc = res
-        .headers()
-        .get("location")
-        .and_then(|v| v.to_str().ok())
-        .unwrap_or_default()
-        .to_owned();
+    let loc =
+        res.headers().get("location").and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned();
     (res.status().as_u16(), loc)
 }
 
 #[tokio::test]
 async fn refs_is_one_page_with_ordered_sections() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = Fixture::init(dir.path())
-        .write("a.rs", "fn main() {}\n")
-        .commit("feat: first");
+    let f = Fixture::init(dir.path()).write("a.rs", "fn main() {}\n").commit("feat: first");
     let router = gitterrace_web::app_router(f.path()).expect("router");
     oracle::ready(&router).await;
 
@@ -33,10 +27,7 @@ async fn refs_is_one_page_with_ordered_sections() {
     assert!(!body.contains("<nav class=\"tabs\">"), "no sub-tab row");
     assert!(body.contains(">Branches<"), "Branches always shows");
     for gone in ["Tags", "Worktrees", "Stashes", "Remotes"] {
-        assert!(
-            !body.contains(&format!("<h2 id=\"{}\"", gone.to_lowercase())),
-            "{gone}"
-        );
+        assert!(!body.contains(&format!("<h2 id=\"{}\"", gone.to_lowercase())), "{gone}");
     }
 
     f.git(&["tag", "v1"]);
@@ -44,14 +35,7 @@ async fn refs_is_one_page_with_ordered_sections() {
     f.git(&["add", "b.txt"]);
     f.git(&["stash"]);
     let wt = dir.path().join("wt");
-    f.git(&[
-        "worktree",
-        "add",
-        "-q",
-        wt.to_str().expect("utf8"),
-        "-b",
-        "side",
-    ]);
+    f.git(&["worktree", "add", "-q", wt.to_str().expect("utf8"), "-b", "side"]);
     let (_, body) = page(&router, "/refs").await;
     let at = |id: &str| body.find(&format!("<h2 id=\"{id}\"")).unwrap_or(usize::MAX);
     let order = ["branches", "tags", "worktrees", "stashes"].map(at);

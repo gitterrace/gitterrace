@@ -24,9 +24,7 @@ const GENERATED: [&str; 10] = [
 /// filter, the web pages and the API hotspots all use it.
 pub fn is_generated(path: &str) -> bool {
     let name = path.rsplit('/').next().unwrap_or(path);
-    GENERATED
-        .iter()
-        .any(|p| fnmatch(p, path) || fnmatch(p, name))
+    GENERATED.iter().any(|p| fnmatch(p, path) || fnmatch(p, name))
 }
 
 /// Decides per path whether statistics leave it out.
@@ -66,9 +64,7 @@ impl PathFilter {
     /// [`PathFilter::skips`] without the memo, for callers that decide each path once anyway.
     pub(crate) fn decide(&self, path: &str) -> bool {
         let name = path.rsplit('/').next().unwrap_or(path);
-        self.patterns
-            .iter()
-            .any(|p| fnmatch(p, path) || fnmatch(p, name))
+        self.patterns.iter().any(|p| fnmatch(p, path) || fnmatch(p, name))
             || self.ignore.as_ref().is_some_and(|i| i.is_ignored(path))
     }
 }

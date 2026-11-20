@@ -88,10 +88,7 @@ impl Feature {
 
     /// A feature of the whole server, not of one repository: `[repo.NAME.features]` refuses it.
     pub const fn is_global_only(self) -> bool {
-        matches!(
-            self,
-            Self::RepoAdmin | Self::Settings | Self::Picker | Self::Api | Self::Credit
-        )
+        matches!(self, Self::RepoAdmin | Self::Settings | Self::Picker | Self::Api | Self::Credit)
     }
 
     /// Shows this machine or changes the server, so a public server never serves it.
@@ -135,9 +132,8 @@ impl Config {
         if f.is_local_only() && self.server.is_public {
             return false;
         }
-        let repo_off = repo
-            .and_then(|r| self.repo.get(r))
-            .is_some_and(|o| o.features_off.contains(&f));
+        let repo_off =
+            repo.and_then(|r| self.repo.get(r)).is_some_and(|o| o.features_off.contains(&f));
         self.file_says(f) && !repo_off
     }
 
@@ -164,11 +160,8 @@ mod tests {
     /// the other way round, fails here.
     #[test]
     fn every_features_key_is_a_feature() {
-        let ks: Vec<&str> = keys()
-            .iter()
-            .filter(|k| k.section == "features")
-            .map(|k| k.name)
-            .collect();
+        let ks: Vec<&str> =
+            keys().iter().filter(|k| k.section == "features").map(|k| k.name).collect();
         let fs: Vec<&str> = Feature::ALL.iter().map(|f| f.key()).collect();
         assert_eq!(ks, fs);
     }
@@ -186,19 +179,14 @@ mod tests {
     /// unless the file asks for it.
     #[test]
     fn public_policy_beats_the_file() {
-        let on = Feature::ALL
-            .map(|f| [f.key(), " = true\n"].concat())
-            .concat();
+        let on = Feature::ALL.map(|f| [f.key(), " = true\n"].concat()).concat();
         let text = format!("[server]\nis_public = true\n[features]\n{on}");
         let c = parse(&text).expect("parse").config;
         for f in Feature::ALL {
             assert_eq!(c.feature_on(f, None), !f.is_local_only(), "{f:?}");
         }
         let d = parse("[server]\nis_public = true\n").expect("parse").config;
-        assert!(
-            !d.feature_on(Feature::Api, None),
-            "api is off under --public by default"
-        );
+        assert!(!d.feature_on(Feature::Api, None), "api is off under --public by default");
         assert!(crate::Config::default().feature_on(Feature::Api, None));
     }
 
@@ -215,10 +203,7 @@ mod tests {
         let e =
             parse("[features]\nblame_enabled = false\n[repo.a.features]\nblame_enabled = true\n")
                 .expect_err("on is refused");
-        assert!(
-            e.to_string().contains("repo.a.features.blame_enabled"),
-            "{e}"
-        );
+        assert!(e.to_string().contains("repo.a.features.blame_enabled"), "{e}");
         let e = parse("[repo.a.features]\napi_enabled = false\n").expect_err("global only");
         assert!(e.to_string().contains("api_enabled"), "{e}");
         let e = parse("[repo.a.features]\nblam_enabled = false\n").expect_err("unknown");
@@ -232,19 +217,12 @@ mod tests {
             e.to_string().contains("insights.pages") && e.to_string().contains("hotspot"),
             "{e}"
         );
-        assert!(
-            e.to_string().contains("patterns"),
-            "names the valid ones: {e}"
-        );
+        assert!(e.to_string().contains("patterns"), "names the valid ones: {e}");
         let e = parse("[insights]\npages = [\"types\", \"types\"]\n").expect_err("twice");
         assert!(e.to_string().contains("insights.pages"), "{e}");
-        let c = parse("[insights]\npages = [\"types\", \"activity\"]\n")
-            .expect("parse")
-            .config;
+        let c = parse("[insights]\npages = [\"types\", \"activity\"]\n").expect("parse").config;
         assert_eq!(c.insight_pages(None), ["types", "activity"]);
-        let c = parse("[features]\ninsights_enabled = false\n")
-            .expect("parse")
-            .config;
+        let c = parse("[features]\ninsights_enabled = false\n").expect("parse").config;
         assert_eq!(c.insight_pages(None), [] as [&str; 0]);
     }
 }

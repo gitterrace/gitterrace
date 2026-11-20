@@ -21,10 +21,7 @@ fn stylesheets_hold_no_raw_colors() {
         for (i, line) in css.lines().enumerate() {
             let raw = line.contains("rgb(") || line.contains("rgba(") || {
                 line.match_indices('#').any(|(at, _)| {
-                    let hex = line[at + 1..]
-                        .chars()
-                        .take_while(char::is_ascii_hexdigit)
-                        .count();
+                    let hex = line[at + 1..].chars().take_while(char::is_ascii_hexdigit).count();
                     matches!(hex, 3 | 4 | 6 | 8)
                 })
             };
@@ -103,9 +100,7 @@ fn text_field_rules_skip_toggles() {
             let Some((sel, body)) = rule.split_once('{') else {
                 continue;
             };
-            let field = ["min-width:", "height:", "padding:"]
-                .iter()
-                .any(|p| body.contains(p));
+            let field = ["min-width:", "height:", "padding:"].iter().any(|p| body.contains(p));
             for s in sel.split(',') {
                 // The whole selector is `input` (or `input:focus` and the like): nothing names
                 // which inputs, so toggles match too. A selector that picks inputs by place or

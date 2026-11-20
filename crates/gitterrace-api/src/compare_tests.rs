@@ -37,13 +37,9 @@ fn compare_three_dot_leaves_out_what_base_did_alone() {
 #[test]
 fn compare_path_keeps_only_files_under_it() {
     let (_d, s) = forked();
-    let c = s
-        .compare("main", "side", Some("src/"), false, None)
-        .expect("compare");
+    let c = s.compare("main", "side", Some("src/"), false, None).expect("compare");
     assert_eq!(paths(&c), ["src/b.rs"]);
-    let none = s
-        .compare("main", "side", Some("sr"), false, None)
-        .expect("compare");
+    let none = s.compare("main", "side", Some("sr"), false, None).expect("compare");
     assert!(none.files.is_empty(), "a prefix is not a directory");
 }
 
@@ -62,19 +58,10 @@ fn compare_stays_bounded_and_refuses_hostile_revs() {
     git(p, &["commit", "-q", "-m", "big"]);
     let s = ApiState::open(p).expect("open");
     for asked in [None, Some(usize::MAX)] {
-        let c = s
-            .compare("HEAD~1", "HEAD", None, false, asked)
-            .expect("compare");
-        let lines: usize = c
-            .files
-            .iter()
-            .flat_map(|f| f.hunks.iter().flatten())
-            .map(|h| h.lines.len())
-            .sum();
-        assert!(
-            lines <= gitterrace_config::Api::default().diff_lines,
-            "{asked:?}"
-        );
+        let c = s.compare("HEAD~1", "HEAD", None, false, asked).expect("compare");
+        let lines: usize =
+            c.files.iter().flat_map(|f| f.hunks.iter().flatten()).map(|h| h.lines.len()).sum();
+        assert!(lines <= gitterrace_config::Api::default().diff_lines, "{asked:?}");
         assert!(c.truncated, "{asked:?}");
         assert!(c.additions > lines as u64, "totals count the cut lines");
     }
@@ -102,16 +89,10 @@ fn worktree_diff_lists_uncommitted_files_and_refuses_unknown_scopes() {
     let (d, s) = fixture();
     std::fs::write(d.path().join("a.txt"), "changed\n").expect("write");
     let w = s.worktree_diff("all", None).expect("worktree");
-    assert_eq!(
-        w.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(),
-        ["a.txt"]
-    );
+    assert_eq!(w.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt"]);
     for bad in ["", "everything", "ALL"] {
         assert!(
-            matches!(
-                s.worktree_diff(bad, None),
-                Err(crate::ApiError::BadRequest(_))
-            ),
+            matches!(s.worktree_diff(bad, None), Err(crate::ApiError::BadRequest(_))),
             "{bad:?}"
         );
     }
@@ -144,10 +125,7 @@ async fn worktree_diff_is_refused_on_a_public_server() {
     let (d, s) = fixture();
     std::fs::write(d.path().join("a.txt"), "secret\n").expect("write");
     let s = s.committed_only();
-    assert!(matches!(
-        s.worktree_diff("all", None),
-        Err(crate::ApiError::Forbidden(_))
-    ));
+    assert!(matches!(s.worktree_diff("all", None), Err(crate::ApiError::Forbidden(_))));
     let (st, v) = get(&s, "/worktree").await;
     assert_eq!(st, StatusCode::FORBIDDEN, "{v}");
     assert!(!v.to_string().contains("secret"));

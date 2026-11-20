@@ -17,9 +17,7 @@ use crate::registry::{Entry, candidates, pick, state_dir};
 /// The MCP scope: a line saying where it comes from, and the repositories in it.
 pub fn mcp_scope(paths: &[PathBuf], served: bool) -> (String, Vec<McpRepo>) {
     let recorded = if served || paths.len() > 1 {
-        state_dir()
-            .and_then(|d| candidates(&d).ok())
-            .unwrap_or_default()
+        state_dir().and_then(|d| candidates(&d).ok()).unwrap_or_default()
     } else {
         Vec::new()
     };
@@ -42,11 +40,7 @@ pub(crate) fn scope_from(
         }
         let unavailable = found.err().map(|e| e.to_string());
         let name = name_for(&root, recorded, &out);
-        out.push(McpRepo {
-            name,
-            path: root,
-            unavailable,
-        });
+        out.push(McpRepo { name, path: root, unavailable });
     }
     if served {
         for e in recorded {
@@ -56,11 +50,7 @@ pub(crate) fn scope_from(
             roots.insert(e.path.clone());
             let unavailable = check(&e.path);
             let name = name_for(&e.path, recorded, &out);
-            out.push(McpRepo {
-                name,
-                path: e.path.clone(),
-                unavailable,
-            });
+            out.push(McpRepo { name, path: e.path.clone(), unavailable });
         }
     }
     let scope = if served {
@@ -93,15 +83,9 @@ fn name_for(root: &Path, recorded: &[Entry], taken: &[McpRepo]) -> String {
     {
         return e.name.clone();
     }
-    let folder = root
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
+    let folder = root.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
     let other = |n: &str| {
-        used(n)
-            || recorded
-                .iter()
-                .any(|e| e.path != root && e.name.eq_ignore_ascii_case(n))
+        used(n) || recorded.iter().any(|e| e.path != root && e.name.eq_ignore_ascii_case(n))
     };
     pick(&url_stem(&folder), root, &other)
 }

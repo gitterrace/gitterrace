@@ -34,10 +34,7 @@ pub(crate) async fn get(state: &ApiState, uri: &str) -> (StatusCode, Value) {
         .expect("res");
     let status = res.status();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
-    (
-        status,
-        serde_json::from_slice(&bytes).unwrap_or(Value::Null),
-    )
+    (status, serde_json::from_slice(&bytes).unwrap_or(Value::Null))
 }
 
 #[tokio::test]
@@ -138,9 +135,7 @@ async fn results_carry_go_permalinks() {
     assert_eq!(blob["link"], format!("{gt}/a.txt#L1-L3").as_str());
     assert_eq!(row["link"], format!("{gt}/a.txt").as_str());
 
-    let go_cfg = gitterrace_config::parse("[links]\nstyle = \"go\"\n")
-        .expect("parse")
-        .config;
+    let go_cfg = gitterrace_config::parse("[links]\nstyle = \"go\"\n").expect("parse").config;
     let go = s.clone().configured(&go_cfg);
     let (_, head) = get(&go, "/commits/HEAD").await;
     assert_eq!(head["link"], base.as_str(), "links.style = go");
@@ -203,11 +198,7 @@ fn etag_moves_with_any_ref_not_only_head() {
     git(d.path(), &["branch", "side", "HEAD~1"]);
     let before = s.etag().expect("tag");
     git(d.path(), &["branch", "-f", "side", "HEAD"]);
-    assert_ne!(
-        before,
-        s.etag().expect("tag"),
-        "side branch moved, HEAD did not"
-    );
+    assert_ne!(before, s.etag().expect("tag"), "side branch moved, HEAD did not");
 }
 
 #[test]
@@ -227,11 +218,7 @@ fn records_cache_is_shared_and_follows_the_tip() {
     let moved = state.records("HEAD").expect("records");
     assert_eq!(moved.len(), 3, "moved tip must change the answer");
     let earlier = state.records("HEAD~1").expect("records");
-    assert_eq!(
-        earlier.len(),
-        2,
-        "another rev must not reuse the HEAD entry"
-    );
+    assert_eq!(earlier.len(), 2, "another rev must not reuse the HEAD entry");
 }
 
 /// A route and a registry entry are one thing: every registered path answers (not 404/405).
@@ -247,10 +234,7 @@ async fn every_registered_endpoint_is_routed() {
         assert!(st == StatusCode::OK || !v.is_null(), "{} unrouted", e.path);
     }
     let (_, v) = get(&s, "/").await;
-    assert_eq!(
-        v["endpoints"].as_array().map(Vec::len),
-        Some(crate::ENDPOINTS.len())
-    );
+    assert_eq!(v["endpoints"].as_array().map(Vec::len), Some(crate::ENDPOINTS.len()));
 }
 
 /// A tool missing from the gate table would be refused for good, so every listed tool has
@@ -259,21 +243,14 @@ async fn every_registered_endpoint_is_routed() {
 fn every_mcp_tool_has_a_feature_entry() {
     let cfg = gitterrace_config::Config::default();
     for t in McpServer::tool_docs() {
-        assert!(
-            crate::tool_on(&cfg, None, &t.name),
-            "{} is gated off",
-            t.name
-        );
+        assert!(crate::tool_on(&cfg, None, &t.name), "{} is gated off", t.name);
     }
 }
 
 #[test]
 fn mcp_lists_read_only_tools() {
     let docs = McpServer::tool_docs();
-    assert!(
-        docs.iter().all(|t| t.read_only),
-        "every tool must be read only"
-    );
+    assert!(docs.iter().all(|t| t.read_only), "every tool must be read only");
     let names: Vec<String> = docs.into_iter().map(|t| t.name).collect();
     for want in [
         "activity",
@@ -307,10 +284,7 @@ fn shallow_clone_indexes_and_answers() {
 fn hostile_paging_and_rev_syntax_are_refused() {
     let (_d, s) = fixture();
     let huge = s.log(None, None, usize::MAX, 2);
-    assert!(
-        matches!(huge, Err(crate::ApiError::BadRequest(_))),
-        "{huge:?}"
-    );
+    assert!(matches!(huge, Err(crate::ApiError::BadRequest(_))), "{huge:?}");
     assert!(s.log(None, Some("a.txt"), 25_001, 2).is_ok());
     assert!(s.log(None, Some("a.txt"), 25_002, 2).is_err());
     for rev in [":/first", "HEAD^{/first}", "main@{1}"] {
@@ -333,18 +307,13 @@ fn caller_cannot_lift_caps() {
     git(p, &["commit", "-q", "-m", "big"]);
     let s = ApiState::open(p).expect("open");
     let lines = |v: &serde_json::Value| -> usize {
-        v["files"][0]["hunks"].as_array().map_or(0, |hs| {
-            hs.iter()
-                .map(|h| h["lines"].as_array().map_or(0, Vec::len))
-                .sum()
-        })
+        v["files"][0]["hunks"]
+            .as_array()
+            .map_or(0, |hs| hs.iter().map(|h| h["lines"].as_array().map_or(0, Vec::len)).sum())
     };
     for asked in [None, Some(usize::MAX)] {
         let v = serde_json::to_value(s.commit("HEAD", true, asked).expect("commit")).expect("json");
-        assert!(
-            lines(&v) <= gitterrace_config::Api::default().diff_lines,
-            "{asked:?}"
-        );
+        assert!(lines(&v) <= gitterrace_config::Api::default().diff_lines, "{asked:?}");
         assert_eq!(v["truncated"], true, "{asked:?}");
     }
     let v = s.log(None, None, 1, usize::MAX).expect("log");
@@ -360,15 +329,8 @@ fn free_text_tools_warn_about_untrusted_content() {
     let info = McpServer::new(s).get_info();
     assert!(info.instructions.is_some_and(|i| i.contains("untrusted")));
     for t in McpServer::tool_docs() {
-        if [
-            "read_file",
-            "show_commit",
-            "log",
-            "blame",
-            "compare",
-            "worktree_diff",
-        ]
-        .contains(&t.name.as_str())
+        if ["read_file", "show_commit", "log", "blame", "compare", "worktree_diff"]
+            .contains(&t.name.as_str())
         {
             assert!(t.description.contains("untrusted"), "{}", t.name);
         }
@@ -388,9 +350,7 @@ fn etag_moves_with_cache_generation_and_defaults() {
     s.refresh_index().expect("index");
     let built = s.etag().expect("tag");
     assert_ne!(empty, built, "the cache filled with no ref moving");
-    let cfg = gitterrace_config::parse("[insights]\ninclude_bots = true\n")
-        .expect("parse")
-        .config;
+    let cfg = gitterrace_config::parse("[insights]\ninclude_bots = true\n").expect("parse").config;
     let bots = s.configured(&cfg);
     assert_ne!(built, bots.etag().expect("tag"), "other counting defaults");
 }
@@ -438,13 +398,9 @@ fn configured_state_counts_with_the_config() {
     let c = s.configured(&cfg);
     assert_eq!(authors(&c), 2, "insights.include_bots = true");
     assert_eq!(authors(&router_state), 2, "a reload reaches earlier clones");
-    let hot = c
-        .insight("hotspots", None, &crate::Params::default())
-        .expect("hotspots");
+    let hot = c.insight("hotspots", None, &crate::Params::default()).expect("hotspots");
     assert!(
-        !serde_json::to_string(&hot.data)
-            .expect("json")
-            .contains("src/b.rs"),
+        !serde_json::to_string(&hot.data).expect("json").contains("src/b.rs"),
         "repo exclude ignored: {hot:?}"
     );
 }
@@ -476,9 +432,7 @@ async fn an_unreadable_cache_is_rebuilt_by_the_api_alone() {
     let res = router(s.clone()).oneshot(req()).await.expect("res");
     assert_eq!(res.status(), StatusCode::SERVICE_UNAVAILABLE);
     assert_eq!(
-        res.headers()
-            .get("retry-after")
-            .and_then(|v| v.to_str().ok()),
+        res.headers().get("retry-after").and_then(|v| v.to_str().ok()),
         Some(crate::RETRY_AFTER_SECS)
     );
     let rebuilt = || async { get(&s, "/repo").await.0 == StatusCode::OK };
@@ -524,9 +478,7 @@ async fn server_errors_hide_the_inner_message() {
     let (st, v) = get(&s, "/blob?path=missing").await;
     assert_eq!(st, StatusCode::NOT_FOUND);
     assert!(
-        v["error"]["message"]
-            .as_str()
-            .is_some_and(|m| m.contains("missing")),
+        v["error"]["message"].as_str().is_some_and(|m| m.contains("missing")),
         "4xx keep their text: {v}"
     );
 }

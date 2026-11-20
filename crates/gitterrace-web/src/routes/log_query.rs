@@ -44,11 +44,7 @@ pub(crate) fn page(a: &App, id: &str, m: &Matcher, pg: usize) -> Result<LogPage>
     if let Some((ranks, rows)) = a.accelerate(id, |s| indexed(&**s, m))? {
         let ids: Vec<String> = a
             .accelerate(id, |s| {
-                ranks
-                    .iter()
-                    .rev()
-                    .filter_map(|r| s.commit_id(*r).map(|x| x.to_string()))
-                    .collect()
+                ranks.iter().rev().filter_map(|r| s.commit_id(*r).map(|x| x.to_string())).collect()
             })?
             .unwrap_or_default();
         let (ids, walked) = with_words(a, m, ids, from + PAGE + 1)?;
@@ -90,8 +86,7 @@ pub(crate) fn indexed(src: &dyn InsightsSource, m: &Matcher) -> (Vec<Rank>, usiz
         .rows_for(cand)
         .filter(|(_, fs)| {
             rows += fs.len();
-            fs.iter()
-                .any(|f| src.path(f.path).is_some_and(|n| m.row(&n)))
+            fs.iter().any(|f| src.path(f.path).is_some_and(|n| m.row(&n)))
         })
         .map(|(r, _)| r)
         .collect();
@@ -106,11 +101,7 @@ fn by_authors(src: &dyn InsightsSource, who: &[String]) -> Vec<Rank> {
             let (name, email) = src.ident(id)?;
             who.iter().any(|w| by(w, &name, &email)).then_some(id)
         })
-        .flat_map(|id| {
-            src.postings(Posting::Author(id))
-                .map(|h| h.rank)
-                .collect::<Vec<_>>()
-        })
+        .flat_map(|id| src.postings(Posting::Author(id)).map(|h| h.rank).collect::<Vec<_>>())
         .collect();
     ranks.sort_unstable();
     ranks.dedup();
@@ -128,13 +119,7 @@ fn with_words(a: &App, m: &Matcher, ids: Vec<String>, want: usize) -> Result<(Ve
     for chunk in ids.chunks(CHUNK) {
         let texts = a.repo.messages(chunk)?;
         read += chunk.len();
-        out.extend(
-            chunk
-                .iter()
-                .zip(texts)
-                .filter(|(_, t)| m.message(t))
-                .map(|(id, _)| id.clone()),
-        );
+        out.extend(chunk.iter().zip(texts).filter(|(_, t)| m.message(t)).map(|(id, _)| id.clone()));
         if out.len() >= want {
             break;
         }
@@ -173,12 +158,7 @@ fn walk(a: &App, id: &str, m: &Matcher, from: usize) -> Result<LogPage> {
     let mut list: Vec<_> = hits.into_iter().skip(from).collect();
     let more = list.len() > PAGE;
     list.truncate(PAGE);
-    Ok(LogPage {
-        capped: capped && !more,
-        list,
-        more,
-        work: Work { rows: 0, walked },
-    })
+    Ok(LogPage { capped: capped && !more, list, more, work: Work { rows: 0, walked } })
 }
 
 /// Whether the walked commit `c` passes `m`. Paths beyond the one the walk filters by read

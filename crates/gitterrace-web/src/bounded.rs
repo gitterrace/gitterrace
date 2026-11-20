@@ -17,9 +17,7 @@ impl Weight for String {
 
 impl<T: Weight> Weight for Vec<T> {
     fn weight(&self) -> usize {
-        self.iter()
-            .map(|t| t.weight() + std::mem::size_of::<T>())
-            .sum()
+        self.iter().map(|t| t.weight() + std::mem::size_of::<T>()).sum()
     }
 }
 
@@ -65,12 +63,7 @@ pub(crate) struct Bounded<V> {
 
 impl<V: Clone + Weight> Bounded<V> {
     pub(crate) fn new(budget: usize) -> Self {
-        Self {
-            budget,
-            used: 0,
-            map: HashMap::new(),
-            order: VecDeque::new(),
-        }
+        Self { budget, used: 0, map: HashMap::new(), order: VecDeque::new() }
     }
 
     pub(crate) fn get(&self, key: &str) -> Option<V> {

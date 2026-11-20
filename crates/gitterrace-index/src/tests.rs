@@ -111,15 +111,8 @@ impl CommitSource for Paths {
     }
 
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {
-        let fail = self
-            .fail
-            .lock()
-            .map_err(|_| io::Error::other("poisoned"))?
-            .clone();
-        ids.iter()
-            .filter(|id| !fail.contains(*id))
-            .map(|id| self.record(id))
-            .collect()
+        let fail = self.fail.lock().map_err(|_| io::Error::other("poisoned"))?.clone();
+        ids.iter().filter(|id| !fail.contains(*id)).map(|id| self.record(id)).collect()
     }
 
     fn shallow_ids(&self) -> Vec<String> {
@@ -139,8 +132,7 @@ fn two_writers_leave_one_whole_history() -> io::Result<()> {
         let one = s.spawn(|| Index::open_dir(path.clone())?.update(&a, "HEAD", &|_| {}));
         let two = s.spawn(|| Index::open_dir(path.clone())?.update(&b, "HEAD", &|_| {}));
         for h in [one, two] {
-            h.join()
-                .map_err(|_| io::Error::other("writer panicked"))??;
+            h.join().map_err(|_| io::Error::other("writer panicked"))??;
         }
         Ok::<(), io::Error>(())
     })?;
@@ -169,14 +161,11 @@ fn update_waits_for_the_writer_lock() -> io::Result<()> {
     std::thread::scope(|s| {
         let writer = s.spawn(|| tx.send(idx.update(&src, "HEAD", &|_| {})));
         assert!(
-            rx.recv_timeout(std::time::Duration::from_millis(300))
-                .is_err(),
+            rx.recv_timeout(std::time::Duration::from_millis(300)).is_err(),
             "update ran under a held lock"
         );
         drop(held);
-        let done = rx
-            .recv_timeout(std::time::Duration::from_secs(10))
-            .map_err(io::Error::other)?;
+        let done = rx.recv_timeout(std::time::Duration::from_secs(10)).map_err(io::Error::other)?;
         writer
             .join()
             .map_err(|_| io::Error::other("writer panicked"))?
@@ -200,14 +189,12 @@ fn format_reset_waits_for_the_writer_lock() -> io::Result<()> {
     std::thread::scope(|s| {
         s.spawn(|| tx.send(Index::open_dir(path.clone()).map(drop)));
         assert!(
-            rx.recv_timeout(std::time::Duration::from_millis(300))
-                .is_err(),
+            rx.recv_timeout(std::time::Duration::from_millis(300)).is_err(),
             "the reset ran under a held lock"
         );
         assert!(path.join(crate::seg::manifest::MANIFEST).exists());
         drop(held);
-        rx.recv_timeout(std::time::Duration::from_secs(10))
-            .map_err(io::Error::other)?
+        rx.recv_timeout(std::time::Duration::from_secs(10)).map_err(io::Error::other)?
     })
 }
 
@@ -218,17 +205,11 @@ fn an_unreadable_commit_stays_pending_and_is_retried() -> io::Result<()> {
     let idx = Index::open_dir(dir.path().join("gitterrace"))?;
     let src = Paths::new("a", 3);
     let bad = src.ids[1].clone();
-    src.fail
-        .lock()
-        .map_err(|_| io::Error::other("poisoned"))?
-        .insert(bad.clone());
+    src.fail.lock().map_err(|_| io::Error::other("poisoned"))?.insert(bad.clone());
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(idx.pending(&src, "HEAD")?, 1);
     assert_eq!(idx.records(&src, "HEAD")?.len(), 2);
-    src.fail
-        .lock()
-        .map_err(|_| io::Error::other("poisoned"))?
-        .clear();
+    src.fail.lock().map_err(|_| io::Error::other("poisoned"))?.clear();
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(idx.pending(&src, "HEAD")?, 0);
     assert!(idx.records(&src, "HEAD")?.iter().any(|r| r.id == bad));
@@ -242,31 +223,18 @@ fn a_shallow_boundary_row_is_rebuilt_after_unshallow() -> io::Result<()> {
     let idx = Index::open_dir(dir.path().join("gitterrace"))?;
     let src = Paths::new("a", 2);
     let edge = src.ids[0].clone();
-    src.shallow
-        .lock()
-        .map_err(|_| io::Error::other("poisoned"))?
-        .push(edge.clone());
+    src.shallow.lock().map_err(|_| io::Error::other("poisoned"))?.push(edge.clone());
     idx.update(&src, "HEAD", &|_| {})?;
-    assert_eq!(
-        idx.pending(&src, "HEAD")?,
-        0,
-        "a boundary row is done while shallow"
-    );
+    assert_eq!(idx.pending(&src, "HEAD")?, 0, "a boundary row is done while shallow");
     assert_eq!(idx.records(&src, "HEAD")?[0].files[0].additions, 0);
-    src.shallow
-        .lock()
-        .map_err(|_| io::Error::other("poisoned"))?
-        .clear();
+    src.shallow.lock().map_err(|_| io::Error::other("poisoned"))?.clear();
     // A moved boundary changes topo ranks, so the whole set is rebuilt.
     assert_eq!(idx.pending(&src, "HEAD")?, 2);
     idx.update(&src, "HEAD", &|_| {})?;
     assert_eq!(idx.pending(&src, "HEAD")?, 0);
     let got = idx.records(&src, "HEAD")?;
     assert_eq!(got.len(), 2);
-    assert_eq!(
-        (got[0].id.as_str(), got[0].files[0].additions),
-        (edge.as_str(), 1)
-    );
+    assert_eq!((got[0].id.as_str(), got[0].files[0].additions), (edge.as_str(), 1));
     Ok(())
 }
 
@@ -296,10 +264,7 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
         .collect::<io::Result<_>>()?;
     have.sort();
     // The documented files plus the manifest and the files it names.
-    let mut want: Vec<String> = crate::CACHE_FILES
-        .iter()
-        .map(|(n, _)| (*n).to_owned())
-        .collect();
+    let mut want: Vec<String> = crate::CACHE_FILES.iter().map(|(n, _)| (*n).to_owned()).collect();
     want.push(crate::seg::manifest::MANIFEST.to_owned());
     let m = crate::seg::manifest::Manifest::load(idx.dir())
         .map_err(io::Error::other)?
@@ -369,10 +334,7 @@ fn a_newer_cache_is_left_byte_identical() -> io::Result<()> {
         let mut v = Vec::new();
         for e in std::fs::read_dir(p)? {
             let e = e?;
-            v.push((
-                e.file_name().to_string_lossy().into_owned(),
-                std::fs::read(e.path())?,
-            ));
+            v.push((e.file_name().to_string_lossy().into_owned(), std::fs::read(e.path())?));
         }
         v.sort();
         Ok(v)
@@ -476,15 +438,7 @@ fn a_fresh_build_times_every_step_by_name() -> io::Result<()> {
     idx.update(&Fake::new(&["a", "b"]), "HEAD", &|_| {})?;
     let (steps, running) = idx.phases();
     let names: Vec<_> = steps.iter().map(|p| p.name).collect();
-    let want = [
-        "rev_list",
-        "held",
-        "stream",
-        "stream.fold",
-        "finish",
-        "messages",
-        "tip",
-    ];
+    let want = ["rev_list", "held", "stream", "stream.fold", "finish", "messages", "tip"];
     assert_eq!(names, want);
     assert_eq!(running, None);
     assert!(steps.iter().all(|p| p.secs >= 0.0));
@@ -508,23 +462,19 @@ fn an_inline_merge_past_the_segment_limit_finishes_the_update() -> io::Result<()
                 let these: Vec<&str> = names[..n].iter().map(String::as_str).collect();
                 idx.update(&Fake::new(&these), "HEAD", &|_| {})?;
             }
-            crate::seg::manifest::Manifest::load(idx.dir())
-                .map_err(io::Error::other)?
-                .map_or(Ok(0), |m| {
+            crate::seg::manifest::Manifest::load(idx.dir()).map_err(io::Error::other)?.map_or(
+                Ok(0),
+                |m| {
                     let seg = crate::seg::format::Kind::Segment as u8;
                     Ok(m.live.iter().filter(|f| f.kind == seg).count())
-                })
+                },
+            )
         };
         drop(tx.send(run()));
     });
-    let segs = rx
-        .recv_timeout(std::time::Duration::from_secs(30))
-        .map_err(|_| {
-            io::Error::other("the update never returned: the inline merge waits on its own lock")
-        })??;
-    assert!(
-        segs <= crate::store::MAX_SEGMENTS,
-        "{segs} segments: no merge ran"
-    );
+    let segs = rx.recv_timeout(std::time::Duration::from_secs(30)).map_err(|_| {
+        io::Error::other("the update never returned: the inline merge waits on its own lock")
+    })??;
+    assert!(segs <= crate::store::MAX_SEGMENTS, "{segs} segments: no merge ran");
     Ok(())
 }

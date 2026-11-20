@@ -37,10 +37,7 @@ pub(crate) fn writable(dir: &Path) -> io::Result<()> {
 
 /// Whether `e` says the file system refused a write, so another folder may work.
 pub(crate) fn cannot_write(e: &io::Error) -> bool {
-    matches!(
-        e.kind(),
-        io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem
-    )
+    matches!(e.kind(), io::ErrorKind::PermissionDenied | io::ErrorKind::ReadOnlyFilesystem)
 }
 
 /// The opt-in for a user-cache index on a read-only `.git`: an absolute folder. The Docker image
@@ -67,9 +64,7 @@ pub(crate) fn fallback_for(
         return None;
     }
     // Keyed on the real path: a relative or symlinked spelling of one repository shares a folder.
-    let real = git_dir
-        .canonicalize()
-        .unwrap_or_else(|_| git_dir.to_path_buf());
+    let real = git_dir.canonicalize().unwrap_or_else(|_| git_dir.to_path_buf());
     Some((fallback_in(&base, &real), real))
 }
 
@@ -156,11 +151,7 @@ pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
 /// goes. The caller holds the lock and has checked the cache is not a newer build's.
 pub(crate) fn wipe(dir: &Path) -> io::Result<()> {
     sweep(dir, &[LOCK_FILE.to_owned()])?;
-    cache::write_atomic(
-        dir,
-        VERSION_FILE,
-        format!("{}\n", version_stamp()).as_bytes(),
-    )
+    cache::write_atomic(dir, VERSION_FILE, format!("{}\n", version_stamp()).as_bytes())
 }
 
 /// Removes every entry of `dir` not named in `live`, the retired-file sweep. Links and
@@ -219,10 +210,7 @@ fn needs_reset(dir: &Path) -> io::Result<bool> {
 /// format's or a crash's leftover. A manifest that does not decode names nothing: its files
 /// are then strays and the manifest itself is not live, so the cache is wiped and rebuilt.
 fn known_files(dir: &Path) -> Vec<String> {
-    let mut out: Vec<String> = crate::CACHE_FILES
-        .iter()
-        .map(|(n, _)| (*n).to_owned())
-        .collect();
+    let mut out: Vec<String> = crate::CACHE_FILES.iter().map(|(n, _)| (*n).to_owned()).collect();
     if let Ok(Some(m)) = crate::seg::manifest::Manifest::load(dir) {
         out.push(crate::seg::manifest::MANIFEST.to_owned());
         out.extend(m.live.into_iter().map(|f| f.name));
@@ -236,9 +224,7 @@ fn known_files(dir: &Path) -> Vec<String> {
 const TEMP_GRACE: std::time::Duration = std::time::Duration::from_secs(3600);
 
 fn in_flight(dir: &Path, name: &str) -> bool {
-    Path::new(name)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("tmp"))
+    Path::new(name).extension().is_some_and(|e| e.eq_ignore_ascii_case("tmp"))
         && std::fs::symlink_metadata(dir.join(name))
             .and_then(|m| m.modified())
             .is_ok_and(|t| t.elapsed().map_or(true, |age| age < TEMP_GRACE))
@@ -258,10 +244,7 @@ fn has_foreign(dir: &Path) -> io::Result<bool> {
     let known = known_files(dir);
     for entry in std::fs::read_dir(dir)? {
         let name = entry?.file_name();
-        if !name
-            .to_str()
-            .is_some_and(|n| known.iter().any(|k| k == n) || in_flight(dir, n))
-        {
+        if !name.to_str().is_some_and(|n| known.iter().any(|k| k == n) || in_flight(dir, n)) {
             return Ok(true);
         }
     }

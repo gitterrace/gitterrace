@@ -80,17 +80,9 @@ pub(super) fn item(
     put(&0u16.to_le_bytes());
     put(&opt(kind).to_le_bytes());
     put(&opt(scope).to_le_bytes());
-    put(&u32::try_from(r.files.len())
-        .unwrap_or(u32::MAX)
-        .to_le_bytes());
-    for v in [
-        sums.add,
-        sums.del,
-        sums.rewritten,
-        sums.code_add,
-        sums.code_del,
-        sums.code_rewritten,
-    ] {
+    put(&u32::try_from(r.files.len()).unwrap_or(u32::MAX).to_le_bytes());
+    for v in [sums.add, sums.del, sums.rewritten, sums.code_add, sums.code_del, sums.code_rewritten]
+    {
         put(&v.to_le_bytes());
     }
     out
@@ -144,11 +136,7 @@ pub(super) struct Spool {
 impl Spool {
     pub(super) fn new(dir: &Path, name: &str) -> SegResult<Self> {
         let file = crate::seg::io::create_no_follow(dir, name)?;
-        Ok(Self {
-            path: dir.join(name),
-            file: BufWriter::new(file),
-            items: 0,
-        })
+        Ok(Self { path: dir.join(name), file: BufWriter::new(file), items: 0 })
     }
 
     pub(super) fn push(&mut self, item: &[u8; ITEM]) -> SegResult<()> {
@@ -271,10 +259,7 @@ mod tests {
             Store::open(dir.path())?.ok_or_else(|| crate::seg::SegError::BadName("none".into()))?,
             &mut |p| Ok(p.to_vec()),
         )?;
-        assert_eq!(
-            disk.commits_in(crate::feed::CommitRange::All).count(),
-            recs.len()
-        );
+        assert_eq!(disk.commits_in(crate::feed::CommitRange::All).count(), recs.len());
         assert_eq!(disk.unreadable(), None);
         Ok(())
     }

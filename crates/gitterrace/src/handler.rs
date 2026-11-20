@@ -62,10 +62,7 @@ pub(crate) fn applescript(exe: &Path) -> String {
     format!(
         "on open location theURL\n\tdo shell script quoted form of \"{}\" & \" open \" & quoted \
         form of theURL & \" >/dev/null 2>&1 &\"\nend open location\n",
-        exe.display()
-            .to_string()
-            .replace('\\', "\\\\")
-            .replace('"', "\\\"")
+        exe.display().to_string().replace('\\', "\\\\").replace('"', "\\\"")
     )
 }
 
@@ -81,10 +78,7 @@ fn app_path(home: &Path) -> PathBuf {
 fn tool(cmd: &mut Command) -> anyhow::Result<()> {
     let out = cmd.output().with_context(|| format!("running {cmd:?}"))?;
     if !out.status.success() {
-        bail!(
-            "{cmd:?} failed: {}",
-            String::from_utf8_lossy(&out.stderr).trim()
-        );
+        bail!("{cmd:?} failed: {}", String::from_utf8_lossy(&out.stderr).trim());
     }
     Ok(())
 }
@@ -109,10 +103,7 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         }
         let _ = Command::new(LSREGISTER).arg("-u").arg(&app).output();
         std::fs::remove_dir_all(&app).with_context(|| format!("removing {}", app.display()))?;
-        println!(
-            "removed {}\nunregistered gitterrace:// from LaunchServices",
-            app.display()
-        );
+        println!("removed {}\nunregistered gitterrace:// from LaunchServices", app.display());
         return Ok(());
     }
     // A marked app is ours and is rewritten in place: current icon, program path and
@@ -125,11 +116,7 @@ fn macos(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
     write_app(&app, exe)?;
     tool(Command::new(LSREGISTER).arg("-f").arg(&app))?;
     if let Some(old) = previous.filter(|old| old != exe) {
-        println!(
-            "the handler pointed at {}, it now points at {}",
-            old.display(),
-            exe.display()
-        );
+        println!("the handler pointed at {}, it now points at {}", old.display(), exe.display());
     }
     println!(
         "wrote {} (runs: {} open <url>)\nregistered gitterrace:// with LaunchServices\nremove \
@@ -155,43 +142,28 @@ fn write_app(app: &Path, exe: &Path) -> anyhow::Result<()> {
         std::fs::remove_dir_all(app).with_context(|| format!("replacing {}", app.display()))?;
     }
     std::fs::create_dir_all(app.parent().context("no parent")?)?;
-    let script = std::env::temp_dir().join(format!(
-        "gitterrace-open-{}.applescript",
-        std::process::id()
-    ));
+    let script =
+        std::env::temp_dir().join(format!("gitterrace-open-{}.applescript", std::process::id()));
     std::fs::write(&script, applescript(exe))?;
     let made = tool(Command::new("osacompile").arg("-o").arg(app).arg(&script));
     let _ = std::fs::remove_file(&script);
     made?;
     let plist = app.join("Contents/Info.plist");
-    plist_set(
-        &plist,
-        &["-replace", "CFBundleIdentifier", "-string", BUNDLE_ID],
-    )?;
+    plist_set(&plist, &["-replace", "CFBundleIdentifier", "-string", BUNDLE_ID])?;
     plist_set(&plist, &["-replace", "LSUIElement", "-bool", "true"])?;
     plist_set(&plist, &["-replace", MARKER_KEY, "-bool", "true"])?;
     let program = exe.to_str().context("the program path is not UTF-8")?;
     plist_set(&plist, &["-replace", PROGRAM_KEY, "-string", program])?;
-    plist_set(
-        &plist,
-        &["-replace", "CFBundleURLTypes", "-json", url_types_json()],
-    )?;
+    plist_set(&plist, &["-replace", "CFBundleURLTypes", "-json", url_types_json()])?;
     let res = app.join("Contents/Resources");
     std::fs::write(res.join("gitterrace.icns"), ICON)?;
     let _ = std::fs::remove_file(res.join("applet.icns"));
     let _ = std::fs::remove_file(res.join("Assets.car"));
-    plist_set(
-        &plist,
-        &["-replace", "CFBundleIconFile", "-string", "gitterrace"],
-    )?;
+    plist_set(&plist, &["-replace", "CFBundleIconFile", "-string", "gitterrace"])?;
     // osacompile names its asset catalogue here; without the key the icon file above wins.
     let _ = plist_set(&plist, &["-remove", "CFBundleIconName"]);
     // Editing the bundle invalidates osacompile's ad hoc signature, so sign it again.
-    tool(
-        Command::new("codesign")
-            .args(["--force", "--sign", "-"])
-            .arg(app),
-    )
+    tool(Command::new("codesign").args(["--force", "--sign", "-"]).arg(app))
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -221,8 +193,7 @@ fn owner(plist: &str) -> Owner {
     let key = format!("<key>{PROGRAM_KEY}</key>\n\t<string>");
     let program = plist.find(&key).and_then(|i| {
         let rest = &plist[i + key.len()..];
-        rest.find("</string>")
-            .map(|j| PathBuf::from(unxml(&rest[..j])))
+        rest.find("</string>").map(|j| PathBuf::from(unxml(&rest[..j])))
     });
     Owner::Ours(program)
 }
@@ -249,18 +220,12 @@ fn hint_for(app: &Path, exe: &Path) -> Option<String> {
     let Owner::Ours(Some(runs)) = owner_of(app) else {
         return None;
     };
-    let same = runs == exe
-        || runs
-            .canonicalize()
-            .is_ok_and(|r| exe.canonicalize().is_ok_and(|e| e == r));
+    let same =
+        runs == exe || runs.canonicalize().is_ok_and(|r| exe.canonicalize().is_ok_and(|e| e == r));
     if same {
         return None;
     }
-    let why = if runs.exists() {
-        "another"
-    } else {
-        "a missing"
-    };
+    let why = if runs.exists() { "another" } else { "a missing" };
     Some(format!(
         "gitterrace:// links run {why} program ({}). Run `git terrace install-handler` to point \
         them here",
@@ -319,9 +284,7 @@ fn linux(home: &Path, exe: &Path, uninstall: bool) -> anyhow::Result<()> {
         } else {
             println!("nothing to remove: {} does not exist", file.display());
         }
-        let _ = Command::new("update-desktop-database")
-            .arg(file.parent().unwrap_or(home))
-            .output();
+        let _ = Command::new("update-desktop-database").arg(file.parent().unwrap_or(home)).output();
         return Ok(());
     }
     std::fs::create_dir_all(file.parent().context("no parent")?)?;

@@ -91,19 +91,11 @@ fn no_huge_pages() -> std::io::Result<()> {
 fn release_freed_pages() -> std::io::Result<()> {
     for key in ["dirty_decay_ms", "muzzy_decay_ms"] {
         // Arenas made from now on.
-        format!("arenas.{key}\0")
-            .as_str()
-            .name()
-            .write(0_isize)
-            .map_err(ctl)?;
+        format!("arenas.{key}\0").as_str().name().write(0_isize).map_err(ctl)?;
         // Before main only arena 0 exists (the others are made on a thread's first
         // allocation and take the default above). jemalloc's "all arenas" index crashes on
         // arenas not made yet, so name it.
-        format!("arena.0.{key}\0")
-            .as_str()
-            .name()
-            .write(0_isize)
-            .map_err(ctl)?;
+        format!("arena.0.{key}\0").as_str().name().write(0_isize).map_err(ctl)?;
     }
     Ok(())
 }

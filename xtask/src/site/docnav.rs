@@ -55,18 +55,10 @@ pub(super) fn nav(
         .iter()
         .enumerate()
         .map(|(i, (p, t, g))| Item {
-            group: if i == 0 || order[i - 1].2 != *g {
-                g
-            } else {
-                ""
-            },
+            group: if i == 0 || order[i - 1].2 != *g { g } else { "" },
             href: p,
             title: t,
-            current: if p == here {
-                " aria-current=\"page\""
-            } else {
-                ""
-            },
+            current: if p == here { " aria-current=\"page\"" } else { "" },
         })
         .collect();
     let at = order.iter().position(|(p, ..)| p == here);
@@ -114,25 +106,11 @@ mod tests {
     fn the_current_page_is_marked_and_its_neighbours_are_previous_and_next() {
         let n = nav(&order(), "docs/b/", &[]);
         assert_eq!(n.list.matches("aria-current=\"page\"").count(), 1);
-        assert!(
-            n.list
-                .contains("<a href=\"/docs/b/\" aria-current=\"page\">B</a>")
-        );
-        assert!(
-            n.pager.contains("href=\"/docs/a/\" rel=\"prev\""),
-            "{}",
-            n.pager
-        );
-        assert!(
-            n.pager.contains("href=\"/docs/c/\" rel=\"next\""),
-            "{}",
-            n.pager
-        );
+        assert!(n.list.contains("<a href=\"/docs/b/\" aria-current=\"page\">B</a>"));
+        assert!(n.pager.contains("href=\"/docs/a/\" rel=\"prev\""), "{}", n.pager);
+        assert!(n.pager.contains("href=\"/docs/c/\" rel=\"next\""), "{}", n.pager);
         assert!(n.menus.is_empty(), "{}", n.menus);
-        assert!(
-            n.menu
-                .starts_with("<details class=\"menu docsmenu\"><summary>")
-        );
+        assert!(n.menu.starts_with("<details class=\"menu docsmenu\"><summary>"));
         let summary = n.menu.split("</summary>").next().unwrap_or_default();
         assert!(
             summary.contains("<span>Docs</span>") && summary.contains("M12 6.5C10.5"),
@@ -153,20 +131,8 @@ mod tests {
     fn a_page_with_an_outline_folds_it_into_a_menu() {
         let heads = vec![("x".to_owned(), "X <y>".to_owned())];
         let n = nav(&order(), "docs/a/", &heads);
-        assert!(
-            n.menus.contains("<summary>On this page</summary>"),
-            "{}",
-            n.menus
-        );
-        assert!(
-            n.menus.contains("href=\"#x\"") && !n.menus.contains("<y>"),
-            "{}",
-            n.menus
-        );
-        assert!(
-            n.menus.lines().all(|l| l.chars().count() <= 100),
-            "{}",
-            n.menus
-        );
+        assert!(n.menus.contains("<summary>On this page</summary>"), "{}", n.menus);
+        assert!(n.menus.contains("href=\"#x\"") && !n.menus.contains("<y>"), "{}", n.menus);
+        assert!(n.menus.lines().all(|l| l.chars().count() <= 100), "{}", n.menus);
     }
 }

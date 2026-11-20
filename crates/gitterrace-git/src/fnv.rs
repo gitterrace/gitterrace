@@ -8,16 +8,12 @@ const PRIME_32: u32 = 0x0100_0193;
 
 /// FNV-1a 64 over `bytes`, in order.
 pub fn fnv1a64(bytes: impl IntoIterator<Item = u8>) -> u64 {
-    bytes
-        .into_iter()
-        .fold(OFFSET_64, |h, b| (h ^ u64::from(b)).wrapping_mul(PRIME_64))
+    bytes.into_iter().fold(OFFSET_64, |h, b| (h ^ u64::from(b)).wrapping_mul(PRIME_64))
 }
 
 /// FNV-1a 32 over `bytes`, in order.
 pub fn fnv1a32(bytes: impl IntoIterator<Item = u8>) -> u32 {
-    bytes
-        .into_iter()
-        .fold(OFFSET_32, |h, b| (h ^ u32::from(b)).wrapping_mul(PRIME_32))
+    bytes.into_iter().fold(OFFSET_32, |h, b| (h ^ u32::from(b)).wrapping_mul(PRIME_32))
 }
 
 #[cfg(test)]

@@ -178,10 +178,7 @@ fn repo_router_tasks(
     if let Some(memo) = &env.changes {
         repo.use_change_memo(memo);
     }
-    repo.set_worktree_limits(
-        cfg.limits.worktree_files,
-        (cfg.limits.worktree_diff_kb as u64) << 10,
-    );
+    repo.set_worktree_limits(cfg.limits.worktree_files, (cfg.limits.worktree_diff_kb as u64) << 10);
     let index = Index::open(&repo)?.with_fresh_cap(cfg.limits.unindexed_commits);
     index.set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
     let mut app = App::configured(repo, index, env);
@@ -192,28 +189,17 @@ fn repo_router_tasks(
     env.register(&app);
     let tasks = vec![
         tokio::spawn(app::keep_index_fresh_supervised(Arc::clone(&app))).abort_handle(),
-        tokio::spawn(app::release_when_idle(
-            Arc::downgrade(&app),
-            app::RECORDS_IDLE,
-        ))
-        .abort_handle(),
+        tokio::spawn(app::release_when_idle(Arc::downgrade(&app), app::RECORDS_IDLE))
+            .abort_handle(),
     ];
-    let api = gitterrace_api::ApiState::open(repo_path)
-        .map_err(io::Error::other)?
-        .configured(&env.cfg());
-    let api = if env.public() {
-        api.committed_only()
-    } else {
-        api
-    };
+    let api =
+        gitterrace_api::ApiState::open(repo_path).map_err(io::Error::other)?.configured(&env.cfg());
+    let api = if env.public() { api.committed_only() } else { api };
     // A reload reaches the API through the app: both count with the same `insights.*`.
     app.set_api(api.clone());
     let pages = routes::router(Arc::clone(&app))
         .nest("/api/v1", gitterrace_api::router(api))
-        .route_layer(axum::middleware::from_fn_with_state(
-            Arc::clone(&app),
-            features::repo_gate,
-        ));
+        .route_layer(axum::middleware::from_fn_with_state(Arc::clone(&app), features::repo_gate));
     let pages = if env.public() {
         pages.route_layer(axum::middleware::from_fn(public::only_public))
     } else {
@@ -270,16 +256,8 @@ fn guarded(router: axum::Router, gate: guard::Gate) -> axum::Router {
         .and(NotForContentType::new("font/"))
         .and(NotForContentType::IMAGES);
     router
-        .layer(
-            CompressionLayer::new()
-                .gzip(true)
-                .br(true)
-                .compress_when(worth_it),
-        )
-        .layer(axum::middleware::from_fn_with_state(
-            Arc::new(gate),
-            guard::guard,
-        ))
+        .layer(CompressionLayer::new().gzip(true).br(true).compress_when(worth_it))
+        .layer(axum::middleware::from_fn_with_state(Arc::new(gate), guard::guard))
 }
 
 fn build(
@@ -288,14 +266,7 @@ fn build(
     actions_file: Option<&Path>,
     env: &Env,
 ) -> io::Result<(axum::Router, String)> {
-    build_server(
-        vec![repo_path.to_path_buf()],
-        extra,
-        actions_file,
-        env,
-        None,
-        None,
-    )
+    build_server(vec![repo_path.to_path_buf()], extra, actions_file, env, None, None)
 }
 
 fn build_multi(
@@ -378,10 +349,8 @@ fn build_server(
             Err(e) => tracing::warn!("settings page off: no randomness for the token: {e}"),
         }
     }
-    let router = router.route_layer(axum::middleware::from_fn_with_state(
-        env.clone(),
-        features::server_gate,
-    ));
+    let router = router
+        .route_layer(axum::middleware::from_fn_with_state(env.clone(), features::server_gate));
     let router = if env.public() {
         router.route_layer(axum::middleware::from_fn(public::only_public))
     } else {
@@ -409,16 +378,10 @@ fn remember(dir: Option<&Path>, paths: &[PathBuf]) {
     let Some(dir) = dir else {
         return;
     };
-    let repos: Vec<Repo> = paths
-        .iter()
-        .filter_map(|p| Repo::discover(p).ok())
-        .collect();
+    let repos: Vec<Repo> = paths.iter().filter_map(|p| Repo::discover(p).ok()).collect();
     let refs: Vec<&Repo> = repos.iter().collect();
     if let Err(e) = registry::record(dir, &refs) {
-        tracing::warn!(
-            "not recording served repositories in {}: {e}",
-            dir.display()
-        );
+        tracing::warn!("not recording served repositories in {}: {e}", dir.display());
     }
 }
 
@@ -438,14 +401,9 @@ pub async fn serve(
     cli_paths: &[PathBuf],
 ) -> io::Result<()> {
     refuse_lan(addr, &cfg)?;
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| bind_error(addr, &e))?;
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| bind_error(addr, &e))?;
     let state = registry::state_dir();
-    serve_on(
-        listener, repo_paths, actions, cfg, watched, state, cli_paths,
-    )
-    .await
+    serve_on(listener, repo_paths, actions, cfg, watched, state, cli_paths).await
 }
 
 /// [`serve`] with the state folder (registry and add secret) named, `None` for none.
@@ -458,9 +416,7 @@ pub async fn serve_in(
     state: Option<PathBuf>,
 ) -> io::Result<()> {
     refuse_lan(addr, &cfg)?;
-    let listener = tokio::net::TcpListener::bind(addr)
-        .await
-        .map_err(|e| bind_error(addr, &e))?;
+    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| bind_error(addr, &e))?;
     serve_on(listener, repo_paths, actions, cfg, watched, state, &[]).await
 }
 
@@ -492,9 +448,7 @@ pub async fn serve_on(
     let mut env = Env::new(cfg);
     env.search = search;
     // The settings page edits the folder `config.toml` is reloaded from, and nothing else.
-    env.settings_dir = watched
-        .as_ref()
-        .and_then(|w| w.file.parent().map(Path::to_path_buf));
+    env.settings_dir = watched.as_ref().and_then(|w| w.file.parent().map(Path::to_path_buf));
     // The secret `open` reads to add a repository. Without a state folder, or when it cannot
     // be written, the route stays unmounted and `open` starts a server of its own.
     let add = match (&state, extra) {
@@ -502,14 +456,8 @@ pub async fn serve_on(
         _ => None,
     };
     let published = add.is_some();
-    let (router, name) = build_server(
-        repo_paths,
-        extra,
-        actions.as_deref(),
-        &env,
-        add,
-        state.clone(),
-    )?;
+    let (router, name) =
+        build_server(repo_paths, extra, actions.as_deref(), &env, add, state.clone())?;
     if let Some(w) = watched {
         tokio::spawn(reload::run(reload::Reloader::new(w), env.clone()));
     }

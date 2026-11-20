@@ -3,9 +3,7 @@
 /// Escapes element content only: quotes stay as they are, which keeps JSON-heavy sources small.
 #[must_use]
 pub fn esc_text(s: &str) -> String {
-    s.replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
 }
 
 /// Escapes text for an HTML or SVG attribute or element: `& < > "`.

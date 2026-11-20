@@ -13,10 +13,7 @@ use gitterrace_testkit::{git, git_at, page};
 static CLOCK: AtomicU32 = AtomicU32::new(0);
 
 fn at() -> String {
-    format!(
-        "{} +0000",
-        1_700_000_000 + CLOCK.fetch_add(1, Ordering::Relaxed)
-    )
+    format!("{} +0000", 1_700_000_000 + CLOCK.fetch_add(1, Ordering::Relaxed))
 }
 
 fn commit(dir: &Path, msg: &str) {
@@ -54,20 +51,11 @@ async fn the_graph_view_draws_a_hidden_cell_per_row_and_marks_refs() {
     let router = gitterrace_web::app_router(repo(root.path())).expect("router");
     let (_, body) = page(&router, "/log/HEAD?view=graph").await;
     assert_eq!(cells(&body), 5, "{body}");
-    assert!(
-        body.contains("class=\"m main "),
-        "the merge is a hollow mainline dot"
-    );
-    assert!(
-        body.contains("<span class=\"gref cur\">main</span>"),
-        "{body}"
-    );
+    assert!(body.contains("class=\"m main "), "the merge is a hollow mainline dot");
+    assert!(body.contains("<span class=\"gref cur\">main</span>"), "{body}");
     assert!(body.contains("<span class=\"gref\">v1</span>"), "{body}");
     assert!(body.contains("aria-current=\"page\">Graph</a>"), "{body}");
-    assert!(
-        !body.contains("class=\"day\""),
-        "no day header cuts the lines"
-    );
+    assert!(!body.contains("class=\"day\""), "no day header cuts the lines");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -139,19 +127,10 @@ async fn the_graph_draws_every_branch_and_worktree_lane_with_its_label() {
     }
     assert_eq!(cells(&all), 6, "{all}");
     for b in ["l1", "l2", "l3"] {
-        assert!(
-            all.contains(&format!("<span class=\"gref\">{b}</span>")),
-            "{all}"
-        );
+        assert!(all.contains(&format!("<span class=\"gref\">{b}</span>")), "{all}");
     }
-    assert!(
-        all.contains("<span class=\"gref cur\">main</span>"),
-        "{all}"
-    );
-    assert!(
-        all.contains("<span class=\"gref\">worktree wt</span>"),
-        "{all}"
-    );
+    assert!(all.contains("<span class=\"gref cur\">main</span>"), "{all}");
+    assert!(all.contains("<span class=\"gref\">worktree wt</span>"), "{all}");
     // Every tip row leads with its labels in its column's color, joined to the dot by a
     // dashed line. Colour follows the column: `wt` sits on main's tip, so the two share
     // column 0, and tips in different columns get different colors.
@@ -165,11 +144,9 @@ async fn the_graph_draws_every_branch_and_worktree_lane_with_its_label() {
         let k = l.split('"').next().expect("class");
         // A tip line and dot may carry the fold classes (xn, on) before the column color.
         let wears = |el: &str| {
-            row.split(&format!("<{el} class=\"")).skip(1).any(|r| {
-                r.split('"')
-                    .next()
-                    .is_some_and(|c| c.split(' ').any(|w| w == k))
-            })
+            row.split(&format!("<{el} class=\""))
+                .skip(1)
+                .any(|r| r.split('"').next().is_some_and(|c| c.split(' ').any(|w| w == k)))
         };
         assert!(row.contains("class=\"gtip") && wears("path"), "{row}");
         assert!(wears("circle"), "the dot wears {k}: {row}");
@@ -184,10 +161,7 @@ async fn the_graph_draws_every_branch_and_worktree_lane_with_its_label() {
     assert_eq!((lanes.len(), ks.len()), (4, 4), "{lanes:?}");
     let (_, one) = page(&router, "/log/HEAD?view=graph&lanes=one").await;
     assert_eq!(cells(&one), 2, "{one}");
-    assert!(
-        !one.contains("tip of l1") && !one.contains("tip of wt"),
-        "{one}"
-    );
+    assert!(!one.contains("tip of l1") && !one.contains("tip of wt"), "{one}");
     assert!(one.contains("aria-current=\"page\">This ref</a>"), "{one}");
 }
 
@@ -200,10 +174,7 @@ async fn a_public_server_leaves_worktree_lanes_out() {
     let router = gitterrace_web::app_router_with(&p, cfg).expect("router");
     let (_, all) = page(&router, "/log/HEAD?view=graph").await;
     assert!(all.contains("tip of l3"), "{all}");
-    assert!(
-        !all.contains("tip of wt") && !all.contains("worktree wt"),
-        "{all}"
-    );
+    assert!(!all.contains("tip of wt") && !all.contains("worktree wt"), "{all}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -228,10 +199,7 @@ async fn lanes_of_many_branches_run_on_across_pages() {
     let (_, two) = page(&router, "/log/HEAD?view=graph&page=1").await;
     assert_eq!(cells(&one), 50);
     for b in ["b1", "b2", "b3", "b4"] {
-        assert!(
-            one.contains(&format!("<span class=\"gref\">{b}</span>")),
-            "{b}"
-        );
+        assert!(one.contains(&format!("<span class=\"gref\">{b}</span>")), "{b}");
     }
     // Mainline plus four branch lines leave page one and enter page two.
     let last = one.rsplit("class=\"graph\"").next().expect("cell");

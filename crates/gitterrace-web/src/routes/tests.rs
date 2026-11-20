@@ -24,9 +24,7 @@ async fn blame_prewarm_fills_the_cache_for_the_costliest_files() {
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
     let app = Arc::new(crate::app::App::configured(repo, index, &env));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     let src = crate::tests::unchecked_src(&app, &head);
@@ -68,9 +66,7 @@ async fn an_export_run_warms_no_blame() {
     let mut env = crate::app::Env::new(gitterrace_config::Config::default());
     env.changes = Some(Arc::new(gitterrace_git::ChangeMemo::new()));
     let app = Arc::new(crate::app::App::configured(repo, index, &env));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     let head = app.repo.resolve("HEAD").expect("head");
     super::prewarm_blame(Arc::clone(&app)).await;
@@ -90,9 +86,7 @@ async fn a_long_blame_arrives_in_bounded_pages() {
     let lines = 2 * BLAME_PAGE_LINES + 7;
     let body = "line\n".repeat(lines);
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("big.txt", &body)
-        .commit("feat: a");
+    let f = gitterrace_testkit::Fixture::init(dir.path()).write("big.txt", &body).commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
@@ -149,25 +143,13 @@ async fn commit_page_is_memoized_per_commit() {
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
     let app = Arc::new(crate::app::App::configured(repo, index, &env));
-    let first = commit(State(Arc::clone(&app)), Path("HEAD".into()))
-        .await
-        .expect("page")
-        .0;
+    let first = commit(State(Arc::clone(&app)), Path("HEAD".into())).await.expect("page").0;
     assert!(first.contains("fix: b"), "{first}");
     app.memo_put(app.memo_key("commit", Some(&head)), "memo");
-    let again = commit(State(Arc::clone(&app)), Path(head.clone()))
-        .await
-        .expect("page")
-        .0;
+    let again = commit(State(Arc::clone(&app)), Path(head.clone())).await.expect("page").0;
     assert_eq!(again, "memo", "the repeat must not diff again");
-    let parent = commit(State(app), Path("HEAD~1".into()))
-        .await
-        .expect("page")
-        .0;
-    assert!(
-        parent.contains("feat: a"),
-        "another commit renders its own page"
-    );
+    let parent = commit(State(app), Path("HEAD~1".into())).await.expect("page").0;
+    assert!(parent.contains("feat: a"), "another commit renders its own page");
 }
 
 fn rec(id: &str, author: &str, email: &str, path: &str) -> CommitRecord {
@@ -181,10 +163,7 @@ fn rec(id: &str, author: &str, email: &str, path: &str) -> CommitRecord {
         parents: Vec::new(),
         kind: None,
         scope: None,
-        files: vec![FileStat {
-            path: path.into(),
-            ..FileStat::default()
-        }],
+        files: vec![FileStat { path: path.into(), ..FileStat::default() }],
     }
 }
 
@@ -222,9 +201,7 @@ fn author_log_comes_from_the_records_newest_first() {
 async fn tree_page_is_memoized_until_the_branch_moves() {
     use axum::extract::Query;
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "one\n")
-        .commit("feat: a");
+    let f = gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "one\n").commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
@@ -241,17 +218,10 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
     let head = app.repo.resolve("main").expect("head");
     let key = app.memo_key("tree", Some(&format!("main\0{head}\0\0")));
     app.memo_put(key, "memo");
-    assert_eq!(
-        get(&app).await.expect("page").0,
-        "memo",
-        "a repeat is not rebuilt"
-    );
+    assert_eq!(get(&app).await.expect("page").0, "memo", "a repeat is not rebuilt");
     let _f = f.write("b.txt", "two\n").commit("feat: b");
     let moved = get(&app).await.expect("page").0;
-    assert!(
-        moved.contains("b.txt"),
-        "a moved branch renders its new tree: {moved}"
-    );
+    assert!(moved.contains("b.txt"), "a moved branch renders its new tree: {moved}");
 }
 
 /// Guard class, as for the tree: the blame page is rendered once per (rev, commit, path), and a
@@ -259,9 +229,7 @@ async fn tree_page_is_memoized_until_the_branch_moves() {
 #[tokio::test]
 async fn blame_page_is_memoized_until_the_branch_moves() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "one\n")
-        .commit("feat: a");
+    let f = gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "one\n").commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
@@ -278,15 +246,8 @@ async fn blame_page_is_memoized_until_the_branch_moves() {
     let head = app.repo.resolve("main").expect("head");
     let key = app.memo_key("blame", Some(&format!("main\0{head}\0a.txt\0")));
     app.memo_put(key, "memo");
-    assert_eq!(
-        get(&app).await.expect("page").0,
-        "memo",
-        "a repeat is not rebuilt"
-    );
+    assert_eq!(get(&app).await.expect("page").0, "memo", "a repeat is not rebuilt");
     let _f = f.write("a.txt", "two\n").commit("feat: b");
     let moved = get(&app).await.expect("page").0;
-    assert!(
-        moved.contains("two"),
-        "a moved branch blames its new file: {moved}"
-    );
+    assert!(moved.contains("two"), "a moved branch blames its new file: {moved}");
 }

@@ -135,11 +135,7 @@ pub struct ContributorReport {
 /// points build their scope here.
 pub(crate) fn scope_with(base: &Scope, period: Period, days: Option<(i64, i64)>) -> Scope {
     let p = ScopeParams {
-        period: Some(
-            if days.is_some() { Period::All } else { period }
-                .as_str()
-                .to_owned(),
-        ),
+        period: Some(if days.is_some() { Period::All } else { period }.as_str().to_owned()),
         from: days.map(|(a, _)| format_date(a)),
         to: days.map(|(_, b)| format_date(b)),
         select: base.selection().clone(),
@@ -198,10 +194,7 @@ const fn bounds(c: &Counted<'_>) -> (Option<i64>, i64) {
     if *d.start() == i64::MIN {
         return (None, c.context().now().saturating_add(1));
     }
-    (
-        Some(d.start().saturating_mul(day)),
-        d.end().saturating_add(1).saturating_mul(day),
-    )
+    (Some(d.start().saturating_mul(day)), d.end().saturating_add(1).saturating_mul(day))
 }
 
 impl Counted<'_> {
@@ -259,22 +252,12 @@ impl Counted<'_> {
                 .or_else(|| period.days().map(|_| PeriodStats::default()))
         };
         let (from, to) = bounds(self);
-        PeriodSummary {
-            period,
-            from,
-            to,
-            current,
-            previous,
-        }
+        PeriodSummary { period, from, to, current, previous }
     }
 
     fn rhythm_of(&self, series: Series, when: &When) -> Rhythm {
         let axis = self.axis();
-        let When {
-            punch_card,
-            by_weekday,
-            by_hour,
-        } = *when;
+        let When { punch_card, by_weekday, by_hour } = *when;
         Rhythm {
             series: series.finish(axis),
             unit: axis.unit(),

@@ -14,17 +14,8 @@ fn doc(src: &str) -> crate::markdown::Doc {
 #[test]
 fn heading_pilcrow_and_outline_hrefs_are_plain() {
     let d = doc("# Reference\n\n## Two\n\n## Three\n\n## Four\n\n[r](#reference)\n");
-    assert!(
-        d.html
-            .contains("<h2 class=\"markdown-h1\" id=\"reference\""),
-        "{}",
-        d.html
-    );
-    assert!(
-        d.html.contains("class=\"anchor\" href=\"#reference\""),
-        "{}",
-        d.html
-    );
+    assert!(d.html.contains("<h2 class=\"markdown-h1\" id=\"reference\""), "{}", d.html);
+    assert!(d.html.contains("class=\"anchor\" href=\"#reference\""), "{}", d.html);
     assert!(d.html.contains("href=\"#reference\" rel"), "{}", d.html);
     let rail = outline_rail(&d.outline);
     assert!(rail.contains("<a href=\"#two\""), "{rail}");
@@ -36,50 +27,24 @@ fn colliding_heading_keeps_a_working_prefixed_target() {
     let d = doc("# theme\n\n# q\n\n# location\n\n[m](#theme)\n");
     for id in ["theme", "q", "location"] {
         let pre = format!("user-content-{id}");
-        assert!(
-            d.html.contains(&format!("id=\"{pre}\"")),
-            "{id}: {}",
-            d.html
-        );
-        assert!(
-            d.html
-                .contains(&format!("class=\"anchor\" href=\"#{pre}\"")),
-            "{id}"
-        );
-        assert!(
-            !d.html.contains(&format!("id=\"{id}\"")),
-            "{id} clobbers the page"
-        );
+        assert!(d.html.contains(&format!("id=\"{pre}\"")), "{id}: {}", d.html);
+        assert!(d.html.contains(&format!("class=\"anchor\" href=\"#{pre}\"")), "{id}");
+        assert!(!d.html.contains(&format!("id=\"{id}\"")), "{id} clobbers the page");
         let rail = outline_rail(&d.outline);
         assert!(rail.contains(&format!("href=\"#{pre}\"")), "{rail}");
     }
-    assert!(
-        d.html.contains("<a href=\"#user-content-theme\" rel"),
-        "{}",
-        d.html
-    );
+    assert!(d.html.contains("<a href=\"#user-content-theme\" rel"), "{}", d.html);
     let raw = doc("<div id=\"theme\">x</div>\n<span id=\"top\">y</span>\n");
-    assert!(
-        raw.html.contains("id=\"user-content-theme\""),
-        "{}",
-        raw.html
-    );
+    assert!(raw.html.contains("id=\"user-content-theme\""), "{}", raw.html);
     assert!(raw.html.contains("id=\"user-content-top\""), "{}", raw.html);
 }
 
 #[test]
 fn footnote_refs_and_definitions_stay_paired() {
     let html = doc("note[^1] and[^b]\n\n[^1]: one\n[^b]: two\n").html;
-    let ids: Vec<&str> = html
-        .split("id=\"")
-        .skip(1)
-        .filter_map(|s| s.split('"').next())
-        .collect();
-    let hrefs: Vec<&str> = html
-        .split("href=\"#")
-        .skip(1)
-        .filter_map(|s| s.split('"').next())
-        .collect();
+    let ids: Vec<&str> = html.split("id=\"").skip(1).filter_map(|s| s.split('"').next()).collect();
+    let hrefs: Vec<&str> =
+        html.split("href=\"#").skip(1).filter_map(|s| s.split('"').next()).collect();
     assert!(!hrefs.is_empty(), "{html}");
     for h in &hrefs {
         assert!(ids.contains(h), "#{h} has no target in {html}");

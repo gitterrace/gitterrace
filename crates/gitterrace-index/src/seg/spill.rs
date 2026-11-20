@@ -101,12 +101,7 @@ impl Spill {
         let mut runs: Vec<Run> = self
             .runs
             .iter()
-            .map(|&(start, n)| Run {
-                pos: start,
-                left: n,
-                buf: Vec::new(),
-                at: 0,
-            })
+            .map(|&(start, n)| Run { pos: start, left: n, buf: Vec::new(), at: 0 })
             .collect();
         let mut heap = BinaryHeap::new();
         for (i, r) in runs.iter_mut().enumerate() {

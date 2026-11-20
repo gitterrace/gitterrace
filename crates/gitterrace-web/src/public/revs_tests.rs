@@ -27,9 +27,7 @@ struct Site {
 fn site() -> Site {
     let dir = tempfile::tempdir().expect("tmp");
     let p = dir.path().join("repo");
-    let f = Fixture::init(&p)
-        .write("a.txt", &format!("{OLD}\n"))
-        .commit("feat: first");
+    let f = Fixture::init(&p).write("a.txt", &format!("{OLD}\n")).commit("feat: first");
     let old = f.git(&["rev-parse", "HEAD"]);
     let f = f.write("a.txt", "tip\n").commit("fix: second");
     let tip = f.git(&["rev-parse", "HEAD"]);
@@ -38,29 +36,15 @@ fn site() -> Site {
     let index = f.git(&["rev-parse", "stash^2"]);
     let tree = f.git(&["rev-parse", "stash:"]);
     let dangling = git(&p, &["commit-tree", &tree, "-p", &tip, "-m", "dangling"]);
-    let repo_id = gitterrace_git::Repo::discover(&p)
-        .expect("repo")
-        .id()
-        .expect("id");
-    let on: String = Feature::ALL
-        .map(|f| [f.key(), " = true\n"].concat())
-        .concat();
+    let repo_id = gitterrace_git::Repo::discover(&p).expect("repo").id().expect("id");
+    let on: String = Feature::ALL.map(|f| [f.key(), " = true\n"].concat()).concat();
     let text = format!("[server]\nis_public = true\nhosts = [\"{HOST}\"]\n[features]\n{on}");
     let router = crate::app_router_with(&p, parse(&text).expect("parse").config).expect("router");
-    Site {
-        router,
-        repo_id,
-        old,
-        hidden: vec![stash, index, dangling],
-        _dir: dir,
-    }
+    Site { router, repo_id, old, hidden: vec![stash, index, dangling], _dir: dir }
 }
 
 async fn send(r: &Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri)
-        .header("host", HOST)
-        .body(Body::empty())
-        .expect("req");
+    let req = Request::get(uri).header("host", HOST).body(Body::empty()).expect("req");
     let res = r.clone().oneshot(req).await.expect("res");
     let status = res.status().as_u16();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
@@ -133,9 +117,5 @@ async fn a_public_server_still_reads_reachable_history_by_its_full_id() {
     assert_eq!((status, body.trim()), (200, OLD));
     let parent = format!("{}^", s.hidden[0]);
     let (status, body) = send(&s.router, &format!("/r/repo/raw/{parent}/a.txt")).await;
-    assert_eq!(
-        (status, body.trim()),
-        (200, "tip"),
-        "a stash's public parent"
-    );
+    assert_eq!((status, body.trim()), (200, "tip"), "a stash's public parent");
 }

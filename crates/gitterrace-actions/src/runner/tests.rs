@@ -35,15 +35,8 @@ fn payload(repo: &Repo, kind: Kind) -> Payload {
         sha: None,
         query: None,
     };
-    Payload::build(
-        repo,
-        "t",
-        kind,
-        &loc,
-        &gitterrace_testkit::base_url(),
-        LinkStyle::Go,
-    )
-    .expect("payload")
+    Payload::build(repo, "t", kind, &loc, &gitterrace_testkit::base_url(), LinkStyle::Go)
+        .expect("payload")
 }
 
 fn fixture() -> (tempfile::TempDir, Repo) {
@@ -62,9 +55,7 @@ fn shell_braces_run_verbatim() {
         "cat >/dev/null; echo ${HOME} | awk '{print}'; f() { :; }; f",
         Duration::from_secs(5),
     );
-    let r = Runner::new(Limits::default())
-        .run(&a, &p, &repo.root())
-        .expect("run");
+    let r = Runner::new(Limits::default()).run(&a, &p, &repo.root()).expect("run");
     assert!(r.ok, "{r:?}");
     assert_eq!(r.first_line, std::env::var("HOME").expect("HOME"));
 }
@@ -133,20 +124,14 @@ fn script_gets_exact_stdin_and_only_allowed_env() {
     );
     let p = payload(&repo, Kind::Line);
     let r = Runner::new(Limits::default())
-        .run(
-            &shell("a", &script, Duration::from_secs(5)),
-            &p,
-            &repo.root(),
-        )
+        .run(&shell("a", &script, Duration::from_secs(5)), &p, &repo.root())
         .expect("run");
     assert!(r.ok, "{r:?}");
     assert_eq!(r.first_line, "first");
     let stdin = std::fs::read(t.path().join("seen.json")).expect("stdin");
     assert_eq!(stdin, serde_json::to_vec(&p).expect("json"));
     let env = std::fs::read_to_string(t.path().join("seen.env")).expect("env");
-    let allowed = [
-        "PATH", "HOME", "USER", "LANG", "TMPDIR", "PWD", "SHLVL", "OLDPWD", "_",
-    ];
+    let allowed = ["PATH", "HOME", "USER", "LANG", "TMPDIR", "PWD", "SHLVL", "OLDPWD", "_"];
     for line in env.lines() {
         let name = line.split('=').next().unwrap_or_default();
         assert!(
@@ -156,9 +141,7 @@ fn script_gets_exact_stdin_and_only_allowed_env() {
     }
     assert!(env.contains("GITTERRACE_PATH=src/a.rs"));
     assert_eq!(
-        std::fs::read_to_string(t.path().join("seen.pwd"))
-            .expect("pwd")
-            .trim(),
+        std::fs::read_to_string(t.path().join("seen.pwd")).expect("pwd").trim(),
         repo.root().to_string_lossy()
     );
 }
@@ -173,19 +156,12 @@ fn vars_reach_env_and_stdin_but_never_shadow() {
         Duration::from_secs(5),
     );
     // Names chosen to collide with the payload vars, PATH and HOME if unprefixed.
-    a.vars = [
-        ("vault", "Notes"),
-        ("path", "/evil"),
-        ("home", "/evil"),
-        ("var_path", "x"),
-    ]
-    .into_iter()
-    .map(|(k, v)| (k.to_string(), v.to_string()))
-    .collect();
+    a.vars = [("vault", "Notes"), ("path", "/evil"), ("home", "/evil"), ("var_path", "x")]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
     let p = payload(&repo, Kind::Line);
-    let r = Runner::new(Limits::default())
-        .run(&a, &p, &repo.root())
-        .expect("run");
+    let r = Runner::new(Limits::default()).run(&a, &p, &repo.root()).expect("run");
     assert!(r.ok, "{r:?}");
     let json: serde_json::Value =
         serde_json::from_slice(&std::fs::read(t.path().join("vars.json")).expect("stdin"))
@@ -195,10 +171,8 @@ fn vars_reach_env_and_stdin_but_never_shadow() {
     assert_eq!(json["vars"]["path"], "/evil");
     assert_eq!(json["path"], "src/a.rs");
     let env = std::fs::read_to_string(t.path().join("vars.env")).expect("env");
-    let get = |k: &str| {
-        env.lines()
-            .find_map(|l| l.strip_prefix(&format!("{k}=")).map(str::to_string))
-    };
+    let get =
+        |k: &str| env.lines().find_map(|l| l.strip_prefix(&format!("{k}=")).map(str::to_string));
     assert_eq!(get("GITTERRACE_VAR_VAULT").as_deref(), Some("Notes"));
     assert_eq!(get("GITTERRACE_VAR_PATH").as_deref(), Some("/evil"));
     assert_eq!(get("GITTERRACE_VAR_VAR_PATH").as_deref(), Some("x"));
@@ -214,21 +188,13 @@ fn repo_content_never_becomes_shell() {
     assert!(p.title.contains("$(touch pwned)"));
     let r = Runner::new(Limits::default())
         .run(
-            &shell(
-                "a",
-                "cat >/dev/null; echo \"$GITTERRACE_TITLE\"",
-                Duration::from_secs(5),
-            ),
+            &shell("a", "cat >/dev/null; echo \"$GITTERRACE_TITLE\"", Duration::from_secs(5)),
             &p,
             &repo.root(),
         )
         .expect("run");
     assert!(r.ok);
-    assert!(
-        r.first_line.contains("$(touch pwned)"),
-        "printed literally: {}",
-        r.first_line
-    );
+    assert!(r.first_line.contains("$(touch pwned)"), "printed literally: {}", r.first_line);
     assert!(!t.path().join("pwned").exists());
 }
 
@@ -237,29 +203,19 @@ fn failure_reports_stderr_and_exit() {
     let (_t, repo) = fixture();
     let r = Runner::new(Limits::default())
         .run(
-            &shell(
-                "a",
-                "echo out; echo boom >&2; exit 3",
-                Duration::from_secs(5),
-            ),
+            &shell("a", "echo out; echo boom >&2; exit 3", Duration::from_secs(5)),
             &payload(&repo, Kind::Commit),
             &repo.root(),
         )
         .expect("run");
-    assert_eq!(
-        (r.ok, r.exit, r.first_line.as_str()),
-        (false, Some(3), "boom")
-    );
+    assert_eq!((r.ok, r.exit, r.first_line.as_str()), (false, Some(3), "boom"));
 }
 
 #[test]
 fn timeout_kills_the_whole_group() {
     let (t, repo) = fixture();
     let pidfile = t.path().join("grandchild.pid");
-    let script = format!(
-        "sh -c 'echo $$ > \"{}\"; sleep 30' & sleep 30",
-        pidfile.display()
-    );
+    let script = format!("sh -c 'echo $$ > \"{}\"; sleep 30' & sleep 30", pidfile.display());
     let start = Instant::now();
     let r = Runner::new(Limits::default())
         .run(
@@ -269,16 +225,8 @@ fn timeout_kills_the_whole_group() {
         )
         .expect("run");
     assert!(r.timed_out && !r.ok);
-    assert!(
-        start.elapsed() < Duration::from_secs(5),
-        "{:?}",
-        start.elapsed()
-    );
-    let pid: i32 = std::fs::read_to_string(&pidfile)
-        .expect("pid")
-        .trim()
-        .parse()
-        .expect("int");
+    assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
+    let pid: i32 = std::fs::read_to_string(&pidfile).expect("pid").trim().parse().expect("int");
     // The kernel reaps the signalled group soon after, on a loaded runner later.
     gitterrace_testkit::wait::process_gone_blocking("the grandchild is reaped", &pid.to_string());
 }
@@ -305,20 +253,17 @@ fn output_is_capped() {
 #[test]
 fn output_limit_is_the_configured_one() {
     let (_t, repo) = fixture();
-    let r = Runner::new(Limits {
-        output_bytes: 1000,
-        ..Limits::default()
-    })
-    .run(
-        &shell(
-            "a",
-            "cat >/dev/null; head -c 300000 /dev/zero | tr '\\0' x",
-            Duration::from_secs(5),
-        ),
-        &payload(&repo, Kind::Commit),
-        &repo.root(),
-    )
-    .expect("run");
+    let r = Runner::new(Limits { output_bytes: 1000, ..Limits::default() })
+        .run(
+            &shell(
+                "a",
+                "cat >/dev/null; head -c 300000 /dev/zero | tr '\\0' x",
+                Duration::from_secs(5),
+            ),
+            &payload(&repo, Kind::Commit),
+            &repo.root(),
+        )
+        .expect("run");
     assert_eq!(r.stdout.len(), 1000);
 }
 
@@ -346,22 +291,14 @@ fn concurrency_and_rate_limits() {
     let p = payload(&repo, Kind::Commit);
     assert!(
         matches!(
-            runner.run(
-                &shell("a9", "true", Duration::from_secs(5)),
-                &p,
-                Path::new("/")
-            ),
+            runner.run(&shell("a9", "true", Duration::from_secs(5)), &p, Path::new("/")),
             Err(RunError::Busy)
         ),
         "5th concurrent"
     );
     assert!(
         matches!(
-            runner.run(
-                &shell("a0", "true", Duration::from_secs(5)),
-                &p,
-                Path::new("/")
-            ),
+            runner.run(&shell("a0", "true", Duration::from_secs(5)), &p, Path::new("/")),
             Err(RunError::Busy)
         ),
         "same id"
@@ -370,27 +307,18 @@ fn concurrency_and_rate_limits() {
         assert!(h.join().expect("join").expect("run").ok);
     }
 
-    let limited = Runner::new(Limits {
-        per_minute: 2,
-        ..Limits::default()
-    });
+    let limited = Runner::new(Limits { per_minute: 2, ..Limits::default() });
     let quick = shell("q", "true", Duration::from_secs(5));
     assert!(limited.run(&quick, &p, Path::new("/")).is_ok());
     assert!(limited.run(&quick, &p, Path::new("/")).is_ok());
-    assert!(matches!(
-        limited.run(&quick, &p, Path::new("/")),
-        Err(RunError::RateLimited)
-    ));
+    assert!(matches!(limited.run(&quick, &p, Path::new("/")), Err(RunError::RateLimited)));
 }
 
 /// Runs `argv` (placeholders included) with a recorder in front: `/bin/sh -c` writes each
 /// argument it gets on its own NUL-terminated record, and stdin beside it.
 fn record(t: &Path, args: &[&str], stdin: Stdin, p: &Payload) -> Result<Vec<String>, RunError> {
     let out = t.join("argv");
-    let script = format!(
-        "printf '%s\\0' \"$@\" > '{0}'; cat > '{0}.in'",
-        out.display()
-    );
+    let script = format!("printf '%s\\0' \"$@\" > '{0}'; cat > '{0}.in'", out.display());
     let mut a = shell("rec", &script, Duration::from_secs(5));
     // A recorder: `sh -c` only prints the template arguments it is handed, so this is an
     // argv template action, and its arguments are expanded.
@@ -445,12 +373,7 @@ fn child_argv_is_the_template_filled_in() {
 fn hostile_titles_are_one_literal_argument() {
     let (t, repo) = fixture();
     let mut p = payload(&repo, Kind::Commit);
-    for title in [
-        "--help",
-        "$(touch PWNED)",
-        "a b; touch PWNED",
-        "`touch PWNED`",
-    ] {
+    for title in ["--help", "$(touch PWNED)", "a b; touch PWNED", "`touch PWNED`"] {
         p.title = title.into();
         let got = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect("run");
         assert_eq!(got, ["--", title]);
@@ -467,10 +390,7 @@ fn caps_and_nul_refuse_the_run() {
     let (t, repo) = fixture();
     let mut p = payload(&repo, Kind::Commit);
     p.title = "x".repeat(64 * 1024);
-    assert!(
-        record(t.path(), &["--", "{title}"], Stdin::None, &p).is_ok(),
-        "at cap"
-    );
+    assert!(record(t.path(), &["--", "{title}"], Stdin::None, &p).is_ok(), "at cap");
     p.title.push('x');
     let e = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect_err("over");
     assert!(
@@ -480,20 +400,11 @@ fn caps_and_nul_refuse_the_run() {
     p.title = "x".repeat(60 * 1024);
     let five = ["--", "{title}", "{title}", "{title}", "{title}", "{title}"];
     let e = record(t.path(), &five, Stdin::None, &p).expect_err("total");
-    assert!(
-        matches!(&e, RunError::Refused(m) if m.contains("256 KiB")),
-        "{e}"
-    );
-    assert!(
-        record(t.path(), &five[..5], Stdin::None, &p).is_ok(),
-        "under total"
-    );
+    assert!(matches!(&e, RunError::Refused(m) if m.contains("256 KiB")), "{e}");
+    assert!(record(t.path(), &five[..5], Stdin::None, &p).is_ok(), "under total");
     p.title = "a\0b".into();
     let e = record(t.path(), &["--", "{title}"], Stdin::None, &p).expect_err("nul");
-    assert!(
-        matches!(&e, RunError::Refused(m) if m.contains("NUL")),
-        "{e}"
-    );
+    assert!(matches!(&e, RunError::Refused(m) if m.contains("NUL")), "{e}");
 }
 
 #[test]
@@ -519,13 +430,9 @@ fn url_modifier_encodes_a_query_value() {
     // A title cannot add a parameter of its own.
     p.title = "t&notes=x".into();
     p.markdown = "m".into();
-    let got = record(
-        t.path(),
-        &["x://new?title={title:url}&notes={markdown:url}"],
-        Stdin::None,
-        &p,
-    )
-    .expect("run");
+    let got =
+        record(t.path(), &["x://new?title={title:url}&notes={markdown:url}"], Stdin::None, &p)
+            .expect("run");
     assert_eq!(got, ["x://new?title=t%26notes%3Dx&notes=m"]);
     let query = got[0].split_once('?').expect("query").1;
     assert_eq!(query.matches("notes=").count(), 1, "{query}");
@@ -555,25 +462,12 @@ fn stdin_modes() {
 #[test]
 fn a_timed_out_run_frees_its_slot_on_return() {
     let (_t, repo) = fixture();
-    let runner = Runner::new(Limits {
-        max_running: 1,
-        ..Limits::default()
-    });
+    let runner = Runner::new(Limits { max_running: 1, ..Limits::default() });
     let p = payload(&repo, Kind::Commit);
-    let slow = shell(
-        "slow",
-        "sh -c 'sleep 30' & sleep 30",
-        Duration::from_millis(200),
-    );
+    let slow = shell("slow", "sh -c 'sleep 30' & sleep 30", Duration::from_millis(200));
     let r = runner.run(&slow, &p, &repo.root()).expect("run");
     assert!(r.timed_out);
-    let next = runner.run(
-        &shell("next", "cat >/dev/null", Duration::from_secs(5)),
-        &p,
-        &repo.root(),
-    );
-    assert!(
-        next.is_ok_and(|o| o.ok),
-        "the slot was still held after the time-out"
-    );
+    let next =
+        runner.run(&shell("next", "cat >/dev/null", Duration::from_secs(5)), &p, &repo.root());
+    assert!(next.is_ok_and(|o| o.ok), "the slot was still held after the time-out");
 }

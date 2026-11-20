@@ -51,9 +51,7 @@ fn clip(s: &str) -> &str {
 
 /// Whether the query or glob of `q` is over the cap, so it is neither run nor memoized.
 fn over_cap(q: &SearchQuery) -> bool {
-    [&q.q, &q.glob]
-        .iter()
-        .any(|v| v.as_ref().is_some_and(|v| v.len() > MAX_QUERY_BYTES))
+    [&q.q, &q.glob].iter().any(|v| v.as_ref().is_some_and(|v| v.len() > MAX_QUERY_BYTES))
 }
 
 #[derive(Deserialize, Default)]
@@ -88,10 +86,7 @@ impl FileHits {
 }
 
 // The flags mirror the form's checkboxes; the template reads them directly.
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "independent switches, one per option"
-)]
+#[expect(clippy::struct_excessive_bools, reason = "independent switches, one per option")]
 #[derive(Template)]
 #[template(path = "search.html")]
 struct SearchPage {
@@ -153,9 +148,7 @@ static SCANS: Mutex<Vec<std::path::PathBuf>> = Mutex::new(Vec::new());
 /// Code scans run for the repository at `git_dir`, for the single-flight test.
 #[cfg(test)]
 pub(crate) fn scans_of(git_dir: &std::path::Path) -> usize {
-    SCANS
-        .lock()
-        .map_or(0, |g| g.iter().filter(|p| *p == git_dir).count())
+    SCANS.lock().map_or(0, |g| g.iter().filter(|p| *p == git_dir).count())
 }
 
 /// Key for one rendered search: the memo key moves with HEAD, the index and config, and the
@@ -230,10 +223,8 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     let rev = rev.unwrap_or_else(|| "HEAD".to_owned());
     let commits_mode = q.kind.as_deref() == Some("commits");
     let (regex, case) = (q.regex.is_some(), q.case.is_some());
-    let (text, glob, cap_error) = capped(
-        q.q.as_deref().unwrap_or_default(),
-        q.glob.as_deref().unwrap_or_default(),
-    );
+    let (text, glob, cap_error) =
+        capped(q.q.as_deref().unwrap_or_default(), q.glob.as_deref().unwrap_or_default());
     let mut page = SearchPage {
         c: views::chrome_at(a, "search", &rev),
         head: search_head(&rev),
@@ -301,11 +292,8 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
         } else {
             ("Search commit messages instead", "commits")
         };
-        let next = format!(
-            "/search?q={}&kind={kind}&rev={}",
-            fmt::enc_seg(&text),
-            fmt::enc_seg(&rev)
-        );
+        let next =
+            format!("/search?q={}&kind={kind}&rev={}", fmt::enc_seg(&text), fmt::enc_seg(&rev));
         page.nothing = Some(e.step(label, fmt::href(&next)));
     }
     page.summary = summary(&page, commits_mode, a.repo.text_limit());
@@ -348,44 +336,26 @@ fn search_head(rev: &str) -> crate::pagehead::PageHead {
 struct PatternError(String);
 
 fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, PatternError> {
-    let pat = if is_regex {
-        q.to_owned()
-    } else {
-        regex::escape(q)
-    };
+    let pat = if is_regex { q.to_owned() } else { regex::escape(q) };
     RegexBuilder::new(&pat)
         .case_insensitive(!case)
         .multi_line(true)
         .size_limit(8 * 1024 * 1024)
         .build()
         .map_err(|e| {
-            PatternError(
-                e.to_string()
-                    .lines()
-                    .last()
-                    .unwrap_or("invalid pattern")
-                    .to_owned(),
-            )
+            PatternError(e.to_string().lines().last().unwrap_or("invalid pattern").to_owned())
         })
 }
 
 /// Comma separated globs. Without a `/` a glob matches a file name at any depth.
 fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
-    let parts: Vec<&str> = glob
-        .split(',')
-        .map(str::trim)
-        .filter(|g| !g.is_empty())
-        .collect();
+    let parts: Vec<&str> = glob.split(',').map(str::trim).filter(|g| !g.is_empty()).collect();
     if parts.is_empty() {
         return Ok(None);
     }
     let mut alts = Vec::new();
     for g in parts {
-        let g = if g.ends_with('/') {
-            format!("{g}**")
-        } else {
-            g.to_owned()
-        };
+        let g = if g.ends_with('/') { format!("{g}**") } else { g.to_owned() };
         let mut body = String::new();
         let mut chars = g.chars().peekable();
         while let Some(ch) = chars.next() {
@@ -404,11 +374,7 @@ fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
                 c => body.push_str(&regex::escape(&c.to_string())),
             }
         }
-        alts.push(if g.contains('/') {
-            format!("^{body}$")
-        } else {
-            format!("(?:^|/){body}$")
-        });
+        alts.push(if g.contains('/') { format!("^{body}$") } else { format!("(?:^|/){body}$") });
     }
     RegexBuilder::new(&alts.join("|"))
         .size_limit(8 * 1024 * 1024)
@@ -434,24 +400,15 @@ struct CodeOut {
 fn search_code(a: &App, rev: &str, re: &Regex, glob: Option<&Regex>) -> Result<CodeOut> {
     let id = a.repo.resolve(rev)?;
     let all = gitterrace_git::files(&a.repo, &id)?;
-    let list: Vec<&FileRef> = all
-        .iter()
-        .filter(|f| glob.is_none_or(|g| g.is_match(&f.path)))
-        .collect();
+    let list: Vec<&FileRef> =
+        all.iter().filter(|f| glob.is_none_or(|g| g.is_match(&f.path))).collect();
     let max_matches = a.cfg().limits.search_matches;
     let per_file = a.cfg().limits.search_file_lines;
     let workers = scan_workers(&a.cfg());
     let rev_enc = fmt::enc_seg(rev);
-    let mut readers: Vec<BlobReader> = (0..workers)
-        .filter_map(|_| BlobReader::open(&a.repo).ok())
-        .collect();
-    let mut out = CodeOut {
-        files: Vec::new(),
-        matches: 0,
-        scanned: 0,
-        skipped: 0,
-        capped: false,
-    };
+    let mut readers: Vec<BlobReader> =
+        (0..workers).filter_map(|_| BlobReader::open(&a.repo).ok()).collect();
+    let mut out = CodeOut { files: Vec::new(), matches: 0, scanned: 0, skipped: 0, capped: false };
     // Chunks are scanned in parallel but merged in path order, so a capped result is always
     // the same first files: the page is memoized, and a race must not decide what it keeps.
     for chunk in list.chunks(SCAN_CHUNK) {
@@ -524,11 +481,7 @@ fn file_hits(path: &str, rev_enc: &str, text: &str, re: &Regex, per_file: usize)
         if let Some(l) = last
             && from > l + 1
         {
-            out.push(Line {
-                n: 0,
-                html: String::new(),
-                hit: false,
-            });
+            out.push(Line { n: 0, html: String::new(), hit: false });
         }
         for (i, line) in lines.iter().enumerate().take(to + 1).skip(from) {
             let is_hit = i == h;

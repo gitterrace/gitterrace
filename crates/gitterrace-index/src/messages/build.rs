@@ -45,11 +45,8 @@ pub(crate) fn remap(
             return Ok(None);
         };
         let mut it = items[r as usize].clone();
-        it.parents = it
-            .parents
-            .iter()
-            .filter_map(|p| new.get(&old_order[*p as usize]).copied())
-            .collect();
+        it.parents =
+            it.parents.iter().filter_map(|p| new.get(&old_order[*p as usize]).copied()).collect();
         w.push(&it)?;
     }
     w.finish().map(Some)
@@ -72,18 +69,10 @@ pub(crate) fn extend(dir: &Path, source: &dyn crate::CommitSource) -> std::io::R
     let mut manifest = store.manifest.clone();
     let n = store.messages.len();
     drop(store);
-    let rank: HashMap<Oid, u32> = order
-        .iter()
-        .enumerate()
-        .map(|(i, o)| (*o, u32::try_from(i).unwrap_or(u32::MAX)))
-        .collect();
+    let rank: HashMap<Oid, u32> =
+        order.iter().enumerate().map(|(i, o)| (*o, u32::try_from(i).unwrap_or(u32::MAX))).collect();
     let from = usize::try_from(have).unwrap_or(usize::MAX);
-    let ids: Vec<String> = order
-        .get(from..)
-        .unwrap_or_default()
-        .iter()
-        .map(hex)
-        .collect();
+    let ids: Vec<String> = order.get(from..).unwrap_or_default().iter().map(hex).collect();
     let mut w = Writer::new(dir, manifest.generation, n).map_err(seg)?;
     let mut next = from;
     // A failed push ends the stream: no later text can land in a column with a hole.

@@ -17,10 +17,7 @@ fn scope(force: bool) -> crate::export::Scope {
 fn headers_file_carries_the_page_policy() {
     let h = crate::export::headers_file();
     assert!(h.contains("font-src 'self' data:"), "{h}");
-    assert!(
-        !gitterrace_web::PAGE_CSP.contains("font-src"),
-        "the served app takes no data: fonts"
-    );
+    assert!(!gitterrace_web::PAGE_CSP.contains("font-src"), "the served app takes no data: fonts");
     assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
 }
 
@@ -30,9 +27,7 @@ fn headers_file_carries_the_page_policy() {
 fn headers_file_revalidates_pages_but_not_static() {
     let h = crate::export::headers_file();
     for rule in ["/\n", "/r/*\n"] {
-        let at = h
-            .find(&format!("\n{rule}"))
-            .unwrap_or_else(|| panic!("{rule:?} in {h}"));
+        let at = h.find(&format!("\n{rule}")).unwrap_or_else(|| panic!("{rule:?} in {h}"));
         let block = h[at + 1..].split("\n\n").next().unwrap_or_default();
         assert!(block.contains("Cache-Control: no-cache"), "{block}");
     }
@@ -60,14 +55,9 @@ async fn every_asset_an_exported_page_names_carries_the_build_version() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let out = dir.path().join("out");
-    crate::export::export(
-        &[repo.path().to_path_buf()],
-        &out,
-        &scope(false),
-        DEFAULT_PAGES,
-    )
-    .await
-    .expect("export");
+    crate::export::export(&[repo.path().to_path_buf()], &out, &scope(false), DEFAULT_PAGES)
+        .await
+        .expect("export");
     let v = format!("?v={}", gitterrace_web::asset_version());
     let mut stack = vec![out.clone()];
     let mut seen = 0;

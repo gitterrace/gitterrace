@@ -11,9 +11,7 @@ use crate::languages::{Held, View};
 /// A linear history of `n` commits over a handful of languages, with deletions, a lock file
 /// the filter skips and more languages than the page shows, so `Other` is folded.
 fn history(n: usize) -> Vec<CommitRecord> {
-    const EXT: [&str; 11] = [
-        "rs", "py", "go", "c", "js", "ts", "rb", "md", "sh", "toml", "lock",
-    ];
+    const EXT: [&str; 11] = ["rs", "py", "go", "c", "js", "ts", "rb", "md", "sh", "toml", "lock"];
     (0..n)
         .map(|i| {
             let ext = EXT[(i * 7) % EXT.len()];
@@ -24,11 +22,7 @@ fn history(n: usize) -> Vec<CommitRecord> {
                 author: "a".to_owned(),
                 email: "a@x.io".to_owned(),
                 time: 1_600_000_000 + i64::try_from(i).unwrap_or(0) * 3600,
-                parents: if i == 0 {
-                    vec![]
-                } else {
-                    vec![format!("{:040x}", i - 1)]
-                },
+                parents: if i == 0 { vec![] } else { vec![format!("{:040x}", i - 1)] },
                 files: vec![FileStat {
                     path: Arc::from(format!("src/f{}.{ext}", i % 5).as_str()),
                     additions: add,
@@ -81,10 +75,7 @@ fn reference(src: &dyn InsightsSource, filter: &PathFilter) -> Reference {
             .iter()
             .map(|r| src.commit_id(*r).map(|s| s.to_string()).unwrap_or_default())
             .collect(),
-        times: chain
-            .iter()
-            .map(|r| src.commit(*r).map_or(0, |c| c.time))
-            .collect(),
+        times: chain.iter().map(|r| src.commit(*r).map_or(0, |c| c.time)).collect(),
         lines,
         adds,
         dels,
@@ -134,11 +125,7 @@ fn views_match_the_full_chain() {
         }
         let (a, b) = range.unwrap_or((0, n - 1));
         assert_eq!(ch.added, want.adds[a..=b].iter().sum::<u64>(), "{range:?}");
-        assert_eq!(
-            ch.removed,
-            want.dels[a..=b].iter().sum::<u64>(),
-            "{range:?}"
-        );
+        assert_eq!(ch.removed, want.dels[a..=b].iter().sum::<u64>(), "{range:?}");
     }
 }
 
@@ -159,26 +146,15 @@ fn skeleton_size_is_flat_in_history_length() {
 /// languages: the legend names only languages, and every line still counts, under `Other`.
 #[test]
 fn formats_count_under_other_and_leave_the_legend() {
-    let names: Vec<String> = [
-        "Rust",
-        ".asc",
-        "Python",
-        ".prebuilt",
-        "(no extension)",
-        ".png",
-    ]
-    .map(str::to_owned)
-    .to_vec();
+    let names: Vec<String> = ["Rust", ".asc", "Python", ".prebuilt", "(no extension)", ".png"]
+        .map(str::to_owned)
+        .to_vec();
     let last = [500, 40, 300, 70, 20, 9];
     let f = Fold::new(&names, &last);
     assert_eq!(f.langs, ["Rust", "Python", "(no extension)", "Other"]);
     let row = f.apply(&last);
     assert_eq!(row, [500, 300, 20, 40 + 70 + 9]);
-    assert_eq!(
-        row.iter().sum::<i64>(),
-        last.iter().sum::<i64>(),
-        "no line is lost"
-    );
+    assert_eq!(row.iter().sum::<i64>(), last.iter().sum::<i64>(), "no line is lost");
     // Languages alone fold nothing.
     let f = Fold::new(&names[..1], &last[..1]);
     assert_eq!(f.langs, ["Rust"]);
@@ -214,10 +190,7 @@ impl<S> Reads<S> {
     }
 
     fn take(&self) -> (usize, usize) {
-        (
-            self.lookups.swap(0, Ordering::Relaxed),
-            self.records.swap(0, Ordering::Relaxed),
-        )
+        (self.lookups.swap(0, Ordering::Relaxed), self.records.swap(0, Ordering::Relaxed))
     }
 }
 
@@ -290,14 +263,9 @@ impl<S: InsightsSource + ?Sized> InsightsSource for Reads<&S> {
 
 /// The chain by oid lookups, one per step: the walk the page must agree with.
 fn chain_by_lookup(src: &dyn InsightsSource) -> Vec<Rank> {
-    let newest = src
-        .len()
-        .checked_sub(1)
-        .map(|i| Rank(u32::try_from(i).unwrap_or(0)));
-    std::iter::successors(newest, |r| {
-        src.parent_ids(*r).first().and_then(|p| src.commit_of(p))
-    })
-    .collect()
+    let newest = src.len().checked_sub(1).map(|i| Rank(u32::try_from(i).unwrap_or(0)));
+    std::iter::successors(newest, |r| src.parent_ids(*r).first().and_then(|p| src.commit_of(p)))
+        .collect()
 }
 
 /// Walking the first-parent chain does no oid index lookup, and reads each record a bounded
@@ -319,19 +287,13 @@ fn the_chain_walk_reads_each_record_a_bounded_number_of_times() {
         let (lookups, records) = src.take();
         assert_eq!(got, want, "the chain at {n} commits");
         assert_eq!(lookups, 0, "oid lookups walking {n} commits");
-        assert!(
-            records <= 3 * n,
-            "{records} record reads walking {n} commits"
-        );
+        assert!(records <= 3 * n, "{records} record reads walking {n} commits");
         // The whole skeleton too: its walk, its marks and its kept positions.
         let sk = Skeleton::build(&src, &filter()).0;
         let (lookups, records) = src.take();
         assert_eq!(sk.len(), want.len());
         assert_eq!(lookups, 0, "oid lookups building over {n} commits");
-        assert!(
-            records <= 4 * n,
-            "{records} record reads building over {n} commits"
-        );
+        assert!(records <= 4 * n, "{records} record reads building over {n} commits");
     }
 }
 
@@ -380,13 +342,7 @@ fn same(a: &Skeleton, b: &Skeleton, what: &str) {
 #[test]
 fn extending_a_saved_state_equals_a_fresh_build() {
     let f = filter();
-    for (a, b) in [
-        (1, 2),
-        (10, 40),
-        (500, 1500),
-        (1500, 1500),
-        (131_000, 131_300),
-    ] {
+    for (a, b) in [(1, 2), (10, 40), (500, 1500), (1500, 1500), (131_000, 131_300)] {
         let recs = history(b);
         let at_b = MemorySource::new(&recs);
         let at_a = MemorySource::new(&recs[..a]);
@@ -410,16 +366,10 @@ fn a_state_off_this_chain_is_refused() {
     let src = MemorySource::new(&recs);
     let (_, mut state) = Skeleton::build(&MemorySource::new(&recs[..100]), &f);
     state.tip = "f".repeat(40);
-    assert!(
-        Skeleton::extend(&src, &f, &state).is_none(),
-        "a foreign tip"
-    );
+    assert!(Skeleton::extend(&src, &f, &state).is_none(), "a foreign tip");
     let (_, mut state) = Skeleton::build(&MemorySource::new(&recs[..100]), &f);
     state.gap = 96;
-    assert!(
-        Skeleton::extend(&src, &f, &state).is_none(),
-        "a gap that does not divide"
-    );
+    assert!(Skeleton::extend(&src, &f, &state).is_none(), "a gap that does not divide");
 }
 
 /// Guard class: the reader of a state file bounds itself by the file. Any prefix or flipped
@@ -450,9 +400,5 @@ fn the_state_key_follows_the_rules_and_the_ignore_files() {
     assert_ne!(base, k("s", &ig(".gitignore", "*.o\n")));
     assert_ne!(base, k("r", &ig(".gitignore", "*.a\n")));
     assert_ne!(base, k("r", &ig("d/.gitignore", "*.o\n")));
-    assert_ne!(
-        k("r", &ig("ab", "c")),
-        k("r", &ig("a", "bc")),
-        "no run-together"
-    );
+    assert_ne!(k("r", &ig("ab", "c")), k("r", &ig("a", "bc")), "no run-together");
 }

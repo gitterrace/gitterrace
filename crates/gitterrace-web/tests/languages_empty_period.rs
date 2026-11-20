@@ -32,9 +32,6 @@ async fn an_empty_period_shows_the_empty_card_and_the_chart() {
     // Every commit of the range list carries its short id: no empty chip.
     let list = all.split("class=\"rlist\"").nth(1).expect("the range list");
     assert!(list.contains("class=\"sha\""), "the list has chips");
-    assert!(
-        !list.contains("class=\"sha\" href=\"\""),
-        "no chip without a target"
-    );
+    assert!(!list.contains("class=\"sha\" href=\"\""), "no chip without a target");
     assert!(!list.contains("></a>"), "no empty chip");
 }

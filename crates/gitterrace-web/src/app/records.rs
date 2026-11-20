@@ -135,12 +135,8 @@ impl App {
     /// page, never data from a corrupt set. The page that met the error was refused by
     /// `Checked::run` already; this runs at the next request.
     fn check_unreadable(&self) -> Result<()> {
-        let bad = self
-            .caches
-            .source
-            .lock()
-            .ok()
-            .and_then(|g| g.as_ref().and_then(|(_, s)| s.failure()));
+        let bad =
+            self.caches.source.lock().ok().and_then(|g| g.as_ref().and_then(|(_, s)| s.failure()));
         let Some(why) = bad else {
             return Ok(());
         };

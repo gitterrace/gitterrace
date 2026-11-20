@@ -21,11 +21,7 @@ pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> 
         tabs: crate::views::stats_tabs(active)
             .primary
             .into_iter()
-            .map(|n| Tab {
-                label: n.label.to_owned(),
-                href: n.href,
-                on: n.on,
-            })
+            .map(|n| Tab { label: n.label.to_owned(), href: n.href, on: n.on })
             .collect(),
         toolbar,
         ..PageHead::new("Insights", tagline)
@@ -45,10 +41,7 @@ pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize, compare: String) -> Pa
         actions: if compare.is_empty() {
             Vec::new()
         } else {
-            vec![Action {
-                label: "Compare",
-                href: compare,
-            }]
+            vec![Action { label: "Compare", href: compare }]
         },
         ..PageHead::new("Branches and tags", Tagline::of(&said))
     }
@@ -56,11 +49,7 @@ pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize, compare: String) -> Pa
 
 /// The head of an insights tab while the history index is built.
 pub(crate) fn waiting_head(tab: &str) -> PageHead {
-    insights_head(
-        tab,
-        Tagline::of("Waiting for the history index."),
-        String::new(),
-    )
+    insights_head(tab, Tagline::of("Waiting for the history index."), String::new())
 }
 
 /// Which view of one file a page shows, for its tab row.
@@ -95,21 +84,14 @@ pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -
             on: on == FileView::History,
         });
     }
-    PageHead {
-        crumbs: crate::views::crumbs(rev, path, true),
-        tabs,
-        ..PageHead::new(path, tagline)
-    }
+    PageHead { crumbs: crate::views::crumbs(rev, path, true), tabs, ..PageHead::new(path, tagline) }
 }
 
 /// A changed file's head on the working tree: its path, linked back to the working tree page.
 pub(crate) fn worktree_file_head(path: &str, tagline: Tagline) -> PageHead {
     PageHead {
         qualifier: "working tree".to_owned(),
-        actions: vec![Action {
-            label: "Working tree",
-            href: fmt::href("/worktree"),
-        }],
+        actions: vec![Action { label: "Working tree", href: fmt::href("/worktree") }],
         ..PageHead::new(path, tagline)
     }
 }

@@ -79,12 +79,7 @@ fn row(f: Field) -> Row {
         Input::Number { min, max } => ("number", *min, *max, Vec::new()),
         Input::Text => ("text", None, None, Vec::new()),
         Input::List => ("list", None, None, Vec::new()),
-        Input::Select(v) => (
-            "select",
-            None,
-            None,
-            v.iter().map(|o| (*o, *o == value)).collect(),
-        ),
+        Input::Select(v) => ("select", None, None, v.iter().map(|o| (*o, *o == value)).collect()),
     };
     Row {
         id: f.id,
@@ -113,10 +108,7 @@ pub(crate) fn sections(loaded: &gitterrace_config::Loaded) -> Vec<Section> {
     for f in gitterrace_config::fields(loaded) {
         match out.last_mut() {
             Some(s) if s.name == f.section => s.rows.push(row(f)),
-            _ => out.push(Section {
-                name: f.section,
-                rows: vec![row(f)],
-            }),
+            _ => out.push(Section { name: f.section, rows: vec![row(f)] }),
         }
     }
     out
@@ -164,11 +156,7 @@ fn settings_head(
         own: true,
         tabs: files
             .into_iter()
-            .map(|c| crate::pagehead::Tab {
-                label: c.label,
-                href: c.target,
-                on: c.on,
-            })
+            .map(|c| crate::pagehead::Tab { label: c.label, href: c.target, on: c.on })
             .collect(),
         toolbar: format!(
             "{}{}",
@@ -234,11 +222,8 @@ pub(crate) async fn page(
             SettingsFile::Config => "config.toml",
             SettingsFile::Actions => "actions.toml",
         };
-        let mut files = vec![Choice::new(
-            "config.toml",
-            "/_settings?f=config",
-            f == SettingsFile::Config,
-        )];
+        let mut files =
+            vec![Choice::new("config.toml", "/_settings?f=config", f == SettingsFile::Config)];
         if actions_on {
             files.push(Choice::new(
                 "actions.toml",
@@ -257,9 +242,7 @@ pub(crate) async fn page(
             file: f.as_str(),
             head: settings_head(files, form_off.is_none(), &path, stamp.is_some()),
             missing: stamp.is_none().then(|| {
-                Empty::new(format!(
-                    "No {file_name} yet: every setting is at its default."
-                ))
+                Empty::new(format!("No {file_name} yet: every setting is at its default."))
             }),
             stamp: gitterrace_config::Stamp::tag(stamp),
             text,
@@ -274,8 +257,7 @@ pub(crate) async fn page(
     match r {
         Ok(Ok(html)) => {
             let mut res = Html(html).into_response();
-            res.headers_mut()
-                .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+            res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
             res
         }
         _ => crate::error::not_found("The settings page could not be built."),

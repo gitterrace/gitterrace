@@ -16,11 +16,7 @@ async fn limits_search_file_lines_caps_lines_per_file() {
             .map(str::to_owned)
     };
     let (_, all) = get(&router(&p, Config::default()), "/search?q=needle").await;
-    assert_eq!(
-        mid(&all).as_deref(),
-        Some("100"),
-        "the default keeps 100 of 450"
-    );
+    assert_eq!(mid(&all).as_deref(), Some("100"), "the default keeps 100 of 450");
     let capped = with(|c| c.limits.search_file_lines = 3);
     let (_, few) = get(&router(&p, capped), "/search?q=needle").await;
     assert_eq!(mid(&few).as_deref(), Some("3"));
@@ -43,11 +39,7 @@ async fn limits_blob_lines_cuts_the_file_page() {
     let p = repo(dir.path(), "r");
     let (_, all) = get(&router(&p, Config::default()), "/blob/HEAD/mid.txt").await;
     assert!(!all.contains("Truncated after"));
-    let (_, cut) = get(
-        &router(&p, with(|c| c.limits.blob_lines = 10)),
-        "/blob/HEAD/mid.txt",
-    )
-    .await;
+    let (_, cut) = get(&router(&p, with(|c| c.limits.blob_lines = 10)), "/blob/HEAD/mid.txt").await;
     assert!(cut.contains("Truncated after 10 lines."), "{cut}");
     assert!(!cut.contains("id=\"L11\""));
 }
@@ -62,15 +54,8 @@ async fn limits_highlight_kb_shows_larger_text_plain() {
         .to_owned();
     let (_, lit) = get(&router(&p, Config::default()), "/blob/HEAD/a.rs").await;
     assert!(lit.contains("class=\"s-"), "highlighted by default");
-    let (_, plain) = get(
-        &router(&p, with(|c| c.limits.highlight_kb = 1)),
-        "/blob/HEAD/a.rs",
-    )
-    .await;
-    assert!(
-        !plain.contains("class=\"s-"),
-        "2.2 KiB over a 1 KiB limit shows plain"
-    );
+    let (_, plain) = get(&router(&p, with(|c| c.limits.highlight_kb = 1)), "/blob/HEAD/a.rs").await;
+    assert!(!plain.contains("class=\"s-"), "2.2 KiB over a 1 KiB limit shows plain");
 }
 
 #[tokio::test]
@@ -78,20 +63,10 @@ async fn limits_log_pages_clamps_the_page_number() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let (_, far) = get(&router(&p, Config::default()), "/log/HEAD?page=5").await;
-    assert!(
-        !far.contains("fix: second"),
-        "page 5 of a 2-commit log is empty"
-    );
-    let (_, clamped) = get(
-        &router(&p, with(|c| c.limits.log_pages = 1)),
-        "/log/HEAD?page=5",
-    )
-    .await;
+    assert!(!far.contains("fix: second"), "page 5 of a 2-commit log is empty");
+    let (_, clamped) = get(&router(&p, with(|c| c.limits.log_pages = 1)), "/log/HEAD?page=5").await;
     let (_, page1) = get(&router(&p, Config::default()), "/log/HEAD?page=1").await;
-    assert_eq!(
-        clamped.contains("fix: second"),
-        page1.contains("fix: second")
-    );
+    assert_eq!(clamped.contains("fix: second"), page1.contains("fix: second"));
     assert_ne!(far, clamped, "the clamp moved page 5 to page 1");
 }
 
@@ -107,19 +82,9 @@ async fn limits_preview_mb_stops_reading_media_facts() {
     std::fs::write(root.join("a.png"), &png).expect("write");
     let p = f.commit("feat: image").path().to_owned();
     let (_, facts) = get(&router(&p, Config::default()), "/blob/HEAD/a.png").await;
-    assert!(
-        facts.contains("7 × 5") || facts.contains("7×5") || facts.contains("7 x 5"),
-        "{facts}"
-    );
-    let (_, none) = get(
-        &router(&p, with(|c| c.limits.preview_mb = 1)),
-        "/blob/HEAD/a.png",
-    )
-    .await;
-    assert_ne!(
-        facts, none,
-        "a 1 MiB image over a 1 MB limit shows no pixel size"
-    );
+    assert!(facts.contains("7 × 5") || facts.contains("7×5") || facts.contains("7 x 5"), "{facts}");
+    let (_, none) = get(&router(&p, with(|c| c.limits.preview_mb = 1)), "/blob/HEAD/a.png").await;
+    assert_ne!(facts, none, "a 1 MiB image over a 1 MB limit shows no pixel size");
 }
 
 #[tokio::test]
@@ -130,11 +95,7 @@ async fn limits_worktree_files_reach_the_uncommitted_page() {
         std::fs::write(p.join(format!("new{i}.txt")), "x\n").expect("write");
     }
     let (_, all) = get(&router(&p, Config::default()), "/worktree").await;
-    let (_, one) = get(
-        &router(&p, with(|c| c.limits.worktree_files = 1)),
-        "/worktree",
-    )
-    .await;
+    let (_, one) = get(&router(&p, with(|c| c.limits.worktree_files = 1)), "/worktree").await;
     let n = |b: &str| b.matches("class=\"file\"").count();
     assert_eq!((n(&all), n(&one)), (3, 1));
 }
@@ -208,10 +169,7 @@ async fn an_unknown_binary_names_its_format_size_and_a_download() {
     let p = f.commit("feat: database").path().to_owned();
     let (_, page) = get(&router(&p, Config::default()), "/blob/HEAD/app.data").await;
     assert!(page.contains("SQLite database \u{b7} 4.0 KiB"), "{page}");
-    assert!(
-        page.contains("/raw/HEAD/app.data\" download>Download</a>"),
-        "{page}"
-    );
+    assert!(page.contains("/raw/HEAD/app.data\" download>Download</a>"), "{page}");
 }
 
 #[tokio::test]
@@ -225,10 +183,7 @@ async fn a_folder_offers_a_search_scoped_to_itself() {
         .to_owned();
     let app = router(&p, Config::default());
     let (_, root) = get(&app, "/tree/HEAD").await;
-    assert!(
-        !root.contains(">Search here</a>"),
-        "the root has the header search"
-    );
+    assert!(!root.contains(">Search here</a>"), "the root has the header search");
     let (_, folder) = get(&app, "/tree/HEAD/src/a").await;
     let href = folder
         .split("\">Search here</a>")

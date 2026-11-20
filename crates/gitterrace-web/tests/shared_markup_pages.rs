@@ -25,9 +25,7 @@ fn loose_switches(body: &str) -> Vec<String> {
     let mut page = String::new();
     while let Some(i) = rest.find("<nav") {
         page.push_str(&rest[..i]);
-        rest = rest[i..]
-            .split_once("</nav>")
-            .map_or("", |(_, after)| after);
+        rest = rest[i..].split_once("</nav>").map_or("", |(_, after)| after);
     }
     page.push_str(rest);
     let mut bad = Vec::new();
@@ -64,17 +62,12 @@ fn bad_cards(body: &str) -> Vec<String> {
         let Some(open_end) = card.find('>') else {
             continue;
         };
-        let first = card[open_end + 1..]
-            .trim_start()
-            .split('>')
-            .next()
-            .unwrap_or_default();
+        let first = card[open_end + 1..].trim_start().split('>').next().unwrap_or_default();
         let is_doc = card.contains("class=\"markdown-body") || card.contains("data-md-view");
         let headlike = first.starts_with("<div")
             && first.split("class=\"").nth(1).is_some_and(|c| {
                 let c = c.split('"').next().unwrap_or_default();
-                c.split(' ')
-                    .any(|w| w.ends_with("-h") || w.contains("head") || w == "tabs")
+                c.split(' ').any(|w| w.ends_with("-h") || w.contains("head") || w == "tabs")
             });
         let shared = first.contains("data-dochead");
         if (is_doc && !shared) || card.matches("data-dochead").count() > 1 || (headlike && !shared)
@@ -110,10 +103,8 @@ fn hand_shaped_markup_is_caught() {
 async fn ready_router() -> axum::Router {
     let router = gitterrace_web::app_router(Shared::Docs.path()).expect("router");
     oracle::ready(&router).await;
-    wait::page_until(&router, "/search?q=first&kind=commits", |b| {
-        b.contains("class=\"crow\"")
-    })
-    .await;
+    wait::page_until(&router, "/search?q=first&kind=commits", |b| b.contains("class=\"crow\""))
+        .await;
     router
 }
 
@@ -178,11 +169,7 @@ async fn lists_empty_states_and_switches_render_the_shared_components() {
         if got < want {
             fails.push(format!("{p}: {got} shared controls, want {want}"));
         }
-        fails.extend(
-            loose_switches(&body)
-                .into_iter()
-                .map(|b| format!("{p}: {b}")),
-        );
+        fails.extend(loose_switches(&body).into_iter().map(|b| format!("{p}: {b}")));
     }
 
     assert!(fails.is_empty(), "{}", fails.join("\n"));

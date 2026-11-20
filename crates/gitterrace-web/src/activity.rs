@@ -23,14 +23,7 @@ fn delta(now: u64, before: Option<u64>) -> (String, &'static str) {
         return (String::new(), "");
     };
     if b == 0 {
-        return (
-            if now == 0 {
-                String::new()
-            } else {
-                "new".to_owned()
-            },
-            "up",
-        );
+        return (if now == 0 { String::new() } else { "new".to_owned() }, "up");
     }
     let pct = (now as f64 - b as f64) / b as f64 * 100.0;
     (format!("{pct:+.0}%"), if pct >= 0.0 { "up" } else { "dn" })
@@ -41,15 +34,8 @@ const COMMITS: &str = "Commits without merges";
 /// The same total with the merges option on.
 const COMMITS_WITH_MERGES: &str = "Commits";
 
-const WEEKDAYS: [&str; 7] = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday",
-];
+const WEEKDAYS: [&str; 7] =
+    ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 struct PulseRow {
     label: &'static str,
@@ -152,11 +138,8 @@ fn span_text(from: Option<i64>, to: i64, days: Option<i64>) -> String {
 
 /// The weekday split of the narrowed range.
 fn range_card(from: &str, to: &str, by_weekday: &[u32; 7]) -> RangeCard {
-    let days: Vec<(String, u64)> = WEEKDAYS
-        .iter()
-        .zip(by_weekday)
-        .map(|(n, v)| ((*n).to_owned(), u64::from(*v)))
-        .collect();
+    let days: Vec<(String, u64)> =
+        WEEKDAYS.iter().zip(by_weekday).map(|(n, v)| ((*n).to_owned(), u64::from(*v))).collect();
     RangeCard {
         title: format!("{from} to {to}"),
         total: fmt::count(
@@ -207,16 +190,8 @@ fn pulse_rows(now: &PeriodStats, prev: Option<&PeriodStats>, merges: bool) -> Ve
     };
     vec![
         row(commits, now.commits as u64, prev.map(|p| p.commits as u64)),
-        row(
-            "Authors",
-            now.authors as u64,
-            prev.map(|p| p.authors as u64),
-        ),
-        row(
-            "Files changed",
-            now.files as u64,
-            prev.map(|p| p.files as u64),
-        ),
+        row("Authors", now.authors as u64, prev.map(|p| p.authors as u64)),
+        row("Files changed", now.files as u64, prev.map(|p| p.files as u64)),
         row("Lines added", now.additions, prev.map(|p| p.additions)),
         row("Lines removed", now.deletions, prev.map(|p| p.deletions)),
     ]
@@ -247,9 +222,8 @@ pub(crate) async fn page(
         let plain = scope_of(&q, &d, period, None);
         let plain_set = crate::insights::counted(&ins, &plain, r);
         let plain_fold = sel.map(|_| plain_set.activity_fold());
-        let (sec_set, sec_fold) = plain_fold
-            .as_ref()
-            .map_or((&counted, &fold), |f| (&plain_set, f));
+        let (sec_set, sec_fold) =
+            plain_fold.as_ref().map_or((&counted, &fold), |f| (&plain_set, f));
         let (s, rhythm) = (&fold.summary, &fold.rhythm);
         let prev = s.previous.as_ref();
         let rows = pulse_rows(&s.current, prev, scope.options().include_merges);
@@ -260,11 +234,8 @@ pub(crate) async fn page(
         );
         let span_days = sel.map_or_else(|| period.days(), |(a, b)| Some(b - a + 1));
         let span = span_text(s.from, s.to, span_days);
-        let series: Vec<_> = rhythm
-            .series
-            .iter()
-            .map(|p| (p.label.clone(), u64::from(p.commits)))
-            .collect();
+        let series: Vec<_> =
+            rhythm.series.iter().map(|p| (p.label.clone(), u64::from(p.commits))).collect();
         let links: Vec<String> = rhythm
             .series
             .iter()

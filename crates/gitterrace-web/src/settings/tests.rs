@@ -12,9 +12,7 @@ use crate::app::Env;
 
 pub(super) fn repo(root: &Path) -> PathBuf {
     let p = root.join("r");
-    let built = gitterrace_testkit::Fixture::init(&p)
-        .write("a.txt", "a\n")
-        .commit("one");
+    let built = gitterrace_testkit::Fixture::init(&p).write("a.txt", "a\n").commit("one");
     built.path().to_path_buf()
 }
 
@@ -24,9 +22,7 @@ fn server(root: &Path, dir: &Path, public: bool) -> axum::Router {
     cfg.server.is_public = public;
     let mut env = Env::new(cfg);
     env.settings_dir = Some(dir.to_path_buf());
-    crate::build_server(vec![repo(root)], None, None, &env, None, None)
-        .expect("router")
-        .0
+    crate::build_server(vec![repo(root)], None, None, &env, None, None).expect("router").0
 }
 
 struct Req<'a> {
@@ -46,10 +42,7 @@ impl<'a> Req<'a> {
             body: String::new(),
             token,
             site: Some("same-origin"),
-            origin: Some(format!(
-                "http://{}",
-                gitterrace_testkit::on_port("localhost")
-            )),
+            origin: Some(format!("http://{}", gitterrace_testkit::on_port("localhost"))),
         }
     }
 }
@@ -69,11 +62,7 @@ async fn send(r: &axum::Router, q: Req<'_>) -> (u16, String) {
     if let Some(t) = q.token {
         b = b.header("x-gitterrace-token", t);
     }
-    let res = r
-        .clone()
-        .oneshot(b.body(Body::from(q.body)).expect("req"))
-        .await
-        .expect("res");
+    let res = r.clone().oneshot(b.body(Body::from(q.body)).expect("req")).await.expect("res");
     let s = res.status().as_u16();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
     (s, String::from_utf8_lossy(&bytes).into_owned())
@@ -86,10 +75,7 @@ fn token_of(_built: &axum::Router) -> String {
 
 #[tokio::test]
 async fn settings_routes_are_absent_under_public() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     std::fs::write(dir.path().join("config.toml"), "").expect("w");
     let app = server(root.path(), dir.path(), true);
     for (m, uri) in [
@@ -98,15 +84,9 @@ async fn settings_routes_are_absent_under_public() {
         ("POST", "/_settings/check"),
     ] {
         let (s, _) = send(&app, Req::new(m, uri, Some("x"))).await;
-        assert!(
-            s == 404 || s == 405,
-            "{m} {uri} answered {s} on a public server"
-        );
+        assert!(s == 404 || s == 405, "{m} {uri} answered {s} on a public server");
     }
-    assert_eq!(
-        std::fs::read(dir.path().join("config.toml")).expect("r"),
-        b""
-    );
+    assert_eq!(std::fs::read(dir.path().join("config.toml")).expect("r"), b"");
 }
 
 #[tokio::test]
@@ -128,10 +108,7 @@ async fn absent_in_export_and_without_a_config_folder() {
 
 #[tokio::test]
 async fn cross_site_or_tokenless_put_is_refused_and_file_unchanged() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let file = dir.path().join("config.toml");
     std::fs::write(&file, "# mine\n").expect("w");
     let app = server(root.path(), dir.path(), false);
@@ -145,12 +122,7 @@ async fn cross_site_or_tokenless_put_is_refused_and_file_unchanged() {
         ("wrong token", Some("nope"), Some("same-origin"), None),
         ("cross-site", Some(token.as_str()), Some("cross-site"), None),
         ("no fetch metadata", Some(token.as_str()), None, None),
-        (
-            "foreign origin",
-            Some(token.as_str()),
-            Some("same-origin"),
-            foreign,
-        ),
+        ("foreign origin", Some(token.as_str()), Some("same-origin"), foreign),
     ] {
         let mut req = Req::new("PUT", "/_settings/file", tok);
         req.body.clone_from(&body);
@@ -160,28 +132,18 @@ async fn cross_site_or_tokenless_put_is_refused_and_file_unchanged() {
         }
         let (s, _) = send(&app, req).await;
         assert_eq!(s, 403, "{why}");
-        assert_eq!(
-            std::fs::read_to_string(&file).expect("r"),
-            "# mine\n",
-            "{why}"
-        );
+        assert_eq!(std::fs::read_to_string(&file).expect("r"), "# mine\n", "{why}");
     }
     let mut ok = Req::new("PUT", "/_settings/file", Some(&token));
     ok.body = body;
     let (status, reply) = send(&app, ok).await;
     assert_eq!(status, 200, "{reply}");
-    assert_eq!(
-        std::fs::read_to_string(&file).expect("r"),
-        "[watch]\nrescan_secs = 50\n"
-    );
+    assert_eq!(std::fs::read_to_string(&file).expect("r"), "[watch]\nrescan_secs = 50\n");
 }
 
 #[tokio::test]
 async fn the_request_cannot_name_a_path() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = server(root.path(), dir.path(), false);
     let token = token_of(&app);
     for f in ["../config", "/etc/passwd", "config.toml", "Config", ""] {
@@ -197,19 +159,13 @@ async fn the_request_cannot_name_a_path() {
     req.body = serde_json::json!({ "f": "config", "path": "/tmp/x", "text": "", "stamp": "none" })
         .to_string();
     let (s, _) = send(&app, req).await;
-    assert_eq!(
-        s, 200,
-        "an unknown field is ignored, the target stays config.toml"
-    );
+    assert_eq!(s, 200, "an unknown field is ignored, the target stays config.toml");
     assert!(dir.path().join("config.toml").exists());
 }
 
 #[tokio::test]
 async fn put_reports_restart_keys() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = server(root.path(), dir.path(), false);
     let token = token_of(&app);
     let mut req = Req::new("PUT", "/_settings/file", Some(&token));
@@ -231,21 +187,14 @@ async fn put_reports_restart_keys() {
 
 #[tokio::test]
 async fn a_stale_or_invalid_save_leaves_the_file() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let file = dir.path().join("config.toml");
     std::fs::write(&file, "# mine\n").expect("w");
     let app = server(root.path(), dir.path(), false);
     let token = token_of(&app);
     let mut req = Req::new("PUT", "/_settings/file", Some(&token));
     req.body = serde_json::json!({ "f": "config", "text": "", "stamp": "none" }).to_string();
-    assert_eq!(
-        send(&app, req).await.0,
-        409,
-        "the file exists, so `none` is stale"
-    );
+    assert_eq!(send(&app, req).await.0, 409, "the file exists, so `none` is stale");
     let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
     let mut req = Req::new("PUT", "/_settings/file", Some(&token));
     req.body =
@@ -271,10 +220,7 @@ async fn form_and_plain_saves_produce_the_same_file() {
         "# my settings\n[watch]\n# fast\nrescan_secs = 50\n\n[display]\ntheme = \"dark\"\n";
     let mut files = Vec::new();
     for how in ["form", "plain"] {
-        let (root, dir) = (
-            tempfile::tempdir().expect("t"),
-            tempfile::tempdir().expect("t"),
-        );
+        let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
         let file = dir.path().join("config.toml");
         std::fs::write(&file, START).expect("w");
         let app = server(root.path(), dir.path(), false);
@@ -305,27 +251,17 @@ async fn form_and_plain_saves_produce_the_same_file() {
     }
     assert_eq!(files[0], files[1], "form and plain wrote different files");
     let text = String::from_utf8_lossy(&files[0]);
-    assert!(
-        text.starts_with("# my settings\n[watch]\n# fast\nrescan_secs = 75\n"),
-        "{text}"
-    );
+    assert!(text.starts_with("# my settings\n[watch]\n# fast\nrescan_secs = 75\n"), "{text}");
     assert!(text.contains("theme = \"dark\""), "{text}");
 }
 
 #[tokio::test]
 async fn check_reply_names_the_line() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = server(root.path(), dir.path(), false);
     let token = token_of(&app);
     for (text, line, key) in [
-        (
-            "[watch]\nenabled = true\nrescan_secs = 3\n",
-            3,
-            Some("watch.rescan_secs"),
-        ),
+        ("[watch]\nenabled = true\nrescan_secs = 3\n", 3, Some("watch.rescan_secs")),
         ("[watch]\nenabled = true\n[display\n", 3, None),
         ("\n\n[server]\naddr = 4\n", 4, Some("server.addr")),
     ] {
@@ -338,43 +274,26 @@ async fn check_reply_names_the_line() {
         assert_eq!(v["errors"][0]["line"], line, "{text:?}: {reply}");
         assert_eq!(v["errors"][0]["key"].as_str(), key, "{text:?}");
     }
-    assert!(
-        !dir.path().join("config.toml").exists(),
-        "a check writes nothing"
-    );
+    assert!(!dir.path().join("config.toml").exists(), "a check writes nothing");
 }
 
 #[tokio::test]
 async fn the_page_renders_the_schema_and_carries_its_token() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
-    std::fs::write(
-        dir.path().join("config.toml"),
-        "[watch]\nrescan_secs = 50\n",
-    )
-    .expect("w");
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
+    std::fs::write(dir.path().join("config.toml"), "[watch]\nrescan_secs = 50\n").expect("w");
     let app = server(root.path(), dir.path(), false);
     let (s, html) = page(&app, "/_settings").await;
     assert_eq!(s, 200, "{html}");
     let token = token_of(&app);
     assert!(html.contains(&format!("name=\"gitterrace-settings\" content=\"{token}\"")));
     for k in gitterrace_config::keys() {
-        assert!(
-            html.contains(&format!("data-id=\"{}\"", k.id)),
-            "{} has no row",
-            k.id
-        );
+        assert!(html.contains(&format!("data-id=\"{}\"", k.id)), "{} has no row", k.id);
     }
     assert!(html.contains("value=\"50\""), "the file's value is shown");
     assert!(!html.contains("style=\""), "no inline style");
     let (s, overview) = page(&app, "/r/r/").await;
     assert_eq!(s, 200);
-    assert!(
-        overview.contains("name=\"gt-settings\""),
-        "the menu entry is offered"
-    );
+    assert!(overview.contains("name=\"gt-settings\""), "the menu entry is offered");
     assert!(!overview.contains("settingsbtn"), "no second header entry");
     for uri in ["/r/r/", "/r/r/log/HEAD", "/r/r/tree/HEAD/"] {
         let (s, body) = page(&app, uri).await;
@@ -385,10 +304,7 @@ async fn the_page_renders_the_schema_and_carries_its_token() {
             "{uri}: a header destination appears twice with settings on"
         );
     }
-    assert!(
-        !overview.contains(&token),
-        "only the settings page carries its token"
-    );
+    assert!(!overview.contains(&token), "only the settings page carries its token");
 }
 
 #[tokio::test]
@@ -398,25 +314,16 @@ async fn without_the_routes_no_page_offers_settings() {
     let (s, overview) = page(&app, "/r/r/").await;
     assert_eq!(s, 200);
     assert!(!overview.contains("settingsbtn") && !overview.contains("gt-settings"));
-    let (root2, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root2, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let public = server(root2.path(), dir.path(), true);
     let (s, overview) = page(&public, "/r/r/").await;
     assert_eq!(s, 200);
-    assert!(
-        !overview.contains("settingsbtn"),
-        "a public server offers no settings"
-    );
+    assert!(!overview.contains("settingsbtn"), "a public server offers no settings");
 }
 
 #[tokio::test]
 async fn restart_keys_name_only_what_the_edit_changes() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     // The running server was started on another address by a flag; the file never names it.
     let mut cfg = gitterrace_config::Config::default();
     cfg.server.addr = "127.0.0.1:9".to_owned();
@@ -455,9 +362,7 @@ fn with_actions(root: &Path, dir: &Path, text: &str) -> axum::Router {
     }
     let mut env = Env::new(gitterrace_config::Config::default());
     env.settings_dir = Some(dir.to_path_buf());
-    crate::build_server(vec![repo(root)], None, Some(&file), &env, None, None)
-        .expect("router")
-        .0
+    crate::build_server(vec![repo(root)], None, Some(&file), &env, None, None).expect("router").0
 }
 
 #[tokio::test]
@@ -467,19 +372,13 @@ async fn an_actions_form_edit_keeps_comments_and_is_checked() {
          kinds = [\"file\"]\ncommand = [{}]\n",
         any_program()
     );
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = with_actions(root.path(), dir.path(), &file_text);
     let token = token_of(&app);
     let file = dir.path().join("actions.toml");
     let (status, html) = page(&app, "/_settings?f=actions").await;
     assert_eq!(status, 200, "{html}");
-    assert!(
-        html.contains("data-id=\"action.0.label\""),
-        "the row's fields show"
-    );
+    assert!(html.contains("data-id=\"action.0.label\""), "the row's fields show");
     let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
     let mut req = Req::new("PUT", "/_settings/file", Some(&token));
     req.body = serde_json::json!({
@@ -521,22 +420,13 @@ async fn a_vars_edit_saves_and_the_loader_reads_it() {
          [action.vars]\nold = \"1\"\n",
         any_program()
     );
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = with_actions(root.path(), dir.path(), &file_text);
     let token = token_of(&app);
     let file = dir.path().join("actions.toml");
     let (_, html) = page(&app, "/_settings?f=actions").await;
-    assert!(
-        html.contains("data-kind=\"kv\""),
-        "vars render as a kv field"
-    );
-    assert!(
-        html.contains("old = 1"),
-        "the sub-table reads back into the field"
-    );
+    assert!(html.contains("data-kind=\"kv\""), "vars render as a kv field");
+    assert!(html.contains("old = 1"), "the sub-table reads back into the field");
     let put = |input: &str| {
         let stamp = gitterrace_config::Stamp::tag(gitterrace_config::Stamp::of(&file).expect("s"));
         let mut req = Req::new("PUT", "/_settings/file", Some(&token));
@@ -554,10 +444,7 @@ async fn a_vars_edit_saves_and_the_loader_reads_it() {
     assert!(saved.contains("# mine"), "{saved}");
     let cfg = gitterrace_actions::Config::load(&file, &[]).expect("loads");
     let vars = &cfg.get("e").expect("e").vars;
-    assert_eq!(
-        vars.get("new").map(String::as_str),
-        Some("say \"hi\" \\ ok")
-    );
+    assert_eq!(vars.get("new").map(String::as_str), Some("say \"hi\" \\ ok"));
     assert_eq!(vars.get("old").map(String::as_str), Some("1"));
     let (status, reply) = send(&app, put("Bad-Name = x")).await;
     assert_eq!(status, 422, "{reply}");
@@ -566,10 +453,7 @@ async fn a_vars_edit_saves_and_the_loader_reads_it() {
 
 #[tokio::test]
 async fn each_field_links_to_its_error_and_the_page_has_an_alert_summary() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = server(root.path(), dir.path(), false);
     let (_, html) = page(&app, "/_settings").await;
     let fields = html.matches("id=\"f-").count();

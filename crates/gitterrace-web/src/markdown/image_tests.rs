@@ -4,11 +4,7 @@
 use crate::markdown::{Base, image_url, render_with, rewrite_url};
 
 fn base() -> Base {
-    Base {
-        rev: "r".into(),
-        dir: String::new(),
-        highlight_bytes: crate::highlight::HIGHLIGHT_BYTES,
-    }
+    Base { rev: "r".into(), dir: String::new(), highlight_bytes: crate::highlight::HIGHLIGHT_BYTES }
 }
 
 #[test]
@@ -19,10 +15,7 @@ fn relative_images_go_to_raw() {
     );
     assert!(out.contains("src=\"/raw/abc123/docs/img/l.svg\""));
     assert!(out.contains("src=\"/raw/abc123/p.png\""));
-    assert_eq!(
-        rewrite_url(&base(), "https://x/y.png", true),
-        "https://x/y.png"
-    );
+    assert_eq!(rewrite_url(&base(), "https://x/y.png", true), "https://x/y.png");
 }
 
 #[test]

@@ -83,9 +83,7 @@ impl InsightsQuery {
     }
 
     pub(crate) fn metric(&self) -> Metric {
-        self.metric
-            .as_deref()
-            .map_or(Metric::Commits, Metric::parse)
+        self.metric.as_deref().map_or(Metric::Commits, Metric::parse)
     }
 
     pub(crate) fn options(&self, d: &Defaults) -> Options {
@@ -122,11 +120,8 @@ impl InsightsQuery {
     /// Link to `base` with the current filters and options, `key` replaced by `value`
     /// (`None` removes it).
     fn link(&self, d: &Defaults, base: &str, key: &'static str, value: Option<&str>) -> String {
-        let mut extra: Vec<(&str, String)> = self
-            .pairs(d)
-            .into_iter()
-            .filter(|(k, _)| *k != key)
-            .collect();
+        let mut extra: Vec<(&str, String)> =
+            self.pairs(d).into_iter().filter(|(k, _)| *k != key).collect();
         if let Some(v) = value {
             extra.push((key, v.to_owned()));
         }
@@ -152,12 +147,7 @@ impl InsightsQuery {
         // The link that flips an option: the opposite value, or none when that is the default.
         let flip = |key: &'static str, now: bool, default: bool| {
             let to = !now;
-            self.link(
-                d,
-                base,
-                key,
-                (to != default).then_some(if to { "1" } else { "0" }),
-            )
+            self.link(d, base, key, (to != default).then_some(if to { "1" } else { "0" }))
         };
         let mut row = vec![
             OptLink::new(
@@ -218,12 +208,7 @@ pub(crate) struct OptLink {
 
 impl OptLink {
     fn new(label: &'static str, on: bool, yes: &str, no: &str, href: String) -> Self {
-        Self {
-            label,
-            state: (if on { yes } else { no }).to_owned(),
-            href,
-            on,
-        }
+        Self { label, state: (if on { yes } else { no }).to_owned(), href, on }
     }
 }
 
@@ -242,16 +227,8 @@ pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
     // The full record set of the tip is what every unfiltered page reads: its derived tables
     // (path filter decisions, rename-followed touches, per-commit lines) are built once per
     // tip, index generation and options, not once per page. Filtered sets stay per request.
-    let full = a
-        .source(&head)
-        .ok()
-        .flatten()
-        .is_some_and(|tip| tip.holds(src));
-    if full {
-        shared_at(a, src, &head, o)
-    } else {
-        Insights::from_source(&**src, o, ignore(a))
-    }
+    let full = a.source(&head).ok().flatten().is_some_and(|tip| tip.holds(src));
+    if full { shared_at(a, src, &head, o) } else { Insights::from_source(&**src, o, ignore(a)) }
 }
 
 /// The shared tables of the full set of `head`, see [`insights`].
@@ -349,9 +326,7 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
         // The warm-up holds the key and may take minutes on a large history: the visitor gets
         // the page that fills in once ready rather than waiting on it.
         Err(_) if app.state() == crate::app::RepoState::Warming => {
-            return Ok(Html(
-                blocking(app, move |a| crate::routes::pending(a, tab)).await?,
-            ));
+            return Ok(Html(blocking(app, move |a| crate::routes::pending(a, tab)).await?));
         }
         Err(_) => claim.hold().await,
     };
@@ -359,8 +334,7 @@ pub(crate) async fn cached_keyed<T: askama::Template + Send + 'static>(
         return Ok(Html(h));
     }
     #[cfg(test)]
-    app.renders
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    app.renders.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let (html, served) = with_records(app, tab, build).await?;
     if served {
         app.memo_put(key, &html.0);
@@ -427,11 +401,7 @@ pub(crate) async fn contributors(
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
 ) -> Result<Html<String>> {
-    let all = raw
-        .as_deref()
-        .unwrap_or_default()
-        .split('&')
-        .any(|p| p == "all=1");
+    let all = raw.as_deref().unwrap_or_default().split('&').any(|p| p == "all=1");
     cached(&app, "co", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
@@ -450,10 +420,7 @@ pub(crate) async fn contributors(
         let more = (!all && total > PEOPLE_SHOWN).then(|| {
             (
                 q.link(&d, "/stats/contributors", "all", Some("1")),
-                format!(
-                    "Show all {}",
-                    fmt::count(total, "contributor", "contributors")
-                ),
+                format!("Show all {}", fmt::count(total, "contributor", "contributors")),
             )
         });
         let shown_rows = shown.len().min(if all { usize::MAX } else { PEOPLE_SHOWN });
@@ -489,10 +456,8 @@ pub(crate) async fn contributors(
                 }
             })
             .collect();
-        let (add, del): (u64, u64) = report
-            .contributors
-            .iter()
-            .fold((0, 0), |t, p| (t.0 + p.additions, t.1 + p.deletions));
+        let (add, del): (u64, u64) =
+            report.contributors.iter().fold((0, 0), |t, p| (t.0 + p.additions, t.1 + p.deletions));
         ContributorsPage {
             unit: report.unit.noun(),
             c,

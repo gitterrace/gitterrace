@@ -121,10 +121,8 @@ pub(crate) async fn keep_index_fresh(app: Arc<App>) {
             continue;
         };
         watcher = Some(w);
-        let mut kinds = seen
-            .filter(|b| *b != now)
-            .map(|before| now.changed_since(&before))
-            .unwrap_or_default();
+        let mut kinds =
+            seen.filter(|b| *b != now).map(|before| now.changed_since(&before)).unwrap_or_default();
         // A gix status runs only when something may have changed.
         // A tab that just opened the worktree page needs a baseline scan.
         let look =
@@ -175,10 +173,7 @@ async fn parts_off_worker(
 /// Runs [`keep_index_fresh`] and starts it again when it panics, so one bad round does not
 /// leave the repository unwatched for the rest of the process. Spawn this, not the loop.
 pub(crate) async fn keep_index_fresh_supervised(app: Arc<App>) {
-    supervise("index refresher", RESTART_AFTER, || {
-        keep_index_fresh(Arc::clone(&app))
-    })
-    .await;
+    supervise("index refresher", RESTART_AFTER, || keep_index_fresh(Arc::clone(&app))).await;
 }
 
 /// How long a panicked task waits before it runs again, so a loop that panics at once does not
@@ -253,9 +248,7 @@ async fn chip_flip(app: &Arc<App>, seen: &mut Option<bool>) -> Option<bool> {
         return None;
     }
     let a = Arc::clone(app);
-    let now = tokio::task::spawn_blocking(move || gitterrace_git::is_dirty(&a.repo))
-        .await
-        .ok();
+    let now = tokio::task::spawn_blocking(move || gitterrace_git::is_dirty(&a.repo)).await.ok();
     let Some(now) = now else {
         app.wt_scans.fetch_add(1, Ordering::Release);
         return None;
@@ -370,10 +363,6 @@ mod tests {
         gitterrace_testkit::wait::pause(Duration::from_millis(10)).await;
         let at = ticks.load(Ordering::Acquire);
         gitterrace_testkit::wait::pause(Duration::from_millis(40)).await;
-        assert_eq!(
-            ticks.load(Ordering::Acquire),
-            at,
-            "the task outlived its supervisor"
-        );
+        assert_eq!(ticks.load(Ordering::Acquire), at, "the task outlived its supervisor");
     }
 }

@@ -6,10 +6,7 @@ use clap::{Parser, Subcommand};
 
 /// Browse a git repository in your browser, offline.
 #[derive(Parser)]
-#[expect(
-    clippy::struct_excessive_bools,
-    reason = "each bool is its own command line switch"
-)]
+#[expect(clippy::struct_excessive_bools, reason = "each bool is its own command line switch")]
 #[command(version = option_env!("GITTERRACE_VERSION").unwrap_or(env!("CARGO_PKG_VERSION")))]
 pub(crate) struct Cli {
     /// Repositories to serve (any path inside one), or folders to search two levels deep.
@@ -156,10 +153,7 @@ mod tests {
                     bad.push(format!("--{long}: says max"));
                 }
                 // `Overrides `section.key`` in the help names the key the flag sets.
-                for k in keys
-                    .iter()
-                    .filter(|k| help.contains(&format!("`{}`", k.id)))
-                {
+                for k in keys.iter().filter(|k| help.contains(&format!("`{}`", k.id))) {
                     if help.contains("Overrides")
                         && !gitterrace_config::naming::flag_fits(long, k.id)
                     {

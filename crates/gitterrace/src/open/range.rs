@@ -40,11 +40,7 @@ pub(super) fn parse_range(spec: &str) -> anyhow::Result<(String, String, bool)> 
         anyhow::bail!("expected A..B or A...B, got {spec}");
     };
     let side = |s: &str| {
-        if s.is_empty() {
-            "HEAD".to_owned()
-        } else {
-            s.to_owned()
-        }
+        if s.is_empty() { "HEAD".to_owned() } else { s.to_owned() }
     };
     Ok((side(base), side(head), merge))
 }

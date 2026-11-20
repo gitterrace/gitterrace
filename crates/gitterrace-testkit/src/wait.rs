@@ -29,9 +29,7 @@ const HARD_CAP: u32 = 10;
 
 /// The multiplier `TEST_WAIT_SCALE` names, 1 when unset or not a positive whole number.
 fn scale(raw: Option<&str>) -> u32 {
-    raw.and_then(|v| v.trim().parse::<u32>().ok())
-        .filter(|n| *n > 0)
-        .unwrap_or(1)
+    raw.and_then(|v| v.trim().parse::<u32>().ok()).filter(|n| *n > 0).unwrap_or(1)
 }
 
 /// [`DEADLINE`] times `TEST_WAIT_SCALE`: what every hang wait here allows.
@@ -138,10 +136,8 @@ pub fn until_blocking(what: &str, mut cond: impl FnMut() -> bool) {
 /// where nothing reaps orphans it stays so, which is no running process.
 #[must_use]
 pub fn process_state(pid: &str) -> Option<String> {
-    let out = std::process::Command::new("ps")
-        .args(["-o", "stat=", "-p", pid.trim()])
-        .output()
-        .ok()?;
+    let out =
+        std::process::Command::new("ps").args(["-o", "stat=", "-p", pid.trim()]).output().ok()?;
     let stat = String::from_utf8_lossy(&out.stdout).trim().to_owned();
     (out.status.success() && !stat.is_empty()).then_some(stat)
 }
@@ -218,17 +214,13 @@ mod tests {
     /// Guard class: a stuck wait that passes silently or fails without saying where it stood.
     #[tokio::test]
     async fn a_stuck_wait_fails_with_its_last_state() {
-        let stuck = tokio::spawn(until_moving(
-            Duration::from_millis(100),
-            "the build",
-            || async { (false, "done 0/2") },
-        ));
+        let stuck = tokio::spawn(until_moving(Duration::from_millis(100), "the build", || async {
+            (false, "done 0/2")
+        }));
         let err = stuck.await.expect_err("a stuck wait must panic");
         assert!(err.is_panic());
         let payload = err.into_panic();
-        let msg = payload
-            .downcast_ref::<String>()
-            .expect("a formatted message");
+        let msg = payload.downcast_ref::<String>().expect("a formatted message");
         assert!(msg.contains("the build"), "{msg}");
         assert!(msg.contains("done 0/2"), "{msg}");
     }
@@ -236,10 +228,7 @@ mod tests {
     #[test]
     fn the_scale_is_a_positive_whole_number_or_one() {
         let at = |v| scale(Some(v));
-        assert_eq!(
-            [at("3"), at(" 2 "), at("0"), at("x"), at("-1")],
-            [3, 2, 1, 1, 1]
-        );
+        assert_eq!([at("3"), at(" 2 "), at("0"), at("x"), at("-1")], [3, 2, 1, 1, 1]);
         assert_eq!(scale(None), 1);
     }
 

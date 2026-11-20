@@ -29,9 +29,7 @@ fn doc(next: &str, body: &str) -> String {
         format!("<nav class=\"pager\"><a class=\"next\" href=\"/{next}\" rel=\"next\">N</a></nav>")
     };
     let menus = "<div class=\"menus\"><details><a href=\"/docs/a/\">A</a></details></div>\n";
-    page(&format!(
-        "{menus}<h1>T</h1><h2>S</h2><p>{body}</p>{pager}{list}"
-    ))
+    page(&format!("{menus}<h1>T</h1><h2>S</h2><p>{body}</p>{pager}{list}"))
 }
 
 fn site() -> (BTreeMap<String, String>, Facts<'static>) {
@@ -41,14 +39,8 @@ fn site() -> (BTreeMap<String, String>, Facts<'static>) {
         words(70)
     ));
     pages.insert("docs/index.html".to_owned(), index);
-    pages.insert(
-        "docs/a/index.html".to_owned(),
-        doc("docs/b/", &format!("alpha {}", words(70))),
-    );
-    pages.insert(
-        "docs/b/index.html".to_owned(),
-        doc("", &format!("beta {}", words(70))),
-    );
+    pages.insert("docs/a/index.html".to_owned(), doc("docs/b/", &format!("alpha {}", words(70))));
+    pages.insert("docs/b/index.html".to_owned(), doc("", &format!("beta {}", words(70))));
     pages.insert("404.html".to_owned(), page("<h1>Not found</h1>"));
     let facts = Facts {
         repo: REPO,
@@ -88,10 +80,7 @@ fn guard_1_a_link_to_the_markdown_of_a_published_page_is_red() {
         );
         edit_page(p, "docs/a/index.html", "<h2>S</h2>", &links);
     });
-    assert!(
-        bad.contains("blob/main/docs/b.md#x links the markdown"),
-        "{bad}"
-    );
+    assert!(bad.contains("blob/main/docs/b.md#x links the markdown"), "{bad}");
     assert_eq!(bad.matches("links the markdown").count(), 1, "{bad}");
 }
 
@@ -121,20 +110,14 @@ fn guard_3b_a_landing_sentence_said_twice_or_elsewhere_is_red() {
     });
     assert!(twice.contains("index.html: says twice"), "{twice}");
     let elsewhere = plant(|p| {
-        let html = page(&format!(
-            "<h1>Home</h1><h2>S</h2><p>{}. {line}</p>",
-            words(70)
-        ));
+        let html = page(&format!("<h1>Home</h1><h2>S</h2><p>{}. {line}</p>", words(70)));
         p.insert("index.html".to_owned(), html);
         let b = format!("<h2>S</h2><p>Some lead in. {line} And more.</p>");
         edit_page(p, "docs/b/index.html", "<h2>S</h2>", &b);
     });
     assert!(elsewhere.contains("another page also says"), "{elsewhere}");
     let once = plant(|p| {
-        let html = page(&format!(
-            "<h1>Home</h1><h2>S</h2><p>{}. {line}</p>",
-            words(70)
-        ));
+        let html = page(&format!("<h1>Home</h1><h2>S</h2><p>{}. {line}</p>", words(70)));
         p.insert("index.html".to_owned(), html);
     });
     assert!(!once.contains("index.html:"), "{once}");
@@ -144,10 +127,7 @@ fn guard_3b_a_landing_sentence_said_twice_or_elsewhere_is_red() {
 fn guard_3_prose_two_pages_carry_is_red_unless_quoted() {
     let shared = "This sentence is long enough to count as prose that two pages repeat.";
     let bad = plant(|p| {
-        let (a, b) = (
-            format!("<h2>S</h2><p>{shared}</p>"),
-            format!("<h2>S</h2><li>{shared}</li>"),
-        );
+        let (a, b) = (format!("<h2>S</h2><p>{shared}</p>"), format!("<h2>S</h2><li>{shared}</li>"));
         edit_page(p, "docs/a/index.html", "<h2>S</h2>", &a);
         edit_page(p, "docs/b/index.html", "<h2>S</h2>", &b);
     });
@@ -174,15 +154,9 @@ fn guard_3_prose_two_pages_carry_is_red_unless_quoted() {
 #[test]
 fn guard_4_a_page_without_text_or_a_section_is_red() {
     let bad = plant(|p| {
-        p.insert(
-            "changelog/index.html".to_owned(),
-            page("<h1>Changelog</h1><p>Nothing yet.</p>"),
-        );
+        p.insert("changelog/index.html".to_owned(), page("<h1>Changelog</h1><p>Nothing yet.</p>"));
     });
-    assert!(
-        bad.contains("changelog/index.html: 3 words and 0 h2"),
-        "{bad}"
-    );
+    assert!(bad.contains("changelog/index.html: 3 words and 0 h2"), "{bad}");
 }
 
 #[test]
@@ -207,10 +181,7 @@ fn guard_7_a_page_without_title_description_or_frame_is_red() {
     });
     assert!(bad.contains("404.html: no title"), "{bad}");
     assert!(bad.contains("404.html: no meta description"), "{bad}");
-    assert!(
-        bad.contains("docs/b/index.html: not exactly one <footer>"),
-        "{bad}"
-    );
+    assert!(bad.contains("docs/b/index.html: not exactly one <footer>"), "{bad}");
 }
 
 #[test]
@@ -223,22 +194,11 @@ fn guard_8_a_page_left_out_of_the_index_the_list_or_the_chain_is_red() {
     let unlinked = plant(|p| {
         edit_page(p, "docs/index.html", "<a href=\"/docs/b/\">B</a>", "");
     });
-    assert!(
-        unlinked.contains("docs/index.html: does not link /docs/b/"),
-        "{unlinked}"
-    );
+    assert!(unlinked.contains("docs/index.html: does not link /docs/b/"), "{unlinked}");
     let unlisted = plant(|p| {
-        edit_page(
-            p,
-            "docs/a/index.html",
-            "<a href=\"/docs/b/\">B</a></nav>",
-            "</nav>",
-        );
+        edit_page(p, "docs/a/index.html", "<a href=\"/docs/b/\">B</a></nav>", "</nav>");
     });
-    assert!(
-        unlisted.contains("docs/a/: the docs list leaves out /docs/b/"),
-        "{unlisted}"
-    );
+    assert!(unlisted.contains("docs/a/: the docs list leaves out /docs/b/"), "{unlisted}");
     let broken = plant(|p| {
         let next = "<a class=\"next\" href=\"/docs/b/\"";
         edit_page(p, "docs/a/index.html", next, "<a class=\"x\"");

@@ -39,10 +39,7 @@ fn mit_license_and_origin_link() {
         Some("git@github.com:owner/proj.git"),
     );
     assert!(line.contains("Source: proj, MIT license, "), "{line}");
-    assert!(
-        line.contains("<a href=\"https://github.com/owner/proj\">"),
-        "{line}"
-    );
+    assert!(line.contains("<a href=\"https://github.com/owner/proj\">"), "{line}");
 }
 
 #[test]
@@ -69,10 +66,7 @@ fn no_remote_and_no_license_gives_a_bare_line() {
 fn unknown_license_links_the_file() {
     let d = tempfile::tempdir().expect("tempdir");
     let line = credit_for(&d.path().join("proj"), Some(("LICENSE.txt", "mine")), None);
-    assert!(
-        line.contains("<a href=\"/blob/HEAD/LICENSE.txt\">license</a>"),
-        "{line}"
-    );
+    assert!(line.contains("<a href=\"/blob/HEAD/LICENSE.txt\">license</a>"), "{line}");
 }
 
 // Windows refuses `<` and `>` in a folder name, so no repository there can be named this way.
@@ -116,19 +110,11 @@ fn oversized_license_is_never_read() {
     let body = format!("{MIT}{}", " ".repeat(super::MAX_LICENSE + 1));
     LICENSE_READS.with(|n| n.set(0));
     let line = credit_for(&d.path().join("big"), Some(("LICENSE", &body)), None);
-    assert_eq!(
-        LICENSE_READS.with(Cell::get),
-        0,
-        "the oversized blob was read"
-    );
+    assert_eq!(LICENSE_READS.with(Cell::get), 0, "the oversized blob was read");
     assert!(!line.contains("MIT"), "{line}");
 
     let small = tempfile::tempdir().expect("tempdir");
     let line = credit_for(&small.path().join("ok"), Some(("LICENSE", MIT)), None);
-    assert_eq!(
-        LICENSE_READS.with(Cell::get),
-        1,
-        "a normal license is read once"
-    );
+    assert_eq!(LICENSE_READS.with(Cell::get), 1, "a normal license is read once");
     assert!(line.contains("MIT"), "{line}");
 }

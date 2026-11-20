@@ -15,17 +15,11 @@ fn served(root: &Path) -> Router {
     let paths = crate::discover_repos(&search, 2, &[]);
     env.search = crate::search_roots(&search, 2, &[]);
     assert_eq!(env.search, search, "the root is searched");
-    crate::build_server(paths, None, None, &env, None, None)
-        .expect("server")
-        .0
+    crate::build_server(paths, None, None, &env, None, None).expect("server").0
 }
 
 fn repo(dir: &Path) -> PathBuf {
-    Fixture::init(dir)
-        .write("a.txt", "a\n")
-        .commit("feat: first")
-        .path()
-        .to_path_buf()
+    Fixture::init(dir).write("a.txt", "a\n").commit("feat: first").path().to_path_buf()
 }
 
 async fn listed(router: &Router) -> Vec<String> {
@@ -46,11 +40,7 @@ async fn awaits(router: &Router, want: &[&str], gone: Option<&str>) {
             return false;
         }
         let (home, _) = get(router, "/").await;
-        let shown = if want.len() == 1 {
-            home == 302
-        } else {
-            home == 200
-        };
+        let shown = if want.len() == 1 { home == 302 } else { home == 200 };
         match gone {
             Some(name) => shown && get(router, &format!("/r/{name}/")).await.0 == 404,
             None => shown,
@@ -75,10 +65,7 @@ async fn a_deleted_repository_folder_leaves_and_a_recreated_one_returns() {
     repo(&root.join("alpha"));
     awaits(&router, &["alpha", "beta"], None).await;
     // A found repository answers 503 until its router is built.
-    wait::until("alpha opens", || async {
-        get(&router, "/r/alpha/").await.0 == 200
-    })
-    .await;
+    wait::until("alpha opens", || async { get(&router, "/r/alpha/").await.0 == 200 }).await;
 }
 
 /// A folder that stays but whose `.git` is removed is no repository any more: it is dropped too.
@@ -106,13 +93,7 @@ fn the_watch_sees_repository_entries_but_not_their_contents() {
     for seen in ["", "alpha", "alpha/.git", "group", "group/new"] {
         assert!(!skip(&root.join(seen), true), "{seen}");
     }
-    for skipped in [
-        "alpha/a.txt",
-        "alpha/.git/HEAD",
-        "alpha/src",
-        "target",
-        "a/b/c/d",
-    ] {
+    for skipped in ["alpha/a.txt", "alpha/.git/HEAD", "alpha/src", "target", "a/b/c/d"] {
         assert!(skip(&root.join(skipped), true), "{skipped}");
     }
     assert!(skip(Path::new("/elsewhere"), true));
@@ -188,9 +169,7 @@ async fn the_home_waits_for_a_page_job_slot() {
     cfg.resources.blocking_jobs = 1;
     let env = crate::app::Env::new(cfg);
     let paths = crate::discover_repos(std::slice::from_ref(&root), 2, &[]);
-    let router = crate::build_server(paths, None, None, &env, None, None)
-        .expect("server")
-        .0;
+    let router = crate::build_server(paths, None, None, &env, None, None).expect("server").0;
     let held = env.job_slot().await.expect("slot");
     let home = tokio::spawn({
         let router = router.clone();

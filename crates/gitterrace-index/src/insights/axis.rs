@@ -29,9 +29,8 @@ const ALL_QUARTERS_MAX: i64 = 5_460;
 pub const MAX_BUCKETS: usize = 400;
 
 const WEEKDAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+const MONTHS: [&str; 12] =
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /// Width of one bucket.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
@@ -107,10 +106,7 @@ pub struct TimeAxis {
 
 impl TimeAxis {
     const fn empty() -> Self {
-        Self {
-            unit: BucketUnit::Day,
-            starts: Vec::new(),
-        }
+        Self { unit: BucketUnit::Day, starts: Vec::new() }
     }
 
     /// The axis for `period` ending on local day `last`. A fixed period starts
@@ -351,18 +347,10 @@ mod tests {
             reference_record(&recs).map(local_day),
             "reference day"
         );
-        for p in [
-            None,
-            Some(Period::Week),
-            Some(Period::Year),
-            Some(Period::All),
-        ] {
+        for p in [None, Some(Period::Week), Some(Period::Year), Some(Period::All)] {
             let want = covering(p, &recs, shown);
             let got = TimeAxis::covering_source(p, &all_src, &shown_src);
-            assert_eq!(
-                got.names().collect::<Vec<_>>(),
-                want.names().collect::<Vec<_>>()
-            );
+            assert_eq!(got.names().collect::<Vec<_>>(), want.names().collect::<Vec<_>>());
             assert_eq!(got.unit(), want.unit());
         }
         let c = all_src.commit(crate::feed::Rank(2));
@@ -388,9 +376,7 @@ mod tests {
             assert!(a.len() <= super::MAX_BUCKETS);
             let mut per = vec![0usize; a.len()];
             for d in first..=last {
-                per[a
-                    .slot_day(d)
-                    .unwrap_or_else(|| panic!("{years}y: day {d} dropped"))] += 1;
+                per[a.slot_day(d).unwrap_or_else(|| panic!("{years}y: day {d} dropped"))] += 1;
             }
             let total: i64 = per.iter().map(|n| i64::try_from(*n).unwrap_or(0)).sum();
             assert_eq!(total, last - first + 1, "{years}y: {:?}", a.unit());

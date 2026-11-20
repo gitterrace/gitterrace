@@ -19,10 +19,7 @@ impl Repo {
         let (b, h) = (self.resolve_id(&repo, base)?, self.resolve_id(&repo, head)?);
         let from = if three_dot {
             let none = || Error::RevNotFound(format!("{base}...{head}"));
-            repo.merge_base(b, h)
-                .map_err(|_| none())?
-                .ok_or_else(none)?
-                .detach()
+            repo.merge_base(b, h).map_err(|_| none())?.ok_or_else(none)?.detach()
         } else {
             b
         };

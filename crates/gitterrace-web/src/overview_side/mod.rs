@@ -99,12 +99,10 @@ pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
     if let Some(h) = a.memo_get(&key) {
         return h;
     }
-    let out = build(a, head, src, dirty, fmt::now())
-        .render()
-        .unwrap_or_else(|e| {
-            tracing::warn!("sidebar not rendered: {e}");
-            String::new()
-        });
+    let out = build(a, head, src, dirty, fmt::now()).render().unwrap_or_else(|e| {
+        tracing::warn!("sidebar not rendered: {e}");
+        String::new()
+    });
     a.memo_put(key, &out);
     out
 }
@@ -167,12 +165,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         spark_tip: format!(
             "{}, oldest first: {}",
             series.label(),
-            series
-                .counts
-                .iter()
-                .map(u32::to_string)
-                .collect::<Vec<_>>()
-                .join(", ")
+            series.counts.iter().map(u32::to_string).collect::<Vec<_>>().join(", ")
         ),
         hot,
         hot_href: crate::features::page_href("hotspots"),
@@ -186,9 +179,7 @@ pub(crate) fn build(a: &App, head: &str, src: &dyn InsightsSource, dirty: bool, 
         refs_href: href("/refs"),
         langs: langs(a, head),
         langs_href: crate::features::page_href("languages"),
-        insights_href: crate::features::insights_home()
-            .map(href)
-            .unwrap_or_default(),
+        insights_href: crate::features::insights_home().map(href).unwrap_or_default(),
     }
 }
 
@@ -236,13 +227,8 @@ pub(crate) fn spark_times(
     until: i64,
 ) -> (Vec<gitterrace_index::feed::CommitRow>, Option<i64>) {
     let window: Vec<_> = src.commits_in(CommitRange::Time(from..until)).collect();
-    let capped = src
-        .commits_in(CommitRange::Time(i64::MIN..from))
-        .next()
-        .is_some();
-    let start = (!capped)
-        .then(|| window.iter().map(|c| c.time).min())
-        .flatten();
+    let capped = src.commits_in(CommitRange::Time(i64::MIN..from)).next().is_some();
+    let start = (!capped).then(|| window.iter().map(|c| c.time).min()).flatten();
     (window, start)
 }
 
@@ -262,11 +248,8 @@ fn line(counts: &[u32]) -> String {
     // A repository under an hour old has one bucket: drawn flat across, not as a dot.
     let one = [counts.first().copied().unwrap_or(0); 2];
     let counts = if counts.len() < 2 { &one[..] } else { counts };
-    let pts: Vec<String> = counts
-        .iter()
-        .enumerate()
-        .map(|(i, &n)| format!("{i},{:.1}", y(n)))
-        .collect();
+    let pts: Vec<String> =
+        counts.iter().enumerate().map(|(i, &n)| format!("{i},{:.1}", y(n))).collect();
     let last = counts.len() - 1;
     format!(
         "<svg class=\"spark s1\" viewBox=\"0 0 {last} {SPARK_H}\" preserveAspectRatio=\"none\" \

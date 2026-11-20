@@ -57,10 +57,7 @@ fn kind_of(name: &str) -> Option<SymbolKind> {
             _ => None,
         })
         .or_else(|| {
-            atoms
-                .iter()
-                .any(|a| matches!(*a, "type" | "typedef"))
-                .then_some(SymbolKind::Type)
+            atoms.iter().any(|a| matches!(*a, "type" | "typedef")).then_some(SymbolKind::Type)
         })
 }
 
@@ -217,17 +214,9 @@ impl Collector {
             last.name.push_str(name);
             return;
         }
-        let kind = if kind == SymbolKind::Function && depth > 0 {
-            SymbolKind::Method
-        } else {
-            kind
-        };
-        self.out.push(Symbol {
-            name: name.to_owned(),
-            line: self.line,
-            depth,
-            kind: Some(kind),
-        });
+        let kind =
+            if kind == SymbolKind::Function && depth > 0 { SymbolKind::Method } else { kind };
+        self.out.push(Symbol { name: name.to_owned(), line: self.line, depth, kind: Some(kind) });
     }
 }
 
@@ -241,10 +230,7 @@ mod tests {
         let cases = [
             ("entity.name.function.c", Some(SymbolKind::Function)),
             ("entity.name.type.class.kotlin", Some(SymbolKind::Class)),
-            (
-                "entity.name.function.preprocessor.c",
-                Some(SymbolKind::Macro),
-            ),
+            ("entity.name.function.preprocessor.c", Some(SymbolKind::Macro)),
             ("entity.name.namespace.header.scala", None),
             ("entity.name.package.kotlin", None),
             ("entity.name.tag.html", None),

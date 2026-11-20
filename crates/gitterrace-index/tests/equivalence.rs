@@ -12,12 +12,8 @@ use gitterrace_testkit::{Adversarial, git};
 fn records(index: &Index, repo: &Path) -> Vec<String> {
     let source = Repo::discover(repo).expect("open");
     index.update(&source, "HEAD", &|_| {}).expect("update");
-    let mut r: Vec<String> = index
-        .records(&source, "HEAD")
-        .expect("records")
-        .iter()
-        .map(|r| format!("{r:?}"))
-        .collect();
+    let mut r: Vec<String> =
+        index.records(&source, "HEAD").expect("records").iter().map(|r| format!("{r:?}")).collect();
     r.sort();
     r
 }
@@ -42,18 +38,11 @@ fn an_unshallowed_clone_indexes_like_a_full_one() {
     let index = Index::open_dir(cache.clone()).expect("index");
     let shallow = records(&index, &adv.shallow);
     let full = fresh(&adv.repo);
-    assert_ne!(
-        shallow, full,
-        "the shallow fixture must differ, or this proves nothing"
-    );
+    assert_ne!(shallow, full, "the shallow fixture must differ, or this proves nothing");
     git(&adv.shallow, &["fetch", "-q", "--unshallow"]);
     let index = Index::open_dir(cache).expect("reopen");
     assert_eq!(records(&index, &adv.shallow), fresh(&adv.shallow));
-    assert_eq!(
-        fresh(&adv.shallow),
-        full,
-        "unshallowed history equals the original"
-    );
+    assert_eq!(fresh(&adv.shallow), full, "unshallowed history equals the original");
 }
 
 /// HEAD~k indexed first, then HEAD in the same cache (an incremental update), equals a
@@ -69,12 +58,7 @@ fn a_two_step_build_answers_like_a_one_step_build() {
     let step = dir.path().join("step");
     git(
         dir.path(),
-        &[
-            "clone",
-            "-q",
-            adv.repo.to_str().expect("utf8"),
-            step.to_str().expect("utf8"),
-        ],
+        &["clone", "-q", adv.repo.to_str().expect("utf8"), step.to_str().expect("utf8")],
     );
     git(&step, &["reset", "-q", "--hard", "HEAD~2"]);
     let index = Index::open_dir(dir.path().join("cache")).expect("index");

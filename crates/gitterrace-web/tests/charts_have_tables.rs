@@ -47,11 +47,10 @@ fn tip_numbers(tip: &str) -> (String, Option<String>) {
         .chars()
         .take_while(|c| c.is_ascii_digit() || *c == ',' || *c == '%' || *c == '<')
         .collect();
-    let total = tip.split(" of ").nth(1).map(|t| {
-        t.chars()
-            .take_while(|c| c.is_ascii_digit() || *c == ',')
-            .collect::<String>()
-    });
+    let total = tip
+        .split(" of ")
+        .nth(1)
+        .map(|t| t.chars().take_while(|c| c.is_ascii_digit() || *c == ',').collect::<String>());
     (lead, total.filter(|t| !t.is_empty()))
 }
 
@@ -75,10 +74,7 @@ fn faults(body: &str) -> Vec<String> {
         .collect();
     let in_figures: usize = figures.iter().map(|f| marks_in(f)).sum();
     if in_figures != charts {
-        out.push(format!(
-            "{} of {charts} charts have no figure with a table",
-            charts - in_figures
-        ));
+        out.push(format!("{} of {charts} charts have no figure with a table", charts - in_figures));
     }
     for f in figures {
         let open = between(f, "<svg class=\"chart", ">")
@@ -115,16 +111,12 @@ fn faults(body: &str) -> Vec<String> {
             let tip = unesc(t.split('"').next().unwrap_or_default());
             let (lead, total) = tip_numbers(&tip);
             if lead.is_empty() || !values.contains(&lead) {
-                out.push(format!(
-                    "{name}: tip value {lead:?} is no table cell: {tip}"
-                ));
+                out.push(format!("{name}: tip value {lead:?} is no table cell: {tip}"));
             }
             if let (Some(total), Some(row)) = (total, &totals)
                 && !row.contains(&total)
             {
-                out.push(format!(
-                    "{name}: tip total {total} is not the table total {row:?}"
-                ));
+                out.push(format!("{name}: tip total {total} is not the table total {row:?}"));
             }
         }
     }
@@ -148,10 +140,8 @@ fn a_planted_chart_without_a_table_is_caught() {
     );
     assert_eq!(faults(good), Vec::<String>::new());
     // A table whose total drifts from the tips is caught too.
-    let drift = good.replace(
-        r#"<td class="r">3</td></tr></tfoot>"#,
-        r#"<td class="r">4</td></tr></tfoot>"#,
-    );
+    let drift = good
+        .replace(r#"<td class="r">3</td></tr></tfoot>"#, r#"<td class="r">4</td></tr></tfoot>"#);
     assert_ne!(faults(&drift), [] as [std::string::String; 0]);
     let summary_less = good.replace("3 commits.</figcaption>", "</figcaption>");
     assert_ne!(faults(&summary_less), [] as [std::string::String; 0]);
@@ -173,10 +163,7 @@ fn tip_numbers_read_value_and_total() {
         tip_numbers("Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"),
         ("40".to_owned(), None)
     );
-    assert_eq!(
-        tip_numbers("May: 42% of changed lines replaced existing code").0,
-        "42%"
-    );
+    assert_eq!(tip_numbers("May: 42% of changed lines replaced existing code").0, "42%");
 }
 
 #[tokio::test]
@@ -201,10 +188,7 @@ async fn every_chart_on_the_insights_pages_has_a_summary_and_a_table() {
         assert_eq!(status, 200, "{p}");
         charts += body.matches("<figure class=\"chart-fig\">").count();
         if p == "/stats" {
-            assert!(
-                body.contains("aria-label=\"Type by scope\""),
-                "no type by scope grid"
-            );
+            assert!(body.contains("aria-label=\"Type by scope\""), "no type by scope grid");
         }
         bad.extend(faults(&body).into_iter().map(|e| format!("{p}: {e}")));
     }

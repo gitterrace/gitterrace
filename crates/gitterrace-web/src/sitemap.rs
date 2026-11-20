@@ -13,11 +13,7 @@ pub struct Page {
 }
 
 const fn page(shown: &'static str, does: &'static str, routes: &'static [&'static str]) -> Page {
-    Page {
-        shown,
-        does,
-        routes,
-    }
+    Page { shown, does, routes }
 }
 
 /// Every route a repository serves, under its `/r/{name}/`, then the ones outside it.

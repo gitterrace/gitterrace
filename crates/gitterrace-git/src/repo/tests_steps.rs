@@ -13,11 +13,7 @@ fn linear(d: &std::path::Path, n: usize) {
     let mut script = String::new();
     for i in 1..=n {
         let t = 1_700_000_000 + i;
-        let from = if i > 1 {
-            format!("from :{}\n", i - 1)
-        } else {
-            String::new()
-        };
+        let from = if i > 1 { format!("from :{}\n", i - 1) } else { String::new() };
         write!(
             script,
             "commit refs/heads/main\nmark :{i}\ncommitter t <t@t> {t} +0000\ndata 1\nx\n{from}"
@@ -41,19 +37,13 @@ fn ancestor_steps_above_the_cap_are_refused_fast() {
         repo.resolve("main~1000").expect("at cap"),
         open.resolve("main~1000").expect("open")
     );
-    assert_eq!(
-        repo.resolve("main~0").expect("zero"),
-        open.resolve("main").expect("tip")
-    );
+    assert_eq!(repo.resolve("main~0").expect("zero"), open.resolve("main").expect("tip"));
     assert_eq!(
         repo.resolve("main~500~500").expect("chained at cap"),
         open.resolve("main~1000").expect("open")
     );
     let deep = format!("main{}", "~1".repeat(1_001));
-    assert!(
-        open.resolve("main~2999").is_ok(),
-        "the history is deep enough"
-    );
+    assert!(open.resolve("main~2999").is_ok(), "the history is deep enough");
     for rev in ["main~1001", "main~2999", "main~600~600", &deep, "HEAD^1001"] {
         assert!(
             matches!(repo.resolve(rev), Err(crate::Error::RevNotFound(_))),
@@ -66,8 +56,5 @@ fn ancestor_steps_above_the_cap_are_refused_fast() {
         assert!(repo.resolve("main~2999").is_err());
     }
     let spent = started.elapsed();
-    assert!(
-        spent < std::time::Duration::from_millis(500),
-        "refusals took {spent:?}"
-    );
+    assert!(spent < std::time::Duration::from_millis(500), "refusals took {spent:?}");
 }

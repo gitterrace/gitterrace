@@ -129,11 +129,7 @@ fn reserved(id: &str) -> bool {
 /// id over a plain one is already the heading alias and stays as it is.
 pub(crate) fn doc_id(id: &str) -> String {
     let alias = id.strip_prefix(USER_ID).is_some_and(|rest| !reserved(rest));
-    if !alias && reserved(id) {
-        format!("{USER_ID}{id}")
-    } else {
-        id.to_owned()
-    }
+    if !alias && reserved(id) { format!("{USER_ID}{id}") } else { id.to_owned() }
 }
 
 #[cfg(test)]
@@ -181,10 +177,7 @@ mod tests {
             }
         }
         let listed: BTreeSet<String> = CHROME_IDS.iter().map(|s| (*s).to_owned()).collect();
-        assert_eq!(
-            found, listed,
-            "CHROME_IDS must list every chrome id in the sources"
-        );
+        assert_eq!(found, listed, "CHROME_IDS must list every chrome id in the sources");
     }
 
     #[test]
@@ -195,15 +188,7 @@ mod tests {
         for id in ["Location", "L12", "L3-L9", "L3-9", "f4", "user-content-q"] {
             assert!(doc_id(id).starts_with(USER_ID), "{id}");
         }
-        for id in [
-            "reference",
-            "main",
-            "label",
-            "fn1",
-            "f",
-            "Lx",
-            "user-content-x",
-        ] {
+        for id in ["reference", "main", "label", "fn1", "f", "Lx", "user-content-x"] {
             assert_eq!(doc_id(id), id, "{id}");
         }
     }

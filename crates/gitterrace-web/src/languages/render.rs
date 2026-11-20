@@ -1,9 +1,6 @@
 //! The chart, range card and language table as typed data for `languages_body.html`.
 
-#![expect(
-    clippy::too_many_lines,
-    reason = "one linear sequence, splitting it hides the flow"
-)]
+#![expect(clippy::too_many_lines, reason = "one linear sequence, splitting it hides the flow")]
 
 use std::fmt::Write as _;
 
@@ -33,11 +30,7 @@ fn signed(n: i64) -> String {
 }
 
 fn share_label(f: f64) -> String {
-    if f > 0.0 && f < 0.001 {
-        "<0.1%".to_owned()
-    } else {
-        format!("{:.1}%", f * 100.0)
-    }
+    if f > 0.0 && f < 0.001 { "<0.1%".to_owned() } else { format!("{:.1}%", f * 100.0) }
 }
 
 fn cat(k: usize, n: usize) -> String {
@@ -83,10 +76,8 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         xs.push(xs.last().map_or(x, |p: &f64| p.max(x)));
     }
     let rows: Vec<Vec<i64>> = pts.iter().map(|i| ch.lines(*i)).collect();
-    let totals: Vec<i64> = pts
-        .iter()
-        .map(|i| ch.lines(*i).iter().map(|v| (*v).max(0)).sum())
-        .collect();
+    let totals: Vec<i64> =
+        pts.iter().map(|i| ch.lines(*i).iter().map(|v| (*v).max(0)).sum()).collect();
     let max = totals.iter().copied().max().unwrap_or(0).max(1);
     let (ymax_n, step) = if view.share {
         (100u64, 25u64)
@@ -104,11 +95,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         grid.push(Tick {
             y: P(y),
             ty: P(y + 3.5),
-            label: if view.share {
-                format!("{v}%")
-            } else {
-                fmt::thousands(v)
-            },
+            label: if view.share { format!("{v}%") } else { fmt::thousands(v) },
         });
         v += step;
     }
@@ -121,11 +108,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         for j in 0..pts.len() {
             let raw = rows[j][lang].max(0) as f64;
             let val = if view.share {
-                if totals[j] > 0 {
-                    raw / totals[j] as f64 * 100.0
-                } else {
-                    0.0
-                }
+                if totals[j] > 0 { raw / totals[j] as f64 * 100.0 } else { 0.0 }
             } else {
                 raw
             };
@@ -133,12 +116,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         }
         let mut d = String::new();
         for (j, x) in xs.iter().enumerate() {
-            let _ = write!(
-                d,
-                "{}{x:.1},{:.1}",
-                if j == 0 { "M" } else { "L" },
-                yat(top[j])
-            );
+            let _ = write!(d, "{}{x:.1},{:.1}", if j == 0 { "M" } else { "L" }, yat(top[j]));
         }
         for (j, x) in xs.iter().enumerate().rev() {
             let _ = write!(d, "L{x:.1},{:.1}", yat(base[j]));
@@ -202,14 +180,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         ],
         rows: (0..k)
             .rev()
-            .map(|lang| {
-                row(
-                    &ch.langs()[lang],
-                    rows[0][lang],
-                    rows[last][lang],
-                    totals[last],
-                )
-            })
+            .map(|lang| row(&ch.langs()[lang], rows[0][lang], rows[last][lang], totals[last]))
             .collect(),
         total: Some(row("Total", totals[0], totals[last], totals[last])),
     };
@@ -236,10 +207,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
     };
 
     let data = PlotData {
-        d: pts
-            .iter()
-            .map(|i| fmt::date(ch.time(*i), ch.offset(*i)))
-            .collect(),
+        d: pts.iter().map(|i| fmt::date(ch.time(*i), ch.offset(*i))).collect(),
         i: &pts,
         l: rows,
         n,
@@ -253,9 +221,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         x: xs.iter().map(|x| (x * 10.0).round() / 10.0).collect(),
     };
     // Strings and numbers only: serialization cannot fail.
-    let json = serde_json::to_string(&data)
-        .unwrap_or_default()
-        .replace('<', "\\u003c");
+    let json = serde_json::to_string(&data).unwrap_or_default().replace('<', "\\u003c");
     (area, json)
 }
 
@@ -276,12 +242,7 @@ fn range_card(ch: &Chain, view: View, subj: &Subjects) -> RangeCard {
     let net = added as i64 - removed as i64;
     let k = ch.langs().len();
     let deltas: Vec<i64> = (0..k).map(|i| end[i] - base[i]).collect();
-    let big = deltas
-        .iter()
-        .map(|d| d.unsigned_abs())
-        .max()
-        .unwrap_or(1)
-        .max(1);
+    let big = deltas.iter().map(|d| d.unsigned_abs()).max().unwrap_or(1).max(1);
     let end_total: i64 = end.iter().sum::<i64>().max(1);
 
     let rows = (0..k)
@@ -360,33 +321,24 @@ fn languages_now(ch: &Chain) -> Now {
     let shown = |v: i64| u64::try_from(v.max(0)).unwrap_or(0);
     let row = |label: &str, v: i64| Row {
         label: label.to_owned(),
-        cells: vec![
-            fmt::thousands(shown(v)),
-            charttip::share(shown(v), shown(total)),
-        ],
+        cells: vec![fmt::thousands(shown(v)), charttip::share(shown(v), shown(total))],
     };
     let table = Table {
         head: ["Language", "Lines", "Share"].map(str::to_owned).to_vec(),
-        rows: (0..k)
-            .filter(|i| last[*i] > 0)
-            .map(|i| row(&ch.langs()[i], last[i]))
-            .collect(),
+        rows: (0..k).filter(|i| last[*i] > 0).map(|i| row(&ch.langs()[i], last[i])).collect(),
         total: Some(row("Total", total)),
     };
-    let summary = (0..k)
-        .filter(|i| last[*i] > 0)
-        .max_by_key(|i| last[*i])
-        .map_or_else(
-            || "No lines.".to_owned(),
-            |i| {
-                format!(
-                    "{} at the newest commit, the most in {} with {}.",
-                    fmt::count(shown(total), "line", "lines"),
-                    ch.langs()[i],
-                    charttip::share(shown(last[i]), shown(total))
-                )
-            },
-        );
+    let summary = (0..k).filter(|i| last[*i] > 0).max_by_key(|i| last[*i]).map_or_else(
+        || "No lines.".to_owned(),
+        |i| {
+            format!(
+                "{} at the newest commit, the most in {} with {}.",
+                fmt::count(shown(total), "line", "lines"),
+                ch.langs()[i],
+                charttip::share(shown(last[i]), shown(total))
+            )
+        },
+    );
     let fig: Fig = charts::fig("Share of lines by language", summary, table);
     let window = if n <= 10 {
         format!("All {}", fmt::count(n, "commit", "commits"))
@@ -396,10 +348,8 @@ fn languages_now(ch: &Chain) -> Now {
     let step = (n / 40).max(1);
     let rows = (0..k)
         .map(|i| {
-            let mut series: Vec<i64> = (0..n)
-                .step_by(step)
-                .map(|c| ch.lines(c)[i].max(0))
-                .collect();
+            let mut series: Vec<i64> =
+                (0..n).step_by(step).map(|c| ch.lines(c)[i].max(0)).collect();
             series.push(last[i].max(0));
             let maxv = series.iter().copied().fold(1i64, i64::max);
             let m = series.len().saturating_sub(1).max(1);
@@ -427,31 +377,20 @@ fn languages_now(ch: &Chain) -> Now {
             }
         })
         .collect();
-    Now {
-        fig,
-        bar,
-        window,
-        rows,
-    }
+    Now { fig, bar, window, rows }
 }
 
 fn seg(label: &str, items: &[(&str, bool, String)]) -> Seg {
     Seg::links(
         label,
-        items
-            .iter()
-            .map(|(text, on, href)| Choice::new(*text, href.clone(), *on))
-            .collect(),
+        items.iter().map(|(text, on, href)| Choice::new(*text, href.clone(), *on)).collect(),
     )
     .no_caption()
 }
 
 pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
     if ch.len() == 0 {
-        return Body {
-            empty: Some(Empty::new("No commits match these filters.")),
-            shown: None,
-        };
+        return Body { empty: Some(Empty::new("No commits match these filters.")), shown: None };
     }
     let period = Seg::links(
         "Period",
@@ -476,12 +415,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
         .enumerate()
         .filter(|(i, _)| ch.langs()[*i] != "Other")
         .max_by_key(|(_, v)| **v)
-        .map(|(i, v)| {
-            (
-                ch.langs()[i].clone(),
-                share_label((*v).max(0) as f64 / positive as f64),
-            )
-        });
+        .map(|(i, v)| (ch.langs()[i].clone(), share_label((*v).max(0) as f64 / positive as f64)));
     let lead = top
         .as_ref()
         .map(|(name, share)| crate::lead::languages(name, share, total))
@@ -490,10 +424,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
     let kpis = vec![
         Kpi("Languages", fmt::thousands(counted)),
         Kpi("Lines", fmt::thousands(total.max(0))),
-        Kpi(
-            "Largest",
-            top.as_ref().map_or_else(|| "-".to_owned(), |t| t.0.clone()),
-        ),
+        Kpi("Largest", top.as_ref().map_or_else(|| "-".to_owned(), |t| t.0.clone())),
         Kpi("Its share", top.map_or_else(|| "-".to_owned(), |t| t.1)),
     ];
     let k = ch.langs().len();
@@ -519,12 +450,7 @@ pub(super) fn body(ch: &Chain, view: View, subj: &Subjects) -> Body {
                 ],
             ),
             total: fmt::count(total.max(0), "line", "lines"),
-            legend: ch
-                .langs()
-                .iter()
-                .enumerate()
-                .map(|(i, l)| (cat(i, k), l.clone()))
-                .collect(),
+            legend: ch.langs().iter().enumerate().map(|(i, l)| (cat(i, k), l.clone())).collect(),
             area,
             json,
             range: range_card(ch, view, subj),

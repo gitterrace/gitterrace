@@ -31,10 +31,7 @@ mod tests {
         f.git(&["checkout", "-q", "--orphan", "other"]);
         f.git(&["commit", "-q", "--allow-empty", "-m", "orphan"]);
         let repo = crate::Repo::discover(f.path()).expect("open");
-        assert_eq!(
-            repo.merge_base("main", "side").expect("base").as_deref(),
-            Some(root.trim())
-        );
+        assert_eq!(repo.merge_base("main", "side").expect("base").as_deref(), Some(root.trim()));
         assert_eq!(repo.merge_base("main", "other").expect("none"), None);
         assert!(repo.merge_base("main", "nope").is_err());
     }

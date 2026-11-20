@@ -43,11 +43,7 @@ fn intern(
     s: &str,
 ) -> SegResult<u32> {
     if s.len() > MAX_STRING {
-        return Err(SegError::TooLong {
-            kind,
-            len: s.len(),
-            max: MAX_STRING,
-        });
+        return Err(SegError::TooLong { kind, len: s.len(), max: MAX_STRING });
     }
     if let Some(&id) = map.get(s) {
         return Ok(id);
@@ -55,11 +51,7 @@ fn intern(
     let id = u32::try_from(list.len())
         .ok()
         .and_then(|n| base.checked_add(n))
-        .ok_or(SegError::TooLong {
-            kind,
-            len: list.len(),
-            max: u32::MAX as usize,
-        })?;
+        .ok_or(SegError::TooLong { kind, len: list.len(), max: u32::MAX as usize })?;
     map.insert(s.to_owned(), id);
     list.push(s.to_owned());
     Ok(id)
@@ -67,44 +59,20 @@ fn intern(
 
 impl Interner {
     pub fn new(base: StringBase) -> Self {
-        Self {
-            base,
-            ..Self::default()
-        }
+        Self { base, ..Self::default() }
     }
 
     pub fn path(&mut self, s: &str) -> SegResult<PathId> {
-        intern(
-            &mut self.paths,
-            &mut self.delta.paths,
-            self.base.paths,
-            "path",
-            s,
-        )
-        .map(PathId)
+        intern(&mut self.paths, &mut self.delta.paths, self.base.paths, "path", s).map(PathId)
     }
 
     pub fn identity(&mut self, s: &str) -> SegResult<IdentId> {
         let base = self.base.identities;
-        intern(
-            &mut self.identities,
-            &mut self.delta.identities,
-            base,
-            "identity",
-            s,
-        )
-        .map(IdentId)
+        intern(&mut self.identities, &mut self.delta.identities, base, "identity", s).map(IdentId)
     }
 
     pub fn label(&mut self, s: &str) -> SegResult<LabelId> {
-        intern(
-            &mut self.labels,
-            &mut self.delta.labels,
-            self.base.labels,
-            "label",
-            s,
-        )
-        .map(LabelId)
+        intern(&mut self.labels, &mut self.delta.labels, self.base.labels, "label", s).map(LabelId)
     }
 
     pub const fn base(&self) -> StringBase {
@@ -131,9 +99,7 @@ pub fn write_delta(
         (section::LABELS, &delta.labels, &mut next.labels),
     ] {
         write_list(&mut w, sec, list)?;
-        let n = u32::try_from(list.len())
-            .ok()
-            .and_then(|n| slot.checked_add(n));
+        let n = u32::try_from(list.len()).ok().and_then(|n| slot.checked_add(n));
         *slot = n.ok_or(SegError::TooLong {
             kind: "string count",
             len: list.len(),
@@ -176,10 +142,7 @@ pub struct Strings<'a> {
 
 impl<'a> Strings<'a> {
     pub const fn new(deltas: &'a [Container]) -> Self {
-        Self {
-            deltas,
-            buf: Vec::new(),
-        }
+        Self { deltas, buf: Vec::new() }
     }
 
     pub fn path(&mut self, id: PathId) -> SegResult<String> {
@@ -217,11 +180,7 @@ impl<'a> Strings<'a> {
             }
             first = end;
         }
-        Err(SegError::unreadable(
-            d.name(),
-            0,
-            "string id past its delta",
-        ))
+        Err(SegError::unreadable(d.name(), 0, "string id past its delta"))
     }
 
     /// Parses every string of every delta, for the guards.
@@ -256,14 +215,7 @@ mod tests {
         assert_eq!(i.path("a")?, PathId(0));
         i.identity("Ann <a@x>")?;
         let (_, base) = write_delta(dir.path(), "str-1-0.gts", i.base(), &i.into_delta())?;
-        assert_eq!(
-            base,
-            StringBase {
-                paths: 2,
-                identities: 1,
-                labels: 0
-            }
-        );
+        assert_eq!(base, StringBase { paths: 2, identities: 1, labels: 0 });
         let mut j = Interner::new(base);
         assert_eq!(j.path("c")?, PathId(2));
         assert_eq!(j.label("feat")?, LabelId(0));

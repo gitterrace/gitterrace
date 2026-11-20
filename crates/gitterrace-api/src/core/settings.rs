@@ -53,8 +53,7 @@ impl ApiState {
     /// Puts `cfg` in force for this state and every clone of it, such as a router built
     /// earlier: a reloaded `config.toml` changes the next answer.
     pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
-        self.index
-            .set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
+        self.index.set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
         self.index.set_message_index(cfg.index.has_messages);
         let defaults = options_from(cfg, &self.repo.name());
         let mut s = self.write_settings();
@@ -64,15 +63,10 @@ impl ApiState {
     }
 
     pub(super) fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {
-        self.settings
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.settings.write().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     pub(super) fn settings(&self) -> Settings {
-        self.settings
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .clone()
+        self.settings.read().unwrap_or_else(std::sync::PoisonError::into_inner).clone()
     }
 }

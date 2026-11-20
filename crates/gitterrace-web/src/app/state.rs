@@ -25,13 +25,7 @@ pub(crate) enum RepoState {
 }
 
 impl RepoState {
-    const ALL: [Self; 5] = [
-        Self::Queued,
-        Self::Indexing,
-        Self::Warming,
-        Self::Ready,
-        Self::Failed,
-    ];
+    const ALL: [Self; 5] = [Self::Queued, Self::Indexing, Self::Warming, Self::Ready, Self::Failed];
 
     /// The word the pages show, the same as the API value.
     pub(crate) const fn label(self) -> &'static str {
@@ -49,10 +43,7 @@ impl RepoState {
     }
 
     fn of(code: u8) -> Self {
-        Self::ALL
-            .into_iter()
-            .find(|s| s.code() == code)
-            .unwrap_or(Self::Queued)
+        Self::ALL.into_iter().find(|s| s.code() == code).unwrap_or(Self::Queued)
     }
 }
 
@@ -162,11 +153,7 @@ mod tests {
         c.set(RepoState::Queued);
         assert_eq!(c.get(), RepoState::Queued);
         c.finish_warming();
-        assert_eq!(
-            c.get(),
-            RepoState::Queued,
-            "a rebuild during the warm-up stays queued"
-        );
+        assert_eq!(c.get(), RepoState::Queued, "a rebuild during the warm-up stays queued");
         assert!(c.advance(RepoState::Warming));
         c.finish_warming();
         assert_eq!(c.get(), RepoState::Ready);
@@ -190,15 +177,10 @@ mod tests {
             async move {
                 let (_, body) = gitterrace_testkit::get(&r, "/api/progress").await;
                 let v: serde_json::Value = serde_json::from_str(&body).expect("json");
-                (
-                    v["state"].as_str().unwrap_or("").to_owned(),
-                    v["ready"] == true,
-                )
+                (v["state"].as_str().unwrap_or("").to_owned(), v["ready"] == true)
             }
         };
-        tokio::spawn(crate::app::keep_index_fresh_supervised(
-            std::sync::Arc::clone(&a),
-        ));
+        tokio::spawn(crate::app::keep_index_fresh_supervised(std::sync::Arc::clone(&a)));
         assert_eq!(state().await, ("queued".to_owned(), false));
         let lock = std::fs::File::create(a.index.dir().join("lock")).expect("lock file");
         lock.lock().expect("hold the writer lock");
@@ -238,9 +220,7 @@ mod tests {
         std::fs::create_dir_all(&cache).expect("cache dir");
         std::fs::write(cache.join("VERSION"), "v99\n").expect("stamp");
         let a = crate::wiring_tests::app(&p, with(|_| {}));
-        tokio::spawn(crate::app::keep_index_fresh_supervised(
-            std::sync::Arc::clone(&a),
-        ));
+        tokio::spawn(crate::app::keep_index_fresh_supervised(std::sync::Arc::clone(&a)));
         gitterrace_testkit::wait::until("the build gives up", || async {
             a.state() == RepoState::Failed
         })

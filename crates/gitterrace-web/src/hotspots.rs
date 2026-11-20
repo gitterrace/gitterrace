@@ -100,11 +100,7 @@ pub(crate) async fn page(
                 authors: fmt::thousands(h.authors),
                 last: fmt::day(h.last_change),
                 score: fmt::thousands(h.score.round() as u64),
-                pct: if max > 0.0 {
-                    (h.score / max * 100.0).max(1.0) as u32
-                } else {
-                    0
-                },
+                pct: if max > 0.0 { (h.score / max * 100.0).max(1.0) as u32 } else { 0 },
             })
             .collect();
         let patterns = if crate::features::pages().contains(&"patterns") {
@@ -136,14 +132,8 @@ pub(crate) async fn page(
             kpis: vec![
                 Kpi("Files changed", fmt::thousands(rep.files.len())),
                 Kpi("Changes", fmt::thousands(rep.total_changes)),
-                Kpi(
-                    "Top tenth takes",
-                    format!("{:.0}%", rep.concentration * 100.0),
-                ),
-                Kpi(
-                    "Single-author files",
-                    fmt::thousands(rep.single_author_files),
-                ),
+                Kpi("Top tenth takes", format!("{:.0}%", rep.concentration * 100.0)),
+                Kpi("Single-author files", fmt::thousands(rep.single_author_files)),
             ],
             scatter: charts::scatter(&dots, "changes"),
             rows,

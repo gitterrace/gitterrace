@@ -7,12 +7,7 @@
 use gitterrace_testkit::{Fixture, base, oracle, page};
 
 /// Pages that are gone: no redirect keeps them, so they must 404 like an unknown path.
-const GONE: [&str; 4] = [
-    "/stats/types",
-    "/stats/frequency",
-    "/stats/patterns",
-    "/insights",
-];
+const GONE: [&str; 4] = ["/stats/types", "/stats/frequency", "/stats/patterns", "/insights"];
 
 /// Every section id and heading of the old pages, on the page that holds it now. Code age and
 /// release cadence are named on their own: they cover all history and were easy to drop.
@@ -118,12 +113,7 @@ async fn every_old_section_renders_on_its_new_page() {
     // The charts themselves, not only their headings.
     let (_, hot) = page(&router, "/stats/hotspots").await;
     let age = hot.split("id=\"code-age\"").nth(1).unwrap_or_default();
-    if !age
-        .split("id=\"sizes\"")
-        .next()
-        .unwrap_or_default()
-        .contains("<svg")
-    {
+    if !age.split("id=\"sizes\"").next().unwrap_or_default().contains("<svg") {
         fails.push("code age has no chart".to_owned());
     }
     let rel = hot.split("id=\"releases\"").nth(1).unwrap_or_default();
@@ -149,36 +139,21 @@ async fn five_insights_tabs_and_compare_sits_under_commits() {
     for gone in ["Commit types", "Code frequency", "Patterns", "More"] {
         assert!(!tabs.contains(gone), "{gone} is still a tab");
     }
-    for kept in [
-        "Activity",
-        "Contributors",
-        "Hotspots",
-        "Languages",
-        "Ownership",
-    ] {
+    for kept in ["Activity", "Contributors", "Hotspots", "Languages", "Ownership"] {
         assert!(tabs.contains(&format!(">{kept}</a>")), "{kept} tab missing");
     }
     // Compare sits under Commits: no insights tab and none in the log's toolbar (its one
     // field is the filter), reached from the branch and tag lists, Commits marked there.
-    assert!(
-        !tabs.contains("Compare"),
-        "Compare is still an insights tab"
-    );
+    assert!(!tabs.contains("Compare"), "Compare is still an insights tab");
     let (_, log) = page(&router, "/log/HEAD").await;
-    assert!(
-        !log.contains(">Compare</a>"),
-        "Compare is back in the log toolbar"
-    );
+    assert!(!log.contains(">Compare</a>"), "Compare is back in the log toolbar");
     let (_, refs) = page(&router, "/refs").await;
     assert!(
         refs.contains(&format!("href=\"{root}/compare?")),
         "the branch and tag lists do not link to Compare"
     );
     let (_, cmp) = page(&router, "/compare").await;
-    let nav = cmp
-        .split("<nav class=\"tabnav\">")
-        .nth(1)
-        .unwrap_or_default();
+    let nav = cmp.split("<nav class=\"tabnav\">").nth(1).unwrap_or_default();
     let on = nav.split("class=\"on\"").nth(1).unwrap_or_default();
     assert!(on.starts_with(" aria-current=\"page\">Commits<"), "{nav}");
 }
@@ -195,13 +170,7 @@ async fn removed_insights_paths_answer_as_unknown_pages() {
         // The not-found page, never a redirect or the page that took the old one's place. Its
         // next steps follow the path, so the body is checked by what makes it that page.
         assert_eq!(status, 404, "{p}");
-        assert!(
-            body.contains("Nothing at this address"),
-            "{p}: not the not-found page"
-        );
-        assert!(
-            body.contains("class=\"card empty lost\""),
-            "{p}: not the not-found page"
-        );
+        assert!(body.contains("Nothing at this address"), "{p}: not the not-found page");
+        assert!(body.contains("class=\"card empty lost\""), "{p}: not the not-found page");
     }
 }

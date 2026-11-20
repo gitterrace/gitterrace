@@ -21,10 +21,7 @@ fn missing(pages: &[(String, String)]) -> Vec<&str> {
 fn the_check_sees_an_outline_without_its_script() {
     let bad = vec![("/x".to_owned(), "<nav data-outline></nav>".to_owned())];
     assert_eq!(missing(&bad), ["/x"]);
-    let good = vec![(
-        "/x".to_owned(),
-        format!("<nav data-outline></nav><script {SCRIPT}1\">"),
-    )];
+    let good = vec![("/x".to_owned(), format!("<nav data-outline></nav><script {SCRIPT}1\">"))];
     assert_eq!(missing(&good), [] as [&str; 0]);
 }
 
@@ -46,10 +43,8 @@ fn every_page_with_an_outline_loads_the_outline_script() {
     let pages = rt.block_on(async {
         let router = gitterrace_web::app_router(&repo).expect("router");
         oracle::ready(&router).await;
-        let mut paths: Vec<String> = gitterrace_web::WARM_PAGES
-            .iter()
-            .map(|p| (*p).to_owned())
-            .collect();
+        let mut paths: Vec<String> =
+            gitterrace_web::WARM_PAGES.iter().map(|p| (*p).to_owned()).collect();
         paths.extend(["/".to_owned(), "/blob/HEAD/docs/x.md".to_owned()]);
         let mut out = Vec::new();
         for p in paths {
@@ -62,9 +57,5 @@ fn every_page_with_an_outline_loads_the_outline_script() {
         pages.iter().any(|(_, b)| b.contains("data-outline")),
         "no page has an outline: the check proves nothing"
     );
-    assert!(
-        missing(&pages).is_empty(),
-        "outline without {SCRIPT}: {:?}",
-        missing(&pages)
-    );
+    assert!(missing(&pages).is_empty(), "outline without {SCRIPT}: {:?}", missing(&pages));
 }

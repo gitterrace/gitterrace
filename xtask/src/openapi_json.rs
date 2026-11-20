@@ -19,10 +19,7 @@ pub fn render(ws: &Workspace) -> Out {
     let mut paths = Map::new();
     let mut generator = schema_generator();
     for e in ENDPOINTS {
-        paths.insert(
-            e.path.to_owned(),
-            json!({ "get": operation(e, &mut generator) }),
-        );
+        paths.insert(e.path.to_owned(), json!({ "get": operation(e, &mut generator) }));
     }
     let mut schemas = Map::new();
     schemas.insert("Error".to_owned(), error_schema(&codes));
@@ -120,8 +117,7 @@ fn query_param(p: &Param) -> Value {
 
 /// `{id}` and `{name}` segments of a route.
 fn path_params(path: &str) -> impl Iterator<Item = &str> {
-    path.split('/')
-        .filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
+    path.split('/').filter_map(|s| s.strip_prefix('{').and_then(|s| s.strip_suffix('}')))
 }
 
 fn path_param_doc(name: &str) -> String {
@@ -146,11 +142,7 @@ fn operation_id(path: &str) -> String {
         .filter(|s| !s.is_empty())
         .collect::<Vec<_>>()
         .join("_");
-    if id.is_empty() {
-        "index".to_owned()
-    } else {
-        id
-    }
+    if id.is_empty() { "index".to_owned() } else { id }
 }
 
 #[cfg(test)]
@@ -161,10 +153,7 @@ mod tests {
     fn ids_and_path_params() {
         assert_eq!(operation_id("/"), "index");
         assert_eq!(operation_id("/commits/{id}"), "commits_id");
-        assert_eq!(
-            path_params("/insights/{name}").collect::<Vec<_>>(),
-            ["name"]
-        );
+        assert_eq!(path_params("/insights/{name}").collect::<Vec<_>>(), ["name"]);
     }
 
     #[test]
@@ -176,11 +165,7 @@ mod tests {
         let doc: serde_json::Value = serde_json::from_str(&body).expect("json");
         assert_eq!(doc["openapi"], "3.1.0");
         for e in gitterrace_api::ENDPOINTS {
-            assert!(
-                doc["paths"][e.path]["get"].is_object(),
-                "{} missing",
-                e.path
-            );
+            assert!(doc["paths"][e.path]["get"].is_object(), "{} missing", e.path);
         }
     }
 }

@@ -13,13 +13,8 @@ use gitterrace_index::{
 };
 use gitterrace_testkit::{Adversarial, git_at};
 
-const PERIODS: [Period; 5] = [
-    Period::Week,
-    Period::Month,
-    Period::Quarter,
-    Period::Year,
-    Period::All,
-];
+const PERIODS: [Period; 5] =
+    [Period::Week, Period::Month, Period::Quarter, Period::Year, Period::All];
 const FAST: Duration = Duration::from_millis(100);
 
 fn indexed(path: &std::path::Path) -> (Repo, Index) {
@@ -76,21 +71,11 @@ fn every_insight_answers_fast_and_bounded() {
     let (repo, index) = indexed(&fx.repo);
     let records = index.records(&repo, "HEAD").expect("records");
     let ids: Vec<&str> = records.iter().map(|r| r.id.as_str()).collect();
-    for want in [
-        &fx.roots[0],
-        &fx.roots[1],
-        &fx.octopus,
-        &fx.far,
-        &fx.extreme,
-        &fx.tip,
-    ] {
+    for want in [&fx.roots[0], &fx.roots[1], &fx.octopus, &fx.far, &fx.extreme, &fx.tip] {
         assert!(ids.contains(&want.as_str()), "{want} not indexed");
     }
     assert_eq!(index.pending(&repo, "HEAD").expect("pending"), 0);
-    let oct = records
-        .iter()
-        .find(|r| r.id == fx.octopus)
-        .expect("octopus");
+    let oct = records.iter().find(|r| r.id == fx.octopus).expect("octopus");
     assert!(oct.merge && oct.parents.len() == 3);
     let ins = Insights::new(&records, Options::default(), None);
     every_insight(&repo, &ins);
@@ -101,17 +86,10 @@ fn every_insight_answers_fast_and_bounded() {
 /// One commit dated in year 950 million and one at the i64 edges must not size any axis.
 #[test]
 fn an_axis_never_exceeds_the_bucket_cap() {
-    for (first, last) in [
-        (0, 3_000_000_000),
-        (-3_000_000_000, 0),
-        (i64::MIN / 2, i64::MAX / 2),
-    ] {
+    for (first, last) in [(0, 3_000_000_000), (-3_000_000_000, 0), (i64::MIN / 2, i64::MAX / 2)] {
         let start = Instant::now();
         let axis = TimeAxis::for_period(None, first, last);
-        assert!(
-            axis.len() <= MAX_BUCKETS && !axis.is_empty(),
-            "{first}..{last}"
-        );
+        assert!(axis.len() <= MAX_BUCKETS && !axis.is_empty(), "{first}..{last}");
         assert!(start.elapsed() < FAST);
     }
 }
@@ -136,11 +114,7 @@ fn the_tip_mailmap_names_every_cached_commit() {
         "Jane D. <jane@x.io> <old@x.io>\nJane D. <jane@x.io> <jane@x.io>\n",
     )
     .expect("write mailmap");
-    git_at(
-        &fx.repo,
-        "2024-04-01T12:00:00Z",
-        &["commit", "-qam", "docs: rename"],
-    );
+    git_at(&fx.repo, "2024-04-01T12:00:00Z", &["commit", "-qam", "docs: rename"]);
     index.update(&repo, "HEAD", &|_| {}).expect("update");
     let records = index.records(&repo, "HEAD").expect("records");
     assert!(
@@ -161,10 +135,7 @@ fn a_shallow_clone_indexes_its_boundary_as_a_root() {
     assert_eq!(records.len(), 3);
     let edge = records.iter().find(|r| r.id == fx.far).expect("boundary");
     assert!(!edge.files.is_empty(), "the boundary adds its whole tree");
-    assert!(
-        repo.commit(&fx.far).is_ok(),
-        "the boundary's commit page opens"
-    );
+    assert!(repo.commit(&fx.far).is_ok(), "the boundary's commit page opens");
     let ins = Insights::new(&records, Options::default(), None);
     every_insight(&repo, &ins);
 }

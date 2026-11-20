@@ -52,12 +52,7 @@ impl SegmentBuilder {
     }
 
     fn with_spill(spill: Spill) -> Self {
-        Self {
-            agg: Aggregates::default(),
-            post: Postings::default(),
-            spill,
-            ranks: Vec::new(),
-        }
+        Self { agg: Aggregates::default(), post: Postings::default(), spill, ranks: Vec::new() }
     }
 
     /// Folds the next record. `strings` is the cache's interner (ids global until a merge), `rank`
@@ -77,8 +72,7 @@ impl SegmentBuilder {
         self.post.push_without_paths(strings, r, who, &paths);
         if !r.merge {
             for (row, &p) in paths.iter().enumerate() {
-                self.spill
-                    .push((p, ord, u32::try_from(row).unwrap_or(u32::MAX)))?;
+                self.spill.push((p, ord, u32::try_from(row).unwrap_or(u32::MAX)))?;
             }
         }
         Ok(())
@@ -317,12 +311,7 @@ impl<B: InsightsSource> SegmentSource<B> {
             postings::decode_renames(c, n, |e| local.push(e))?;
             let ords: Vec<u32> = local.iter().map(|e| e.ordinal).collect();
             for (e, rank) in local.iter().zip(seg.ranks(&ords)?) {
-                out.push(RenameEdge {
-                    rank,
-                    row: e.row,
-                    old: PathId(e.old),
-                    new: PathId(e.new),
-                });
+                out.push(RenameEdge { rank, row: e.row, old: PathId(e.old), new: PathId(e.new) });
             }
             Ok(())
         })?;
@@ -392,9 +381,7 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
     }
 
     fn failure(&self) -> Option<SourceError> {
-        self.unreadable()
-            .map(SourceError)
-            .or_else(|| self.base.failure())
+        self.unreadable().map(SourceError).or_else(|| self.base.failure())
     }
 
     fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {
@@ -403,8 +390,5 @@ impl<B: InsightsSource> InsightsSource for SegmentSource<B> {
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::many_single_char_names,
-    reason = "short names for the segment parts of a fixture"
-)]
+#[expect(clippy::many_single_char_names, reason = "short names for the segment parts of a fixture")]
 mod tests;

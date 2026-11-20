@@ -12,32 +12,19 @@ use crate::search::{
 #[tokio::test]
 async fn repeat_search_at_one_tip_is_memoized() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "needle\n")
-        .commit("feat: a");
+    let f =
+        gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "needle\n").commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
     let app = Arc::new(crate::app::App::configured(repo, index, &env));
-    let q = || SearchQuery {
-        q: Some("needle".into()),
-        ..SearchQuery::default()
-    };
-    let first = search(State(Arc::clone(&app)), Query(q()))
-        .await
-        .expect("page")
-        .0;
+    let q = || SearchQuery { q: Some("needle".into()), ..SearchQuery::default() };
+    let first = search(State(Arc::clone(&app)), Query(q())).await.expect("page").0;
     assert!(first.contains("1 match"), "{first}");
     app.memo_put(memo_key(&app, &q()), "memo");
-    let again = search(State(Arc::clone(&app)), Query(q()))
-        .await
-        .expect("page")
-        .0;
+    let again = search(State(Arc::clone(&app)), Query(q())).await.expect("page").0;
     assert_eq!(again, "memo", "the repeat must not scan again");
-    let other = SearchQuery {
-        case: Some("on".into()),
-        ..q()
-    };
+    let other = SearchQuery { case: Some("on".into()), ..q() };
     let other = search(State(app), Query(other)).await.expect("page").0;
     assert_ne!(other, "memo", "options are part of the key");
 }
@@ -64,15 +51,8 @@ fn capped_search_keeps_the_first_files_in_path_order() {
         let want: Vec<String> = (0..251).map(|i| format!("f{i:04}.txt")).collect();
         assert_eq!(paths, want, "the first files, in order");
         assert_eq!((out.matches, out.capped), (501, true));
-        assert_eq!(
-            out.files.last().map(|h| h.count),
-            Some(1),
-            "the last file is cut"
-        );
-        assert_eq!(
-            out.scanned, 251,
-            "files up to the one that hits the cap count as scanned"
-        );
+        assert_eq!(out.files.last().map(|h| h.count), Some(1), "the last file is cut");
+        assert_eq!(out.scanned, 251, "files up to the one that hits the cap count as scanned");
     }
 }
 
@@ -100,10 +80,7 @@ fn globs_match_names_and_paths() {
 #[test]
 fn highlights_escape_and_mark() {
     let re = build_regex("b", false, false).expect("re");
-    assert_eq!(
-        highlight("a<b>b", &re),
-        "a&lt;<mark>b</mark>&gt;<mark>b</mark>"
-    );
+    assert_eq!(highlight("a<b>b", &re), "a&lt;<mark>b</mark>&gt;<mark>b</mark>");
 }
 
 #[test]
@@ -120,10 +97,7 @@ fn hits_carry_context_and_gaps() {
 fn a_file_header_counts_its_matching_lines_with_the_noun() {
     let re = build_regex("x", false, true).expect("re");
     assert_eq!(file_hits("a", "HEAD", "x\n", &re, 100).matches(), "1 match");
-    assert_eq!(
-        file_hits("a", "HEAD", "x\nx x\n.\n", &re, 100).matches(),
-        "2 matches"
-    );
+    assert_eq!(file_hits("a", "HEAD", "x\nx x\n.\n", &re, 100).matches(), "2 matches");
 }
 
 /// Guard: a commit search that matches nothing builds no summary, so a miss costs the walk
@@ -134,9 +108,7 @@ fn a_commit_miss_builds_no_more_than_a_hit() {
     let dir = tempfile::tempdir().expect("tmp");
     let mut f = gitterrace_testkit::Fixture::init(dir.path());
     for i in 0..30 {
-        f = f
-            .write("a.txt", &format!("{i}\n"))
-            .commit(&format!("chore: step {i}"));
+        f = f.write("a.txt", &format!("{i}\n")).commit(&format!("chore: step {i}"));
     }
     let f = f.write("a.txt", "end\n").commit("feat: needle");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
@@ -150,16 +122,9 @@ fn a_commit_miss_builds_no_more_than_a_hit() {
     let (hit_rows, _, hit) = run("needle");
     let (miss_rows, capped, miss) = run("zzqq-nothing");
     assert_eq!(hit_rows.len(), 1);
-    assert_eq!(
-        hit_rows.first().map(|c| c.subject.as_str()),
-        Some("feat: needle")
-    );
+    assert_eq!(hit_rows.first().map(|c| c.subject.as_str()), Some("feat: needle"));
     assert!(miss_rows.is_empty() && !capped);
-    assert_eq!(
-        (hit.walked, miss.walked),
-        (31, 31),
-        "both walk the whole history"
-    );
+    assert_eq!((hit.walked, miss.walked), (31, 31), "both walk the whole history");
     assert_eq!(miss.built, 0, "a miss builds no summary");
     assert!(miss.built <= hit.built, "{miss:?} vs {hit:?}");
     let (rows, _, all) = run("step");
@@ -171,9 +136,8 @@ fn a_commit_miss_builds_no_more_than_a_hit() {
 #[tokio::test]
 async fn an_over_long_query_or_filter_is_refused_with_a_message() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "needle\n")
-        .commit("feat: a");
+    let f =
+        gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "needle\n").commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let env = crate::app::Env::new(gitterrace_config::Config::default());
@@ -181,10 +145,7 @@ async fn an_over_long_query_or_filter_is_refused_with_a_message() {
     let long = "needle".repeat(crate::search::MAX_QUERY_BYTES);
     let page = search(
         State(Arc::clone(&app)),
-        Query(SearchQuery {
-            q: Some(long.clone()),
-            ..SearchQuery::default()
-        }),
+        Query(SearchQuery { q: Some(long.clone()), ..SearchQuery::default() }),
     )
     .await
     .expect("page")
@@ -207,21 +168,12 @@ async fn an_over_long_query_or_filter_is_refused_with_a_message() {
     .await
     .expect("page")
     .0;
-    assert!(
-        page.contains("file filter is longer than 1024 bytes"),
-        "{page}"
-    );
+    assert!(page.contains("file filter is longer than 1024 bytes"), "{page}");
     let at_cap = "n".repeat(crate::search::MAX_QUERY_BYTES);
-    let page = search(
-        State(app),
-        Query(SearchQuery {
-            q: Some(at_cap),
-            ..SearchQuery::default()
-        }),
-    )
-    .await
-    .expect("page")
-    .0;
+    let page = search(State(app), Query(SearchQuery { q: Some(at_cap), ..SearchQuery::default() }))
+        .await
+        .expect("page")
+        .0;
     assert!(!page.contains("longer than"), "a query at the cap runs");
 }
 
@@ -229,10 +181,7 @@ async fn an_over_long_query_or_filter_is_refused_with_a_message() {
 fn an_oversized_glob_is_refused_like_an_oversized_pattern() {
     // Past the 8 MiB the query regex allows, within the regex crate's own default.
     let glob = "?".repeat(10_000);
-    assert!(
-        glob_regex(&glob).is_err(),
-        "the glob regex has the query's size limit"
-    );
+    assert!(glob_regex(&glob).is_err(), "the glob regex has the query's size limit");
     assert!(glob_regex("src/**/*.rs, *.md").expect("small").is_some());
 }
 
@@ -245,19 +194,15 @@ fn scan_threads_stay_within_blocking_jobs() {
     };
     assert_eq!(crate::search::scan_workers(&cfg(1)), 1);
     assert!(crate::search::scan_workers(&cfg(2)) <= 2);
-    assert!(
-        crate::search::scan_workers(&cfg(64)) <= 8,
-        "never more than eight"
-    );
+    assert!(crate::search::scan_workers(&cfg(64)) <= 8, "never more than eight");
 }
 
 /// N identical cold searches at once scan the tree once: the rest wait and read the memo.
 #[tokio::test]
 async fn concurrent_cold_identical_searches_scan_once() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a.txt", "needle\n")
-        .commit("feat: a");
+    let f =
+        gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "needle\n").commit("feat: a");
     let repo = gitterrace_git::Repo::discover(f.path()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let git_dir = repo.git_dir().to_owned();
@@ -265,10 +210,7 @@ async fn concurrent_cold_identical_searches_scan_once() {
     let app = Arc::new(crate::app::App::configured(repo, index, &env));
     let tasks: Vec<_> = (0..6)
         .map(|_| {
-            let q = SearchQuery {
-                q: Some("needle".into()),
-                ..SearchQuery::default()
-            };
+            let q = SearchQuery { q: Some("needle".into()), ..SearchQuery::default() };
             tokio::spawn(search(State(Arc::clone(&app)), Query(q)))
         })
         .collect();
@@ -277,9 +219,5 @@ async fn concurrent_cold_identical_searches_scan_once() {
         pages.push(t.await.expect("task").expect("page").0);
     }
     assert!(pages.iter().all(|p| *p == pages[0]), "one page for all");
-    assert_eq!(
-        crate::search::scans_of(&git_dir),
-        1,
-        "one scan for six requests"
-    );
+    assert_eq!(crate::search::scans_of(&git_dir), 1, "one scan for six requests");
 }

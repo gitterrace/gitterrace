@@ -12,10 +12,7 @@ const HOST: &str = "git.example.com";
 const MARKER: &str = "host-folder-marker";
 
 async fn fetch(router: &axum::Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri)
-        .header("host", HOST)
-        .body(Body::empty())
-        .expect("req");
+    let req = Request::get(uri).header("host", HOST).body(Body::empty()).expect("req");
     let res = router.clone().oneshot(req).await.expect("res");
     let s = res.status().as_u16();
     let b = res.into_body().collect().await.expect("body").to_bytes();
@@ -40,9 +37,7 @@ fn links(body: &str) -> Vec<String> {
 async fn public_error_bodies_never_name_host_folders() {
     let dir = tempfile::tempdir().expect("tmp");
     // The marker is a parent folder: the repository's own folder name is its public name.
-    let p = Fixture::standard(&dir.path().join(MARKER).join("repo"))
-        .path()
-        .to_owned();
+    let p = Fixture::standard(&dir.path().join(MARKER).join("repo")).path().to_owned();
     let mut cfg = gitterrace_config::Config::default();
     cfg.server.is_public = true;
     cfg.server.hosts = vec![HOST.to_owned()];
@@ -59,11 +54,8 @@ async fn public_error_bodies_never_name_host_folders() {
         .map(str::to_owned)
         .chain(gitterrace_api::ENDPOINTS.iter().map(|e| {
             // An endpoint refuses a parameter it does not list, before any cache read.
-            let query = if e.params.iter().any(|p| p.name == "path") {
-                "?path=src/a.rs"
-            } else {
-                ""
-            };
+            let query =
+                if e.params.iter().any(|p| p.name == "path") { "?path=src/a.rs" } else { "" };
             format!(
                 "/r/repo/api/v1{}{query}",
                 e.path.replace("{id}", "HEAD").replace("{name}", "summary")
@@ -92,13 +84,6 @@ async fn public_error_bodies_never_name_host_folders() {
             bad.push(format!("{u} ({s})"));
         }
     }
-    assert!(
-        server_errors > 0,
-        "the broken cache produced no 5xx: the guard tests nothing"
-    );
-    assert!(
-        bad.is_empty(),
-        "bodies name the host folder:\n{}",
-        bad.join("\n")
-    );
+    assert!(server_errors > 0, "the broken cache produced no 5xx: the guard tests nothing");
+    assert!(bad.is_empty(), "bodies name the host folder:\n{}", bad.join("\n"));
 }

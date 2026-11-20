@@ -42,30 +42,17 @@ fn every_page_of_a_path_log_is_the_slice_git_lists() {
         git_at(d, &at(m), &["commit", "-q", "-m", msg]);
     };
     git_at(d, &at(0), &["init", "-q", "-b", "main"]);
-    step(
-        d,
-        0,
-        &[("p/a.txt", "0\n".into()), ("other.txt", "0\n".into())],
-        "root",
-    );
+    step(d, 0, &[("p/a.txt", "0\n".into()), ("other.txt", "0\n".into())], "root");
     git_at(d, &at(1), &["checkout", "-q", "-b", "side"]);
     git_at(d, &at(1), &["checkout", "-q", "main"]);
     // Dates interleave: main 10, side 15, main 20, side 25, main 30, side 35.
     for (i, m) in [10, 20, 30].into_iter().enumerate() {
-        step(
-            d,
-            m,
-            &[("p/a.txt", format!("main {i}\n"))],
-            &format!("main {i}"),
-        );
+        step(d, m, &[("p/a.txt", format!("main {i}\n"))], &format!("main {i}"));
         git_at(d, &at(m + 5), &["checkout", "-q", "side"]);
         step(
             d,
             m + 5,
-            &[
-                ("p/b.txt", format!("side {i}\n")),
-                ("other.txt", format!("s{i}\n")),
-            ],
+            &[("p/b.txt", format!("side {i}\n")), ("other.txt", format!("s{i}\n"))],
             &format!("side {i}"),
         );
         git_at(d, &at(m + 5), &["checkout", "-q", "main"]);
@@ -76,11 +63,7 @@ fn every_page_of_a_path_log_is_the_slice_git_lists() {
     step(d, 42, &[("p/a.txt", "hidden\n".into())], "hidden");
     git_at(d, &at(43), &["checkout", "-q", "main"]);
     // Takes main's tree: git hides the hidden branch for p/a.txt.
-    git_at(
-        d,
-        &at(44),
-        &["merge", "-q", "-s", "ours", "--no-edit", "hidden"],
-    );
+    git_at(d, &at(44), &["merge", "-q", "-s", "ours", "--no-edit", "hidden"]);
     step(d, 50, &[("p/a.txt", "after\n".into())], "after");
     let repo = Repo::discover(d).expect("repo");
     for path in ["p/a.txt", "p", "p/b.txt", "other.txt"] {
@@ -139,10 +122,7 @@ fn committed_only_refuses_local_state() {
     ] {
         assert!(repo.resolve(ok).is_ok(), "{ok} refused");
     }
-    assert_eq!(
-        repo.resolve("HEAD~1").expect("restricted"),
-        open.resolve("HEAD~1").expect("open")
-    );
+    assert_eq!(repo.resolve("HEAD~1").expect("restricted"), open.resolve("HEAD~1").expect("open"));
     // A full id that no public ref reaches is refused too, see `tests_visible.rs`.
     for bad in [
         "stash",
@@ -172,17 +152,11 @@ fn fixture() -> tempfile::TempDir {
     git_at(d, T0, &["init", "-q", "-b", "main"]);
     git_at(d, T0, &["config", "user.name", "Old Name"]);
     git_at(d, T0, &["config", "user.email", "old@example.com"]);
-    write(
-        d,
-        ".mailmap",
-        "New Name <new@example.com> <old@example.com>\n",
-    );
+    write(d, ".mailmap", "New Name <new@example.com> <old@example.com>\n");
     write(d, "a.txt", &numbered(40));
     write(d, "src/b.txt", "one\ntwo\n");
     commit(d, "feat: first\n\nbody text\nmore body");
-    let mut edited = numbered(40)
-        .replace("line 5\n", "five\n")
-        .replace("line 30\n", "thirty\n");
+    let mut edited = numbered(40).replace("line 5\n", "five\n").replace("line 30\n", "thirty\n");
     edited.push_str("tail\n");
     write(d, "a.txt", &edited);
     write(d, "bin.dat", "\0\u{1}\u{2}binary");
@@ -196,25 +170,12 @@ fn fixture() -> tempfile::TempDir {
 }
 
 /// Parses `git log --numstat -z -M` into id to path to `(add, del, old_path)`.
-#[expect(
-    clippy::type_complexity,
-    reason = "test reference shape, a named type adds nothing"
-)]
+#[expect(clippy::type_complexity, reason = "test reference shape, a named type adds nothing")]
 fn reference(
     dir: &std::path::Path,
 ) -> BTreeMap<String, BTreeMap<String, (u32, u32, Option<String>)>> {
-    let raw = git_at(
-        dir,
-        T0,
-        &[
-            "log",
-            "--numstat",
-            "-z",
-            "-M",
-            "--format=%x01%H%x00",
-            "--topo-order",
-        ],
-    );
+    let raw =
+        git_at(dir, T0, &["log", "--numstat", "-z", "-M", "--format=%x01%H%x00", "--topo-order"]);
     let mut out = BTreeMap::new();
     for chunk in raw.split('\u{1}').filter(|c| !c.is_empty()) {
         let mut parts = chunk.split('\0');
@@ -226,11 +187,7 @@ fn reference(
                 continue;
             }
             let mut f = head.split('\t');
-            let (a, d, p) = (
-                f.next().expect("a"),
-                f.next().expect("d"),
-                f.next().expect("p"),
-            );
+            let (a, d, p) = (f.next().expect("a"), f.next().expect("d"), f.next().expect("p"));
             let (path, old) = if p.is_empty() {
                 let old = parts.next().expect("old").to_string();
                 (parts.next().expect("new").to_string(), Some(old))
@@ -273,32 +230,14 @@ fn commit_detail_has_hunks_kinds_and_body() {
     let second = &log[2];
     assert_eq!(second.subject, "fix: edit a, add binary");
     let detail = repo.commit(&second.id).expect("commit");
-    let a = detail
-        .files
-        .iter()
-        .find(|f| f.path == "a.txt")
-        .expect("a.txt");
-    assert_eq!(
-        (a.kind, a.additions, a.deletions),
-        (ChangeKind::Modified, 3, 2)
-    );
+    let a = detail.files.iter().find(|f| f.path == "a.txt").expect("a.txt");
+    assert_eq!((a.kind, a.additions, a.deletions), (ChangeKind::Modified, 3, 2));
     assert_eq!(a.hunks.len(), 3);
     let first = &a.hunks[0];
     assert_eq!(first.header, "@@ -2,7 +2,7 @@");
-    let removed = first
-        .lines
-        .iter()
-        .find(|l| l.kind == LineKind::Removed)
-        .expect("removed");
-    assert_eq!(
-        (removed.old_no, removed.new_no, removed.text.as_str()),
-        (Some(5), None, "line 5")
-    );
-    let bin = detail
-        .files
-        .iter()
-        .find(|f| f.path == "bin.dat")
-        .expect("bin");
+    let removed = first.lines.iter().find(|l| l.kind == LineKind::Removed).expect("removed");
+    assert_eq!((removed.old_no, removed.new_no, removed.text.as_str()), (Some(5), None, "line 5"));
+    let bin = detail.files.iter().find(|f| f.path == "bin.dat").expect("bin");
     assert!(bin.binary && bin.hunks.is_empty() && bin.kind == ChangeKind::Added);
 
     let root = repo.commit(&log[3].id).expect("root");
@@ -322,26 +261,13 @@ fn log_orders_filters_and_pages() {
     assert_eq!(paged[0].id, all[1].id);
     let on_a = repo.log("HEAD", Some("a.txt"), 0, 100).expect("log");
     let subjects: Vec<_> = on_a.iter().map(|c| c.subject.as_str()).collect();
-    assert_eq!(
-        subjects,
-        [
-            "chore: drop a, grow c",
-            "fix: edit a, add binary",
-            "feat: first"
-        ]
-    );
+    assert_eq!(subjects, ["chore: drop a, grow c", "fix: edit a, add binary", "feat: first"]);
     let oldest_first = repo.rev_list("HEAD").expect("rev_list");
     assert_eq!(oldest_first.last(), Some(&all[0].id));
-    assert!(matches!(
-        repo.resolve("nope"),
-        Err(crate::Error::RevNotFound(_))
-    ));
+    assert!(matches!(repo.resolve("nope"), Err(crate::Error::RevNotFound(_))));
     // History searches and reflog reads never resolve, whichever route passes them.
     for rev in [":/first", "HEAD^{/first}", "main@{1}", "@{-1}"] {
-        assert!(
-            matches!(repo.resolve(rev), Err(crate::Error::RevNotFound(_))),
-            "{rev}"
-        );
+        assert!(matches!(repo.resolve(rev), Err(crate::Error::RevNotFound(_))), "{rev}");
         assert!(repo.log(rev, None, 0, 1).is_err(), "{rev}");
     }
     assert!(repo.resolve("HEAD~1").is_ok());
@@ -401,23 +327,11 @@ fn a_lower_text_cap_hides_text_and_a_small_blame_cache_keeps_nothing() {
     assert!(blob.size > 10 && blob.text.is_none(), "over the cap");
     assert!(tiny.blame(&at, "a.txt").expect("blame").is_empty());
     let mut cache = BlameCache::with_limit(1);
-    let key = (
-        gix::ObjectId::empty_tree(gix::hash::Kind::Sha1),
-        "p".to_owned(),
-    );
-    cache.put(
-        key.clone(),
-        Arc::new(open.blame(&at, "a.txt").expect("blame")),
-    );
-    assert!(
-        cache.get(&key).is_none(),
-        "a result over the budget is not kept"
-    );
+    let key = (gix::ObjectId::empty_tree(gix::hash::Kind::Sha1), "p".to_owned());
+    cache.put(key.clone(), Arc::new(open.blame(&at, "a.txt").expect("blame")));
+    assert!(cache.get(&key).is_none(), "a result over the budget is not kept");
     let mut roomy = BlameCache::with_limit(1 << 20);
-    roomy.put(
-        key.clone(),
-        Arc::new(open.blame(&at, "a.txt").expect("blame")),
-    );
+    roomy.put(key.clone(), Arc::new(open.blame(&at, "a.txt").expect("blame")));
     assert!(roomy.get(&key).is_some());
 }
 
@@ -429,21 +343,12 @@ fn blame_cache_follows_the_commit() {
     let second = repo.log("HEAD", None, 0, 10).expect("log")[2].id.clone();
     assert!(!repo.blame_is_cached(&second, "a.txt"));
     let before = repo.blame(&second, "a.txt").expect("blame");
-    assert!(
-        repo.blame_is_cached(&second, "a.txt"),
-        "a repeat blame is a hit"
-    );
-    assert_eq!(
-        repo.blame(&second, "a.txt").expect("cached").len(),
-        before.len()
-    );
+    assert!(repo.blame_is_cached(&second, "a.txt"), "a repeat blame is a hit");
+    assert_eq!(repo.blame(&second, "a.txt").expect("cached").len(), before.len());
     git_at(d, T0, &["checkout", "-q", "-b", "other", &second]);
     std::fs::write(d.join("a.txt"), "only\n").expect("write");
     git_at(d, T0, &["commit", "-qam", "shrink"]);
-    assert!(
-        !repo.blame_is_cached("other", "a.txt"),
-        "a new commit misses"
-    );
+    assert!(!repo.blame_is_cached("other", "a.txt"), "a new commit misses");
     let after = repo.blame("other", "a.txt").expect("blame");
     assert_eq!((before.len(), after.len()), (41, 1));
     assert_eq!(repo.blame(&second, "a.txt").expect("old").len(), 41);
@@ -495,46 +400,24 @@ fn the_ref_list_follows_every_new_moved_and_deleted_ref() {
     let d = tmp.path();
     let repo = Repo::discover(d).expect("open");
     let names = |r: &Repo| -> Vec<(String, String)> {
-        let mut v: Vec<_> = r
-            .refs()
-            .expect("refs")
-            .into_iter()
-            .map(|x| (x.name, x.target))
-            .collect();
+        let mut v: Vec<_> =
+            r.refs().expect("refs").into_iter().map(|x| (x.name, x.target)).collect();
         v.sort();
         v
     };
     let before = names(&repo);
     assert_eq!(before, names(&repo), "a repeat answers the same list");
     git_at(d, T0, &["tag", "v9"]);
-    assert!(
-        names(&repo).iter().any(|(n, _)| n == "v9"),
-        "a new tag shows"
-    );
+    assert!(names(&repo).iter().any(|(n, _)| n == "v9"), "a new tag shows");
     git_at(d, T0, &["branch", "side", "HEAD~1"]);
-    let side = names(&repo)
-        .into_iter()
-        .find(|(n, _)| n == "side")
-        .expect("side")
-        .1;
+    let side = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
     git_at(d, T0, &["branch", "-f", "side", "HEAD"]);
-    let moved = names(&repo)
-        .into_iter()
-        .find(|(n, _)| n == "side")
-        .expect("side")
-        .1;
+    let moved = names(&repo).into_iter().find(|(n, _)| n == "side").expect("side").1;
     assert_ne!(side, moved, "a moved branch shows its new commit");
     git_at(d, T0, &["tag", "-d", "v9"]);
-    assert!(
-        !names(&repo).iter().any(|(n, _)| n == "v9"),
-        "a deleted tag goes"
-    );
+    assert!(!names(&repo).iter().any(|(n, _)| n == "v9"), "a deleted tag goes");
     git_at(d, T0, &["pack-refs", "--all"]);
-    assert_eq!(
-        names(&repo).len(),
-        before.len() + 1,
-        "packing changes nothing shown"
-    );
+    assert_eq!(names(&repo).len(), before.len() + 1, "packing changes nothing shown");
 }
 
 /// Guard class: a combined read answers what the separate reads answer, on every side of
@@ -545,20 +428,12 @@ fn one_read_of_text_and_bytes_matches_the_two_reads() {
     let d = tmp.path();
     let repo = Repo::discover(d).expect("open");
     let at = repo.log("HEAD", None, 0, 10).expect("log")[2].id.clone();
-    for (path, cap) in [
-        ("a.txt", 1 << 20),
-        ("a.txt", 4),
-        ("bin.dat", 1 << 20),
-        ("bin.dat", 0),
-    ] {
+    for (path, cap) in [("a.txt", 1 << 20), ("a.txt", 4), ("bin.dat", 1 << 20), ("bin.dat", 0)] {
         let (b, bytes) = repo.blob_with_bytes(&at, path, cap).expect("one");
         let two = repo.blob(&at, path).expect("blob");
         assert_eq!((b.size, b.text), (two.size, two.text), "{path} {cap}");
-        let want = if b.size <= cap {
-            repo.blob_bytes(&at, path).expect("bytes")
-        } else {
-            Vec::new()
-        };
+        let want =
+            if b.size <= cap { repo.blob_bytes(&at, path).expect("bytes") } else { Vec::new() };
         assert_eq!(bytes, want, "{path} {cap}");
     }
 }

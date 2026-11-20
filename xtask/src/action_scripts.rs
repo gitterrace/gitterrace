@@ -25,21 +25,13 @@ pub fn load(root: &Path) -> Result<Vec<Script>> {
             .take_while(|l| l.starts_with('#'))
             .map(|l| l.trim_start_matches('#').trim())
             .collect();
-        let first = comment
-            .split(|l| l.is_empty())
-            .next()
-            .unwrap_or(&[])
-            .join(" ");
-        let summary = first
-            .split_once(". ")
-            .map_or_else(|| first.clone(), |(a, _)| format!("{a}."));
+        let first = comment.split(|l| l.is_empty()).next().unwrap_or(&[]).join(" ");
+        let summary =
+            first.split_once(". ").map_or_else(|| first.clone(), |(a, _)| format!("{a}."));
         let at = comment.iter().position(|l| l.starts_with("Needs"));
         let needs = at.map_or_else(String::new, |i| {
-            let mut paragraph: Vec<&str> = comment[i..]
-                .iter()
-                .take_while(|l| !l.is_empty())
-                .copied()
-                .collect();
+            let mut paragraph: Vec<&str> =
+                comment[i..].iter().take_while(|l| !l.is_empty()).copied().collect();
             if let Some(first) = paragraph.first_mut() {
                 *first = first.trim_start_matches("Needs").trim_start();
             }
@@ -59,11 +51,7 @@ pub fn load(root: &Path) -> Result<Vec<Script>> {
                 format!("{head} {}", rest.join(" "))
             }
         });
-        out.push(Script {
-            file,
-            summary,
-            needs,
-        });
+        out.push(Script { file, summary, needs });
     }
     Ok(out)
 }

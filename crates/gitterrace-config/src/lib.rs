@@ -65,16 +65,10 @@ pub enum ConfigError {
     Invalid { key: String, why: String },
     /// The config file could not be read.
     #[error("{}: {source}", path.display())]
-    Read {
-        path: std::path::PathBuf,
-        source: std::io::Error,
-    },
+    Read { path: std::path::PathBuf, source: std::io::Error },
     /// The config file holds a bad setting.
     #[error("{}: {source}", path.display())]
-    File {
-        path: std::path::PathBuf,
-        source: Box<Self>,
-    },
+    File { path: std::path::PathBuf, source: Box<Self> },
 }
 
 /// Where the config directory is.
@@ -114,10 +108,7 @@ pub fn home_dir() -> Option<PathBuf> {
 pub fn tilde(path: &Path) -> String {
     home_dir()
         .and_then(|h| path.strip_prefix(h).ok().map(Path::to_path_buf))
-        .map_or_else(
-            || path.display().to_string(),
-            |rest| format!("~/{}", rest.display()),
-        )
+        .map_or_else(|| path.display().to_string(), |rest| format!("~/{}", rest.display()))
 }
 
 /// `~`, `~/x` (and `~\x` on Windows) against `home`; anything else as written.
@@ -155,11 +146,7 @@ impl Loaded {
         let mut out = String::new();
         for k in &keys() {
             let name = format!("{}.{}", k.section, k.name);
-            let src = self
-                .sources
-                .get(name.as_str())
-                .copied()
-                .unwrap_or(Source::Default);
+            let src = self.sources.get(name.as_str()).copied().unwrap_or(Source::Default);
             let _ = writeln!(out, "{name} = {}  ({})", self.config.show(k), src.label());
         }
         for (repo, o) in &self.config.repo {
@@ -183,10 +170,7 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, ConfigError> {
         None => None,
     };
     match text {
-        Some((path, t)) => parse(&t).map_err(|e| ConfigError::File {
-            path,
-            source: Box::new(e),
-        }),
+        Some((path, t)) => parse(&t).map_err(|e| ConfigError::File { path, source: Box::new(e) }),
         None => Ok(parse("").unwrap_or_else(|_| unreachable_defaults())),
     }
 }
@@ -214,21 +198,15 @@ pub fn template() -> String {
 }
 
 fn unreachable_defaults() -> Loaded {
-    Loaded {
-        config: Config::default(),
-        sources: BTreeMap::new(),
-        warnings: Vec::new(),
-    }
+    Loaded { config: Config::default(), sources: BTreeMap::new(), warnings: Vec::new() }
 }
 
 /// Parses config text. Unknown keys become warnings.
 pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
-    let table: toml::Table = text
-        .parse()
-        .map_err(|e: toml::de::Error| ConfigError::Parse {
-            msg: e.to_string(),
-            at: e.span().map(|s| s.start),
-        })?;
+    let table: toml::Table = text.parse().map_err(|e: toml::de::Error| ConfigError::Parse {
+        msg: e.to_string(),
+        at: e.span().map(|s| s.start),
+    })?;
     let mut warnings = Vec::new();
     let mut sources = BTreeMap::new();
     for (section, v) in &table {
@@ -240,10 +218,7 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
             continue;
         }
         for name in sub.keys() {
-            match keys()
-                .iter()
-                .find(|k| k.section == section && k.name == name)
-            {
+            match keys().iter().find(|k| k.section == section && k.name == name) {
                 Some(k) => {
                     sources.insert(k.id, Source::File);
                 }
@@ -253,11 +228,7 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
     }
     let config = Config::from_table(table)?;
     config.validate()?;
-    Ok(Loaded {
-        config,
-        sources,
-        warnings,
-    })
+    Ok(Loaded { config, sources, warnings })
 }
 
 #[cfg(test)]
@@ -281,27 +252,16 @@ mod tests {
     #[test]
     fn config_errors_keep_their_text() {
         assert_eq!(
-            ConfigError::Expected {
-                key: "a.b".into(),
-                expected: "x or y".into()
-            }
-            .to_string(),
+            ConfigError::Expected { key: "a.b".into(), expected: "x or y".into() }.to_string(),
             "a.b: expected x or y"
         );
         assert_eq!(
-            ConfigError::Invalid {
-                key: "a.b".into(),
-                why: "bad".into()
-            }
-            .to_string(),
+            ConfigError::Invalid { key: "a.b".into(), why: "bad".into() }.to_string(),
             "a.b: bad"
         );
         let e = ConfigError::File {
             path: "/c/config.toml".into(),
-            source: Box::new(ConfigError::Parse {
-                msg: "oops".into(),
-                at: None,
-            }),
+            source: Box::new(ConfigError::Parse { msg: "oops".into(), at: None }),
         };
         assert_eq!(e.to_string(), "/c/config.toml: oops");
         let e = parse("[repo.x.features]\nlive = true\n").expect_err("override");
@@ -331,32 +291,17 @@ mod tests {
         .expect("parse")
         .config;
         let old = Config::default();
-        let restart: Vec<&str> = keys()
-            .iter()
-            .filter(|k| k.reload == Reload::Restart)
-            .map(|k| k.id)
-            .collect();
+        let restart: Vec<&str> =
+            keys().iter().filter(|k| k.reload == Reload::Restart).map(|k| k.id).collect();
         for k in keys() {
-            let says = k
-                .doc
-                .split_whitespace()
-                .collect::<Vec<_>>()
-                .join(" ")
-                .contains("Needs a restart");
-            assert_eq!(
-                says,
-                k.reload == Reload::Restart,
-                "{}: doc and table disagree",
-                k.id
-            );
+            let says =
+                k.doc.split_whitespace().collect::<Vec<_>>().join(" ").contains("Needs a restart");
+            assert_eq!(says, k.reload == Reload::Restart, "{}: doc and table disagree", k.id);
         }
         assert_eq!(old.restart_changes(&changed), restart);
         changed.keep_restart(&old);
         assert_eq!(old.restart_changes(&changed), [] as [&str; 0]);
-        assert_eq!(
-            changed.server.live_streams, 3,
-            "live keys are not held back"
-        );
+        assert_eq!(changed.server.live_streams, 3, "live keys are not held back");
     }
 
     #[test]
@@ -405,10 +350,7 @@ mod tests {
         let off = parse("[display]\nhas_line_hover = false\n").expect("parses");
         assert!(!off.config.display.has_line_hover);
         let all = keys();
-        let k = all
-            .iter()
-            .find(|k| k.id == "display.has_line_hover")
-            .expect("key exists");
+        let k = all.iter().find(|k| k.id == "display.has_line_hover").expect("key exists");
         assert_eq!(k.reload, Reload::Live);
     }
 
@@ -421,10 +363,7 @@ mod tests {
             e.to_string().contains("display.sidebar") && e.to_string().contains("churm"),
             "{e}"
         );
-        assert!(
-            e.to_string().contains("loose_ends"),
-            "names the valid ones: {e}"
-        );
+        assert!(e.to_string().contains("loose_ends"), "names the valid ones: {e}");
         let l = parse("[display]\nsidebar = []\n").expect("empty is valid");
         assert_eq!(l.config.display.sidebar, [] as [std::string::String; 0]);
     }
@@ -434,21 +373,13 @@ mod tests {
     fn the_sidebar_shows_loose_ends_before_recent_by_default() {
         let s = &parse("").expect("empty").config.display.sidebar;
         let at = |n: &str| s.iter().position(|x| x == n).expect(n);
-        assert!(
-            at("now") < at("loose_ends") && at("loose_ends") < at("recent"),
-            "{s:?}"
-        );
+        assert!(at("now") < at("loose_ends") && at("loose_ends") < at("recent"), "{s:?}");
     }
 
     /// Every address another machine can reach needs `public`; loopback never does.
     #[test]
     fn a_reachable_address_needs_public() {
-        for addr in [
-            "0.0.0.0:4250",
-            "[::]:4250",
-            "192.168.1.5:4250",
-            "10.0.0.1:80",
-        ] {
+        for addr in ["0.0.0.0:4250", "[::]:4250", "192.168.1.5:4250", "10.0.0.1:80"] {
             let e = parse(&format!("[server]\naddr = \"{addr}\"\n")).expect_err(addr);
             assert!(e.to_string().contains("server.is_public"), "{addr}: {e}");
             parse(&format!("[server]\naddr = \"{addr}\"\nis_public = true\n")).expect(addr);
@@ -483,22 +414,10 @@ mod tests {
     #[test]
     fn a_value_outside_a_fixed_set_names_the_key_and_every_accepted_value() {
         for (toml, msg) in [
-            (
-                "[insights]\nperiod = \"2y\"\n",
-                "insights.period: expected 1w, 1m, 3m, 1y or all",
-            ),
-            (
-                "[display]\ntheme = \"blue\"\n",
-                "display.theme: expected system, light or dark",
-            ),
-            (
-                "[display]\ndates = \"iso\"\n",
-                "display.dates: expected relative or absolute",
-            ),
-            (
-                "[links]\nstyle = \"http\"\n",
-                "links.style: expected gitterrace or go",
-            ),
+            ("[insights]\nperiod = \"2y\"\n", "insights.period: expected 1w, 1m, 3m, 1y or all"),
+            ("[display]\ntheme = \"blue\"\n", "display.theme: expected system, light or dark"),
+            ("[display]\ndates = \"iso\"\n", "display.dates: expected relative or absolute"),
+            ("[links]\nstyle = \"http\"\n", "links.style: expected gitterrace or go"),
         ] {
             assert_eq!(parse(toml).expect_err(toml).to_string(), msg);
         }

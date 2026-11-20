@@ -27,10 +27,8 @@ const END: &str = "<!-- END GENERATED: unreleased -->";
 pub fn render(root: &Path, refresh: bool) -> Result<Vec<Out>> {
     let current = || -> Result<Vec<Out>> {
         let text = std::fs::read_to_string(root.join(FILE)).context("reading CHANGELOG.md")?;
-        let body = text
-            .split_once(BEGIN)
-            .and_then(|(_, r)| r.split_once(END))
-            .map_or("", |(b, _)| b);
+        let body =
+            text.split_once(BEGIN).and_then(|(_, r)| r.split_once(END)).map_or("", |(b, _)| b);
         Ok(vec![Out::block(FILE, "unreleased", body)])
     };
     if !refresh {
@@ -44,11 +42,7 @@ pub fn render(root: &Path, refresh: bool) -> Result<Vec<Out>> {
     else {
         return current();
     };
-    anyhow::ensure!(
-        out.status.success(),
-        "git-cliff: {}",
-        String::from_utf8_lossy(&out.stderr)
-    );
+    anyhow::ensure!(out.status.success(), "git-cliff: {}", String::from_utf8_lossy(&out.stderr));
     let text = String::from_utf8(out.stdout).context("git-cliff output")?;
     let text = unreleased_only(&text, &released_items(&file));
     Ok(vec![Out::block(FILE, "unreleased", section(&text))])
@@ -150,18 +144,10 @@ mod tests {
     #[test]
     fn a_long_item_wraps_under_its_dash_and_headings_stay() {
         let long = "web: ".to_owned() + &"word ".repeat(30);
-        let s = section(&format!(
-            "## [Unreleased]\n\n### Added\n\n- {long}\n- short\n"
-        ));
-        assert!(
-            s.starts_with("## [Unreleased]\n\n### Added\n\n- web: word"),
-            "{s}"
-        );
+        let s = section(&format!("## [Unreleased]\n\n### Added\n\n- {long}\n- short\n"));
+        assert!(s.starts_with("## [Unreleased]\n\n### Added\n\n- web: word"), "{s}");
         assert!(s.lines().all(|l| l.chars().count() <= WIDTH), "{s}");
-        assert!(
-            s.lines().filter(|l| l.starts_with("  word")).count() >= 1,
-            "{s}"
-        );
+        assert!(s.lines().filter(|l| l.starts_with("  word")).count() >= 1, "{s}");
         assert!(s.ends_with("- short\n"), "{s}");
     }
 

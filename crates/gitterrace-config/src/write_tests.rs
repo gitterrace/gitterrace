@@ -36,18 +36,10 @@ fn entries(d: &Path) -> Vec<String> {
 fn invalid_toml_is_refused_and_the_file_is_unchanged() {
     let d = dir_with(GOOD);
     let before = (bytes(d.path()), stamp(d.path()), entries(d.path()));
-    for bad in [
-        "[watch\n",
-        "[watch]\nrescan_secs = 1\n",
-        "[server]\naddr = \"nope\"\n",
-    ] {
+    for bad in ["[watch\n", "[watch]\nrescan_secs = 1\n", "[server]\naddr = \"nope\"\n"] {
         let e = save_config(d.path(), bad, before.1).expect_err(bad);
         assert!(matches!(e, SaveError::Invalid(_)), "{bad}: {e}");
-        assert_eq!(
-            (bytes(d.path()), stamp(d.path()), entries(d.path())),
-            before,
-            "{bad}"
-        );
+        assert_eq!((bytes(d.path()), stamp(d.path()), entries(d.path())), before, "{bad}");
     }
 }
 

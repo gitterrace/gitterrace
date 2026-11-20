@@ -36,9 +36,7 @@ impl Selection {
     /// The selection of the filter text `q` alone.
     #[must_use]
     pub fn of(q: &Query) -> Self {
-        Self {
-            q: (!q.is_empty()).then(|| q.to_string()),
-        }
+        Self { q: (!q.is_empty()).then(|| q.to_string()) }
     }
 
     /// The query `q` says. Empty or blank text is the empty query.
@@ -98,12 +96,7 @@ impl<'a> Scoped<'a> {
             .enumerate()
             .map(|(i, (r, _))| (*r, u32::try_from(i).unwrap_or(u32::MAX)))
             .collect();
-        Self {
-            base: Arc::clone(base),
-            kept,
-            by_base,
-            over: SumOverflow::new(),
-        }
+        Self { base: Arc::clone(base), kept, by_base, over: SumOverflow::new() }
     }
 
     fn base_rank(&self, r: Rank) -> Option<Rank> {
@@ -114,18 +107,10 @@ impl<'a> Scoped<'a> {
         let Some((b, keep)) = self.kept.get(r.0 as usize) else {
             return Vec::new();
         };
-        let rows = self
-            .base
-            .rows_for(vec![*b])
-            .next()
-            .map(|x| x.1)
-            .unwrap_or_default();
+        let rows = self.base.rows_for(vec![*b]).next().map(|x| x.1).unwrap_or_default();
         match keep {
             None => rows,
-            Some(k) => k
-                .iter()
-                .filter_map(|i| rows.get(*i as usize).copied())
-                .collect(),
+            Some(k) => k.iter().filter_map(|i| rows.get(*i as usize).copied()).collect(),
         }
     }
 
@@ -187,9 +172,7 @@ impl InsightsSource for Scoped<'_> {
     }
 
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
-        self.base_rank(rank)
-            .map(|b| self.base.parent_ids(b))
-            .unwrap_or_default()
+        self.base_rank(rank).map(|b| self.base.parent_ids(b)).unwrap_or_default()
     }
 
     fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
@@ -301,10 +284,7 @@ impl InsightsSource for Scoped<'_> {
 
 /// True when `path` is `prefix` itself or inside it.
 pub fn under(path: &str, prefix: &str) -> bool {
-    path == prefix
-        || path
-            .strip_prefix(prefix)
-            .is_some_and(|rest| rest.starts_with('/'))
+    path == prefix || path.strip_prefix(prefix).is_some_and(|rest| rest.starts_with('/'))
 }
 
 /// The counting options as URL parameters. Absent ones keep the defaults they are applied to.

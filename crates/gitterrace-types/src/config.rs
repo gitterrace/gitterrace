@@ -40,10 +40,7 @@ impl Period {
     #[must_use]
     pub const fn window(self, now: i64) -> (i64, i64) {
         match self.days() {
-            Some(d) => (
-                now.saturating_add(1).saturating_sub(d * DAY),
-                now.saturating_add(1),
-            ),
+            Some(d) => (now.saturating_add(1).saturating_sub(d * DAY), now.saturating_add(1)),
             None => (i64::MIN, now.saturating_add(1)),
         }
     }
@@ -87,11 +84,7 @@ impl DiffPalette {
     /// The `data-diff-palette` value, empty for the default colors.
     #[must_use]
     pub fn attr(self) -> String {
-        if self == Self::Default {
-            String::new()
-        } else {
-            self.as_str().to_owned()
-        }
+        if self == Self::Default { String::new() } else { self.as_str().to_owned() }
     }
 }
 

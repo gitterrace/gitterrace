@@ -16,9 +16,7 @@ use gitterrace_testkit::{a11y, oracle};
 
 /// Where a failing run writes the differing bodies: under `target/`, never the source tree.
 fn dump(golden: &Path) -> std::path::PathBuf {
-    let name = golden
-        .file_stem()
-        .map_or_else(|| "golden".into(), |s| s.to_string_lossy());
+    let name = golden.file_stem().map_or_else(|| "golden".into(), |s| s.to_string_lossy());
     Path::new(env!("CARGO_TARGET_TMPDIR")).join(format!("{name}.actual"))
 }
 
@@ -30,10 +28,7 @@ fn targets() -> Vec<String> {
 /// The temp folder differs per run: it must not reach a digest.
 fn scrub(answers: BTreeMap<String, String>, tmp: &Path) -> BTreeMap<String, String> {
     let t = tmp.to_string_lossy().into_owned();
-    answers
-        .into_iter()
-        .map(|(k, v)| (k, millis(&v.replace(&t, "<TMP>"))))
-        .collect()
+    answers.into_iter().map(|(k, v)| (k, millis(&v.replace(&t, "<TMP>")))).collect()
 }
 
 /// Blanks the elapsed time a search page prints (`in 8 ms`): wall clock, not output.
@@ -57,10 +52,7 @@ async fn run(mm: Mailmap, cells: &[matrix::Cell]) -> BTreeMap<String, String> {
     oracle::ready(&router).await;
     let tag = tag(mm);
     let got = oracle::capture(&router, &targets(), cells, &values).await;
-    scrub(got, dir.path())
-        .into_iter()
-        .map(|(k, v)| (format!("[{tag}] {k}"), v))
-        .collect()
+    scrub(got, dir.path()).into_iter().map(|(k, v)| (format!("[{tag}] {k}"), v)).collect()
 }
 
 /// A renamed-and-reused path: `src/lib.rs` moves to `src/core.rs`, and a new `src/lib.rs`
@@ -94,9 +86,7 @@ async fn golden_answers() -> BTreeMap<String, String> {
         for n in named.iter().filter(|n| n.cell.mailmap == mm) {
             let got = oracle::capture(&router, &[n.page.to_owned()], &[n.cell], &values).await;
             answers.extend(
-                scrub(got, dir.path())
-                    .into_iter()
-                    .map(|(k, v)| (format!("[{}] {k}", tag(mm)), v)),
+                scrub(got, dir.path()).into_iter().map(|(k, v)| (format!("[{}] {k}", tag(mm)), v)),
             );
         }
     }
@@ -109,16 +99,9 @@ async fn golden_answers() -> BTreeMap<String, String> {
         .filter(|n| n.page.contains("ownership") && n.cell.mailmap == Mailmap::AsIs)
         .map(|n| n.cell)
         .collect();
-    let pages = [
-        "/stats/ownership".to_owned(),
-        "/api/v1/insights/ownership".to_owned(),
-    ];
+    let pages = ["/stats/ownership".to_owned(), "/api/v1/insights/ownership".to_owned()];
     let got = oracle::capture(&router, &pages, &cells, &values).await;
-    answers.extend(
-        scrub(got, dir.path())
-            .into_iter()
-            .map(|(k, v)| (format!("[renamed] {k}"), v)),
-    );
+    answers.extend(scrub(got, dir.path()).into_iter().map(|(k, v)| (format!("[renamed] {k}"), v)));
     answers
 }
 
@@ -151,11 +134,7 @@ fn every_golden_page_passes_the_page_checks() {
     let rt = tokio::runtime::Runtime::new().expect("runtime");
     let mut bad = Vec::new();
     for (key, body) in rt.block_on(golden_answers()) {
-        let reads = if key.contains("/api/") {
-            Vec::new()
-        } else {
-            a11y::problems(&body)
-        };
+        let reads = if key.contains("/api/") { Vec::new() } else { a11y::problems(&body) };
         let found = [
             (
                 "repeated header destination",
@@ -168,11 +147,7 @@ fn every_golden_page_passes_the_page_checks() {
             bad.push(format!("{key}: {what}: {d:?}"));
         }
     }
-    assert!(
-        bad.is_empty(),
-        "pages failing a page check:\n{}",
-        bad.join("\n")
-    );
+    assert!(bad.is_empty(), "pages failing a page check:\n{}", bad.join("\n"));
 }
 
 /// The per-commit proof that the pairwise golden loses nothing: at this build, run the full
@@ -289,37 +264,22 @@ const BROWSE: [&str; 59] = [
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
 const EXEMPT: [(&str, &str); 16] = [
-    (
-        "/api/last/{rev}",
-        "a fragment the tree page fetches, filled by the file walk",
-    ),
+    ("/api/last/{rev}", "a fragment the tree page fetches, filled by the file walk"),
     ("/api/last/{rev}/{*path}", "same fragment, below the root"),
     ("/api/progress", "indexing state, changes with timing"),
     ("/events", "an event stream, never a page"),
     ("/go/{*rest}", "a redirect to a served repository by id"),
     ("/_send/targets", "targets from the user's actions file"),
-    (
-        "/r/{name}/_send/targets",
-        "same, under the repository prefix",
-    ),
+    ("/r/{name}/_send/targets", "same, under the repository prefix"),
     ("/r/{name}", "forwards to the repository"),
     ("/r/{name}/", "forwards to the repository"),
-    (
-        "/r/{name}/{*rest}",
-        "the repository prefix, covered by every cell",
-    ),
+    ("/r/{name}/{*rest}", "the repository prefix, covered by every cell"),
     ("/api/repos", "the repository list, holds a temp path"),
     ("/_dirty", "live working tree state, tested in multi::tests"),
-    (
-        "/_repos",
-        "adds and removes repositories, secret and loopback only",
-    ),
+    ("/_repos", "adds and removes repositories, secret and loopback only"),
     ("/_settings", "reads the user's config file"),
     ("/_settings/file", "reads and writes the user's config file"),
-    (
-        "/_settings/check",
-        "checks a posted config file, never a page",
-    ),
+    ("/_settings/check", "checks a posted config file, never a page"),
 ];
 
 /// Whether the route literal `route` (`/blob/{rev}/{*path}`) serves the concrete `path`.
@@ -330,13 +290,8 @@ fn serves(route: &str, path: &str) -> bool {
         if seg.starts_with("{*") {
             return p.len() > i && !p[i].is_empty();
         }
-        let ok = p.get(i).is_some_and(|q| {
-            if seg.starts_with('{') {
-                !q.is_empty()
-            } else {
-                seg == q
-            }
-        });
+        let ok =
+            p.get(i).is_some_and(|q| if seg.starts_with('{') { !q.is_empty() } else { seg == q });
         if !ok {
             return false;
         }
@@ -352,15 +307,9 @@ fn every_routed_page_kind_has_a_golden_cell() {
     assert!(serves("/blob/{rev}/{*path}", "/blob/HEAD/a/b.rs"));
     assert!(!serves("/blob/{rev}/{*path}", "/blob/HEAD"));
     assert!(serves("/tree/{rev}/", "/tree/HEAD/") && !serves("/tree/{rev}/", "/tree/HEAD"));
-    let routes: Vec<&str> = gitterrace_web::sitemap::PAGES
-        .iter()
-        .flat_map(|p| p.routes.iter().copied())
-        .collect();
-    let cells: Vec<&str> = gitterrace_web::WARM_PAGES
-        .iter()
-        .chain(&BROWSE)
-        .copied()
-        .collect();
+    let routes: Vec<&str> =
+        gitterrace_web::sitemap::PAGES.iter().flat_map(|p| p.routes.iter().copied()).collect();
+    let cells: Vec<&str> = gitterrace_web::WARM_PAGES.iter().chain(&BROWSE).copied().collect();
     let bare: Vec<&str> = routes
         .iter()
         .copied()
@@ -368,20 +317,10 @@ fn every_routed_page_kind_has_a_golden_cell() {
         .filter(|r| !cells.iter().any(|c| serves(r, c)))
         .collect();
     assert!(bare.is_empty(), "routes with no golden cell: {bare:?}");
-    let stale: Vec<&str> = EXEMPT
-        .iter()
-        .map(|e| e.0)
-        .filter(|e| !routes.contains(e))
-        .collect();
-    assert!(
-        stale.is_empty(),
-        "EXEMPT names routes that do not exist: {stale:?}"
-    );
-    let orphans: Vec<&str> = BROWSE
-        .iter()
-        .copied()
-        .filter(|c| !routes.iter().any(|r| serves(r, c)))
-        .collect();
+    let stale: Vec<&str> = EXEMPT.iter().map(|e| e.0).filter(|e| !routes.contains(e)).collect();
+    assert!(stale.is_empty(), "EXEMPT names routes that do not exist: {stale:?}");
+    let orphans: Vec<&str> =
+        BROWSE.iter().copied().filter(|c| !routes.iter().any(|r| serves(r, c))).collect();
     assert!(orphans.is_empty(), "cells no route serves: {orphans:?}");
 }
 
@@ -403,11 +342,7 @@ fn browsing_pages_match_the_oracle() {
         for uri in BROWSE {
             let (status, body) = gitterrace_testkit::page(&router, uri).await;
             let body = oracle::normalize(&body);
-            let v = if status == 200 {
-                body
-            } else {
-                format!("status {status}\n{body}")
-            };
+            let v = if status == 200 { body } else { format!("status {status}\n{body}") };
             got.insert(format!("[browse] {uri}"), v);
         }
         scrub(got, dir.path())
@@ -450,9 +385,7 @@ fn other_revisions_match_the_oracle() {
             oracle::ready_at(&router, rev).await;
             let got = oracle::capture_rev(&router, &targets(), &cells, &values, rev).await;
             out.extend(
-                scrub(got, dir.path())
-                    .into_iter()
-                    .map(|(k, v)| (format!("[{rev}] {k}"), v)),
+                scrub(got, dir.path()).into_iter().map(|(k, v)| (format!("[{rev}] {k}"), v)),
             );
         }
         out
@@ -475,11 +408,7 @@ fn the_matrix_does_not_depend_on_the_local_zone() {
             std::fs::remove_dir_all(&out).expect("remove old dump");
         }
         let status = std::process::Command::new(&exe)
-            .args([
-                "every_cell_matches_the_oracle",
-                "--exact",
-                "--test-threads=1",
-            ])
+            .args(["every_cell_matches_the_oracle", "--exact", "--test-threads=1"])
             .env(oracle::NOW_VAR, oracle::FROZEN_NOW.to_string())
             .env("TZ", zone)
             .env("TEST_ORACLE_DUMP", &out)
@@ -526,10 +455,7 @@ fn the_frozen_clock_reaches_every_page() {
         let v: serde_json::Value = serde_json::from_str(&api).expect("json");
         // The newest commit not after the frozen now is 2024-03-08 or 03-09: the reference
         // time is that, not the wall clock's 2026.
-        assert!(
-            v.to_string().contains("1709") || v.to_string().contains("1710"),
-            "{v}"
-        );
+        assert!(v.to_string().contains("1709") || v.to_string().contains("1710"), "{v}");
         // Relative dates count from the frozen now (web fmt::now): a commit two days before it
         // reads "2 days ago", against the wall clock it would read years.
         let plain = dir.path().join("plain");
@@ -559,10 +485,8 @@ fn a_real_history_samples_match_the_oracle() {
         path: "builtin".to_owned(),
         exclude: "t/**".to_owned(),
     };
-    let cells: Vec<_> = matrix::sample(64, 64)
-        .into_iter()
-        .filter(|c| c.mailmap == Mailmap::AsIs)
-        .collect();
+    let cells: Vec<_> =
+        matrix::sample(64, 64).into_iter().filter(|c| c.mailmap == Mailmap::AsIs).collect();
     let answers = rt.block_on(async {
         let router = gitterrace_web::app_router(Path::new(&repo)).expect("router");
         oracle::ready(&router).await;

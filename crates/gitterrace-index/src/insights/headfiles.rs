@@ -63,10 +63,7 @@ pub fn head_files(
             n
         };
         if lines > 0 {
-            out.push(HeadFile {
-                path: f.path,
-                lines,
-            });
+            out.push(HeadFile { path: f.path, lines });
         }
     }
     Ok(out)

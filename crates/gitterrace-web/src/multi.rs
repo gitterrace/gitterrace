@@ -115,10 +115,7 @@ impl Table {
     /// repository are served once.
     pub(crate) fn new(paths: Vec<PathBuf>, env: Env, state: Option<PathBuf>) -> io::Result<Self> {
         let table = Self {
-            repos: RwLock::new(Repos {
-                peers: env.related.clone(),
-                ..Repos::default()
-            }),
+            repos: RwLock::new(Repos { peers: env.related.clone(), ..Repos::default() }),
             env,
             state,
             live: None,
@@ -131,29 +128,23 @@ impl Table {
                 continue;
             }
             let name =
-                table
-                    .allocate(&g, &url_stem(&repo.name()), &root)
-                    .map_err(|NameError(stem)| {
-                        io::Error::other(format!(
-                            "unusable repository name {stem:?} for {}",
-                            path.display()
-                        ))
-                    })?;
+                table.allocate(&g, &url_stem(&repo.name()), &root).map_err(|NameError(stem)| {
+                    io::Error::other(format!(
+                        "unusable repository name {stem:?} for {}",
+                        path.display()
+                    ))
+                })?;
             g.insert(name, path, root, false);
         }
         Ok(table)
     }
 
     fn read(&self) -> std::sync::RwLockReadGuard<'_, Repos> {
-        self.repos
-            .read()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.repos.read().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     fn write(&self) -> std::sync::RwLockWriteGuard<'_, Repos> {
-        self.repos
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.repos.write().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// The URL name of the repository at `root`: the one the registry keeps for it, else a
@@ -182,10 +173,7 @@ impl Table {
     pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, NameError> {
         let mut g = self.write();
         if let Some(s) = g.order.iter().find(|s| s.root == root) {
-            return Ok(Added::Present {
-                name: s.name.clone(),
-                base: format!("/r/{}/", s.name),
-            });
+            return Ok(Added::Present { name: s.name.clone(), base: format!("/r/{}/", s.name) });
         }
         let name = self.allocate(&g, &url_stem(stem), &root)?;
         Ok(Added::Fresh(g.insert(name, root.clone(), root, true)))
@@ -197,11 +185,7 @@ impl Table {
     /// it was still served.
     pub(crate) fn remove(&self, served: &Arc<Served>) -> bool {
         let mut g = self.write();
-        if !g
-            .by_name
-            .get(&served.name)
-            .is_some_and(|s| Arc::ptr_eq(s, served))
-        {
+        if !g.by_name.get(&served.name).is_some_and(|s| Arc::ptr_eq(s, served)) {
             return false;
         }
         let gone = g.drop_name(&served.name);
@@ -294,9 +278,7 @@ impl Table {
     /// dropped would leave its tasks running for no one.
     pub(crate) async fn router_of(self: &Arc<Self>, served: &Arc<Served>) -> io::Result<Router> {
         let (table, served) = (Arc::clone(self), Arc::clone(served));
-        tokio::spawn(async move { table.build(&served).await })
-            .await
-            .map_err(io::Error::other)?
+        tokio::spawn(async move { table.build(&served).await }).await.map_err(io::Error::other)?
     }
 
     async fn build(&self, served: &Arc<Served>) -> io::Result<Router> {
@@ -418,9 +400,7 @@ impl Served {
     fn insights_state(&self) -> Option<crate::app::RepoState> {
         let built = self.app.lock().ok()?.upgrade().map(|a| a.state());
         built.or_else(|| {
-            self.opening
-                .load(Ordering::Acquire)
-                .then_some(crate::app::RepoState::Indexing)
+            self.opening.load(Ordering::Acquire).then_some(crate::app::RepoState::Indexing)
         })
     }
 
@@ -444,10 +424,7 @@ impl Served {
 /// case-insensitive disk.
 pub(crate) fn url_stem(folder: &str) -> String {
     // A bare clone's folder is conventionally `name.git`: the repository is `name`.
-    let folder = folder
-        .strip_suffix(".git")
-        .filter(|f| !f.is_empty())
-        .unwrap_or(folder);
+    let folder = folder.strip_suffix(".git").filter(|f| !f.is_empty()).unwrap_or(folder);
     let mapped: String = folder
         .trim_start_matches('.')
         .chars()
@@ -458,20 +435,14 @@ pub(crate) fn url_stem(folder: &str) -> String {
         })
         .collect();
     let trimmed = mapped.trim_matches(['-', '.']);
-    if trimmed.is_empty() {
-        "repo".to_owned()
-    } else {
-        trimmed.to_owned()
-    }
+    if trimmed.is_empty() { "repo".to_owned() } else { trimmed.to_owned() }
 }
 
 /// A URL-safe name: no separator, no dot prefix (so never `.` or `..`), nothing to escape.
 pub(crate) fn valid_name(name: &str) -> bool {
     !name.is_empty()
         && !name.starts_with('.')
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        && name.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
 }
 
 /// Index at `/`, the switcher list, shared assets, and every repository under `/r/NAME`.
@@ -526,10 +497,7 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
             return table.open_failed(&served.name, &e);
         }
     };
-    let pq = req
-        .uri()
-        .query()
-        .map_or_else(|| format!("/{rest}"), |q| format!("/{rest}?{q}"));
+    let pq = req.uri().query().map_or_else(|| format!("/{rest}"), |q| format!("/{rest}?{q}"));
     let (parts, body) = req.into_parts();
     let Ok(uri) = pq.parse::<Uri>() else {
         return StatusCode::BAD_REQUEST.into_response();
@@ -552,11 +520,7 @@ async fn dispatch(State(table): State<Arc<Table>>, req: Request) -> Response {
 fn opening_page(name: &str) -> Response {
     let status = StatusCode::SERVICE_UNAVAILABLE;
     let detail = format!("The repository {name} is being added and indexed. Try again shortly.");
-    (
-        status,
-        [(axum::http::header::RETRY_AFTER, "2")],
-        crate::error::page(status, &detail),
-    )
+    (status, [(axum::http::header::RETRY_AFTER, "2")], crate::error::page(status, &detail))
         .into_response()
 }
 

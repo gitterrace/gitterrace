@@ -84,23 +84,14 @@ mod tests {
             (Some("bogus"), Scope::All),
             (None, Scope::All),
         ] {
-            let q = ScopeQuery {
-                scope: raw.map(str::to_owned),
-            };
+            let q = ScopeQuery { scope: raw.map(str::to_owned) };
             assert_eq!(q.scope(), want);
         }
     }
 
     #[test]
     fn tabs_mark_one_current_and_carry_counts() {
-        let t = tabs(
-            Scope::Staged,
-            ScopeCounts {
-                all: 3,
-                staged: 2,
-                unstaged: 2,
-            },
-        );
+        let t = tabs(Scope::Staged, ScopeCounts { all: 3, staged: 2, unstaged: 2 });
         assert_eq!(t.iter().filter(|t| t.on).count(), 1);
         assert!(t[0].on && t[0].label == "Staged (2)");
         assert!(t[0].href.ends_with("/worktree?scope=staged"));

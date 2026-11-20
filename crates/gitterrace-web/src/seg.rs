@@ -22,11 +22,7 @@ pub(crate) struct Choice {
 
 impl Choice {
     pub(crate) fn new(label: impl Into<String>, target: impl Into<String>, on: bool) -> Self {
-        Self {
-            label: label.into(),
-            target: target.into(),
-            on,
-        }
+        Self { label: label.into(), target: target.into(), on }
     }
 }
 
@@ -48,12 +44,7 @@ pub(crate) struct Seg {
 impl Seg {
     /// A control of links named `name`, with `name` as its visible caption.
     pub(crate) fn links(name: &str, choices: Vec<Choice>) -> Self {
-        Self {
-            caption: name.to_owned(),
-            name: name.to_owned(),
-            choices,
-            ..Self::default()
-        }
+        Self { caption: name.to_owned(), name: name.to_owned(), choices, ..Self::default() }
     }
 
     /// Hides the caption; the group keeps its accessible name.

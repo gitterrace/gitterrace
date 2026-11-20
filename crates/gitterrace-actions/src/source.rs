@@ -22,11 +22,8 @@ pub struct Source {
 #[must_use]
 pub fn source_line(repo: &str, sha: &str, path: Option<&str>, lines: Option<Lines>) -> String {
     // A line break in a name would end the line early, so control characters become spaces.
-    let flat = |s: &str| -> String {
-        s.chars()
-            .map(|c| if c.is_control() { ' ' } else { c })
-            .collect()
-    };
+    let flat =
+        |s: &str| -> String { s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect() };
     let mut out = format!("{SOURCE_PREFIX}{}@{sha}", flat(repo));
     if let Some(p) = path {
         out.push(':');
@@ -48,10 +45,7 @@ pub fn source_line(repo: &str, sha: &str, path: Option<&str>, lines: Option<Line
 pub fn parse_source(line: &str) -> Option<Source> {
     let rest = line.strip_prefix(SOURCE_PREFIX)?;
     let (at, len) = rest.match_indices('@').find_map(|(i, _)| {
-        let hex = rest[i + 1..]
-            .bytes()
-            .take_while(u8::is_ascii_hexdigit)
-            .count();
+        let hex = rest[i + 1..].bytes().take_while(u8::is_ascii_hexdigit).count();
         let after = rest.as_bytes().get(i + 1 + hex);
         (hex >= 7 && matches!(after, None | Some(b':'))).then_some((i, hex))
     })?;
@@ -68,12 +62,7 @@ pub fn parse_source(line: &str) -> Option<Source> {
     if repo.is_empty() || path.as_deref().is_some_and(str::is_empty) {
         return None;
     }
-    Some(Source {
-        repo: repo.to_owned(),
-        sha: sha.to_owned(),
-        path,
-        lines,
-    })
+    Some(Source { repo: repo.to_owned(), sha: sha.to_owned(), path, lines })
 }
 
 /// The path as written: `%23` and `%25` back to `#` and `%`; any other escape is not ours.
@@ -142,12 +131,9 @@ mod tests {
 
     #[test]
     fn malformed_lines_do_not_parse() {
-        for bad in [
-            "source: r@xyz:p",
-            "source: @abcdef12:p",
-            "src: r@abcdef12",
-            "source: r@abcdef12:",
-        ] {
+        for bad in
+            ["source: r@xyz:p", "source: @abcdef12:p", "src: r@abcdef12", "source: r@abcdef12:"]
+        {
             assert!(parse_source(bad).is_none(), "{bad}");
         }
         for bad in [

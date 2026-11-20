@@ -19,13 +19,7 @@ pub struct Reloader {
 impl Reloader {
     pub fn new(path: PathBuf, repos: Vec<PathBuf>, initial: Config) -> Self {
         let stamp = stamp(&path);
-        Self {
-            path,
-            repos,
-            stamp,
-            current: Arc::new(RwLock::new(Arc::new(initial))),
-            error: None,
-        }
+        Self { path, repos, stamp, current: Arc::new(RwLock::new(Arc::new(initial))), error: None }
     }
 
     /// Why the last reload was refused; `None` once a later one succeeded.

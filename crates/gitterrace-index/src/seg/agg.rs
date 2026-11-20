@@ -55,14 +55,7 @@ impl Sums {
         ) else {
             return None;
         };
-        *self = Self {
-            add,
-            del,
-            rewritten,
-            code_add,
-            code_del,
-            code_rewritten,
-        };
+        *self = Self { add, del, rewritten, code_add, code_del, code_rewritten };
         Some(())
     }
 }
@@ -213,11 +206,7 @@ impl Aggregates {
             if first {
                 lm.touches += 1;
                 la.touches += 1;
-                lm.last = if lm.touches == 1 {
-                    r.time
-                } else {
-                    lm.last.max(r.time)
-                };
+                lm.last = if lm.touches == 1 { r.time } else { lm.last.max(r.time) };
             }
         }
     }
@@ -263,12 +252,7 @@ pub(crate) struct Packer<'w> {
 
 impl<'w> Packer<'w> {
     pub(crate) fn new(section: u16, sink: &'w mut Sink<'w>) -> Self {
-        Self {
-            section,
-            buf: Vec::new(),
-            items: 0,
-            sink,
-        }
+        Self { section, buf: Vec::new(), items: 0, sink }
     }
 
     /// True when the next item starts a block, so its deltas must be absolute.
@@ -280,11 +264,7 @@ impl<'w> Packer<'w> {
     /// this returns the item back because the block was cut first.
     pub(crate) fn push(&mut self, item: &[u8]) -> SegResult<bool> {
         if item.len() > MAX_BLOCK {
-            return Err(SegError::TooLong {
-                kind: "item",
-                len: item.len(),
-                max: MAX_BLOCK,
-            });
+            return Err(SegError::TooLong { kind: "item", len: item.len(), max: MAX_BLOCK });
         }
         if self.buf.len() + item.len() > MAX_BLOCK {
             self.flush()?;
@@ -423,22 +403,10 @@ pub(crate) fn decode_author_day(
         let who = u32_of(c, who)?;
         let commits = c.varint()?;
         let merges = c.varint()?;
-        let row = f(
-            day,
-            who,
-            AuthorDay {
-                commits,
-                merges,
-                lines: get_sums(c)?,
-            },
-        );
+        let row = f(day, who, AuthorDay { commits, merges, lines: get_sums(c)? });
         row.ok_or_else(|| c.err(SUM_OVER))?;
     }
-    if c.is_empty() {
-        Ok(())
-    } else {
-        Err(c.err("bytes after the last row"))
-    }
+    if c.is_empty() { Ok(()) } else { Err(c.err("bytes after the last row")) }
 }
 
 /// Rows of one life x month block (section 9), ascending by (life, month).
@@ -451,28 +419,14 @@ pub(crate) fn decode_life_month(
     let mut life = 0u32;
     for _ in 0..items {
         let d = c.varint()?;
-        life = life
-            .checked_add(u32_of(c, d)?)
-            .ok_or_else(|| c.err("life id over u32"))?;
+        life = life.checked_add(u32_of(c, d)?).ok_or_else(|| c.err("life id over u32"))?;
         let month = unzigzag(c.varint()?);
         let touches = c.varint()?;
         let last = unzigzag(c.varint()?);
-        let row = f(
-            life,
-            month,
-            LifeMonth {
-                touches,
-                lines: get_sums(c)?,
-                last,
-            },
-        );
+        let row = f(life, month, LifeMonth { touches, lines: get_sums(c)?, last });
         row.ok_or_else(|| c.err(SUM_OVER))?;
     }
-    if c.is_empty() {
-        Ok(())
-    } else {
-        Err(c.err("bytes after the last row"))
-    }
+    if c.is_empty() { Ok(()) } else { Err(c.err("bytes after the last row")) }
 }
 
 /// Rows of one path x author block (section 8, or 10 keyed by life), ascending by key.
@@ -484,32 +438,16 @@ pub(crate) fn decode_path_author(
     let mut path = 0u32;
     for _ in 0..items {
         let d = c.varint()?;
-        path = path
-            .checked_add(u32_of(c, d)?)
-            .ok_or_else(|| c.err("path id over u32"))?;
+        path = path.checked_add(u32_of(c, d)?).ok_or_else(|| c.err("path id over u32"))?;
         let who = c.varint()?;
         let who = u32_of(c, who)?;
         let touches = c.varint()?;
-        let row = f(
-            path,
-            who,
-            PathAuthor {
-                touches,
-                lines: get_sums(c)?,
-            },
-        );
+        let row = f(path, who, PathAuthor { touches, lines: get_sums(c)? });
         row.ok_or_else(|| c.err(SUM_OVER))?;
     }
-    if c.is_empty() {
-        Ok(())
-    } else {
-        Err(c.err("bytes after the last row"))
-    }
+    if c.is_empty() { Ok(()) } else { Err(c.err("bytes after the last row")) }
 }
 
 #[cfg(test)]
-#[expect(
-    clippy::many_single_char_names,
-    reason = "short names for the segment parts of a fixture"
-)]
+#[expect(clippy::many_single_char_names, reason = "short names for the segment parts of a fixture")]
 mod tests;

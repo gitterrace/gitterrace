@@ -36,13 +36,7 @@ fn every_section_counts_one_set_of_commits() {
         Some((day0 + 200, day0 + 200)),
         Some((day0 + 390, day0 + 420)),
     ];
-    for period in [
-        Period::Week,
-        Period::Month,
-        Period::Quarter,
-        Period::Year,
-        Period::All,
-    ] {
+    for period in [Period::Week, Period::Month, Period::Quarter, Period::Year, Period::All] {
         for days in ranges {
             let r = ins.rhythm_in(period, days);
             let series: u32 = r.series.iter().map(|p| p.commits).sum();
@@ -64,20 +58,12 @@ fn pulse_compares_with_previous_window() {
     // Day 0 = Monday 2024-01-01. Newest commit on day 20.
     let recs = vec![
         rec("a", "Ann", 0, vec![file("x.rs", 5, 1, 4)]),
-        rec(
-            "b",
-            "Bob",
-            10,
-            vec![file("x.rs", 3, 0, 7), file("Cargo.lock", 99, 0, 99)],
-        ),
+        rec("b", "Bob", 10, vec![file("x.rs", 3, 0, 7), file("Cargo.lock", 99, 0, 99)]),
         rec("c", "Ann", 20, vec![file("y.rs", 2, 2, 2)]),
     ];
     let ins = Insights::new(&recs, Options::default(), None);
     let s = ins.period_summary(Period::Month);
-    assert_eq!(
-        (s.current.commits, s.current.authors, s.current.files),
-        (3, 2, 2)
-    );
+    assert_eq!((s.current.commits, s.current.authors, s.current.files), (3, 2, 2));
     // Lock files are generated and left out.
     assert_eq!((s.current.additions, s.current.deletions), (10, 3));
     assert_eq!(s.previous.as_ref().map(|p| p.commits), Some(0));
@@ -124,14 +110,7 @@ fn contributors_have_series_and_flags() {
         rec("c", "Ann", 16, vec![file("x.rs", 1, 0, 5)]),
         rec("d", "Cy", 16, vec![]),
     ];
-    let ins = Insights::new(
-        &recs,
-        Options {
-            include_bots: true,
-            ..Options::default()
-        },
-        None,
-    );
+    let ins = Insights::new(&recs, Options { include_bots: true, ..Options::default() }, None);
     let rep = ins.contributors(Period::All);
     assert_eq!(rep.labels.len(), rep.contributors[0].series.len());
     assert_eq!(rep.contributors[0].name, "Ann");
@@ -141,16 +120,8 @@ fn contributors_have_series_and_flags() {
     assert!(rep.contributors.iter().any(|c| c.bot));
     let m = ins.contributors(Period::Week);
     assert_eq!(m.labels.len(), 7);
-    assert!(
-        m.contributors
-            .iter()
-            .all(|c| c.first_time || c.name == "Ann")
-    );
-    assert!(
-        m.contributors
-            .iter()
-            .any(|c| c.name == "Cy" && c.first_time)
-    );
+    assert!(m.contributors.iter().all(|c| c.first_time || c.name == "Ann"));
+    assert!(m.contributors.iter().any(|c| c.name == "Cy" && c.first_time));
 }
 
 /// Newest commit Sunday day 20 at noon UTC, so 1w counts local days 14 to 20. `early` sits
@@ -167,12 +138,7 @@ fn week_edges() -> Vec<crate::CommitRecord> {
         rec("a", "Ann", 0, vec![file("x.rs", 1, 0, 1)]),
         late,
         early,
-        rec(
-            "bot",
-            "dependabot[bot]",
-            18,
-            vec![file("Cargo.toml", 1, 0, 1)],
-        ),
+        rec("bot", "dependabot[bot]", 18, vec![file("Cargo.toml", 1, 0, 1)]),
         rec("z", "Ann", 20, vec![file("x.rs", 1, 0, 2)]),
     ];
     v.sort_by_key(|r| r.time);
@@ -211,21 +177,10 @@ fn contributors_follow_the_bot_option() {
     let recs = week_edges();
     let off = Insights::new(&recs, Options::default(), None);
     let names = |i: &Insights<'_>| -> Vec<String> {
-        i.contributors(Period::All)
-            .contributors
-            .into_iter()
-            .map(|c| c.name)
-            .collect()
+        i.contributors(Period::All).contributors.into_iter().map(|c| c.name).collect()
     };
-    assert!(
-        !names(&off).iter().any(|n| n.contains("[bot]")),
-        "{:?}",
-        names(&off)
-    );
-    let on = Options {
-        include_bots: true,
-        ..Options::default()
-    };
+    assert!(!names(&off).iter().any(|n| n.contains("[bot]")), "{:?}", names(&off));
+    let on = Options { include_bots: true, ..Options::default() };
     let on = Insights::new(&recs, on, None);
     assert!(names(&on).iter().any(|n| n.contains("[bot]")));
 }
@@ -279,11 +234,7 @@ fn all_counts_every_admitted_commit_whatever_the_clock() {
         far,
     ];
     let ins = Insights::new(&recs, Options::default(), None);
-    assert_eq!(
-        ins.period_summary(Period::All).current.commits,
-        3,
-        "the page"
-    );
+    assert_eq!(ins.period_summary(Period::All).current.commits, 3, "the page");
     let s = Scope::from_params(&ScopeParams::default(), Options::default(), Period::All)
         .expect("scope");
     let src = MemorySource::new(&recs);
@@ -339,11 +290,7 @@ fn first_time_is_judged_on_counted_commits() {
         names
     };
     assert_eq!(new(Some("docs")), ["Bob"], "a path chip makes no one new");
-    assert_eq!(
-        new(None),
-        ["Bob"],
-        "Ann and Cy committed before the week, a merge never counts"
-    );
+    assert_eq!(new(None), ["Bob"], "Ann and Cy committed before the week, a merge never counts");
 }
 
 #[test]

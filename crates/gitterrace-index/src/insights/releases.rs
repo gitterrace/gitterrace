@@ -76,11 +76,7 @@ impl Insights<'_> {
         // Counted commits up to and including each rank: the gap between two releases is the
         // difference, so it never counts a merge or a commit the selection leaves out.
         let mut upto: Vec<usize> = Vec::new();
-        let scan = if found.is_empty() {
-            None
-        } else {
-            Some(src.commits_in(CommitRange::All))
-        };
+        let scan = if found.is_empty() { None } else { Some(src.commits_in(CommitRange::All)) };
         for c in scan.into_iter().flatten() {
             let i = c.rank.0 as usize;
             if upto.len() <= i {
@@ -99,10 +95,8 @@ impl Insights<'_> {
                 name: name.to_owned(),
                 commit: id.to_string(),
                 time,
-                commits_since: prev.map_or_else(
-                    || through(i),
-                    |(p, _)| through(i).saturating_sub(through(p)),
-                ),
+                commits_since: prev
+                    .map_or_else(|| through(i), |(p, _)| through(i).saturating_sub(through(p))),
                 days_since: prev.map(|(_, pt)| cx.days_between(pt, time)),
             });
             prev = Some((i, time));
@@ -161,17 +155,10 @@ mod tests {
             rec("c", "Ann", 4, vec![file("x.rs", 1, 0, 5)]),
         ];
         recs[2].merge = true;
-        let tags = vec![
-            ("v1".to_owned(), "a".to_owned()),
-            ("v2".to_owned(), "c".to_owned()),
-        ];
+        let tags = vec![("v1".to_owned(), "a".to_owned()), ("v2".to_owned(), "c".to_owned())];
         let ins = Insights::new(&recs, Options::default(), None);
-        let since = |c: &super::Cadence| {
-            c.releases
-                .iter()
-                .map(|r| r.commits_since)
-                .collect::<Vec<_>>()
-        };
+        let since =
+            |c: &super::Cadence| c.releases.iter().map(|r| r.commits_since).collect::<Vec<_>>();
         assert_eq!(
             since(&ins.in_period(Period::All, |c| ins.cadence_in(&tags, c))),
             [1, 2],
@@ -182,10 +169,6 @@ mod tests {
         p.select.q = Some("author:ann@x.io".to_owned());
         let s = Scope::from_params(&p, Options::default(), Period::All).expect("scope");
         let c = ins.counted(&s, cx);
-        assert_eq!(
-            since(&ins.cadence_in(&tags, &c)),
-            [1, 1],
-            "Ann's own: a, then c"
-        );
+        assert_eq!(since(&ins.cadence_in(&tags, &c)), [1, 1], "Ann's own: a, then c");
     }
 }

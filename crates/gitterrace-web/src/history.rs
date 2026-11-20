@@ -96,10 +96,8 @@ pub(crate) async fn page(
                 )
             },
             empty: rows.is_empty().then(|| {
-                crate::empty::Empty::new("No history found for this path.").step(
-                    "Browse the files",
-                    href(&format!("/tree/{}", fmt::selected_seg())),
-                )
+                crate::empty::Empty::new("No history found for this path.")
+                    .step("Browse the files", href(&format!("/tree/{}", fmt::selected_seg())))
             }),
             path,
             rows,
@@ -120,10 +118,7 @@ fn history_kpis(touches: &[gitterrace_index::Touch]) -> Vec<crate::insights::Kpi
         Kpi("Commits", fmt::thousands(touches.len())),
         Kpi("Authors", fmt::thousands(authors.len())),
         Kpi("Lines changed", fmt::thousands(lines)),
-        Kpi(
-            "First changed",
-            first.map_or_else(|| "-".to_owned(), fmt::day),
-        ),
+        Kpi("First changed", first.map_or_else(|| "-".to_owned(), fmt::day)),
     ]
 }
 
@@ -164,11 +159,8 @@ mod tests {
                 assert!(status < 500, "{uri} answered {status}");
             }
         }
-        for uri in [
-            "/log/HEAD?q=path:sub%2Ff",
-            "/log/HEAD?q=path:sub%2Ff&page=1",
-            "/history/sub/f",
-        ] {
+        for uri in ["/log/HEAD?q=path:sub%2Ff", "/log/HEAD?q=path:sub%2Ff&page=1", "/history/sub/f"]
+        {
             let (status, _) = gitterrace_testkit::get(&router, uri).await;
             assert_eq!(status, 200, "{uri}");
         }
@@ -180,17 +172,12 @@ mod tests {
         let dir = tempfile::tempdir().expect("tempdir");
         let p = crate::wiring_tests::repo(dir.path(), "r");
         let app = crate::wiring_tests::app(&p, gitterrace_config::Config::default());
-        app.index
-            .update(&app.repo, "HEAD", &|_| {})
-            .expect("update");
+        app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         app.mark_ready();
         let router = routes::router(app);
         let (_, page) = gitterrace_testkit::get(&router, "/history/small.txt").await;
         let links = page.matches("/commit/").count();
         let anchored = page.matches("#p/small.txt\"").count();
-        assert!(
-            links >= 2 && anchored >= 2,
-            "{links} links, {anchored} anchored"
-        );
+        assert!(links >= 2 && anchored >= 2, "{links} links, {anchored} anchored");
     }
 }

@@ -22,11 +22,7 @@ pub(super) struct LineBound<R> {
 
 impl<R> LineBound<R> {
     pub(super) const fn new(inner: R, limit: usize) -> Self {
-        Self {
-            inner,
-            limit,
-            run: 0,
-        }
+        Self { inner, limit, run: 0 }
     }
 }
 
@@ -81,11 +77,7 @@ mod tests {
         let mut line = Vec::new();
         let err = r.read_until(b'\n', &mut line).await.expect_err("refused");
         assert_eq!(err.kind(), io::ErrorKind::InvalidData);
-        assert!(
-            line.len() <= MAX_LINE_BYTES,
-            "buffered {} bytes",
-            line.len()
-        );
+        assert!(line.len() <= MAX_LINE_BYTES, "buffered {} bytes", line.len());
         drop(r);
         writer.await.expect("writer");
     }

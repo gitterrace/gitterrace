@@ -35,11 +35,7 @@ pub(crate) fn worktree_rows(a: &crate::app::App) -> Result<Vec<WorktreeRow>> {
         .linked_worktrees()?
         .into_iter()
         .map(|w| {
-            let target = w
-                .branch
-                .clone()
-                .or_else(|| w.commit.clone())
-                .unwrap_or_default();
+            let target = w.branch.clone().or_else(|| w.commit.clone()).unwrap_or_default();
             WorktreeRow {
                 log: if target.is_empty() {
                     String::new()
@@ -108,10 +104,8 @@ pub(crate) async fn tag(State(app): Shared, Path(name): Path<String>) -> Result<
             .ok_or_else(|| gitterrace_git::Error::RevNotFound(name.clone()))?;
         let now = fmt::now();
         let note = r.annotation.as_ref();
-        let tagger = note
-            .and_then(|n| n.tagger.as_ref())
-            .map(|t| t.name.clone())
-            .unwrap_or_default();
+        let tagger =
+            note.and_then(|n| n.tagger.as_ref()).map(|t| t.name.clone()).unwrap_or_default();
         let when = note
             .and_then(|n| n.tagger.as_ref())
             .map_or_else(|| ago(r.time, now), |t| ago(t.time, now));
@@ -160,9 +154,7 @@ pub(crate) fn branch_rows(
     let default = a.repo.head_branch();
     let now = fmt::now();
     let base = default.clone().unwrap_or_else(|| "HEAD".to_owned());
-    let branches = refs
-        .iter()
-        .filter(|r| r.kind == gitterrace_git::RefKind::Branch);
+    let branches = refs.iter().filter(|r| r.kind == gitterrace_git::RefKind::Branch);
     let is_default = |r: &&gitterrace_git::RefInfo| default.as_deref() == Some(r.name.as_str());
     let picked = branches
         .clone()

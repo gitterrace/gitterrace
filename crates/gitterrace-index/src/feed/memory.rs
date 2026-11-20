@@ -66,37 +66,26 @@ impl MemoryTables {
                 let id = u32::try_from(t.idents.len()).unwrap_or(u32::MAX);
                 let shown = map
                     .and_then(|m| m.get(&(r.author.clone(), r.email.clone())))
-                    .map_or_else(
-                        || key.clone(),
-                        |(n, e)| (n.as_str().into(), e.as_str().into()),
-                    );
+                    .map_or_else(|| key.clone(), |(n, e)| (n.as_str().into(), e.as_str().into()));
                 t.shown.push(shown);
                 t.idents.push(key.clone());
                 t.ident_ids.insert(key, id);
                 id
             };
-            let kind = r
-                .kind
-                .as_deref()
-                .map(|k| LabelId(intern(&mut t.labels, &mut t.label_ids, k)));
-            let scope = r
-                .scope
-                .as_deref()
-                .map(|s| LabelId(intern(&mut t.labels, &mut t.label_ids, s)));
+            let kind =
+                r.kind.as_deref().map(|k| LabelId(intern(&mut t.labels, &mut t.label_ids, k)));
+            let scope =
+                r.scope.as_deref().map(|s| LabelId(intern(&mut t.labels, &mut t.label_ids, s)));
             t.per_commit.push((IdentId(ident), kind, scope));
             let mut sums = Sums::default();
             for (fi, f) in r.files.iter().enumerate() {
                 let p = intern(&mut t.paths, &mut t.path_ids, &f.path);
-                let old = f
-                    .old
-                    .as_deref()
-                    .map(|o| PathId(intern(&mut t.paths, &mut t.path_ids, o)));
+                let old =
+                    f.old.as_deref().map(|o| PathId(intern(&mut t.paths, &mut t.path_ids, o)));
                 t.by_path.resize_with(t.paths.len(), Vec::new);
                 if !r.merge {
-                    t.by_path[p as usize].push(Hit {
-                        rank: rank(i),
-                        row: u32::try_from(fi).unwrap_or(u32::MAX),
-                    });
+                    t.by_path[p as usize]
+                        .push(Hit { rank: rank(i), row: u32::try_from(fi).unwrap_or(u32::MAX) });
                 }
                 let row = FileRow {
                     path: PathId(p),
@@ -142,11 +131,7 @@ enum Held<'a> {
 
 impl<'a> MemorySource<'a> {
     pub const fn new(records: &'a [CommitRecord]) -> Self {
-        Self {
-            records: Held::Borrowed(records),
-            tables: OnceLock::new(),
-            map: None,
-        }
+        Self { records: Held::Borrowed(records), tables: OnceLock::new(), map: None }
     }
 
     fn recs(&self) -> &[CommitRecord] {
@@ -157,30 +142,21 @@ impl<'a> MemorySource<'a> {
     }
 
     fn t(&self) -> &MemoryTables {
-        self.tables
-            .get_or_init(|| MemoryTables::build(self.recs(), self.map.as_ref()))
+        self.tables.get_or_init(|| MemoryTables::build(self.recs(), self.map.as_ref()))
     }
 }
 
 impl MemorySource<'static> {
     /// Owns its records, so it can live in an `Arc<dyn InsightsSource>` cache.
     pub const fn shared(records: Arc<Vec<CommitRecord>>) -> Self {
-        Self {
-            records: Held::Shared(records),
-            tables: OnceLock::new(),
-            map: None,
-        }
+        Self { records: Held::Shared(records), tables: OnceLock::new(), map: None }
     }
 
     /// Records with raw identities (as stored) plus the shown revision's mailmap: ids key the
     /// raw pair, strings come mapped. The same identity rule as
     /// [`crate::feed::DiskSource`], so the oracle compares like with like.
     pub const fn shared_raw(records: Arc<Vec<CommitRecord>>, map: IdentPairs) -> Self {
-        Self {
-            records: Held::Shared(records),
-            tables: OnceLock::new(),
-            map: Some(map),
-        }
+        Self { records: Held::Shared(records), tables: OnceLock::new(), map: Some(map) }
     }
 }
 
@@ -226,9 +202,7 @@ impl InsightsSource for MemorySource<'_> {
                 Box::new((a..b).map(|i| self.row(i)))
             }
             CommitRange::Time(t) => Box::new(
-                (0..n)
-                    .filter(move |&i| t.contains(&self.recs()[i].time))
-                    .map(|i| self.row(i)),
+                (0..n).filter(move |&i| t.contains(&self.recs()[i].time)).map(|i| self.row(i)),
             ),
         }
     }
@@ -241,9 +215,7 @@ impl InsightsSource for MemorySource<'_> {
     }
 
     fn commit_id(&self, rank: Rank) -> Option<Arc<str>> {
-        self.recs()
-            .get(rank.0 as usize)
-            .map(|r| r.id.as_str().into())
+        self.recs().get(rank.0 as usize).map(|r| r.id.as_str().into())
     }
 
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
@@ -269,15 +241,12 @@ impl InsightsSource for MemorySource<'_> {
             let added = e.1.merge(&self.t().sums[i]);
             debug_assert!(added.is_some(), "record counts summed past u64");
         }
-        Box::new(
-            m.into_iter()
-                .map(|((day, ident), (commits, sums))| AuthorDayRow {
-                    day,
-                    ident,
-                    commits,
-                    sums,
-                }),
-        )
+        Box::new(m.into_iter().map(|((day, ident), (commits, sums))| AuthorDayRow {
+            day,
+            ident,
+            commits,
+            sums,
+        }))
     }
 
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
@@ -294,34 +263,23 @@ impl InsightsSource for MemorySource<'_> {
                 debug_assert!(added.is_some(), "record counts summed past u64");
             }
         }
-        Box::new(
-            m.into_iter()
-                .map(|((path, ident), (touches, sums))| PathAuthorRow {
-                    path,
-                    ident,
-                    touches,
-                    sums,
-                }),
-        )
+        Box::new(m.into_iter().map(|((path, ident), (touches, sums))| PathAuthorRow {
+            path,
+            ident,
+            touches,
+            sums,
+        }))
     }
 
     fn postings(&self, key: Posting) -> Stream<'_, Hit> {
         match key {
-            Posting::Path(p) => Box::new(
-                self.t()
-                    .by_path
-                    .get(p.0 as usize)
-                    .into_iter()
-                    .flatten()
-                    .copied(),
-            ),
+            Posting::Path(p) => {
+                Box::new(self.t().by_path.get(p.0 as usize).into_iter().flatten().copied())
+            }
             Posting::Author(a) => Box::new(
                 (0..self.recs().len())
                     .filter(move |&i| self.t().per_commit[i].0 == a)
-                    .map(|i| Hit {
-                        rank: rank(i),
-                        row: 0,
-                    }),
+                    .map(|i| Hit { rank: rank(i), row: 0 }),
             ),
         }
     }
@@ -388,18 +346,12 @@ mod tests {
     #[test]
     fn commits_rows_and_strings_round_trip() {
         let mut recs = chain();
-        recs[3].files.push(crate::FileStat {
-            old: Some("x.rs".into()),
-            ..file("z.rs", 1, 0, 1)
-        });
+        recs[3].files.push(crate::FileStat { old: Some("x.rs".into()), ..file("z.rs", 1, 0, 1) });
         let s = MemorySource::new(&recs);
         assert_eq!(s.len(), 4);
         let c = s.commit(Rank(2)).expect("commit 2");
         assert_eq!((c.sums.add, c.sums.del, c.files), (300, 103, 2));
-        assert_eq!(
-            s.ident(c.ident).map(|i| i.0.to_string()).as_deref(),
-            Some("Bob")
-        );
+        assert_eq!(s.ident(c.ident).map(|i| i.0.to_string()).as_deref(), Some("Bob"));
         assert_eq!(s.find_commit("c"), Ok(Some(Rank(2))));
         assert_eq!(s.commits_in(CommitRange::Ranks(1..3)).count(), 2);
         let x = s.path_id("x.rs").expect("x.rs");
@@ -408,10 +360,7 @@ mod tests {
         let e: Vec<_> = s.rename_edges().collect();
         assert_eq!(e.len(), 1);
         assert_eq!(s.path(e[0].old).as_deref(), Some("x.rs"));
-        let days: u64 = s
-            .agg_author_day(i64::MIN..i64::MAX)
-            .map(|r| r.commits)
-            .sum();
+        let days: u64 = s.agg_author_day(i64::MIN..i64::MAX).map(|r| r.commits).sum();
         assert_eq!(days, 4);
         let owned: u64 = s.agg_path_author("").map(|r| r.touches).sum();
         assert_eq!(owned, 6);

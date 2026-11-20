@@ -43,25 +43,14 @@ fn a_commit_and_all_its_files_share_one_tree_diff() {
     for id in &ids {
         let page = repo.commit(id).expect("commit").files;
         assert!(page.len() >= 40, "{id}: {} files", page.len());
-        renames += page
-            .iter()
-            .filter(|f| f.kind == ChangeKind::Renamed)
-            .count();
+        renames += page.iter().filter(|f| f.kind == ChangeKind::Renamed).count();
         for round in 0..2 {
             for (n, want) in page.iter().enumerate().rev() {
                 let got = repo.commit_file(id, n).expect("file").expect("in range");
-                assert_eq!(
-                    format!("{got:?}"),
-                    format!("{want:?}"),
-                    "{id} file {n} {round}"
-                );
+                assert_eq!(format!("{got:?}"), format!("{want:?}"), "{id} file {n} {round}");
             }
         }
-        assert!(
-            repo.commit_file(id, page.len())
-                .expect("past end")
-                .is_none()
-        );
+        assert!(repo.commit_file(id, page.len()).expect("past end").is_none());
     }
     assert_eq!(renames, 1, "the fixture's rename is detected");
     assert_eq!(diffs() - before, ids.len(), "one tree diff per commit");
@@ -84,11 +73,7 @@ fn no_tree_diff_outlives_its_export_run() {
         repo.commit_file(&id, 3).expect("file").expect("in range");
         diffs() - before
     };
-    assert_eq!(
-        (read(), read()),
-        (1, 1),
-        "a server handle keeps no tree diff"
-    );
+    assert_eq!((read(), read()), (1, 1), "a server handle keeps no tree diff");
     let memo = Arc::new(crate::ChangeMemo::new());
     repo.use_change_memo(&memo);
     assert_eq!((read(), read()), (1, 0), "the run shares one");

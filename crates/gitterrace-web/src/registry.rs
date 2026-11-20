@@ -37,9 +37,7 @@ pub(crate) fn set_entries(n: usize) {
 static WRITING: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
 fn writing() -> std::sync::MutexGuard<'static, ()> {
-    WRITING
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
+    WRITING.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,25 +88,14 @@ pub fn record(dir: &Path, repos: &[&Repo]) -> io::Result<()> {
     let now = now();
     // Ids first: reading one walks the whole history, and the read-modify-write below must be
     // short, since `claim` writes the same file.
-    let ids: Vec<(String, PathBuf)> = repos
-        .iter()
-        .filter_map(|r| Some((r.id()?, r.root())))
-        .collect();
+    let ids: Vec<(String, PathBuf)> =
+        repos.iter().filter_map(|r| Some((r.id()?, r.root()))).collect();
     let _held = writing();
     let mut all = candidates(dir)?;
     for (id, path) in ids {
-        let name = all
-            .iter()
-            .find(|e| e.path == path)
-            .map(|e| e.name.clone())
-            .unwrap_or_default();
+        let name = all.iter().find(|e| e.path == path).map(|e| e.name.clone()).unwrap_or_default();
         all.retain(|e| e.path != path);
-        all.push(Entry {
-            id,
-            path,
-            last_served: now,
-            name,
-        });
+        all.push(Entry { id, path, last_served: now, name });
     }
     write_all(dir, all)
 }
@@ -131,12 +118,8 @@ pub(crate) fn claim(
     if let Some(e) = all.iter().find(|e| e.path == root && !e.name.is_empty()) {
         return Ok(e.name.clone());
     }
-    let used = |n: &str| {
-        taken(n)
-            || all
-                .iter()
-                .any(|e| e.path != root && e.name.eq_ignore_ascii_case(n))
-    };
+    let used =
+        |n: &str| taken(n) || all.iter().any(|e| e.path != root && e.name.eq_ignore_ascii_case(n));
     let name = pick(stem, root, &used);
     match all.iter_mut().find(|e| e.path == root) {
         Some(e) => e.name.clone_from(&name),
@@ -293,10 +276,8 @@ mod tests {
             last_served: t,
             name: String::new(),
         };
-        let kept: Vec<u64> = newest(vec![e(1), e(3), e(2)], 2)
-            .iter()
-            .map(|x| x.last_served)
-            .collect();
+        let kept: Vec<u64> =
+            newest(vec![e(1), e(3), e(2)], 2).iter().map(|x| x.last_served).collect();
         assert_eq!(kept, [3, 2]);
     }
 
@@ -317,17 +298,11 @@ mod tests {
             let a = repo(&t.path().join("a"), "a");
             record(&state, &[&a]).expect("record");
             let got = candidates(&state).expect("read");
-            assert_eq!(
-                got[0].last_served, 1_710_028_800,
-                "registry clock not frozen"
-            );
+            assert_eq!(got[0].last_served, 1_710_028_800, "registry clock not frozen");
             return;
         }
         let ok = std::process::Command::new(std::env::current_exe().expect("exe"))
-            .args([
-                "registry::tests::the_frozen_clock_reaches_the_registry",
-                "--exact",
-            ])
+            .args(["registry::tests::the_frozen_clock_reaches_the_registry", "--exact"])
             .env("GITTERRACE_TEST_NOW", NOW)
             .status()
             .expect("child")
@@ -344,10 +319,7 @@ mod tests {
         record(&state, &[&a, &b]).expect("record");
         let got = candidates(&state).expect("read");
         assert_eq!(got.len(), 2);
-        assert!(
-            got.iter()
-                .any(|e| e.path == a.root() && Some(&e.id) == a.id().as_ref())
-        );
+        assert!(got.iter().any(|e| e.path == a.root() && Some(&e.id) == a.id().as_ref()));
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -389,11 +361,7 @@ mod tests {
             assert_eq!(claim(&state, &a.root(), "a", &none).expect("claim"), "a");
         }
         racer.join().expect("join");
-        let names: Vec<_> = candidates(&state)
-            .expect("read")
-            .into_iter()
-            .map(|e| e.name)
-            .collect();
+        let names: Vec<_> = candidates(&state).expect("read").into_iter().map(|e| e.name).collect();
         assert_eq!(names, ["a"]);
     }
 
@@ -408,10 +376,7 @@ mod tests {
         {
             use std::os::unix::fs::PermissionsExt;
             let f = state.join("add-token-4321");
-            assert_eq!(
-                std::fs::metadata(&f).expect("m").permissions().mode() & 0o777,
-                0o600
-            );
+            assert_eq!(std::fs::metadata(&f).expect("m").permissions().mode() & 0o777, 0o600);
             std::fs::set_permissions(&f, std::fs::Permissions::from_mode(0o644)).expect("chmod");
             assert!(add_token(&state, 4321).is_err(), "readable by others");
             std::fs::remove_file(&f).expect("rm");
@@ -464,10 +429,6 @@ mod tests {
         let a = repo(&t.path().join("a"), "a");
         assert!(record(&state, &[&a]).is_err(), "write refused");
         assert!(candidates(&state).is_err(), "read refused");
-        assert_eq!(
-            std::fs::read_to_string(&target).expect("r"),
-            "[]",
-            "target untouched"
-        );
+        assert_eq!(std::fs::read_to_string(&target).expect("r"), "[]", "target untouched");
     }
 }

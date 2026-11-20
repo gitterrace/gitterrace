@@ -110,19 +110,9 @@ impl FrequencyTally {
     pub fn new(axis: &TimeAxis) -> Self {
         let out = axis
             .names()
-            .map(|(key, label)| Frequency {
-                key,
-                label,
-                additions: 0,
-                deletions: 0,
-                rewritten: 0,
-            })
+            .map(|(key, label)| Frequency { key, label, additions: 0, deletions: 0, rewritten: 0 })
             .collect();
-        Self {
-            out,
-            sum: LineTotals::default(),
-            slots: Vec::new(),
-        }
+        Self { out, sum: LineTotals::default(), slots: Vec::new() }
     }
 
     /// The buckets, their totals (a commit outside the axis still counts in them) and the
@@ -135,11 +125,8 @@ impl FrequencyTally {
         let mut pre = vec![(0u64, 0u64, 0u64); counted.len() + 1];
         for (k, (_, l)) in counted.iter().enumerate() {
             let p = pre[k];
-            pre[k + 1] = (
-                p.0 + u64::from(l.add),
-                p.1 + u64::from(l.del),
-                p.2 + u64::from(l.rewritten),
-            );
+            pre[k + 1] =
+                (p.0 + u64::from(l.add), p.1 + u64::from(l.del), p.2 + u64::from(l.rewritten));
         }
         // Counted commits up to and including each bucket.
         let mut upto = vec![0usize; axis.len()];
@@ -170,11 +157,7 @@ impl FrequencyTally {
                 }
             })
             .collect();
-        let rework = Rework {
-            window,
-            unit: axis.unit(),
-            points,
-        };
+        let rework = Rework { window, unit: axis.unit(), points };
         (axis.unit(), self.out, self.sum, rework)
     }
 }
@@ -202,10 +185,7 @@ pub(crate) mod tests {
     use crate::{BucketUnit, FileStat, Insights, Options, Period};
 
     fn edit(path: &str, add: u32, del: u32, rewritten: u32) -> FileStat {
-        FileStat {
-            rewritten,
-            ..file(path, add, del, 0)
-        }
+        FileStat { rewritten, ..file(path, add, del, 0) }
     }
 
     #[test]
@@ -222,11 +202,7 @@ pub(crate) mod tests {
     fn rolling_window_and_whitespace() {
         let mut noisy = edit("a.rs", 40, 40, 40);
         // Only 4 of those lines are real changes once whitespace is ignored.
-        noisy.code = Some(crate::CodeStat {
-            additions: 2,
-            deletions: 2,
-            rewritten: 2,
-        });
+        noisy.code = Some(crate::CodeStat { additions: 2, deletions: 2, rewritten: 2 });
         let recs = vec![
             rec("a", "Ann", 0, vec![edit("a.rs", 10, 0, 0)]),
             rec("b", "Ann", 1, vec![edit("a.rs", 5, 5, 5)]),
@@ -241,22 +217,12 @@ pub(crate) mod tests {
         assert_eq!(r[1].share, Some(0.5));
         assert_eq!(
             r[5],
-            ReworkPoint {
-                key: r[5].key.clone(),
-                label: r[5].label.clone(),
-                ..r[1].clone()
-            }
+            ReworkPoint { key: r[5].key.clone(), label: r[5].label.clone(), ..r[1].clone() }
         );
         // Only 4 of c's 120 lines are real changes once whitespace is ignored.
         assert_eq!((r[9].added, r[9].removed, r[9].rewritten), (17, 7, 7));
-        let ws = Insights::new(
-            &recs,
-            Options {
-                count_whitespace: true,
-                ..Options::default()
-            },
-            None,
-        );
+        let ws =
+            Insights::new(&recs, Options { count_whitespace: true, ..Options::default() }, None);
         assert_eq!(ws.rework(Period::All).points[9].added, 55);
         let (unit, f) = ins.frequency(Period::All);
         assert_eq!((unit, f.len()), (BucketUnit::Day, 10));
@@ -268,9 +234,8 @@ pub(crate) mod tests {
 
     #[test]
     fn rework_window_scales_with_the_selection() {
-        let recs: Vec<_> = (0..400)
-            .map(|d| rec(&d.to_string(), "Ann", d, vec![edit("a.rs", 1, 0, 0)]))
-            .collect();
+        let recs: Vec<_> =
+            (0..400).map(|d| rec(&d.to_string(), "Ann", d, vec![edit("a.rs", 1, 0, 0)])).collect();
         let ins = Insights::new(&recs, Options::default(), None);
         assert_eq!(ins.rework(Period::All).window, 50);
         assert_eq!(ins.rework(Period::Week).window, 10);
@@ -297,10 +262,7 @@ pub(crate) mod tests {
         let (_, f) = ins.frequency(Period::Week);
         assert_eq!(f.len(), 7);
         let add: u64 = f.iter().map(|b| b.additions).sum();
-        assert_eq!(
-            add, 15,
-            "commit on local day 13 counted in a week of days 14..=20"
-        );
+        assert_eq!(add, 15, "commit on local day 13 counted in a week of days 14..=20");
         assert_eq!(f[0].additions, 0);
     }
 

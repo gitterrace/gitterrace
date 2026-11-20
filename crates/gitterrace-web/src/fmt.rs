@@ -19,8 +19,7 @@ pub(crate) const UNKNOWN_DATE: &str = "unknown date";
 /// `time` shifted into its offset, or `None` when the sum overflows or leaves years 1 to
 /// 9999. Every date helper goes through this, so none does unchecked time arithmetic.
 fn local(time: i64, offset: i32) -> Option<i64> {
-    time.checked_add(i64::from(offset))
-        .filter(|t| (FIRST_SECOND..=LAST_SECOND).contains(t))
+    time.checked_add(i64::from(offset)).filter(|t| (FIRST_SECOND..=LAST_SECOND).contains(t))
 }
 
 /// `YYYY-MM-DD HH:MM` in the commit's own offset.
@@ -30,19 +29,13 @@ pub(crate) fn date(time: i64, offset: i32) -> String {
     };
     let (y, m, d) = civil(local.div_euclid(DAY));
     let secs = local.rem_euclid(DAY);
-    format!(
-        "{y:04}-{m:02}-{d:02} {:02}:{:02}",
-        secs / 3600,
-        secs % 3600 / 60
-    )
+    format!("{y:04}-{m:02}-{d:02} {:02}:{:02}", secs / 3600, secs % 3600 / 60)
 }
 
 /// `YYYY-MM-DD` in UTC.
 pub(crate) fn day(time: i64) -> String {
-    local(time, 0).map_or_else(
-        || UNKNOWN_DATE.to_owned(),
-        |t| gitterrace_git::ymd(t.div_euclid(DAY)),
-    )
+    local(time, 0)
+        .map_or_else(|| UNKNOWN_DATE.to_owned(), |t| gitterrace_git::ymd(t.div_euclid(DAY)))
 }
 
 thread_local! {
@@ -68,10 +61,7 @@ fn scoped<V: 'static, T>(
             }
         }
     }
-    let _restore = Restore {
-        key,
-        prev: Some(key.with(|c| c.replace(value))),
-    };
+    let _restore = Restore { key, prev: Some(key.with(|c| c.replace(value))) };
     f()
 }
 
@@ -130,11 +120,7 @@ pub(crate) fn size(bytes: u64) -> String {
         v /= 1024.0;
         i += 1;
     }
-    if i == 0 {
-        format!("{bytes} B")
-    } else {
-        format!("{v:.1} {}", UNITS[i])
-    }
+    if i == 0 { format!("{bytes} B") } else { format!("{v:.1} {}", UNITS[i]) }
 }
 
 thread_local! {
@@ -180,9 +166,7 @@ fn with_selected(path: &str) -> std::borrow::Cow<'_, str> {
     if rev == "HEAD" || !follows_rev(path) {
         return path.into();
     }
-    let (head, frag) = path
-        .split_once('#')
-        .map_or((path, None), |(h, f)| (h, Some(f)));
+    let (head, frag) = path.split_once('#').map_or((path, None), |(h, f)| (h, Some(f)));
     if head.split(['?', '&']).any(|p| p.starts_with("rev=")) {
         return path.into();
     }
@@ -245,9 +229,8 @@ pub(crate) fn noun(
     if n.to_string() == "1" { one } else { many }
 }
 
-const MONTHS: [&str; 12] = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-];
+const MONTHS: [&str; 12] =
+    ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 /// Day header such as `Today`, `Yesterday` or `Oct 29`, in the commit's own offset.
 pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
@@ -256,10 +239,8 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
     };
     let d = t.div_euclid(DAY);
     // `now` comes from the clock (or a test), clamped into range so the subtraction is exact.
-    let today = now
-        .saturating_add(i64::from(offset))
-        .clamp(FIRST_SECOND, LAST_SECOND)
-        .div_euclid(DAY);
+    let today =
+        now.saturating_add(i64::from(offset)).clamp(FIRST_SECOND, LAST_SECOND).div_euclid(DAY);
     match today - d {
         0 => "Today".to_owned(),
         1 => "Yesterday".to_owned(),
@@ -267,11 +248,7 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
             let (y, m, day) = civil(d);
             let (ty, _, _) = civil(today);
             let mon = MONTHS[usize::try_from(m - 1).unwrap_or(0).min(11)];
-            if y == ty {
-                format!("{mon} {day}")
-            } else {
-                format!("{mon} {day}, {y}")
-            }
+            if y == ty { format!("{mon} {day}") } else { format!("{mon} {day}, {y}") }
         }
     }
 }
@@ -299,11 +276,7 @@ pub(crate) fn sha_file_link(full: &str, path: &str) -> String {
         return link;
     }
     let plain = format!("/commit/{}\"", esc(full));
-    let with = format!(
-        "/commit/{}#{}\"",
-        esc(full),
-        esc(&file_anchor(&enc_path(path)))
-    );
+    let with = format!("/commit/{}#{}\"", esc(full), esc(&file_anchor(&enc_path(path))));
     link.replacen(&plain, &with, 1)
 }
 
@@ -334,11 +307,7 @@ pub(crate) fn file_link(path: &str) -> String {
 
 /// The `+a -d` markup of lines added and removed, as `_delta.html` writes it.
 pub(crate) fn line_delta(add: impl std::fmt::Display, del: impl std::fmt::Display) -> String {
-    format!(
-        "<b class=\"add\">+{}</b> <b class=\"del\">-{}</b>",
-        thousands(add),
-        thousands(del)
-    )
+    format!("<b class=\"add\">+{}</b> <b class=\"del\">-{}</b>", thousands(add), thousands(del))
 }
 
 #[cfg(test)]
@@ -367,15 +336,8 @@ mod tests {
     fn relative_and_size() {
         assert_eq!(ago(0, 90).text, "1 minute ago");
         assert_eq!(ago(0, 86_400 * 3).text, "3 days ago");
-        assert_eq!(
-            with_dates(true, || ago(86_400 * 40, 86_400 * 43).text),
-            "1970-02-10"
-        );
-        assert_eq!(
-            ago(0, 90).text,
-            "1 minute ago",
-            "the mode does not leak out of its scope"
-        );
+        assert_eq!(with_dates(true, || ago(86_400 * 40, 86_400 * 43).text), "1970-02-10");
+        assert_eq!(ago(0, 90).text, "1 minute ago", "the mode does not leak out of its scope");
         assert_eq!(size(1536), "1.5 KiB");
     }
 
@@ -397,9 +359,7 @@ mod tests {
     fn request_state_is_restored_when_the_handler_panics() {
         use crate::fmt::{base, selected, with_base, with_rev};
         let caught = std::panic::catch_unwind(|| {
-            with_dates(true, || {
-                with_base("/r/x", || with_rev("dev", || panic!("handler")))
-            })
+            with_dates(true, || with_base("/r/x", || with_rev("dev", || panic!("handler"))))
         });
         assert!(caught.is_err());
         assert_eq!(selected(), "HEAD");

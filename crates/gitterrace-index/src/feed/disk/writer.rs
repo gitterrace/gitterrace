@@ -110,13 +110,7 @@ impl RowWriter {
             return Err(SegError::BadName("NUL in an author name or email".into()));
         }
         self.buf.clear();
-        let ids = Ids {
-            who,
-            kind,
-            scope,
-            paths,
-            olds,
-        };
+        let ids = Ids { who, kind, scope, paths, olds };
         encode(&mut self.buf, r, &ids)?;
         if self.buf.len() > MAX_RECORD {
             return Err(SegError::TooLong {
@@ -142,17 +136,8 @@ impl RowWriter {
 
     /// Writes sections 34, 35 and 36 through `sink`, after section 33. Removes the spool.
     pub fn finish(self, sink: &mut Sink<'_>) -> SegResult<()> {
-        let Self {
-            path,
-            spool,
-            offsets,
-            mut oids,
-            len,
-            ..
-        } = self;
-        let mut file = spool
-            .into_inner()
-            .map_err(|e| SegError::Io(e.into_error()))?;
+        let Self { path, spool, offsets, mut oids, len, .. } = self;
+        let mut file = spool.into_inner().map_err(|e| SegError::Io(e.into_error()))?;
         std::io::Seek::rewind(&mut file)?;
         let mut block = vec![0u8; MAX_BLOCK];
         let (mut pos, mut next) = (0u64, 0usize);
@@ -172,11 +157,7 @@ impl RowWriter {
         drop(std::fs::remove_file(&path));
         for chunk in offsets.chunks(MAX_BLOCK / 8) {
             let bytes: Vec<u8> = chunk.iter().flat_map(|o| o.to_le_bytes()).collect();
-            sink(
-                section::ROW_INDEX,
-                u32::try_from(chunk.len()).unwrap_or(0),
-                &bytes,
-            )?;
+            sink(section::ROW_INDEX, u32::try_from(chunk.len()).unwrap_or(0), &bytes)?;
         }
         oids.sort_unstable();
         for chunk in oids.chunks(MAX_BLOCK / OID_ENTRY) {
@@ -185,11 +166,7 @@ impl RowWriter {
                 bytes.extend_from_slice(o);
                 bytes.extend_from_slice(&ord.to_le_bytes());
             }
-            sink(
-                section::OID_INDEX,
-                u32::try_from(chunk.len()).unwrap_or(0),
-                &bytes,
-            )?;
+            sink(section::OID_INDEX, u32::try_from(chunk.len()).unwrap_or(0), &bytes)?;
         }
         Ok(())
     }

@@ -208,10 +208,7 @@ pub(crate) fn no_follow(o: &mut OpenOptions) -> &mut OpenOptions {
 
 /// The error for a path that is not a regular file or folder, which no write follows.
 pub fn refused(path: &Path) -> io::Error {
-    io::Error::other(format!(
-        "refusing to write {}: not a regular file or folder",
-        path.display()
-    ))
+    io::Error::other(format!("refusing to write {}: not a regular file or folder", path.display()))
 }
 
 #[cfg(test)]
@@ -227,10 +224,7 @@ mod tests {
             read_no_follow_bounded(t.path(), "f", 1024).expect("read"),
             Some(b"two".to_vec())
         );
-        assert_eq!(
-            read_no_follow_bounded(t.path(), "none", 1024).expect("read"),
-            None
-        );
+        assert_eq!(read_no_follow_bounded(t.path(), "none", 1024).expect("read"), None);
     }
 
     #[cfg(unix)]

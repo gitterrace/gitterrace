@@ -36,9 +36,7 @@ fn walk(dir: &Path, exts: &[&str], out: &mut Vec<PathBuf>) {
                 walk(&p, exts, out);
             }
         } else if exts.is_empty()
-            || p.extension()
-                .and_then(|x| x.to_str())
-                .is_some_and(|x| exts.contains(&x))
+            || p.extension().and_then(|x| x.to_str()).is_some_and(|x| exts.contains(&x))
         {
             out.push(p);
         }
@@ -59,10 +57,7 @@ pub fn outside_owners(
 ) -> Vec<String> {
     let mut bad = Vec::new();
     for p in files_in(root, dirs, exts) {
-        let name = p
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         if owners.contains(&name.as_str()) || name.ends_with("tests.rs") {
             continue;
         }
@@ -93,12 +88,7 @@ mod tests {
         std::fs::write(t.join("own.html"), "X").expect("w");
         std::fs::write(t.join("page.html"), "X").expect("w");
         std::fs::write(t.join("a.rs"), "fn a() {}\n#[cfg(test)]\nX").expect("w");
-        let found = |c: &str| {
-            c.contains('X')
-                .then(|| "X".to_owned())
-                .into_iter()
-                .collect()
-        };
+        let found = |c: &str| c.contains('X').then(|| "X".to_owned()).into_iter().collect();
         let bad = super::outside_owners(dir.path(), &["t"], &[], &["own.html"], found);
         assert_eq!(bad, [format!("{}: X", t.join("page.html").display())]);
     }

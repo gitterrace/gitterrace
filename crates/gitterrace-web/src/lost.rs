@@ -21,15 +21,8 @@ use crate::{
 };
 
 /// Route prefixes whose answers scripts read: never wrapped in the page shell.
-const FRAGMENTS: [&str; 7] = [
-    "/api/",
-    "/diff/",
-    "/diff-find/",
-    "/hl/",
-    "/worktree/diff/",
-    "/worktree/find",
-    "/events",
-];
+const FRAGMENTS: [&str; 7] =
+    ["/api/", "/diff/", "/diff-find/", "/hl/", "/worktree/diff/", "/worktree/find", "/events"];
 
 /// What a 404 said, carried on the response so the repository layer can re-render it.
 #[derive(Clone)]
@@ -78,9 +71,7 @@ pub(crate) async fn in_shell(State(app): State<Arc<App>>, req: Request, next: Ne
     })
     .await;
     // The bare page is still a 404 with the detail; the shell is a nicety.
-    shown.map_or(res, |html| {
-        (StatusCode::NOT_FOUND, Html(html)).into_response()
-    })
+    shown.map_or(res, |html| (StatusCode::NOT_FOUND, Html(html)).into_response())
 }
 
 /// The heading and the next steps for a missing `path` (the URL path inside the repository).
@@ -124,10 +115,7 @@ fn explain(path: &str, rev: &str) -> (String, Vec<Step>) {
             href: href(&format!("/tree/{}", enc_seg(&rev))),
         }
     } else {
-        Step {
-            label: "Back to the overview".to_owned(),
-            href: href("/"),
-        }
+        Step { label: "Back to the overview".to_owned(), href: href("/") }
     });
     (title, steps)
 }
@@ -143,11 +131,7 @@ mod tests {
         let labels: Vec<_> = steps.iter().map(|s| s.label.as_str()).collect();
         assert_eq!(
             labels,
-            [
-                "Search for nope.c",
-                "Open the history of this path",
-                "Back to the tree of v1"
-            ]
+            ["Search for nope.c", "Open the history of this path", "Back to the tree of v1"]
         );
         assert!(steps[1].href.ends_with("/history/src/nope.c"));
     }

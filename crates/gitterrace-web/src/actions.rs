@@ -63,9 +63,7 @@ impl Live {
     }
 
     fn config(&self) -> Arc<Config> {
-        self.config
-            .read()
-            .map_or_else(|_| Arc::default(), |c| Arc::clone(&c))
+        self.config.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c))
     }
 
     /// The menu entries the client renders, see [`menu_entries`].
@@ -179,25 +177,17 @@ pub(crate) struct Site {
 impl Site {
     /// The targets now, a copy so no lock is held across git reads.
     pub(crate) fn targets(&self) -> Vec<Arc<Target>> {
-        self.targets
-            .read()
-            .map_or_else(|e| e.into_inner().clone(), |g| g.clone())
+        self.targets.read().map_or_else(|e| e.into_inner().clone(), |g| g.clone())
     }
 
     pub(crate) fn push_target(&self, t: Target) {
-        let mut g = self
-            .targets
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut g = self.targets.write().unwrap_or_else(std::sync::PoisonError::into_inner);
         g.push(Arc::new(t));
     }
 
     /// Drops the target of a repository taken off the server, so its permalinks stop resolving.
     pub(crate) fn drop_target(&self, key: &str) {
-        let mut g = self
-            .targets
-            .write()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut g = self.targets.write().unwrap_or_else(std::sync::PoisonError::into_inner);
         g.retain(|t| t.key != key);
     }
 
@@ -217,10 +207,7 @@ pub(crate) fn start(
     output_kb: usize,
 ) -> (Option<Arc<Live>>, Arc<Status>) {
     let status = Arc::new(Status::default());
-    (
-        start_live(file, roots, loopback, output_kb, &status),
-        status,
-    )
+    (start_live(file, roots, loopback, output_kb, &status), status)
 }
 
 /// Where `GET /_send/targets` reads from. Sending opens a URL in the browser and starts
@@ -260,11 +247,7 @@ fn start_live(
         Err(e) => {
             tracing::warn!("actions disabled: {e}");
             status.set(Some(not_loaded(&e)));
-            tokio::spawn(retry(
-                file.to_path_buf(),
-                roots.to_vec(),
-                Arc::clone(status),
-            ));
+            tokio::spawn(retry(file.to_path_buf(), roots.to_vec(), Arc::clone(status)));
             return None;
         }
     };
@@ -278,11 +261,7 @@ fn start_live(
             return None;
         }
     };
-    tracing::info!(
-        "actions: {} loaded from {}",
-        config.actions.len(),
-        file.display()
-    );
+    tracing::info!("actions: {} loaded from {}", config.actions.len(), file.display());
     let reloader = Reloader::new(file.to_path_buf(), roots.to_vec(), config);
     let live = Arc::new(Live {
         token,
@@ -357,42 +336,23 @@ pub(crate) fn router(site: Arc<Site>) -> Router {
         .route(STATUS_PATH, get(status))
         .route("/_send/targets", get(send_targets))
         .route("/r/{name}/_send/targets", get(send_targets));
-    let r = if site.live.is_some() {
-        r.route(RUN_PATH, post(run))
-    } else {
-        r
-    };
+    let r = if site.live.is_some() { r.route(RUN_PATH, post(run)) } else { r };
     r.with_state(site)
 }
 
 /// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus, show.
 async fn status(State(site): State<Arc<Site>>) -> Response {
-    let body = serde_json::to_string(&StatusBody {
-        note: site.status.note(),
-    })
-    .unwrap_or_default();
-    (
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "no-store"),
-        ],
-        body,
-    )
+    let body = serde_json::to_string(&StatusBody { note: site.status.note() }).unwrap_or_default();
+    ([(header::CONTENT_TYPE, "application/json"), (header::CACHE_CONTROL, "no-store")], body)
         .into_response()
 }
 
 /// `GET /_send/targets`: `[{"id","label","parts":[{"lit"}|{"ph"}]}]`, `[]` with none.
 /// The same list under every repository prefix, since targets are not per repository.
 async fn send_targets(State(site): State<Arc<Site>>) -> Response {
-    let config = site
-        .sends
-        .read()
-        .map_or_else(|_| Arc::default(), |c| Arc::clone(&c));
+    let config = site.sends.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c));
     (
-        [
-            (header::CONTENT_TYPE, "application/json"),
-            (header::CACHE_CONTROL, "no-store"),
-        ],
+        [(header::CONTENT_TYPE, "application/json"), (header::CACHE_CONTROL, "no-store")],
         serde_json::to_string(&config.sends).unwrap_or_else(|_| "[]".to_owned()),
     )
         .into_response()
@@ -402,10 +362,7 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
     let mut parts = rest.splitn(3, '/');
     let id = parts.next().unwrap_or_default().to_owned();
     let sha = parts.next().unwrap_or_default().to_owned();
-    let path = parts
-        .next()
-        .map(|p| p.trim_matches('/').to_owned())
-        .filter(|p| !p.is_empty());
+    let path = parts.next().map(|p| p.trim_matches('/').to_owned()).filter(|p| !p.is_empty());
     let found = tokio::task::spawn_blocking(move || {
         let targets = site.targets();
         let refs: Vec<&Target> = targets.iter().map(AsRef::as_ref).collect();
@@ -426,9 +383,7 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
         return (StatusCode::FOUND, [(header::LOCATION, loc)]).into_response();
     }
     let id = rest.split('/').next().unwrap_or_default();
-    crate::error::not_found(&format!(
-        "Repository {id} (or that commit) is not served here."
-    ))
+    crate::error::not_found(&format!("Repository {id} (or that commit) is not served here."))
 }
 
 fn is_json(h: &HeaderMap) -> bool {
@@ -439,16 +394,8 @@ fn is_json(h: &HeaderMap) -> bool {
 }
 
 fn reply(status: StatusCode, ok: bool, exit: Option<i32>, first_line: &str) -> Response {
-    let body = Outcome {
-        exit,
-        first_line,
-        ok,
-    };
-    (
-        status,
-        [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))],
-        axum::Json(body),
-    )
+    let body = Outcome { exit, first_line, ok };
+    (status, [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))], axum::Json(body))
         .into_response()
 }
 
@@ -490,11 +437,7 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
     if !action.kinds.contains(&rr.kind) {
         return bad("this action does not take that kind");
     }
-    let Some(t) = site
-        .targets()
-        .into_iter()
-        .find(|t| t.key == rr.locator.repo)
-    else {
+    let Some(t) = site.targets().into_iter().find(|t| t.key == rr.locator.repo) else {
         return bad("unknown repository");
     };
     let origin = format!("http://{host}");
@@ -527,12 +470,9 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
                 "could not start the action, see the server log",
             )
         }
-        Err(Failed::Internal) => reply(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            false,
-            None,
-            "internal error",
-        ),
+        Err(Failed::Internal) => {
+            reply(StatusCode::INTERNAL_SERVER_ERROR, false, None, "internal error")
+        }
     }
 }
 
@@ -553,10 +493,7 @@ fn run_blocking(
                 Failed::Internal
             }
         })?;
-    let outcome = live
-        .runner
-        .run(action, &payload, &t.repo.root())
-        .map_err(Failed::Run)?;
+    let outcome = live.runner.run(action, &payload, &t.repo.root()).map_err(Failed::Run)?;
     Ok((outcome, action.output))
 }
 
@@ -567,10 +504,7 @@ pub(crate) mod actions_tests;
 
 #[cfg(test)]
 #[cfg(unix)]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one linear sequence, splitting it hides the flow"
-)]
+#[expect(clippy::too_many_lines, reason = "one linear sequence, splitting it hides the flow")]
 mod tests;
 
 #[cfg(test)]

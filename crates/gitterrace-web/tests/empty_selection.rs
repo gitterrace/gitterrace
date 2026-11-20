@@ -16,18 +16,10 @@ async fn an_empty_selection_reads_as_empty_on_every_insights_page() {
         b.contains("class=\"crow\"")
     })
     .await;
-    for page in [
-        "/stats",
-        "/stats/hotspots",
-        "/stats/languages",
-        "/stats/contributors",
-    ] {
+    for page in ["/stats", "/stats/hotspots", "/stats/languages", "/stats/contributors"] {
         let url = format!("{page}?q=author:nobody%40example.com");
         let (status, body) = get(&router, &url).await;
         assert_eq!(status, 200, "{url}");
-        assert!(
-            !body.contains("1970"),
-            "{url} shows a date from an empty set"
-        );
+        assert!(!body.contains("1970"), "{url} shows a date from an empty set");
     }
 }

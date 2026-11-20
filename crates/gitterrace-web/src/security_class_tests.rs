@@ -97,9 +97,7 @@ fn actions_dir() -> tempfile::TempDir {
 }
 
 fn env(public: bool, settings: Option<&Path>) -> Env {
-    let on = gitterrace_config::Feature::ALL
-        .map(|f| [f.key(), " = true\n"].concat())
-        .concat();
+    let on = gitterrace_config::Feature::ALL.map(|f| [f.key(), " = true\n"].concat()).concat();
     let text = format!("[server]\nis_public = {public}\n[features]\n{on}");
     let mut env = Env::new(gitterrace_config::parse(&text).expect("parse").config);
     env.settings_dir = settings.map(Path::to_path_buf);
@@ -120,12 +118,7 @@ fn server(root: &Path, public: bool) -> Built {
     let router = crate::build_server(vec![repo], None, Some(&file), &env, Some(add), None)
         .expect("router")
         .0;
-    Built {
-        router,
-        secret,
-        add_token,
-        dirs: (actions, settings),
-    }
+    Built { router, secret, add_token, dirs: (actions, settings) }
 }
 
 /// The route patterns a built router holds, read from its `Debug` form: the router is the
@@ -144,10 +137,8 @@ fn every_route(b: &Built) -> BTreeSet<(Scope, String)> {
     let (repo, _) = hostile(&b.secret.parent().expect("root").join("probe"));
     let one = crate::repo_router(&repo, "/r/r".into(), "r".into(), None, &env(false, None))
         .expect("repo router");
-    let mut out: BTreeSet<_> = patterns(&b.router)
-        .into_iter()
-        .map(|p| (Scope::Server, p))
-        .collect();
+    let mut out: BTreeSet<_> =
+        patterns(&b.router).into_iter().map(|p| (Scope::Server, p)).collect();
     out.extend(patterns(&one).into_iter().map(|p| (Scope::Repo, p)));
     assert!(out.len() > 50, "only {} routes found: {out:?}", out.len());
     out
@@ -177,10 +168,8 @@ struct Reply {
 /// A page served here: same-origin fetch metadata, this origin, and `token` when given.
 fn page(token: Option<&str>) -> Vec<(&'static str, String)> {
     let host = gitterrace_testkit::on_port("localhost");
-    let mut h = vec![
-        ("sec-fetch-site", "same-origin".to_owned()),
-        ("origin", format!("http://{host}")),
-    ];
+    let mut h =
+        vec![("sec-fetch-site", "same-origin".to_owned()), ("origin", format!("http://{host}"))];
     h.extend(token.map(|t| ("x-gitterrace-token", t.to_owned())));
     h
 }
@@ -195,11 +184,7 @@ async fn send(r: &Router, method: &str, uri: &str, headers: &[(&str, String)]) -
     for (k, v) in headers {
         req = req.header(*k, v);
     }
-    let res = r
-        .clone()
-        .oneshot(req.body(Body::from("{}")).expect("req"))
-        .await
-        .expect("res");
+    let res = r.clone().oneshot(req.body(Body::from("{}")).expect("req")).await.expect("res");
     let (status, headers) = (res.status().as_u16(), res.headers().clone());
     let body = tokio::time::timeout(Duration::from_millis(500), res.into_body().collect())
         .await
@@ -207,11 +192,7 @@ async fn send(r: &Router, method: &str, uri: &str, headers: &[(&str, String)]) -
         .and_then(Result::ok)
         .map(|b| String::from_utf8_lossy(&b.to_bytes()).into_owned())
         .unwrap_or_default();
-    Reply {
-        status,
-        headers,
-        body,
-    }
+    Reply { status, headers, body }
 }
 
 /// The `content` of `<meta name="{name}">` in a page.
@@ -230,35 +211,22 @@ async fn every_routed_pattern_is_classified_once() {
     let routed: BTreeSet<String> = every_route(&b).into_iter().map(|(_, p)| p).collect();
     for r in &routed {
         let (public, local) = (crate::public::public_route(r), LOCAL.contains(&r.as_str()));
-        assert!(
-            public != local,
-            "{r}: classify it in public.rs (public {public}, local {local})"
-        );
+        assert!(public != local, "{r}: classify it in public.rs (public {public}, local {local})");
     }
     for r in PUBLIC.iter().chain(LOCAL) {
-        assert!(
-            routed.contains(*r),
-            "{r} is classified but no router holds it"
-        );
+        assert!(routed.contains(*r), "{r} is classified but no router holds it");
     }
     // The sitemap documents every page route; assets, the action plumbing and the API (its
     // own registry) aside.
     let pages: BTreeSet<String> = routed
         .into_iter()
-        .filter(|r| {
-            !["/static", "/_actions", "/api/v1"]
-                .iter()
-                .any(|p| r.starts_with(p))
-        })
+        .filter(|r| !["/static", "/_actions", "/api/v1"].iter().any(|p| r.starts_with(p)))
         .collect();
     let documented: BTreeSet<String> = crate::sitemap::PAGES
         .iter()
         .flat_map(|p| p.routes.iter().map(|r| (*r).to_owned()))
         .collect();
-    assert_eq!(
-        pages, documented,
-        "add or remove the route's entry in sitemap.rs"
-    );
+    assert_eq!(pages, documented, "add or remove the route's entry in sitemap.rs");
 }
 
 /// Class: a public server answers 404 on every route that is not public, under every method,
@@ -274,10 +242,7 @@ async fn every_local_route_is_dark_on_a_public_server() {
         if !LOCAL.contains(&route.as_str()) {
             continue;
         }
-        assert!(
-            !crate::public::public_route(&route),
-            "{route}: only_public lets it through"
-        );
+        assert!(!crate::public::public_route(&route), "{route}: only_public lets it through");
         assert!(
             !crate::features::route_on(&cfg, None, &route),
             "{route}: no local-only switch turns it off when public"
@@ -302,14 +267,9 @@ async fn every_local_route_is_dark_on_a_public_server() {
 async fn every_response_sends_nosniff_and_html_sends_the_csp() {
     let tmp = tempfile::tempdir().expect("tmp");
     let b = server(tmp.path(), false);
-    let actions = meta(
-        &send(&b.router, "GET", "/r/r/", &[]).await.body,
-        "gitterrace-actions",
-    );
-    let settings = meta(
-        &send(&b.router, "GET", "/_settings", &[]).await.body,
-        "gitterrace-settings",
-    );
+    let actions = meta(&send(&b.router, "GET", "/r/r/", &[]).await.body, "gitterrace-actions");
+    let settings =
+        meta(&send(&b.router, "GET", "/_settings", &[]).await.body, "gitterrace-settings");
     let callers = [
         page(Some(&actions)),
         page(Some(&settings)),
@@ -333,22 +293,12 @@ fn assert_safe_headers(m: &str, u: &str, res: &Reply) {
     let h = &res.headers;
     let get = |n: &str| h.get(n).and_then(|v| v.to_str().ok()).unwrap_or_default();
     assert_eq!(get("x-content-type-options"), "nosniff", "{m} {u}");
-    assert_eq!(
-        get("cross-origin-resource-policy"),
-        "same-origin",
-        "{m} {u}"
-    );
+    assert_eq!(get("cross-origin-resource-policy"), "same-origin", "{m} {u}");
     if get("content-type").starts_with("text/html") {
         let csp = get("content-security-policy");
-        assert!(
-            csp.contains("script-src 'self'") || csp.contains("sandbox"),
-            "{m} {u}: {csp}"
-        );
+        assert!(csp.contains("script-src 'self'") || csp.contains("sandbox"), "{m} {u}: {csp}");
         assert!(!csp.contains("'unsafe-eval'"), "{m} {u}: {csp}");
-        assert!(
-            !get("cache-control").is_empty(),
-            "{m} {u}: no cache-control"
-        );
+        assert!(!get("cache-control").is_empty(), "{m} {u}: no cache-control");
     }
 }
 
@@ -362,10 +312,7 @@ async fn moving_pages_revalidate_and_assets_keep_their_lifetime() {
         v.to_str().expect("ascii").to_owned()
     };
     let blob = send(&b.router, "GET", "/r/r/blob/HEAD/a.txt", &[]).await;
-    assert_eq!(
-        (blob.status, cache(&blob).as_str()),
-        (200, "private, no-cache")
-    );
+    assert_eq!((blob.status, cache(&blob).as_str()), (200, "private, no-cache"));
     let js = send(&b.router, "GET", crate::MERMAID_JS, &[]).await;
     assert_eq!(cache(&js), "public, max-age=31536000, immutable");
     let raw = send(&b.router, "GET", "/r/r/raw/HEAD/a.txt", &[]).await;
@@ -394,15 +341,8 @@ async fn no_path_route_reads_outside_the_tree() {
         "d/secret.txt",
         abs.trim_start_matches('/'),
     ];
-    let values = [
-        ".git/config",
-        "../secret.txt",
-        "out",
-        "link",
-        "d/secret.txt",
-        "/.git/config",
-        &abs,
-    ];
+    let values =
+        [".git/config", "../secret.txt", "out", "link", "d/secret.txt", "/.git/config", &abs];
     let mut checked = 0;
     for (scope, route) in every_route(&b) {
         let mut uris: Vec<String> = Vec::new();
@@ -435,10 +375,7 @@ async fn no_write_succeeds_without_the_token() {
         let u = uri(scope, &route, "a.txt");
         for m in ["POST", "PUT", "DELETE", "PATCH"] {
             let got = send(&b.router, m, &u, &page(None)).await.status;
-            assert!(
-                matches!(got, 403 | 404 | 405 | 415),
-                "{m} {u} answered {got} without a token"
-            );
+            assert!(matches!(got, 403 | 404 | 405 | 415), "{m} {u} answered {got} without a token");
         }
     }
     let after = std::fs::read_to_string(b.dirs.1.path().join("config.toml")).expect("r");

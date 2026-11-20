@@ -85,8 +85,7 @@ impl Insights<'_> {
 
     /// Columns of the counted commits of the period, oldest first.
     pub fn counted_rows(&self, period: Period) -> impl Iterator<Item = CommitRow> {
-        self.in_period(period, |c| c.stream().collect::<Vec<_>>())
-            .into_iter()
+        self.in_period(period, |c| c.stream().collect::<Vec<_>>()).into_iter()
     }
 
     /// Every counted file with its churn, most commits first, then path.
@@ -280,19 +279,9 @@ mod tests {
 
     fn sample() -> Vec<CommitRecord> {
         vec![
-            rec(
-                "1",
-                "Ann",
-                0,
-                vec![file("src/a.rs", 10, 0, 10), file("README.md", 1, 0, 1)],
-            ),
+            rec("1", "Ann", 0, vec![file("src/a.rs", 10, 0, 10), file("README.md", 1, 0, 1)]),
             rec("2", "Bob", 1, vec![file("src/a.rs", 3, 2, 11)]),
-            rec(
-                "3",
-                "Ann",
-                8,
-                vec![file("src/b.rs", 5, 5, 5), file("src/a.rs", 1, 1, 11)],
-            ),
+            rec("3", "Ann", 8, vec![file("src/b.rs", 5, 5, 5), file("src/a.rs", 1, 1, 11)]),
         ]
     }
 
@@ -320,34 +309,16 @@ mod tests {
         r[1].merge = true;
         let ins = Insights::new(&r, Options::default(), None);
         let f = ins.file_churn(Period::All);
-        assert!(
-            f.iter().all(|c| c.path != "Cargo.lock"),
-            "generated left out"
-        );
+        assert!(f.iter().all(|c| c.path != "Cargo.lock"), "generated left out");
         assert_eq!(f[0].commits, 2, "the merge does not count");
-        let all = Insights::new(
-            &r,
-            Options {
-                include_generated: true,
-                ..Options::default()
-            },
-            None,
-        );
-        assert!(
-            all.file_churn(Period::All)
-                .iter()
-                .any(|c| c.path == "Cargo.lock")
-        );
+        let all =
+            Insights::new(&r, Options { include_generated: true, ..Options::default() }, None);
+        assert!(all.file_churn(Period::All).iter().any(|c| c.path == "Cargo.lock"));
     }
 
     #[test]
     fn same_file_twice_in_one_commit_counts_one_commit() {
-        let r = [rec(
-            "1",
-            "a",
-            0,
-            vec![file("x", 1, 0, 1), file("x", 2, 0, 3)],
-        )];
+        let r = [rec("1", "a", 0, vec![file("x", 1, 0, 1), file("x", 2, 0, 3)])];
         let ins = Insights::new(&r, Options::default(), None);
         assert_eq!(ins.file_churn(Period::All)[0].commits, 1);
     }
@@ -386,15 +357,8 @@ mod tests {
         let recs = crate::insights::code::tests::edge_week();
         let ins = Insights::new(&recs, Options::default(), None);
         let p = Period::Week;
-        let n: usize = ins
-            .label_breakdown(Label::Kind, p)
-            .iter()
-            .map(|l| l.commits)
-            .sum();
-        assert_eq!(
-            n, 2,
-            "commit on local day 13 counted in a week of days 14..=20"
-        );
+        let n: usize = ins.label_breakdown(Label::Kind, p).iter().map(|l| l.commits).sum();
+        assert_eq!(n, 2, "commit on local day 13 counted in a week of days 14..=20");
         let over: usize = ins
             .label_over_time(Label::Kind, p)
             .iter()

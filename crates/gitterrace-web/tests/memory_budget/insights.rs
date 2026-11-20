@@ -97,16 +97,8 @@ fn insights_release_returns_to_start() {
     // release, before any page, may keep less still. A cache that survives the release fails
     // both; one that only the requests fill fails the second.
     for (what, v, allowed) in [
-        (
-            "the release after indexing",
-            run.heap_idle,
-            HEAP_SLACK_MB * MB,
-        ),
-        (
-            "the release after the requests",
-            run.heap_released,
-            memo_budget() + HEAP_SLACK_MB * MB,
-        ),
+        ("the release after indexing", run.heap_idle, HEAP_SLACK_MB * MB),
+        ("the release after the requests", run.heap_released, memo_budget() + HEAP_SLACK_MB * MB),
     ] {
         if v > run.heap_start + allowed {
             bad.push(format!(
@@ -133,13 +125,7 @@ fn insights_release_returns_to_start() {
 /// budgets are measured from.
 fn just_started(test: &str) -> (u64, u64) {
     let tiny = tempfile::tempdir().expect("tmp");
-    synthetic::build(
-        tiny.path(),
-        Shape {
-            commits: 1,
-            ..Shape::sized(1)
-        },
-    );
+    synthetic::build(tiny.path(), Shape { commits: 1, ..Shape::sized(1) });
     let t = Server::start(tiny.path(), test);
     let b = t.base();
     t.wait_ready(&b);
@@ -154,9 +140,7 @@ fn measured_pages(base: &str, path: &str) -> Vec<String> {
         for sel in [String::new(), format!("&q=path:{path}")] {
             pages.push(format!("{base}/stats?period={period}{sel}"));
             pages.push(format!("{base}/stats/hotspots?period={period}{sel}"));
-            pages.push(format!(
-                "{base}/api/v1/insights/summary?period={period}{sel}"
-            ));
+            pages.push(format!("{base}/api/v1/insights/summary?period={period}{sel}"));
         }
     }
     pages
@@ -182,11 +166,7 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     s.wait_ready(&base);
     s.wait_released(&base, 0);
     let heap_idle = s.heap();
-    let path = if std::env::var_os("TEST_LINUX").is_some() {
-        "kernel"
-    } else {
-        "d1"
-    };
+    let path = if std::env::var_os("TEST_LINUX").is_some() { "kernel" } else { "d1" };
     let pages = measured_pages(&base, path);
     let mut bad = Vec::new();
     // The memo drops unknown parameters, so a second read of the same URL is a memo hit.
@@ -197,21 +177,11 @@ fn peak_run(test: &str) -> Option<PeakRun> {
         s.reset_peak();
         let (status, _) = s.get(&w);
         assert_eq!(status, 200, "{w}");
-        writeln!(
-            std::io::stderr(),
-            "{w}: heap peak {} MB",
-            s.heap_peak() / MB
-        )
-        .expect("stderr");
+        writeln!(std::io::stderr(), "{w}: heap peak {} MB", s.heap_peak() / MB).expect("stderr");
     }
     let warm = s.dirty();
-    writeln!(
-        std::io::stderr(),
-        "warm idle {} MB, just-started {} MB",
-        warm / MB,
-        start / MB
-    )
-    .expect("stderr");
+    writeln!(std::io::stderr(), "warm idle {} MB, just-started {} MB", warm / MB, start / MB)
+        .expect("stderr");
     if warm > start + FOOTPRINT_IDLE_MB * MB {
         bad.push(format!(
             "warm idle: {} MB above the just-started {} MB, budget {FOOTPRINT_IDLE_MB} MB",
@@ -223,21 +193,12 @@ fn peak_run(test: &str) -> Option<PeakRun> {
         let idle = s.dirty();
         s.reset_peak();
         let (status, _) = s.get(p);
-        writeln!(
-            std::io::stderr(),
-            "{p}: warm heap peak {} MB",
-            s.heap_peak() / MB
-        )
-        .expect("stderr");
+        writeln!(std::io::stderr(), "{p}: warm heap peak {} MB", s.heap_peak() / MB)
+            .expect("stderr");
         assert_eq!(status, 200, "{p}");
         let peak = s.dirty();
-        writeln!(
-            std::io::stderr(),
-            "{p}: idle {} MB, after {} MB",
-            idle / MB,
-            peak / MB
-        )
-        .expect("stderr");
+        writeln!(std::io::stderr(), "{p}: idle {} MB, after {} MB", idle / MB, peak / MB)
+            .expect("stderr");
         if peak > idle + REQUEST_PEAK_MB * MB {
             bad.push(format!(
                 "{p}: {} MB over idle, cap {REQUEST_PEAK_MB} MB",
@@ -258,12 +219,5 @@ fn peak_run(test: &str) -> Option<PeakRun> {
     )
     .expect("stderr");
     writeln!(std::io::stderr(), "released idle {} MB", released / MB).expect("stderr");
-    Some(PeakRun {
-        start,
-        released,
-        heap_start,
-        heap_idle,
-        heap_released,
-        bad,
-    })
+    Some(PeakRun { start, released, heap_start, heap_idle, heap_released, bad })
 }

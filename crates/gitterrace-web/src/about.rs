@@ -57,11 +57,7 @@ pub(crate) fn find(entries: &[TreeEntry]) -> Vec<Doc> {
                 .filter(|e| e.kind == TreeEntryKind::File)
                 .filter_map(|e| Some((rank(&e.name, stems)?, &e.name)))
                 .min()
-                .map(|(_, name)| Doc {
-                    slug,
-                    label,
-                    file: name.clone(),
-                })
+                .map(|(_, name)| Doc { slug, label, file: name.clone() })
         })
         .collect()
 }
@@ -77,15 +73,8 @@ pub(crate) fn card(
     docs: &[Doc],
     want: Option<&str>,
 ) -> Option<About> {
-    let active = docs
-        .iter()
-        .find(|d| Some(d.slug) == want)
-        .or_else(|| docs.first())?;
-    let file = if dir.is_empty() {
-        active.file.clone()
-    } else {
-        format!("{dir}/{}", active.file)
-    };
+    let active = docs.iter().find(|d| Some(d.slug) == want).or_else(|| docs.first())?;
+    let file = if dir.is_empty() { active.file.clone() } else { format!("{dir}/{}", active.file) };
     let is_md = std::path::Path::new(&active.file)
         .extension()
         .and_then(|e| e.to_str())
@@ -125,11 +114,7 @@ pub(crate) fn card(
             outline,
             actions: vec![DocAction {
                 label: "Open file",
-                href: fmt::href(&format!(
-                    "/blob/{}/{}",
-                    fmt::enc_seg(rev),
-                    fmt::enc_path(&file)
-                )),
+                href: fmt::href(&format!("/blob/{}/{}", fmt::enc_seg(rev), fmt::enc_path(&file))),
             }],
             ..DocHead::default()
         },
@@ -144,11 +129,7 @@ mod tests {
     use super::*;
 
     fn e(name: &str, kind: TreeEntryKind) -> TreeEntry {
-        TreeEntry {
-            name: name.into(),
-            kind,
-            size: None,
-        }
+        TreeEntry { name: name.into(), kind, size: None }
     }
 
     #[test]

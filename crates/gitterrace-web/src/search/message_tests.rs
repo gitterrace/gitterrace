@@ -65,11 +65,7 @@ fn assert_equal(a: &App, what: &str) {
         assert_eq!(hits.ids, ids(&walk), "{what}: hits of {q:?}");
         assert_eq!(hits.capped, walk_capped, "{what}: cap of {q:?}");
         let (rows, _) = search_commits(a, "HEAD", &r).expect("search");
-        assert_eq!(
-            format!("{rows:?}"),
-            format!("{walk:?}"),
-            "{what}: rows of {q:?}"
-        );
+        assert_eq!(format!("{rows:?}"), format!("{walk:?}"), "{what}: rows of {q:?}");
     }
 }
 
@@ -95,9 +91,7 @@ fn mixed(dir: &Path) -> std::path::PathBuf {
     f.git(&["commit", "-q", "-F", raw.to_str().expect("utf8")]);
     f.git(&["config", "user.name", "Jane Doe"]);
     f.git(&["config", "user.email", "jane@x.io"]);
-    let f = f
-        .write(".mailmap", "Jane Doe <jane@x.io> <old@x.io>\n")
-        .commit("docs: mailmap");
+    let f = f.write(".mailmap", "Jane Doe <jane@x.io> <old@x.io>\n").commit("docs: mailmap");
     drop(f);
     repo
 }
@@ -141,36 +135,19 @@ fn turned_off_the_search_walks_git_and_the_column_goes() {
         let m = gitterrace_index::seg::manifest::Manifest::load(a.index.dir())
             .expect("manifest")
             .expect("set");
-        m.live
-            .into_iter()
-            .map(|f| f.name)
-            .filter(|n| n.starts_with("msg-"))
-            .collect()
+        m.live.into_iter().map(|f| f.name).filter(|n| n.starts_with("msg-")).collect()
     };
     assert_eq!(names(&on).len(), 1, "on builds one column file");
     drop(on);
     let off = app(&repo, false, 200);
     let r = re("fix", false);
-    assert!(
-        search_indexed(&off, "HEAD", &r, 200)
-            .expect("off")
-            .is_none()
-    );
+    assert!(search_indexed(&off, "HEAD", &r, 200).expect("off").is_none());
     let before = off.repo.commits_read();
     let (rows, _) = search_commits(&off, "HEAD", &r).expect("search");
-    assert!(
-        off.repo.commits_read() > before,
-        "off reads git, as before the column"
-    );
-    assert_eq!(
-        ids(&rows),
-        ids(&walk_commits(&off, "HEAD", &r).expect("walk").0)
-    );
+    assert!(off.repo.commits_read() > before, "off reads git, as before the column");
+    assert_eq!(ids(&rows), ids(&walk_commits(&off, "HEAD", &r).expect("walk").0));
     build(&off);
-    assert!(
-        names(&off).is_empty(),
-        "off drops the column on the next update"
-    );
+    assert!(names(&off).is_empty(), "off drops the column on the next update");
     assert!(
         !std::fs::read_dir(off.index.dir()).expect("dir").any(|e| e
             .expect("entry")
@@ -193,21 +170,14 @@ fn a_damaged_column_is_rebuilt_never_served() {
         let m = gitterrace_index::seg::manifest::Manifest::load(a.index.dir())
             .expect("manifest")
             .expect("set");
-        let f = m
-            .live
-            .into_iter()
-            .find(|f| f.name.starts_with("msg-"))
-            .expect("column");
+        let f = m.live.into_iter().find(|f| f.name.starts_with("msg-")).expect("column");
         a.index.dir().join(f.name)
     };
     let len = std::fs::metadata(file(&a)).expect("meta").len();
     let damage: [&dyn Fn(&Path); 4] = [
         // Cut short: the manifest's length check refuses it on open.
         &|p| {
-            let f = std::fs::OpenOptions::new()
-                .write(true)
-                .open(p)
-                .expect("open");
+            let f = std::fs::OpenOptions::new().write(true).open(p).expect("open");
             f.set_len(len / 2).expect("cut");
         },
         // One flipped byte in the first block: only its crc can tell.
@@ -230,11 +200,7 @@ fn a_damaged_column_is_rebuilt_never_served() {
         a.mark_ready();
         d(&file(&a));
         let (rows, _) = search_commits(&a, "HEAD", &r).expect("search");
-        assert_eq!(
-            ids(&rows),
-            want,
-            "damage {i}: the walk answers this request whole"
-        );
+        assert_eq!(ids(&rows), want, "damage {i}: the walk answers this request whole");
         assert!(!a.ready(), "damage {i}: the rebuild started");
         assert!(
             gitterrace_index::seg::manifest::Manifest::load(a.index.dir())
@@ -254,25 +220,14 @@ fn a_commit_after_the_build_is_found() {
     let a = app(&repo, true, 200);
     build(&a);
     let r = re("brand new needle", false);
-    assert_eq!(
-        search_indexed(&a, "HEAD", &r, 200)
-            .expect("indexed")
-            .map(|h| h.ids.len()),
-        Some(0)
-    );
+    assert_eq!(search_indexed(&a, "HEAD", &r, 200).expect("indexed").map(|h| h.ids.len()), Some(0));
     let f = gitterrace_testkit::Fixture::init(&repo);
     drop(f.write("n", "1").commit("feat: brand new needle"));
     // Before the update the column is not current: the walk answers, never a stale list.
-    assert!(
-        search_indexed(&a, "HEAD", &r, 200)
-            .expect("stale")
-            .is_none()
-    );
+    assert!(search_indexed(&a, "HEAD", &r, 200).expect("stale").is_none());
     assert_eq!(search_commits(&a, "HEAD", &r).expect("walk").0.len(), 1);
     build(&a);
-    let hits = search_indexed(&a, "HEAD", &r, 200)
-        .expect("indexed")
-        .expect("current");
+    let hits = search_indexed(&a, "HEAD", &r, 200).expect("indexed").expect("current");
     assert_eq!(hits.ids, vec![a.repo.resolve("HEAD").expect("head")]);
     assert_equal(&a, "after an append");
 }

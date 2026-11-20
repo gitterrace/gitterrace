@@ -13,15 +13,9 @@ fn links(html: &str, prefix: &str) -> Vec<String> {
     for (i, _) in html.match_indices("href=\"") {
         let rest = &html[i + 6..];
         let v = &rest[..rest.find('"').unwrap_or(0)];
-        let v = v
-            .split('#')
-            .next()
-            .unwrap_or_default()
-            .replace("&amp;", "&");
+        let v = v.split('#').next().unwrap_or_default().replace("&amp;", "&");
         // Raw files and assets are no pages; the API answers JSON.
-        let skip = ["/raw/", "/static/", "/api/", "/_"]
-            .iter()
-            .any(|s| v.contains(s));
+        let skip = ["/raw/", "/static/", "/api/", "/_"].iter().any(|s| v.contains(s));
         if v.starts_with(prefix) && !skip {
             out.push(v);
         }

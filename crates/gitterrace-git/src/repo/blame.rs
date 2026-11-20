@@ -39,20 +39,12 @@ pub(super) struct BlameCache {
 }
 
 fn blame_size(lines: &[BlameLine]) -> usize {
-    lines
-        .iter()
-        .map(|l| 64 + l.commit.len() + l.author.len() + l.text.len())
-        .sum()
+    lines.iter().map(|l| 64 + l.commit.len() + l.author.len() + l.text.len()).sum()
 }
 
 impl BlameCache {
     pub(super) fn with_limit(limit: usize) -> Self {
-        Self {
-            limit,
-            map: HashMap::new(),
-            order: VecDeque::new(),
-            bytes: 0,
-        }
+        Self { limit, map: HashMap::new(), order: VecDeque::new(), bytes: 0 }
     }
 
     pub(super) fn get(&mut self, key: &(gix::ObjectId, String)) -> Option<Arc<Vec<BlameLine>>> {
@@ -153,9 +145,7 @@ impl Repo {
             return false;
         };
         let key = (tip, path.trim_matches('/').to_string());
-        self.blame_cache
-            .lock()
-            .is_ok_and(|c| c.map.contains_key(&key))
+        self.blame_cache.lock().is_ok_and(|c| c.map.contains_key(&key))
     }
 
     /// Empties the blame cache and returns whether it held anything. A server calls this when
@@ -172,9 +162,7 @@ impl Repo {
 
     /// Bytes the blame cache holds and may hold, so a prewarm can leave room for visitors.
     pub fn blame_cache_fill(&self) -> (usize, usize) {
-        self.blame_cache
-            .lock()
-            .map_or((0, 0), |c| (c.bytes, c.limit))
+        self.blame_cache.lock().map_or((0, 0), |c| (c.bytes, c.limit))
     }
 }
 
@@ -223,9 +211,7 @@ fn blame_bounded(
         if !over {
             blamed.store(true, Ordering::Relaxed);
         }
-        let horizon = walk
-            .join()
-            .unwrap_or_else(|_| Err(git("blame horizon walk panicked")));
+        let horizon = walk.join().unwrap_or_else(|_| Err(git("blame horizon walk panicked")));
         (first, over, horizon)
     });
     match first {
@@ -234,9 +220,7 @@ fn blame_bounded(
         Err(_) => {}
     }
     let horizon = horizon?;
-    let since = horizon
-        .since
-        .map(|seconds| gix::date::Time { seconds, offset: 0 });
+    let since = horizon.since.map(|seconds| gix::date::Time { seconds, offset: 0 });
     let outcome = run_blame(repo, &repo.objects, tip, path, since)?;
     Ok((outcome, horizon.commits))
 }
@@ -368,13 +352,8 @@ fn history_horizon(
         commit_node(&odb, graph.as_ref(), id, &mut commit_buf, &mut parents)?;
         let mut sides = Vec::new();
         for parent in std::mem::take(&mut parents) {
-            let (t, root) = commit_node(
-                &odb,
-                graph.as_ref(),
-                parent,
-                &mut commit_buf,
-                &mut Vec::new(),
-            )?;
+            let (t, root) =
+                commit_node(&odb, graph.as_ref(), parent, &mut commit_buf, &mut Vec::new())?;
             if let Some(b) = blob_at(&odb, root, path, &mut tree_buf, &mut trees)? {
                 sides.push((t, parent, b));
             }
@@ -385,9 +364,8 @@ fn history_horizon(
             sides.push(keep);
         }
         if seen.insert(blob) {
-            held += gix::objs::FindHeader::try_header(&odb, &blob)
-                .map_err(git)?
-                .map_or(0, |h| h.size);
+            held +=
+                gix::objs::FindHeader::try_header(&odb, &blob).map_err(git)?.map_or(0, |h| h.size);
             if held > budget {
                 // Blame skips commits strictly older than `since`: one past this commit's
                 // time keeps every newer version and drops this one.
@@ -441,9 +419,7 @@ fn horizon_odb(repo: &gix::Repository) -> gix::OdbHandle {
     let mut odb = repo.objects.clone();
     odb.unset_object_cache();
     odb.set_pack_cache(|| {
-        Box::new(gix::odb::pack::cache::lru::StaticLinkedList::<64>::new(
-            HORIZON_PACK_CACHE_BYTES,
-        ))
+        Box::new(gix::odb::pack::cache::lru::StaticLinkedList::<64>::new(HORIZON_PACK_CACHE_BYTES))
     });
     odb
 }

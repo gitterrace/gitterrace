@@ -43,27 +43,14 @@ fn command_body(s: &mut String, c: &Command, is_root: bool) {
         let about = about.to_string();
         let (first, rest) = about.split_once('\n').unwrap_or((&about, ""));
         let dot = if first.ends_with('.') { "" } else { "." };
-        let rest = if rest.is_empty() {
-            String::new()
-        } else {
-            format!("\n{rest}")
-        };
+        let rest = if rest.is_empty() { String::new() } else { format!("\n{rest}") };
         let _ = writeln!(s, "{first}{dot}{rest}\n");
     }
     let usage = c.clone().render_usage().to_string();
-    let _ = writeln!(
-        s,
-        "```sh\n{}\n```",
-        usage.trim_start_matches("Usage: ").trim()
-    );
-    let own: Vec<&Arg> = visible(c)
-        .filter(|a| is_root || !a.is_global_set())
-        .collect();
-    let own: Vec<&Arg> = if is_root {
-        own.into_iter().filter(|a| !a.is_global_set()).collect()
-    } else {
-        own
-    };
+    let _ = writeln!(s, "```sh\n{}\n```", usage.trim_start_matches("Usage: ").trim());
+    let own: Vec<&Arg> = visible(c).filter(|a| is_root || !a.is_global_set()).collect();
+    let own: Vec<&Arg> =
+        if is_root { own.into_iter().filter(|a| !a.is_global_set()).collect() } else { own };
     if !own.is_empty() {
         s.push('\n');
         table(s, &own);
@@ -92,11 +79,7 @@ fn table(s: &mut String, args: &[&Arg]) {
             .filter(|v| a.get_action().takes_values() || v != "false")
             .collect();
         if !default.is_empty() {
-            let _ = write!(
-                line,
-                " Default: {}.",
-                join(default.iter().map(|d| d.as_str().into()))
-            );
+            let _ = write!(line, " Default: {}.", join(default.iter().map(|d| d.as_str().into())));
         }
         let values = join(
             a.get_possible_values()
@@ -138,11 +121,7 @@ fn value_name(a: &Arg) -> String {
 }
 
 fn many(a: &Arg) -> &'static str {
-    if a.get_num_args().is_some_and(|r| r.max_values() > 1) {
-        "..."
-    } else {
-        ""
-    }
+    if a.get_num_args().is_some_and(|r| r.max_values() > 1) { "..." } else { "" }
 }
 
 fn join<'a>(items: impl Iterator<Item = std::borrow::Cow<'a, str>>) -> String {
@@ -151,10 +130,7 @@ fn join<'a>(items: impl Iterator<Item = std::borrow::Cow<'a, str>>) -> String {
 }
 
 fn cell(text: &str) -> String {
-    text.split_whitespace()
-        .collect::<Vec<_>>()
-        .join(" ")
-        .replace('|', "\\|")
+    text.split_whitespace().collect::<Vec<_>>().join(" ").replace('|', "\\|")
 }
 
 #[cfg(test)]
@@ -195,11 +171,7 @@ mod tests {
         let mut bad = Vec::new();
         let lines: Vec<&str> = md.lines().collect();
         let cells = |l: &str| -> Vec<String> {
-            l.trim()
-                .trim_matches('|')
-                .split(" | ")
-                .map(|c| c.trim().to_owned())
-                .collect()
+            l.trim().trim_matches('|').split(" | ").map(|c| c.trim().to_owned()).collect()
         };
         let mut i = 0;
         while i + 1 < lines.len() {

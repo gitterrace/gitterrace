@@ -78,10 +78,8 @@ pub const KEYWORDS: &[KeywordSpec] = &[
 ];
 
 /// Keywords that read as unsupported rather than as message text, with the reason.
-pub(crate) const UNSUPPORTED: &[(&str, &str)] = &[(
-    "committer",
-    "`committer:` is not supported: the index keeps authors only. Use `author:`",
-)];
+pub(crate) const UNSUPPORTED: &[(&str, &str)] =
+    &[("committer", "`committer:` is not supported: the index keeps authors only. Use `author:`")];
 
 /// The grammar as one line per keyword, ``- `syntax`: description``, for the docs and the MCP
 /// tool descriptions, so the model reads the registry and nothing is written twice.

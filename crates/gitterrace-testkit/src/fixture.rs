@@ -36,14 +36,8 @@ impl Adversarial {
         let f = Fixture::init(&repo).at("2024-01-01T12:00:00Z");
         f.git(&["config", "user.name", "jdoe"]);
         f.git(&["config", "user.email", "old@x.io"]);
-        let f = f
-            .write("a.txt", "a\n")
-            .commit("feat: first root")
-            .branch("side");
-        let f = f
-            .write("s.txt", "s\n")
-            .commit("feat(side): side")
-            .checkout("main");
+        let f = f.write("a.txt", "a\n").commit("feat: first root").branch("side");
+        let f = f.write("s.txt", "s\n").commit("feat(side): side").checkout("main");
         let f = f.write("m.txt", "m\n").commit("fix: main");
         let root_a = f.git(&["rev-list", "--max-parents=0", "HEAD"]);
         let (root_b, octopus) = octopus_with_second_root(&f);
@@ -59,23 +53,12 @@ impl Adversarial {
         let raw = |parent: &str, author: &str, committer: &str, msg: &str| {
             literal_commit(&f, &tree, parent, author, committer, msg)
         };
-        let far = raw(
-            &mailmap,
-            &format!("{FAR_FUTURE} +0000"),
-            &format!("{FAR_FUTURE} +0000"),
-            "far",
-        );
-        let extreme = raw(
-            &far,
-            &format!("{} -9959", i64::MIN),
-            &format!("{} +9959", i64::MAX),
-            "extreme",
-        );
+        let far =
+            raw(&mailmap, &format!("{FAR_FUTURE} +0000"), &format!("{FAR_FUTURE} +0000"), "far");
+        let extreme =
+            raw(&far, &format!("{} -9959", i64::MIN), &format!("{} +9959", i64::MAX), "extreme");
         f.git(&["reset", "-q", "--hard", &extreme]);
-        let f = f
-            .at("2024-03-01T12:00:00Z")
-            .write("a.txt", "a\nb\n")
-            .commit("fix: tip");
+        let f = f.at("2024-03-01T12:00:00Z").write("a.txt", "a\nb\n").commit("fix: tip");
         let tip = f.git(&["rev-parse", "HEAD"]);
         f.git(&["branch", "-q", "-D", "side"]);
         #[cfg(unix)]
@@ -86,27 +69,8 @@ impl Adversarial {
         }
         let shallow = dir.join("shallow");
         let url = format!("file://{}", repo.display());
-        git(
-            dir,
-            &[
-                "clone",
-                "-q",
-                "--depth",
-                "3",
-                &url,
-                shallow.to_str().expect("utf8"),
-            ],
-        );
-        Self {
-            repo,
-            shallow,
-            roots: [root_a, root_b],
-            octopus,
-            mailmap,
-            far,
-            extreme,
-            tip,
-        }
+        git(dir, &["clone", "-q", "--depth", "3", &url, shallow.to_str().expect("utf8")]);
+        Self { repo, shallow, roots: [root_a, root_b], octopus, mailmap, far, extreme, tip }
     }
 }
 
@@ -152,14 +116,7 @@ fn literal_commit(
     );
     git_stdin(
         f.path(),
-        &[
-            "hash-object",
-            "-t",
-            "commit",
-            "--literally",
-            "-w",
-            "--stdin",
-        ],
+        &["hash-object", "-t", "commit", "--literally", "-w", "--stdin"],
         body.as_bytes(),
     )
 }
@@ -174,10 +131,7 @@ impl Fixture {
     /// `git init -b main` in `dir`, which is created if missing.
     pub fn init(dir: &Path) -> Self {
         std::fs::create_dir_all(dir).expect("create dir");
-        let f = Self {
-            dir: dir.to_owned(),
-            date: None,
-        };
+        let f = Self { dir: dir.to_owned(), date: None };
         f.git(&["init", "-q", "-b", "main"]);
         f
     }
@@ -195,9 +149,7 @@ impl Fixture {
 
     /// Runs git in the repository and returns trimmed stdout.
     pub fn git(&self, args: &[&str]) -> String {
-        self.date
-            .as_ref()
-            .map_or_else(|| git(&self.dir, args), |d| git_at(&self.dir, d, args))
+        self.date.as_ref().map_or_else(|| git(&self.dir, args), |d| git_at(&self.dir, d, args))
     }
 
     /// Writes `body` to `path`, creating parent directories.

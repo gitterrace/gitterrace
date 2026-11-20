@@ -73,10 +73,7 @@ pub(super) async fn raw(
                 StatusCode::NOT_MODIFIED,
                 [
                     (header::ETAG, tag),
-                    (
-                        header::CACHE_CONTROL,
-                        HeaderValue::from_static("private, max-age=300"),
-                    ),
+                    (header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=300")),
                 ],
             )
                 .into_response());
@@ -121,10 +118,7 @@ fn media_response(path: &str, bytes: impl Into<Body>, tag: Option<&str>) -> Resp
     } else {
         "inline"
     };
-    let (kind, plain) = (
-        crate::media::content_type(path),
-        crate::media::plain_media(path),
-    );
+    let (kind, plain) = (crate::media::content_type(path), crate::media::plain_media(path));
     // The sandbox keeps SVG and text scriptless. It also stops the browser's PDF viewer, so
     // formats that run no author code are served without it.
     let csp = if plain {
@@ -135,18 +129,9 @@ fn media_response(path: &str, bytes: impl Into<Body>, tag: Option<&str>) -> Resp
     let mut res = (
         [
             (header::CONTENT_TYPE, HeaderValue::from_static(kind)),
-            (
-                header::CONTENT_SECURITY_POLICY,
-                HeaderValue::from_static(csp),
-            ),
-            (
-                header::CONTENT_DISPOSITION,
-                HeaderValue::from_static(disposition),
-            ),
-            (
-                header::X_CONTENT_TYPE_OPTIONS,
-                HeaderValue::from_static("nosniff"),
-            ),
+            (header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp)),
+            (header::CONTENT_DISPOSITION, HeaderValue::from_static(disposition)),
+            (header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff")),
         ],
         bytes.into(),
     )
@@ -154,10 +139,7 @@ fn media_response(path: &str, bytes: impl Into<Body>, tag: Option<&str>) -> Resp
     let h = res.headers_mut();
     match tag {
         Some(tag) => {
-            h.insert(
-                header::CACHE_CONTROL,
-                HeaderValue::from_static("private, max-age=300"),
-            );
+            h.insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=300"));
             h.insert(
                 header::ETAG,
                 HeaderValue::from_str(tag).unwrap_or_else(|_| HeaderValue::from_static("\"0\"")),
@@ -178,10 +160,8 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
     let name = path.trim_matches('/').to_owned();
     let permit = raw_permit(&app).await?;
     let limit = app.cfg().limits.raw_mb << 20;
-    let bytes = blocking(&app, move |a| {
-        Ok(gitterrace_git::worktree_bytes(&a.repo, &name, limit)?)
-    })
-    .await?;
+    let bytes =
+        blocking(&app, move |a| Ok(gitterrace_git::worktree_bytes(&a.repo, &name, limit)?)).await?;
     Ok(bytes.map_or_else(
         || crate::error::not_found("This file is not a changed file of the working tree."),
         |b| media_response(&path, held(b, permit), None),
@@ -199,10 +179,7 @@ mod tests {
     /// end again, not panic.
     #[tokio::test]
     async fn a_held_body_polled_past_its_end_stays_ended() {
-        let permit = Arc::new(Semaphore::new(1))
-            .acquire_owned()
-            .await
-            .expect("permit");
+        let permit = Arc::new(Semaphore::new(1)).acquire_owned().await.expect("permit");
         let mut body = super::held(b"abc".to_vec(), permit);
         let mut seen = 0;
         for _ in 0..4 {

@@ -13,16 +13,8 @@ use gitterrace_git::WorkerTime;
 
 /// Every step name an update records, so steps read back from another process keep a
 /// static name.
-const NAMES: [&str; 8] = [
-    "rev_list",
-    "held",
-    "stream",
-    "stream.fold",
-    "append",
-    "finish",
-    "messages",
-    "tip",
-];
+const NAMES: [&str; 8] =
+    ["rev_list", "held", "stream", "stream.fold", "append", "finish", "messages", "tip"];
 
 /// One step of the last update.
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
@@ -42,13 +34,7 @@ impl PhaseTime {
     /// One step as the index child prints it: `name=secs,cpu,busy`, `-` for none.
     pub fn encode(&self) -> String {
         let opt = |v: Option<f64>| v.map_or_else(|| "-".to_owned(), |v| v.to_string());
-        format!(
-            "{}={},{},{}",
-            self.name,
-            self.secs,
-            opt(self.cpu_secs),
-            opt(self.busy)
-        )
+        format!("{}={},{},{}", self.name, self.secs, opt(self.cpu_secs), opt(self.busy))
     }
 
     /// The steps of a line [`PhaseTime::encode`] wrote, space separated. A step with an
@@ -80,22 +66,14 @@ struct Running {
 
 impl Running {
     fn start(name: &'static str) -> Self {
-        Self {
-            name,
-            wall: Instant::now(),
-            cpu: process_cpu(),
-            workers: WorkerTime::now(),
-        }
+        Self { name, wall: Instant::now(), cpu: process_cpu(), workers: WorkerTime::now() }
     }
 
     fn measure(self) -> PhaseTime {
         PhaseTime {
             name: self.name,
             secs: self.wall.elapsed().as_secs_f64(),
-            cpu_secs: self
-                .cpu
-                .zip(process_cpu())
-                .map(|(a, b)| b.saturating_sub(a).as_secs_f64()),
+            cpu_secs: self.cpu.zip(process_cpu()).map(|(a, b)| b.saturating_sub(a).as_secs_f64()),
             busy: WorkerTime::now().since(self.workers).busy_share(),
         }
     }
@@ -127,22 +105,14 @@ impl Phases {
     /// Records a step measured elsewhere (the fold share inside the stream).
     pub(crate) fn add(&self, name: &'static str, took: Duration) {
         if let Ok(mut s) = self.inner.lock() {
-            s.done.push(PhaseTime {
-                name,
-                secs: took.as_secs_f64(),
-                cpu_secs: None,
-                busy: None,
-            });
+            s.done.push(PhaseTime { name, secs: took.as_secs_f64(), cpu_secs: None, busy: None });
         }
     }
 
     /// Replaces the steps with those of an update run elsewhere.
     pub(crate) fn adopt(&self, steps: Vec<PhaseTime>) {
         if let Ok(mut s) = self.inner.lock() {
-            *s = State {
-                done: steps,
-                now: None,
-            };
+            *s = State { done: steps, now: None };
         }
     }
 
@@ -173,12 +143,7 @@ fn decode_one(field: &str) -> Option<PhaseTime> {
     let mut opt = || parts.next().and_then(|p| p.parse().ok());
     let cpu_secs = opt();
     let busy = opt();
-    Some(PhaseTime {
-        name,
-        secs,
-        cpu_secs,
-        busy,
-    })
+    Some(PhaseTime { name, secs, cpu_secs, busy })
 }
 
 /// CPU time of this process so far, user plus system, over all its threads.
@@ -200,32 +165,14 @@ mod tests {
     #[test]
     fn steps_read_back_as_the_child_printed_them() {
         let steps = [
-            PhaseTime {
-                name: "stream",
-                secs: 2.5,
-                cpu_secs: Some(18.0),
-                busy: Some(0.75),
-            },
-            PhaseTime {
-                name: "stream.fold",
-                secs: 0.5,
-                cpu_secs: None,
-                busy: None,
-            },
+            PhaseTime { name: "stream", secs: 2.5, cpu_secs: Some(18.0), busy: Some(0.75) },
+            PhaseTime { name: "stream.fold", secs: 0.5, cpu_secs: None, busy: None },
         ];
         let line: Vec<String> = steps.iter().map(PhaseTime::encode).collect();
         assert_eq!(PhaseTime::decode(&line.join(" ")), steps);
         // Unknown names and malformed times are dropped, a missing CPU or busy reads as none.
         let odd = PhaseTime::decode("bogus=1,2,3 held=x rev_list=0.5");
-        assert_eq!(
-            odd,
-            [PhaseTime {
-                name: "rev_list",
-                secs: 0.5,
-                cpu_secs: None,
-                busy: None,
-            }]
-        );
+        assert_eq!(odd, [PhaseTime { name: "rev_list", secs: 0.5, cpu_secs: None, busy: None }]);
     }
 
     /// CPU spent inside a step is charged to it. Spins until the process clock moves, so a

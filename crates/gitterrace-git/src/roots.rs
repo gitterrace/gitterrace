@@ -50,10 +50,7 @@ impl Roots {
             let name = reference.name().as_bstr().to_string();
             // Branches, tags and remote branches: what the log lists. Stashes and notes are
             // not the project's history.
-            if !["refs/heads/", "refs/tags/", "refs/remotes/"]
-                .iter()
-                .any(|p| name.starts_with(p))
-            {
+            if !["refs/heads/", "refs/tags/", "refs/remotes/"].iter().any(|p| name.starts_with(p)) {
                 continue;
             }
             name.hash(&mut h);

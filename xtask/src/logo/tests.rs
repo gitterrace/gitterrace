@@ -26,21 +26,10 @@ fn halves_of_one_color_are_refused() {
 fn a_wordmark_token_that_differs_from_the_header_fill_is_drift() {
     let re = Re::new().expect("patterns");
     let ok = "--wm-git:light-dark(#101010,#e3ecf6);--wm-terrace:var(--accent);--accent:#5b5e8d;";
-    assert_eq!(
-        token_drift(&re, HEADER, "light", ok).expect("drift"),
-        Vec::<String>::new()
-    );
+    assert_eq!(token_drift(&re, HEADER, "light", ok).expect("drift"), Vec::<String>::new());
     let bad = ok.replace("#101010", "#000000");
-    assert_eq!(
-        token_drift(&re, HEADER, "light", &bad)
-            .expect("drift")
-            .len(),
-        1
-    );
-    assert_eq!(
-        token_drift(&re, HEADER, "light", "").expect("drift").len(),
-        2
-    );
+    assert_eq!(token_drift(&re, HEADER, "light", &bad).expect("drift").len(), 1);
+    assert_eq!(token_drift(&re, HEADER, "light", "").expect("drift").len(), 2);
 }
 
 #[test]
@@ -53,10 +42,7 @@ fn a_relative_path_command_is_refused_in_the_wordmark() {
 fn wrapping_breaks_at_spaces_within_the_width() {
     let out = wrap(&"ab ".repeat(40), 30);
     assert!(out.lines().all(|l| l.len() <= 30));
-    assert_eq!(
-        out.replace('\n', " "),
-        "ab ".repeat(40).trim_end().to_owned() + " "
-    );
+    assert_eq!(out.replace('\n', " "), "ab ".repeat(40).trim_end().to_owned() + " ");
 }
 
 #[test]

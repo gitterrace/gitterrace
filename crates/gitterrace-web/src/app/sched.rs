@@ -49,11 +49,7 @@ const fn tier(load: Option<u32>) -> usize {
 /// One build's part of `total` workers among `builds`: even, and at least one while any
 /// worker may run, so a build never idles beside another that has them.
 const fn share(total: usize, builds: usize) -> usize {
-    if total == 0 || builds == 0 {
-        0
-    } else {
-        total.div_ceil(builds)
-    }
+    if total == 0 || builds == 0 { 0 } else { total.div_ceil(builds) }
 }
 
 struct Build {
@@ -92,13 +88,7 @@ impl Scheduler {
     }
 
     fn with(load: Box<Load>, poll: Duration, idle: Duration) -> Arc<Self> {
-        Arc::new(Self {
-            load,
-            poll,
-            idle,
-            state: Mutex::default(),
-            entered: Condvar::new(),
-        })
+        Arc::new(Self { load, poll, idle, state: Mutex::default(), entered: Condvar::new() })
     }
 
     /// Registers a build. Returns the workers it starts with, its lease and the budgets that
@@ -115,17 +105,12 @@ impl Scheduler {
         }
         drop(s);
         self.entered.notify_all();
-        let lease = Lease {
-            id,
-            sched: Arc::clone(self),
-        };
+        let lease = Lease { id, sched: Arc::clone(self) };
         (start, lease, rx)
     }
 
     fn lock(&self) -> MutexGuard<'_, State> {
-        self.state
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        self.state.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
     /// Gives every build its share of the current budget, and returns the share of `quiet`,
@@ -147,10 +132,7 @@ impl Scheduler {
     /// Starts the sampler thread, false when the thread cannot start.
     fn sample(self: &Arc<Self>, _s: &mut State) -> bool {
         let me = Arc::clone(self);
-        match std::thread::Builder::new()
-            .name("index-load".into())
-            .spawn(move || me.sampler())
-        {
+        match std::thread::Builder::new().name("index-load".into()).spawn(move || me.sampler()) {
             Ok(_) => true,
             Err(e) => {
                 tracing::warn!("index load sampler not started: {e}");
@@ -206,25 +188,13 @@ fn system_load() -> Option<u32> {
         return Some(fixed);
     }
     let text = std::fs::read_to_string("/proc/loadavg").ok().or_else(|| {
-        let out = std::process::Command::new("sysctl")
-            .args(["-n", "vm.loadavg"])
-            .output()
-            .ok()?;
+        let out = std::process::Command::new("sysctl").args(["-n", "vm.loadavg"]).output().ok()?;
         String::from_utf8(out.stdout).ok()
     })?;
-    let one: f64 = text
-        .trim_start_matches(['{', ' '])
-        .split_whitespace()
-        .next()?
-        .parse()
-        .ok()?;
+    let one: f64 = text.trim_start_matches(['{', ' ']).split_whitespace().next()?.parse().ok()?;
     let cores = std::thread::available_parallelism().map_or(1, usize::from) as f64;
     // Saturating float to int: a load is small and never negative.
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "a percent"
-    )]
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a percent")]
     Some((one / cores * 100.0).max(0.0) as u32)
 }
 

@@ -14,11 +14,7 @@ fn a_memo_hit_carries_the_version_of_now() {
     // A change the key does not see (staging into a tree already dirty): only the version moves.
     let next = a.version().wrapping_add(7);
     a.version.store(next, Ordering::Release);
-    assert_eq!(
-        a.memo_key("stats", Some("q=type:fix")),
-        key,
-        "the key stays put"
-    );
+    assert_eq!(a.memo_key("stats", Some("q=type:fix")), key, "the key stays put");
     assert_eq!(a.memo_get(&key).as_deref(), Some(page(next).as_str()));
 }
 
@@ -53,10 +49,7 @@ fn only_memo_get_reads_the_page_memo() {
             }
         }
     }
-    assert!(
-        bad.is_empty(),
-        "read the memo through App::memo_get: {bad:?}"
-    );
+    assert!(bad.is_empty(), "read the memo through App::memo_get: {bad:?}");
 }
 
 /// The memo survives the idle release, so what it keeps must be small: pages of tens of KB

@@ -10,19 +10,13 @@ mod tests {
 
     /// The tracked paths under any of `dirs`.
     fn tracked_under<'a>(tracked: &'a str, dirs: &[&str]) -> Vec<&'a str> {
-        tracked
-            .lines()
-            .filter(|p| dirs.iter().any(|d| p.starts_with(&format!("{d}/"))))
-            .collect()
+        tracked.lines().filter(|p| dirs.iter().any(|d| p.starts_with(&format!("{d}/")))).collect()
     }
 
     #[test]
     fn a_planted_tracked_build_file_is_reported() {
         let tracked = "src/a.rs\ntarget/debug/x\nsite-src/b\nout/c.html\n";
-        assert_eq!(
-            tracked_under(tracked, &["target", "out"]),
-            ["target/debug/x", "out/c.html"]
-        );
+        assert_eq!(tracked_under(tracked, &["target", "out"]), ["target/debug/x", "out/c.html"]);
     }
 
     #[test]
@@ -34,10 +28,7 @@ mod tests {
         for dir in BUILD_DIRS {
             let probe = format!("{dir}/x");
             let ignored = try_git(&root, &["check-ignore", "-q", "--no-index", &probe]).is_ok();
-            assert!(
-                ignored,
-                "{dir}/ is a build dir but .gitignore does not cover it"
-            );
+            assert!(ignored, "{dir}/ is a build dir but .gitignore does not cover it");
         }
     }
 
@@ -47,9 +38,6 @@ mod tests {
         let toml = std::fs::read_to_string(crate::repo_root().join("wrangler.toml"))
             .expect("wrangler.toml");
         let want = format!("directory = \"./{}\"", crate::site::SITE_DIR);
-        assert!(
-            toml.lines().any(|l| l.trim() == want),
-            "wrangler.toml lacks {want}"
-        );
+        assert!(toml.lines().any(|l| l.trim() == want), "wrangler.toml lacks {want}");
     }
 }

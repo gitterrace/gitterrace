@@ -14,12 +14,7 @@ fn collect<R: Send>(
     stream(
         items,
         workers,
-        Window {
-            items: window,
-            bytes: usize::MAX,
-            first: &[],
-            budget: None,
-        },
+        Window { items: window, bytes: usize::MAX, first: &[], budget: None },
         || Ok(()),
         |(), i| work(i),
         |_| 0,
@@ -61,10 +56,7 @@ fn one_slow_item_does_not_serialize_the_rest() -> crate::Result<()> {
         "item 0 held back the queue for {:?}",
         t0.elapsed()
     );
-    assert!(
-        t0.elapsed() < Duration::from_secs(30),
-        "the others waited on item 0"
-    );
+    assert!(t0.elapsed() < Duration::from_secs(30), "the others waited on item 0");
     Ok(())
 }
 
@@ -84,11 +76,7 @@ fn workers_stay_inside_the_window() -> crate::Result<()> {
         }
         Ok(())
     })?;
-    assert!(
-        peak.load(Ordering::SeqCst) <= 16,
-        "{}",
-        peak.load(Ordering::SeqCst)
-    );
+    assert!(peak.load(Ordering::SeqCst) <= 16, "{}", peak.load(Ordering::SeqCst));
     Ok(())
 }
 
@@ -104,12 +92,7 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
     stream(
         &items,
         8,
-        Window {
-            items: 1000,
-            bytes: 10 * 100,
-            first: &[],
-            budget: None,
-        },
+        Window { items: 1000, bytes: 10 * 100, first: &[], budget: None },
         || Ok(()),
         |(), i| {
             started.fetch_add(1, Ordering::SeqCst);
@@ -143,17 +126,10 @@ fn start_order(n: u64, workers: usize, span: usize, bytes: usize, first: Vec<usi
         let r = stream(
             &items,
             workers,
-            Window {
-                items: span,
-                bytes,
-                first: &first,
-                budget: None,
-            },
+            Window { items: span, bytes, first: &first, budget: None },
             || Ok(()),
             |(), i| {
-                s.lock()
-                    .map_err(|e| crate::Error::Git(e.to_string()))?
-                    .push(*i);
+                s.lock().map_err(|e| crate::Error::Git(e.to_string()))?.push(*i);
                 Ok(*i)
             },
             |_| 100,
@@ -214,21 +190,13 @@ fn a_budget_lowered_mid_run_shrinks_the_live_workers() -> crate::Result<()> {
     use std::sync::atomic::{AtomicUsize, Ordering};
     let items: Vec<u64> = (0..400).collect();
     let budget = crate::Budget::new(8);
-    let (running, peak_low, peak_high) = (
-        AtomicUsize::new(0),
-        AtomicUsize::new(0),
-        AtomicUsize::new(0),
-    );
+    let (running, peak_low, peak_high) =
+        (AtomicUsize::new(0), AtomicUsize::new(0), AtomicUsize::new(0));
     let mut out = Vec::new();
     stream(
         &items,
         8,
-        Window {
-            items: 8,
-            bytes: usize::MAX,
-            first: &[],
-            budget: Some(&budget),
-        },
+        Window { items: 8, bytes: usize::MAX, first: &[], budget: Some(&budget) },
         || Ok(()),
         |(), i| {
             let now = running.fetch_add(1, Ordering::SeqCst) + 1;
@@ -257,10 +225,7 @@ fn a_budget_lowered_mid_run_shrinks_the_live_workers() -> crate::Result<()> {
     let low = peak_low.load(Ordering::SeqCst);
     assert!(low <= 2, "{low} workers ran under a budget of two");
     let high = peak_high.load(Ordering::SeqCst);
-    assert!(
-        high > 2,
-        "the raised budget woke no parked worker: peak {high}"
-    );
+    assert!(high > 2, "the raised budget woke no parked worker: peak {high}");
     Ok(())
 }
 
@@ -280,12 +245,7 @@ fn a_run_ends_with_every_parked_worker_released() {
         let r = stream(
             &items,
             4,
-            Window {
-                items: 2,
-                bytes: 0,
-                first: &[],
-                budget: Some(&budget),
-            },
+            Window { items: 2, bytes: 0, first: &[], budget: Some(&budget) },
             || Ok(()),
             |(), i| Ok(*i),
             |_| 1,
@@ -307,43 +267,25 @@ fn results_keep_input_order_and_errors_surface() {
     let items: Vec<u64> = (0..1000).collect();
     assert!(collect(&items, 7, 32, |i| Ok(*i)).is_ok_and(|o| o == items));
     let err = collect(&items, 3, 32, |i| {
-        if *i == 500 {
-            Err(crate::Error::Git("boom".into()))
-        } else {
-            Ok(())
-        }
+        if *i == 500 { Err(crate::Error::Git("boom".into())) } else { Ok(()) }
     });
     assert!(err.is_err());
     let failed_emit = stream(
         &items,
         4,
-        Window {
-            items: 8,
-            bytes: usize::MAX,
-            first: &[],
-            budget: None,
-        },
+        Window { items: 8, bytes: usize::MAX, first: &[], budget: None },
         || Ok(()),
         |(), _| Ok(()),
         |()| 0,
         |n, ()| {
-            if n == 10 {
-                Err(crate::Error::Git("disk".into()))
-            } else {
-                Ok(())
-            }
+            if n == 10 { Err(crate::Error::Git("disk".into())) } else { Ok(()) }
         },
     );
     assert!(failed_emit.is_err());
     let failed_setup = stream(
         &items,
         4,
-        Window {
-            items: 8,
-            bytes: usize::MAX,
-            first: &[],
-            budget: None,
-        },
+        Window { items: 8, bytes: usize::MAX, first: &[], budget: None },
         || Err::<(), _>(crate::Error::Git("x".into())),
         |(), _| Ok(()),
         |()| 0,
@@ -376,19 +318,14 @@ fn the_count_memo_never_changes_a_result() -> crate::Result<()> {
             .write("x.txt", "one\ntwo\n")
             .write("y.txt", "one\nthree\nfour\n")
             .commit("two starts");
-        f = f
-            .write("x.txt", "one\nend\n")
-            .write("y.txt", "one\nend\n")
-            .commit("one end");
+        f = f.write("x.txt", "one\nend\n").write("y.txt", "one\nend\n").commit("one end");
     }
     let repo = crate::Repo::discover(dir.path())?;
     let gix = repo.repo();
     let memo = super::CountMemo::new(3);
     let mut cache = super::resource_cache(&gix)?;
     for id in repo.rev_list("HEAD")? {
-        let commit = gix
-            .find_commit(repo.full_id(&gix, &id)?)
-            .map_err(crate::error::git)?;
+        let commit = gix.find_commit(repo.full_id(&gix, &id)?).map_err(crate::error::git)?;
         let plain = super::changes(&gix, &commit, false, crate::MAX_TEXT_BYTES)?;
         for _ in 0..2 {
             let memoized = super::changes_with(
@@ -436,19 +373,13 @@ fn the_owned_index_cache_diffs_as_the_shared_one() -> crate::Result<()> {
         .write("d.txt", &format!("x\n{body}"))
         .commit("renames and edits");
     f.git(&["mv", "moved.gen", "e.txt"]);
-    let _done = f
-        .write("e.txt", &format!("{body}again\n"))
-        .commit("across rules");
+    let _done = f.write("e.txt", &format!("{body}again\n")).commit("across rules");
     let repo = crate::Repo::discover(dir.path())?;
     let gix = repo.repo();
     let mut owned = super::resource_cache(&gix)?;
-    let mut shared = gix
-        .diff_resource_cache_for_tree_diff()
-        .map_err(crate::error::git)?;
+    let mut shared = gix.diff_resource_cache_for_tree_diff().map_err(crate::error::git)?;
     for id in repo.rev_list("HEAD")? {
-        let commit = gix
-            .find_commit(repo.full_id(&gix, &id)?)
-            .map_err(crate::error::git)?;
+        let commit = gix.find_commit(repo.full_id(&gix, &id)?).map_err(crate::error::git)?;
         for hunks in [false, true] {
             let a = super::changes_with(
                 &gix,
@@ -477,10 +408,7 @@ fn the_owned_index_cache_diffs_as_the_shared_one() -> crate::Result<()> {
 /// A diff computed on longer texts than the ones it is applied to: its ranges run past them.
 fn stale_diff() -> gix::diff::blob::Diff {
     use gix::diff::blob::{Algorithm, Diff, InternedInput};
-    let (old, new) = (
-        b"a\nb\nc\nd\ne\nf\n".as_slice(),
-        b"a\nb\nc\nd\ne\nF\n".as_slice(),
-    );
+    let (old, new) = (b"a\nb\nc\nd\ne\nf\n".as_slice(), b"a\nb\nc\nd\ne\nF\n".as_slice());
     Diff::compute(Algorithm::Myers, &InternedInput::new(old, new))
 }
 

@@ -127,10 +127,9 @@ impl Repo {
         else {
             return Ok(None);
         };
-        let (Ok(Some(mut local)), Ok(Some(mut remote))) = (
-            repo.try_find_reference(head.as_ref()),
-            repo.try_find_reference(tracking.as_ref()),
-        ) else {
+        let (Ok(Some(mut local)), Ok(Some(mut remote))) =
+            (repo.try_find_reference(head.as_ref()), repo.try_find_reference(tracking.as_ref()))
+        else {
             return Ok(None);
         };
         let tip = local.peel_to_id().map_err(git)?.detach();
@@ -195,11 +194,7 @@ impl Repo {
                 continue;
             }
             let tip = gix::ObjectId::from_hex(r.target.as_bytes()).map_err(git)?;
-            let cached = self
-                .divergence
-                .lock()
-                .ok()
-                .and_then(|c| c.get(&(tip, base_id)).copied());
+            let cached = self.divergence.lock().ok().and_then(|c| c.get(&(tip, base_id)).copied());
             let (ahead, behind) = if let Some(v) = cached {
                 v
             } else {
@@ -208,24 +203,15 @@ impl Repo {
                     .and_then(|g| crate::divergence::graph_divergence(g, tip, base_id))
                 {
                     Some(v) => v,
-                    None => (
-                        count_only(&repo, tip, base_id)?,
-                        count_only(&repo, base_id, tip)?,
-                    ),
+                    None => (count_only(&repo, tip, base_id)?, count_only(&repo, base_id, tip)?),
                 };
-                self.row_reads
-                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                self.row_reads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                 if let Ok(mut c) = self.divergence.lock() {
                     c.insert((tip, base_id), v);
                 }
                 v
             };
-            out.push(BranchStatus {
-                name: r.name,
-                target: r.target,
-                ahead,
-                behind,
-            });
+            out.push(BranchStatus { name: r.name, target: r.target, ahead, behind });
         }
         Ok(out)
     }
@@ -293,11 +279,7 @@ pub(crate) fn annotation(repo: &gix::Repository, id: gix::ObjectId) -> Option<Ta
     let (subject, body) = message.split_once('\n').unwrap_or((&message, ""));
     let map = gix::mailmap::Snapshot::default();
     Some(TagAnnotation {
-        tagger: decoded
-            .tagger()
-            .ok()
-            .flatten()
-            .map(|s| crate::ident::signature(&map, s)),
+        tagger: decoded.tagger().ok().flatten().map(|s| crate::ident::signature(&map, s)),
         subject: subject.trim().to_owned(),
         body: body.trim().to_owned(),
     })
@@ -312,11 +294,7 @@ pub(crate) fn count_only(
     if tip == hidden {
         return Ok(0);
     }
-    let walk = repo
-        .rev_walk([tip])
-        .with_hidden([hidden])
-        .all()
-        .map_err(git)?;
+    let walk = repo.rev_walk([tip]).with_hidden([hidden]).all().map_err(git)?;
     let mut n = 0;
     for info in walk {
         info.map_err(git)?;
@@ -337,9 +315,7 @@ fn parse_head(repo: &gix::Repository, head: &str) -> (Option<String>, Option<Str
         let short = name.strip_prefix("refs/heads/").unwrap_or(name).to_owned();
         return (Some(short), commit);
     }
-    let commit = gix::ObjectId::from_hex(head.as_bytes())
-        .ok()
-        .map(|id| id.to_string());
+    let commit = gix::ObjectId::from_hex(head.as_bytes()).ok().map(|id| id.to_string());
     (None, commit)
 }
 
@@ -350,10 +326,7 @@ fn read_inside(common: &Path, parts: &[&str]) -> Option<String> {
     let mut path = PathBuf::from(common);
     for part in parts {
         let mut comps = Path::new(part).components();
-        if !matches!(
-            (comps.next(), comps.next()),
-            (Some(Component::Normal(_)), None)
-        ) {
+        if !matches!((comps.next(), comps.next()), (Some(Component::Normal(_)), None)) {
             return None;
         }
         path.push(part);
@@ -441,10 +414,7 @@ pub(crate) mod tests {
         let refs = repo.refs().expect("refs");
         let v1 = refs.iter().find(|r| r.name == "v1").expect("v1");
         let note = v1.annotation.as_ref().expect("annotated");
-        assert_eq!(
-            (note.subject.as_str(), note.body.as_str()),
-            ("Release one", "body text")
-        );
+        assert_eq!((note.subject.as_str(), note.body.as_str()), ("Release one", "body text"));
         assert_eq!(note.tagger.as_ref().map(|t| t.name.as_str()), Some("T"));
         let light = refs.iter().find(|r| r.name == "light").expect("light");
         assert!(light.annotation.is_none());
@@ -459,19 +429,10 @@ pub(crate) mod tests {
         let (t, d) = base();
         git(&d, &["branch", "side"]);
         let wt = t.path().join("wt");
+        git(&d, &["worktree", "add", "-q", wt.to_str().expect("utf8"), "side"]);
         git(
             &d,
-            &["worktree", "add", "-q", wt.to_str().expect("utf8"), "side"],
-        );
-        git(
-            &d,
-            &[
-                "worktree",
-                "add",
-                "-q",
-                "--detach",
-                t.path().join("det").to_str().expect("utf8"),
-            ],
+            &["worktree", "add", "-q", "--detach", t.path().join("det").to_str().expect("utf8")],
         );
         git(&d, &["worktree", "lock", "det"]);
         let repo = Repo::discover(&d).expect("open");
@@ -522,10 +483,8 @@ pub(crate) mod tests {
         let t = tempfile::tempdir().expect("tmp");
         let wt = t.path().join("worktrees/x");
         fs::create_dir_all(&wt).expect("mkdir");
-        let made = std::process::Command::new("mkfifo")
-            .arg(wt.join("HEAD"))
-            .status()
-            .expect("mkfifo");
+        let made =
+            std::process::Command::new("mkfifo").arg(wt.join("HEAD")).status().expect("mkfifo");
         assert!(made.success(), "mkfifo");
         assert!(super::read_inside(t.path(), &["worktrees", "x", "HEAD"]).is_none());
         fs::write(wt.join("gitdir"), "/w\n").expect("write");
@@ -549,10 +508,7 @@ pub(crate) mod tests {
         fs::create_dir_all(d.join("gitterrace-export")).expect("mkdir");
         fs::write(d.join("gitterrace-export/index.html"), "x").expect("page");
         let status = git(d, &["status", "--porcelain"]);
-        assert!(
-            status.trim().is_empty(),
-            "export folder shows as untracked: {status}"
-        );
+        assert!(status.trim().is_empty(), "export folder shows as untracked: {status}");
     }
 
     #[test]

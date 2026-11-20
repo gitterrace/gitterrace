@@ -18,12 +18,7 @@ pub fn reference_time(records: &[CommitRecord]) -> i64 {
 /// [`reference_time`] with the clock given.
 pub fn reference_time_at(records: &[CommitRecord], clock: &dyn feed::Clock) -> i64 {
     let wall = clock.now();
-    records
-        .iter()
-        .map(|r| r.time)
-        .filter(|t| *t <= wall)
-        .max()
-        .unwrap_or(0)
+    records.iter().map(|r| r.time).filter(|t| *t <= wall).max().unwrap_or(0)
 }
 
 /// Rewrites every record's author through the source's identity map, asking once per
@@ -44,9 +39,7 @@ pub(crate) fn map_identities(
     }
     let mapped = source.map_identities(rev, &pairs)?;
     if mapped.len() != pairs.len() {
-        return Err(io::Error::other(
-            "identity map returned the wrong number of pairs",
-        ));
+        return Err(io::Error::other("identity map returned the wrong number of pairs"));
     }
     for r in records.iter_mut() {
         let key = (std::mem::take(&mut r.author), std::mem::take(&mut r.email));

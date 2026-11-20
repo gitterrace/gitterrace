@@ -23,8 +23,7 @@ pub(crate) async fn run(
     stop: impl Future<Output = ()>,
 ) -> io::Result<()> {
     let mut http = hyper::server::conn::http1::Builder::new();
-    http.timer(TokioTimer::new())
-        .header_read_timeout(header_timeout);
+    http.timer(TokioTimer::new()).header_read_timeout(header_timeout);
     let graceful = GracefulShutdown::new();
     tokio::pin!(stop);
     loop {
@@ -108,16 +107,9 @@ mod tests {
     async fn a_client_stalled_in_its_headers_is_cut_after_the_timeout() {
         let (l, addr) = bound().await;
         let router = axum::Router::new().route("/", get(|| async { "ok" }));
-        let server = tokio::spawn(run(
-            l,
-            router,
-            Duration::from_secs(1),
-            std::future::pending(),
-        ));
+        let server = tokio::spawn(run(l, router, Duration::from_secs(1), std::future::pending()));
         let mut s = tokio::net::TcpStream::connect(addr).await.expect("connect");
-        s.write_all(b"GET / HTTP/1.1\r\nX-Pad: ")
-            .await
-            .expect("write");
+        s.write_all(b"GET / HTTP/1.1\r\nX-Pad: ").await.expect("write");
         let t = Instant::now();
         let mut buf = Vec::new();
         let read = tokio::time::timeout(Duration::from_secs(5), s.read_to_end(&mut buf)).await;
@@ -151,9 +143,6 @@ mod tests {
         assert!(buf.starts_with("HTTP/1.1 200"), "{buf}");
         assert!(buf.ends_with("done"), "{buf}");
         let ended = tokio::time::timeout(Duration::from_secs(5), server).await;
-        assert!(
-            matches!(ended, Ok(Ok(Ok(())))),
-            "server did not stop cleanly"
-        );
+        assert!(matches!(ended, Ok(Ok(Ok(())))), "server did not stop cleanly");
     }
 }

@@ -24,10 +24,7 @@ impl Totals {
     /// Totals over `c`. The whole unselected history takes its file count from the shared
     /// table, so it streams commit columns only.
     pub fn of(c: &Counted<'_>) -> Self {
-        Self {
-            known_files: c.is_whole().then(|| c.ins.all_files()),
-            ..Self::default()
-        }
+        Self { known_files: c.is_whole().then(|| c.ins.all_files()), ..Self::default() }
     }
 
     pub fn finish(mut self) -> PeriodStats {
@@ -63,34 +60,26 @@ pub struct Series {
 
 impl Series {
     pub fn new(axis: &TimeAxis) -> Self {
-        Self {
-            points: vec![(0, 0, 0); axis.len()],
-        }
+        Self { points: vec![(0, 0, 0); axis.len()] }
     }
 
     pub fn finish(self, axis: &TimeAxis) -> Vec<SeriesPoint> {
         axis.names()
             .zip(self.points)
-            .map(
-                |((key, label), (commits, additions, deletions))| SeriesPoint {
-                    key,
-                    label,
-                    commits,
-                    additions,
-                    deletions,
-                },
-            )
+            .map(|((key, label), (commits, additions, deletions))| SeriesPoint {
+                key,
+                label,
+                commits,
+                additions,
+                deletions,
+            })
             .collect()
     }
 }
 
 impl Reducer for Series {
     fn add(&mut self, c: &Counted<'_>, item: &Item) {
-        if let Some(p) = c
-            .axis
-            .slot_day(item.day)
-            .and_then(|s| self.points.get_mut(s))
-        {
+        if let Some(p) = c.axis.slot_day(item.day).and_then(|s| self.points.get_mut(s)) {
             p.0 += 1;
             p.1 += u64::from(item.lines.add);
             p.2 += u64::from(item.lines.del);
@@ -146,10 +135,7 @@ pub struct PersonTallies {
 
 impl PersonTallies {
     pub fn new(axis: &TimeAxis) -> Self {
-        Self {
-            len: axis.len(),
-            acc: FastMap::default(),
-        }
+        Self { len: axis.len(), acc: FastMap::default() }
     }
 
     pub fn finish(self, c: &Counted<'_>) -> Vec<PersonTally> {
@@ -203,11 +189,7 @@ pub struct LabelTally {
 
 impl LabelTally {
     pub fn new(label: Label, axis: &TimeAxis) -> Self {
-        Self {
-            label,
-            total: HashMap::new(),
-            buckets: vec![HashMap::new(); axis.len()],
-        }
+        Self { label, total: HashMap::new(), buckets: vec![HashMap::new(); axis.len()] }
     }
 
     pub fn finish(self, c: &Counted<'_>) -> (Vec<LabelCount>, Vec<LabelBucket>) {
@@ -218,11 +200,7 @@ impl LabelTally {
             .axis
             .names()
             .zip(self.buckets)
-            .map(|((key, name), m)| LabelBucket {
-                key,
-                label: name,
-                counts: named(m),
-            })
+            .map(|((key, name), m)| LabelBucket { key, label: name, counts: named(m) })
             .collect();
         (named(self.total), buckets)
     }
@@ -235,11 +213,7 @@ impl Reducer for LabelTally {
             Label::Scope => item.commit.scope,
         };
         *self.total.entry(id).or_default() += 1;
-        if let Some(m) = c
-            .axis
-            .slot_day(item.day)
-            .and_then(|s| self.buckets.get_mut(s))
-        {
+        if let Some(m) = c.axis.slot_day(item.day).and_then(|s| self.buckets.get_mut(s)) {
             *m.entry(id).or_default() += 1;
         }
     }
@@ -257,20 +231,13 @@ fn label_counts(
     };
     let mut named: HashMap<String, usize> = HashMap::new();
     for (id, n) in m {
-        let name = id
-            .and_then(|i| src.label(i))
-            .map_or_else(|| missing.to_owned(), |s| s.to_string());
+        let name =
+            id.and_then(|i| src.label(i)).map_or_else(|| missing.to_owned(), |s| s.to_string());
         *named.entry(name).or_default() += n;
     }
-    let mut out: Vec<LabelCount> = named
-        .into_iter()
-        .map(|(label, commits)| LabelCount { label, commits })
-        .collect();
-    out.sort_by(|a, b| {
-        b.commits
-            .cmp(&a.commits)
-            .then_with(|| a.label.cmp(&b.label))
-    });
+    let mut out: Vec<LabelCount> =
+        named.into_iter().map(|(label, commits)| LabelCount { label, commits }).collect();
+    out.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.label.cmp(&b.label)));
     out
 }
 
@@ -285,10 +252,7 @@ impl Sizes {
         SIZE_LABELS
             .iter()
             .zip(self.counts)
-            .map(|(l, commits)| SizeBucket {
-                label: (*l).to_owned(),
-                commits,
-            })
+            .map(|(l, commits)| SizeBucket { label: (*l).to_owned(), commits })
             .collect()
     }
 }
@@ -296,10 +260,7 @@ impl Sizes {
 impl Reducer for Sizes {
     fn add(&mut self, _: &Counted<'_>, item: &Item) {
         let n = item.lines.add + item.lines.del;
-        let slot = SIZE_EDGES
-            .iter()
-            .position(|e| n <= *e)
-            .unwrap_or(SIZE_EDGES.len());
+        let slot = SIZE_EDGES.iter().position(|e| n <= *e).unwrap_or(SIZE_EDGES.len());
         self.counts[slot] += 1;
     }
 }

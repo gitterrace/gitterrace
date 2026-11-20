@@ -33,11 +33,8 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
         for (i, r) in recs.iter().enumerate().take(w[1]).skip(w[0]) {
             b.push(&mut s, r, i as u32)?;
             let (who, paths) = s.ids(r);
-            let olds: Vec<Option<u32>> = r
-                .files
-                .iter()
-                .map(|f| f.old.as_deref().and_then(|o| s.paths.get(o)))
-                .collect();
+            let olds: Vec<Option<u32>> =
+                r.files.iter().map(|f| f.old.as_deref().and_then(|o| s.paths.get(o))).collect();
             let kind = r.kind.as_deref().map(|k| labels.id(k));
             let scope = r.scope.as_deref().map(|k| labels.id(k));
             rows.push(r, who, kind, scope, &paths, &olds)?;
@@ -45,9 +42,7 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
         let name = format!("seg-1-{n}.gts");
         let mut cw = ContainerWriter::new(dir, &name, Kind::Segment, base)?;
         rows.commits(&mut |sec, items, p| cw.block(sec, items, p))?;
-        lives = b.finish(s.paths.list.len(), &mut |sec, items, p| {
-            cw.block(sec, items, p)
-        })?;
+        lives = b.finish(s.paths.list.len(), &mut |sec, items, p| cw.block(sec, items, p))?;
         rows.finish(&mut |sec, items, p| cw.block(sec, items, p))?;
         live.push(cw.finish()?);
         let tail = |l: &[Box<str>], from: u32| -> Vec<String> {
@@ -62,10 +57,7 @@ pub fn write_cache(dir: &Path, recs: &[CommitRecord], cuts: &[usize]) -> SegResu
         live.push(e);
         base = next;
     }
-    let oids: Vec<_> = recs
-        .iter()
-        .filter_map(|r| crate::store::oid_of(&r.id))
-        .collect();
+    let oids: Vec<_> = recs.iter().filter_map(|r| crate::store::oid_of(&r.id)).collect();
     live.push(write_order(dir, "ord-1.gts", &oids)?);
     let mut m = Manifest {
         generation: 1,

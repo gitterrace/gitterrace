@@ -7,10 +7,7 @@ fn a_listed_document_missing_on_disk_and_an_unlisted_one_both_fail() {
     let bad = registry_problems(&on_disk, ["docs/a.md", "docs/gone.md"].into_iter());
     assert_eq!(bad.len(), 2, "{bad:?}");
     assert!(bad[0].contains("docs/new.md: not listed"), "{bad:?}");
-    assert!(
-        bad[1].contains("lists docs/gone.md, which does not exist"),
-        "{bad:?}"
-    );
+    assert!(bad[1].contains("lists docs/gone.md, which does not exist"), "{bad:?}");
     let listed = ["docs/a.md", "docs/new.md"];
     let none = registry_problems(&on_disk, listed.into_iter());
     assert_eq!(none, Vec::<String>::new());
@@ -32,14 +29,8 @@ fn each_kind_of_drift_goes_red() {
     let reverse = |l: &String| l.contains("no row for") || l.contains("leaves out");
     let clean = check(root).expect("check");
     assert!(clean.iter().all(reverse), "{clean:?}");
-    assert!(
-        clean.iter().any(|l| l.contains("no row for `server.addr`")),
-        "{clean:?}"
-    );
-    assert!(
-        clean.iter().any(|l| l.contains("leaves out `--public`")),
-        "{clean:?}"
-    );
+    assert!(clean.iter().any(|l| l.contains("no row for `server.addr`")), "{clean:?}");
+    assert!(clean.iter().any(|l| l.contains("leaves out `--public`")), "{clean:?}");
 
     std::fs::write(root.join("docs/stray.md"), "# Stray\n").expect("stray");
     std::fs::write(
@@ -51,11 +42,8 @@ fn each_kind_of_drift_goes_red() {
          See `scripts/gone.sh` and `scripts/` and `docs/why.md`.\n",
     )
     .expect("why");
-    let bad: Vec<String> = check(root)
-        .expect("check")
-        .into_iter()
-        .filter(|l| !reverse(l))
-        .collect();
+    let bad: Vec<String> =
+        check(root).expect("check").into_iter().filter(|l| !reverse(l)).collect();
     let bad = bad.join("\n");
     for needle in [
         "docs/stray.md: not listed",

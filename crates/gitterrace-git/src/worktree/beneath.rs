@@ -66,10 +66,7 @@ mod tests {
         std::fs::write(&p, "x".repeat(11)).expect("grow");
         assert_eq!(super::read_bounded(&f, 10).expect("read"), None);
         let f = std::fs::File::open(&p).expect("open");
-        assert_eq!(
-            super::read_bounded(&f, 11).expect("read").map(|b| b.len()),
-            Some(11)
-        );
+        assert_eq!(super::read_bounded(&f, 11).expect("read").map(|b| b.len()), Some(11));
     }
 
     #[test]
@@ -82,18 +79,12 @@ mod tests {
         std::fs::create_dir(work.join("d")).expect("mkdir");
         std::fs::write(work.join("d/secret.txt"), "mine\n").expect("write");
         let f = super::open_beneath(&work, "d/secret.txt").expect("open");
-        assert_eq!(
-            super::read_bounded(&f, 64).expect("read"),
-            Some(b"mine\n".to_vec())
-        );
+        assert_eq!(super::read_bounded(&f, 64).expect("read"), Some(b"mine\n".to_vec()));
         // The swap a racing writer would make after the parent check.
         std::fs::remove_dir_all(work.join("d")).expect("rm");
         std::os::unix::fs::symlink(outside.path(), work.join("d")).expect("link");
         let err = super::open_beneath(&work, "d/secret.txt").expect_err("a link is refused");
-        assert!(
-            matches!(err.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR)),
-            "{err:?}"
-        );
+        assert!(matches!(err.raw_os_error(), Some(libc::ELOOP | libc::ENOTDIR)), "{err:?}");
         assert!(super::open_beneath(&work, "../x").is_err());
     }
 

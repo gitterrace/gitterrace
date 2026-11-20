@@ -10,12 +10,7 @@ use crate::seg::{Oid, SegError, SegResult, hex};
 use crate::{CodeStat, CommitRecord, FileStat};
 
 pub(super) fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> SegResult<Seg> {
-    let total = |sec| {
-        c.blocks(sec)
-            .iter()
-            .map(|e| u64::from(e.items))
-            .sum::<u64>()
-    };
+    let total = |sec| c.blocks(sec).iter().map(|e| u64::from(e.items)).sum::<u64>();
     let n = total(section::RANK);
     let bad = |what| SegError::unreadable(c.name(), 0, what);
     if total(section::ROWS) != n
@@ -79,15 +74,7 @@ pub(super) fn open_seg(c: Container, first_expected: u32, buf: &mut Vec<u8>) -> 
         col_first.push(at);
         at += e.items;
     }
-    Ok(Seg {
-        c,
-        first: first_expected,
-        n,
-        row_starts,
-        idx_first,
-        oid_first,
-        col_first,
-    })
+    Ok(Seg { c, first: first_expected, n, row_starts, idx_first, oid_first, col_first })
 }
 
 /// Parses one record. File rows are pushed one at a time, never sized by the count: a
@@ -119,11 +106,7 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
         if ff > 7 {
             return Err(c.err("file flags"));
         }
-        let code = if ff & 2 != 0 {
-            Some((c.u32()?, c.u32()?, c.u32()?))
-        } else {
-            None
-        };
+        let code = if ff & 2 != 0 { Some((c.u32()?, c.u32()?, c.u32()?)) } else { None };
         let f = FileRow {
             path,
             old,
@@ -135,8 +118,7 @@ pub(super) fn parse(c: &mut Cursor<'_>, mut files: Option<&mut Vec<FileRow>>) ->
             binary: ff & 1 != 0,
             deleted: ff & 4 != 0,
         };
-        sums.add_row(&f)
-            .ok_or_else(|| c.err(crate::seg::agg::SUM_OVER))?;
+        sums.add_row(&f).ok_or_else(|| c.err(crate::seg::agg::SUM_OVER))?;
         if let Some(out) = files.as_deref_mut() {
             out.push(f);
         }
@@ -177,10 +159,8 @@ impl DiskSource {
         let mut files = Vec::new();
         let rec = self.decode(rank, Some(&mut files))?;
         let who = self.raw_ident(rec.ident)?;
-        let label = |l: Option<u32>| {
-            l.map(|i| self.string(2, i).map(|s| s.to_string()))
-                .transpose()
-        };
+        let label =
+            |l: Option<u32>| l.map(|i| self.string(2, i).map(|s| s.to_string())).transpose();
         let path = |p: u32| self.string(0, p);
         let mut stats = Vec::new();
         for f in files {
@@ -190,11 +170,7 @@ impl DiskSource {
                 deletions: f.del,
                 lines: f.lines,
                 rewritten: f.rewritten,
-                code: f.code.map(|(a, d, r)| CodeStat {
-                    additions: a,
-                    deletions: d,
-                    rewritten: r,
-                }),
+                code: f.code.map(|(a, d, r)| CodeStat { additions: a, deletions: d, rewritten: r }),
                 old: f.old.map(|o| path(o.0)).transpose()?,
                 binary: f.binary,
                 deleted: f.deleted,

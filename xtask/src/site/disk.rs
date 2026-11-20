@@ -16,15 +16,12 @@ use crate::site::{SITE_DIR, attrs, guards};
 /// Files in the built site that no generator writes but that belong there: the link preview
 /// PNG files, which `make site-render` adds before a deploy.
 fn made_elsewhere(path: &str) -> bool {
-    path.strip_prefix("assets/")
-        .is_some_and(|f| !f.contains('/') && has_ext(f, "png"))
+    path.strip_prefix("assets/").is_some_and(|f| !f.contains('/') && has_ext(f, "png"))
 }
 
 /// Whether `path` ends in `.ext`, in any case.
 fn has_ext(path: &str, ext: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case(ext))
 }
 
 /// The built site: every file by its path under the site dir, with the text of each HTML page.
@@ -36,10 +33,7 @@ pub(super) struct Tree {
 impl Tree {
     /// The built site in `site`, as it is on disk.
     pub(super) fn load(site: &Path) -> Result<Self> {
-        let mut tree = Self {
-            files: BTreeSet::new(),
-            pages: BTreeMap::new(),
-        };
+        let mut tree = Self { files: BTreeSet::new(), pages: BTreeMap::new() };
         let mut dirs = vec![site.to_path_buf()];
         while let Some(dir) = dirs.pop() {
             for e in std::fs::read_dir(&dir).with_context(|| dir.display().to_string())? {
@@ -95,10 +89,8 @@ pub(super) fn leftovers(tree: &Tree, written: &BTreeSet<String>, docs: &[String]
         .filter_map(|f| f.strip_prefix("docs/"))
         .filter_map(|f| f.strip_suffix("/index.html"))
         .collect();
-    let listed: BTreeSet<&str> = docs
-        .iter()
-        .filter_map(|d| d.strip_prefix("docs/")?.strip_suffix('/'))
-        .collect();
+    let listed: BTreeSet<&str> =
+        docs.iter().filter_map(|d| d.strip_prefix("docs/")?.strip_suffix('/')).collect();
     for d in on_disk.difference(&listed) {
         bad.push(format!(
             "{SITE_DIR}/docs/{d}/: a page for a document the docs index does not publish"
@@ -198,10 +190,7 @@ pub(super) fn dead_links(
                 };
                 bad.push(format!("{page}: {dest}: no built file {target}{hint}"));
             } else if !anchor.is_empty() {
-                let ok = tree
-                    .pages
-                    .get(&target)
-                    .is_some_and(|h| targets(h).contains(anchor));
+                let ok = tree.pages.get(&target).is_some_and(|h| targets(h).contains(anchor));
                 if !ok {
                     bad.push(format!("{page}: {dest}: {target} has no #{anchor}"));
                 }
@@ -218,9 +207,7 @@ pub fn check(root: &Path, site: &Path, outs: &[Out], repo: &str) -> Result<Vec<S
     let tree = Tree::load(site)?;
     // Fail closed: a site with no page has no link that could be reported dead.
     if tree.pages.is_empty() {
-        return Ok(vec![format!(
-            "{SITE_DIR} has no HTML page: nothing was checked"
-        )]);
+        return Ok(vec![format!("{SITE_DIR} has no HTML page: nothing was checked")]);
     }
     let written: BTreeSet<String> = outs
         .iter()
@@ -242,19 +229,13 @@ pub fn check(root: &Path, site: &Path, outs: &[Out], repo: &str) -> Result<Vec<S
         if full.is_dir() {
             return Some(String::new());
         }
-        std::fs::read(full)
-            .ok()
-            .map(|b| String::from_utf8_lossy(&b).into_owned())
+        std::fs::read(full).ok().map(|b| String::from_utf8_lossy(&b).into_owned())
     };
     bad.extend(dead_links(&tree, repo, &read));
     let mut published: BTreeSet<String> = on_site().iter().map(|d| d.0.to_owned()).collect();
     published.extend(crate::docs_index::LEGAL.iter().map(|l| l.0.to_owned()));
     published.insert(crate::site::docs::CHANGELOG.to_owned());
-    let facts = guards::Facts {
-        repo,
-        published,
-        docs,
-    };
+    let facts = guards::Facts { repo, published, docs };
     bad.extend(guards::problems(&tree.pages, &facts));
     Ok(bad)
 }
@@ -296,15 +277,9 @@ mod tests {
             ("docs/cli/index.html", &cli),
             ("assets/a.svg", ""),
         ]);
-        assert_eq!(
-            dead_links(&tree, REPO, &repo_file),
-            [] as [std::string::String; 0]
-        );
+        assert_eq!(dead_links(&tree, REPO, &repo_file), [] as [std::string::String; 0]);
         let docs = ["docs/why/".to_owned(), "docs/cli/".to_owned()];
-        assert_eq!(
-            leftovers(&tree, &written(&tree), &docs),
-            [] as [std::string::String; 0]
-        );
+        assert_eq!(leftovers(&tree, &written(&tree), &docs), [] as [std::string::String; 0]);
     }
 
     #[test]
@@ -350,21 +325,12 @@ mod tests {
             bad.contains("target/site/docs/removed/index.html: no generator writes it"),
             "{bad}"
         );
-        assert!(
-            bad.contains("target/site/docs/removed/: a page for a document"),
-            "{bad}"
-        );
-        assert!(
-            bad.contains("target/site/docs/cli/: the docs index publishes it"),
-            "{bad}"
-        );
+        assert!(bad.contains("target/site/docs/removed/: a page for a document"), "{bad}");
+        assert!(bad.contains("target/site/docs/cli/: the docs index publishes it"), "{bad}");
         assert_eq!(bad.lines().count(), 3, "{bad}");
         written.insert("docs/removed/index.html".to_owned());
         let docs = ["docs/why/".to_owned(), "docs/removed/".to_owned()];
-        assert_eq!(
-            leftovers(&tree, &written, &docs),
-            [] as [std::string::String; 0]
-        );
+        assert_eq!(leftovers(&tree, &written, &docs), [] as [std::string::String; 0]);
     }
 
     /// A fresh build: what `make docs-check` runs, held here too so `cargo test` sees it.

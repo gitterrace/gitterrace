@@ -67,10 +67,7 @@ impl Matcher {
     /// starts, from the author postings.
     #[must_use]
     pub fn authors(&self) -> Option<&[String]> {
-        self.authors
-            .iter()
-            .find(|(n, _)| !n)
-            .map(|(_, v)| v.as_slice())
+        self.authors.iter().find(|(n, _)| !n).map(|(_, v)| v.as_slice())
     }
 
     /// The one path prefix when the path terms are exactly one positive term of one item:
@@ -141,9 +138,7 @@ impl Matcher {
     /// items) and under no negated one.
     #[must_use]
     pub fn row(&self, path: &str) -> bool {
-        self.paths
-            .iter()
-            .all(|(n, v)| v.iter().any(|p| under(path, p)) != *n)
+        self.paths.iter().all(|(n, v)| v.iter().any(|p| under(path, p)) != *n)
     }
 
     /// Whether the message (any case) passes every word term.
@@ -153,9 +148,7 @@ impl Matcher {
             return true;
         }
         let text = text.to_lowercase();
-        self.words
-            .iter()
-            .all(|(n, w)| text.contains(w.as_str()) != *n)
+        self.words.iter().all(|(n, w)| text.contains(w.as_str()) != *n)
     }
 
     /// The records the query keeps, a path term trimming each to its files under it. `now`
@@ -181,12 +174,7 @@ impl Matcher {
                 if !self.has_path() {
                     return Some(r.clone());
                 }
-                let files: Vec<_> = r
-                    .files
-                    .iter()
-                    .filter(|f| self.row(&f.path))
-                    .cloned()
-                    .collect();
+                let files: Vec<_> = r.files.iter().filter(|f| self.row(&f.path)).cloned().collect();
                 (!files.is_empty()).then(|| crate::CommitRecord { files, ..r.clone() })
             })
             .collect()

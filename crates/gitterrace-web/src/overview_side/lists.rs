@@ -57,11 +57,7 @@ pub(super) fn loose_ends(
             } else {
                 href(&format!("/log/{}", enc_seg(&b.name)))
             },
-            tip: format!(
-                "{} ahead, {} behind",
-                fmt::count(b.ahead, "commit", "commits"),
-                b.behind
-            ),
+            tip: format!("{} ahead, {} behind", fmt::count(b.ahead, "commit", "commits"), b.behind),
             when: fmt::ago(t, now),
             name: b.name,
         })
@@ -98,11 +94,7 @@ pub(super) fn langs(a: &App, head: &str) -> Vec<Lang> {
             #[expect(clippy::cast_precision_loss, reason = "counts far below 2^52")]
             let share = n as f64 * 100.0 / total as f64;
             Lang {
-                pct: if share < 1.0 {
-                    "<1%".to_owned()
-                } else {
-                    format!("{share:.0}%")
-                },
+                pct: if share < 1.0 { "<1%".to_owned() } else { format!("{share:.0}%") },
                 // Whole percent steps, at least 1 so a sliver stays visible.
                 class: format!("c{} w{}", i + 1, (share.round() as u32).clamp(1, 100)),
                 name,

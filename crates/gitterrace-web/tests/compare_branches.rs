@@ -28,32 +28,17 @@ async fn a_side_branch_compares_and_an_empty_range_says_so() {
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
     assert!(html.contains("side work"), "the side commit is listed");
-    assert!(
-        html.contains("<b>1</b><span>Commits without merges"),
-        "one commit counted"
-    );
-    assert!(
-        html.contains("<th scope=\"row\">Python</th>"),
-        "its language is counted"
-    );
+    assert!(html.contains("<b>1</b><span>Commits without merges"), "one commit counted");
+    assert!(html.contains("<th scope=\"row\">Python</th>"), "its language is counted");
 
     let (_, same) = page(&router, "/compare?base=main&head=main").await;
-    assert!(
-        same.contains("class=\"empty\""),
-        "an empty range shows the empty state"
-    );
+    assert!(same.contains("class=\"empty\""), "an empty range shows the empty state");
     assert!(same.contains("has no commits that"), "and says why");
 
     // Without a tag to start from, the page still says what to do and offers branches.
     let (_, start) = page(&router, "/compare?head=main").await;
-    assert!(
-        start.contains("Choose a base"),
-        "an untagged start explains itself"
-    );
-    assert!(
-        start.contains("compare?base=side&#38;head=main"),
-        "and links the other branch"
-    );
+    assert!(start.contains("Choose a base"), "an untagged start explains itself");
+    assert!(start.contains("compare?base=side&#38;head=main"), "and links the other branch");
 }
 
 /// `side` with `n` commits of one line each, none reachable from `main`, made in one
@@ -88,19 +73,9 @@ async fn a_range_past_the_cap_asks_for_a_nearer_base() {
     let t = std::time::Instant::now();
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
-    assert!(
-        html.contains("too many to read here"),
-        "the bounded state shows"
-    );
-    assert!(
-        !html.contains("Commits without merges"),
-        "and no partial figures"
-    );
-    assert!(
-        t.elapsed().as_secs() < 10,
-        "headers only: {:?}",
-        t.elapsed()
-    );
+    assert!(html.contains("too many to read here"), "the bounded state shows");
+    assert!(!html.contains("Commits without merges"), "and no partial figures");
+    assert!(t.elapsed().as_secs() < 10, "headers only: {:?}", t.elapsed());
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -123,11 +98,7 @@ async fn a_failed_git_read_shows_an_error_not_zeros() {
     }
     // The side tip's tree goes missing: its commit still walks, its diff cannot be read.
     let tree = f.git(&["rev-parse", concat!("side^", "{", "tree}")]);
-    let obj = f
-        .path()
-        .join(".git/objects")
-        .join(&tree[..2])
-        .join(&tree[2..]);
+    let obj = f.path().join(".git/objects").join(&tree[..2]).join(&tree[2..]);
     std::fs::remove_file(&obj).expect("loose tree after fast-import unpack");
     let router = gitterrace_web::app_router(f.path()).expect("router");
     oracle::ready(&router).await;
@@ -171,25 +142,12 @@ fn three_dots_leave_out_what_the_base_gained_after_the_fork() {
 
         let (_, three) = page(&router, "/compare?base=side&head=main&mode=merge-base").await;
         assert!(three.contains("main work"), "main's own commit stays");
-        assert!(
-            !three.contains("side work"),
-            "the branch's commit is not main's"
-        );
+        assert!(!three.contains("side work"), "the branch's commit is not main's");
         let (_, rev) = page(&router, "/compare?base=main&head=side&mode=merge-base").await;
         assert!(rev.contains("side work"));
-        assert!(
-            !rev.contains("main work"),
-            "three dots drop what main gained after the fork"
-        );
-        assert!(
-            rev.contains("checked"),
-            "{}",
-            &rev[rev.find("cmp").unwrap_or(0)..][..900]
-        );
-        assert!(
-            rev.contains("<b>1</b><span>Commits without merges"),
-            "one commit counted"
-        );
+        assert!(!rev.contains("main work"), "three dots drop what main gained after the fork");
+        assert!(rev.contains("checked"), "{}", &rev[rev.find("cmp").unwrap_or(0)..][..900]);
+        assert!(rev.contains("<b>1</b><span>Commits without merges"), "one commit counted");
 
         let (_, log) = page(&router, "/log/side").await;
         let base = f.git(&["merge-base", "main", "side"]);
@@ -198,9 +156,6 @@ fn three_dots_leave_out_what_the_base_gained_after_the_fork() {
             "the branch log links its fork point"
         );
         let (_, log) = page(&router, "/log/main").await;
-        assert!(
-            !log.contains("Since it left"),
-            "the default branch has none"
-        );
+        assert!(!log.contains("Since it left"), "the default branch has none");
     });
 }

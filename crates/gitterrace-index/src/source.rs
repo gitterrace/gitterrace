@@ -127,8 +127,7 @@ impl CommitSource for Repo {
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {
         let mut all = self.records(&[id.to_owned()])?;
-        all.pop()
-            .ok_or_else(|| io::Error::other(format!("commit {id} not found")))
+        all.pop().ok_or_else(|| io::Error::other(format!("commit {id} not found")))
     }
 
     fn records(&self, ids: &[String]) -> io::Result<Vec<CommitRecord>> {

@@ -71,9 +71,6 @@ mod tests {
     #[test]
     fn blame_rejects_path_exceeding_max_len() {
         let (_d, s) = state();
-        assert!(matches!(
-            s.blame(None, &long()),
-            Err(ApiError::BadRequest(_))
-        ));
+        assert!(matches!(s.blame(None, &long()), Err(ApiError::BadRequest(_))));
     }
 }

@@ -25,10 +25,7 @@ pub(crate) fn log_commit(c: &CommitSummary) -> LogCommit {
 pub(crate) fn files(list: &[FileDiff], diff: bool, max_lines: usize) -> (Vec<FileItem>, bool) {
     let mut budget = max_lines;
     let mut truncated = false;
-    let items = list
-        .iter()
-        .map(|f| file_item(f, diff, &mut budget, &mut truncated))
-        .collect();
+    let items = list.iter().map(|f| file_item(f, diff, &mut budget, &mut truncated)).collect();
     (items, truncated)
 }
 
@@ -53,10 +50,7 @@ fn file_item(f: &FileDiff, diff: bool, budget: &mut usize, truncated: &mut bool)
                     text: l.text.clone(),
                 })
                 .collect();
-            hunks.push(DiffHunk {
-                header: h.header.clone(),
-                lines,
-            });
+            hunks.push(DiffHunk { header: h.header.clone(), lines });
         }
         hunks
     });
@@ -74,20 +68,11 @@ fn file_item(f: &FileDiff, diff: bool, budget: &mut usize, truncated: &mut bool)
 }
 
 pub(crate) fn tree_item(e: &TreeEntry) -> TreeItem {
-    TreeItem {
-        kind: e.kind,
-        name: e.name.clone(),
-        size: e.size,
-    }
+    TreeItem { kind: e.kind, name: e.name.clone(), size: e.size }
 }
 
 pub(crate) fn ref_item(r: &RefInfo) -> RefItem {
-    RefItem {
-        kind: r.kind,
-        name: r.name.clone(),
-        target: r.target.clone(),
-        time: r.time,
-    }
+    RefItem { kind: r.kind, name: r.name.clone(), target: r.target.clone(), time: r.time }
 }
 
 pub(crate) fn blame_item(b: &BlameLine) -> BlameItem {

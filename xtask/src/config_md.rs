@@ -74,10 +74,7 @@ mod tests {
         let mut rows = Vec::new();
         let mut section = "";
         for line in body.lines() {
-            if let Some(s) = line
-                .strip_prefix("## `[")
-                .and_then(|s| s.strip_suffix("]`"))
-            {
+            if let Some(s) = line.strip_prefix("## `[").and_then(|s| s.strip_suffix("]`")) {
                 section = s;
             } else if let Some(name) = line.strip_prefix("- `").and_then(|l| l.split('`').next())
                 && !section.is_empty()
@@ -86,10 +83,8 @@ mod tests {
             }
         }
         let loaded = gitterrace_config::parse("").expect("empty config");
-        let form: Vec<String> = gitterrace_config::fields(&loaded)
-            .iter()
-            .map(|f| f.id.to_owned())
-            .collect();
+        let form: Vec<String> =
+            gitterrace_config::fields(&loaded).iter().map(|f| f.id.to_owned()).collect();
         assert_eq!(rows, form);
     }
 }

@@ -29,22 +29,13 @@ fn server(root: &Path, dir: &Path, bound: Option<std::net::IpAddr>) -> axum::Rou
     let mut env = Env::new(gitterrace_config::Config::default());
     env.settings_dir = Some(dir.to_path_buf());
     let file = dir.join("actions.toml");
-    crate::build_server(
-        vec![super::repo(root)],
-        bound,
-        Some(&file),
-        &env,
-        None,
-        None,
-    )
-    .expect("router")
-    .0
+    crate::build_server(vec![super::repo(root)], bound, Some(&file), &env, None, None)
+        .expect("router")
+        .0
 }
 
 async fn page(r: &axum::Router) -> String {
-    super::send(r, super::Req::new("GET", "/r/r/", None))
-        .await
-        .1
+    super::send(r, super::Req::new("GET", "/r/r/", None)).await.1
 }
 
 async fn save(r: &axum::Router, dir: &Path, text: &str) -> serde_json::Value {
@@ -71,10 +62,7 @@ async fn an_action_saved_in_settings_reaches_the_next_page_menu() {
     write_config(d.path(), ONE, 0o600);
     let app = server(root.path(), d.path(), None);
     let before = page(&app).await;
-    assert!(
-        before.contains("First") && !before.contains("Second"),
-        "{before}"
-    );
+    assert!(before.contains("First") && !before.contains("Second"), "{before}");
     save(&app, d.path(), TWO).await;
     gitterrace_testkit::wait::until("the menu lists the new action", || async {
         page(&app).await.contains("&#34;second&#34;")
@@ -110,11 +98,7 @@ async fn a_second_action_saved_in_settings_needs_no_restart() {
 async fn the_run_route_stays_absent_off_loopback_after_a_save() {
     let (root, d) = (tempfile::tempdir().expect("t"), dir());
     write_config(d.path(), ONE, 0o600);
-    let app = server(
-        root.path(),
-        d.path(),
-        Some("192.168.1.5".parse().expect("ip")),
-    );
+    let app = server(root.path(), d.path(), Some("192.168.1.5".parse().expect("ip")));
     write_config(d.path(), TWO, 0o600);
     // Past two reload polls: a reload must not mount the route.
     gitterrace_testkit::wait::pause(std::time::Duration::from_secs(2)).await;
@@ -140,26 +124,14 @@ async fn a_missing_or_empty_settings_file_opens_the_empty_form() {
         }
         let app = server(root.path(), d.path(), None);
         let (s, html) = super::page(&app, &format!("/_settings?f={f}")).await;
-        let case = format!(
-            "{name} {}",
-            if text.is_some() { "empty" } else { "missing" }
-        );
+        let case = format!("{name} {}", if text.is_some() { "empty" } else { "missing" });
         assert_eq!(s, 200, "{case}: {html}");
-        assert!(
-            !html.contains("id=\"formoff\""),
-            "{case}: the form is off: {html}"
-        );
+        assert!(!html.contains("id=\"formoff\""), "{case}: the form is off: {html}");
         if f == "actions" {
             let shown = "version = 1\n";
-            assert!(
-                html.contains("version = 1"),
-                "{case}: no start line in Plain"
-            );
+            assert!(html.contains("version = 1"), "{case}: no start line in Plain");
             let reply = save(&app, d.path(), shown).await;
-            assert!(
-                reply["errors"].as_array().is_none_or(Vec::is_empty),
-                "{case}: {reply}"
-            );
+            assert!(reply["errors"].as_array().is_none_or(Vec::is_empty), "{case}: {reply}");
             let home = std::path::PathBuf::new();
             let text = std::fs::read_to_string(d.path().join(name)).expect("saved");
             gitterrace_actions::Config::parse(&text, &home).expect("the saved file loads");

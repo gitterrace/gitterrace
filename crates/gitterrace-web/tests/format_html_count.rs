@@ -42,9 +42,7 @@ fn walk(dir: &Path, n: &mut usize) {
         if p.is_dir() {
             walk(&p, n);
         } else if p.extension().is_some_and(|x| x == "rs")
-            && !p
-                .file_name()
-                .is_some_and(|f| f.to_string_lossy().ends_with("tests.rs"))
+            && !p.file_name().is_some_and(|f| f.to_string_lossy().ends_with("tests.rs"))
         {
             let text = std::fs::read_to_string(&p).expect("read");
             *n += count_in(text.split("#[cfg(test)]").next().unwrap_or_default());

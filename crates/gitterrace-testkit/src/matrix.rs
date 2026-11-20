@@ -99,21 +99,9 @@ pub fn cells() -> Vec<Cell> {
                     PathFilter::IgnoreOff,
                 ] {
                     for ws in [false, true] {
-                        for chip in [
-                            Chip::None,
-                            Chip::Author,
-                            Chip::Kind,
-                            Chip::Scope,
-                            Chip::Path,
-                        ] {
-                            out.push(Cell {
-                                period,
-                                bots,
-                                mailmap,
-                                filter,
-                                ws,
-                                chip,
-                            });
+                        for chip in [Chip::None, Chip::Author, Chip::Kind, Chip::Scope, Chip::Path]
+                        {
+                            out.push(Cell { period, bots, mailmap, filter, ws, chip });
                         }
                     }
                 }
@@ -127,19 +115,9 @@ pub fn cells() -> Vec<Cell> {
 pub const AXES: [usize; 6] = [5, 2, 3, 4, 2, 5];
 
 const MAILMAPS: [Mailmap; 3] = [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold];
-const FILTERS: [PathFilter; 4] = [
-    PathFilter::None,
-    PathFilter::Exclude,
-    PathFilter::Generated,
-    PathFilter::IgnoreOff,
-];
-const CHIPS: [Chip; 5] = [
-    Chip::None,
-    Chip::Author,
-    Chip::Kind,
-    Chip::Scope,
-    Chip::Path,
-];
+const FILTERS: [PathFilter; 4] =
+    [PathFilter::None, PathFilter::Exclude, PathFilter::Generated, PathFilter::IgnoreOff];
+const CHIPS: [Chip; 5] = [Chip::None, Chip::Author, Chip::Kind, Chip::Scope, Chip::Path];
 
 impl Cell {
     /// The value index of each axis, in [`AXES`] order.
@@ -166,14 +144,7 @@ impl Cell {
         ws: bool,
         chip: Chip,
     ) -> Self {
-        Self {
-            period,
-            bots,
-            mailmap,
-            filter,
-            ws,
-            chip,
-        }
+        Self { period, bots, mailmap, filter, ws, chip }
     }
 }
 
@@ -284,11 +255,7 @@ pub fn named() -> Vec<Named> {
     let mut add = |pages: &[&'static str], cells: &[Cell], why: &'static str| {
         for &page in pages {
             for cell in cells {
-                out.push(Named {
-                    page,
-                    cell: *cell,
-                    why,
-                });
+                out.push(Named { page, cell: *cell, why });
             }
         }
     };
@@ -305,11 +272,7 @@ pub fn named() -> Vec<Named> {
             [C::None, C::Path, C::Author].map(|c| Cell::of("all", false, *m, F::None, false, c))
         })
         .collect();
-    add(
-        &["/stats/ownership", "/api/v1/insights/ownership"],
-        &own,
-        OWN,
-    );
+    add(&["/stats/ownership", "/api/v1/insights/ownership"], &own, OWN);
     let map: Vec<Cell> = [M::Edited, M::CaseFold]
         .iter()
         .flat_map(|m| {
@@ -394,13 +357,7 @@ mod tests {
         let all = cells();
         assert_eq!(all.len(), 1200);
         assert_eq!(all.iter().collect::<BTreeSet<_>>().len(), 1200);
-        for c in [
-            Chip::None,
-            Chip::Author,
-            Chip::Kind,
-            Chip::Scope,
-            Chip::Path,
-        ] {
+        for c in [Chip::None, Chip::Author, Chip::Kind, Chip::Scope, Chip::Path] {
             for f in [
                 PathFilter::None,
                 PathFilter::Exclude,
@@ -446,12 +403,7 @@ mod tests {
         let set = pairwise();
         assert_eq!(set, pairwise());
         let text = format!("{set:?}");
-        assert_eq!(
-            crate::oracle::digest(&text),
-            PAIRWISE_DIGEST,
-            "{} cells",
-            set.len()
-        );
+        assert_eq!(crate::oracle::digest(&text), PAIRWISE_DIGEST, "{} cells", set.len());
     }
 
     const PAIRWISE_DIGEST: &str = "ded7cc9d8ad855cc57ac016016c9551e";

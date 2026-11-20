@@ -59,14 +59,7 @@ impl<'a> Ahead<'a> {
             }
         }
         let first_len = first.partition_point(|&i| i < len);
-        Self {
-            next: 0,
-            held: 0,
-            first: &first[..first_len],
-            first_taken: 0,
-            is_first,
-            rest: 0,
-        }
+        Self { next: 0, held: 0, first: &first[..first_len], first_taken: 0, is_first, rest: 0 }
     }
 
     /// The head of the ascending queue, skipping `first`'s positions.
@@ -130,12 +123,7 @@ pub(crate) fn stream<T: Sync, S, R: Send>(
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Condvar, Mutex, mpsc};
 
-    let Window {
-        items: span,
-        bytes: budget,
-        first,
-        budget: live,
-    } = window;
+    let Window { items: span, bytes: budget, first, budget: live } = window;
     let span = span.max(1);
     let workers = workers.clamp(1, items.len().max(1));
     let len = items.len();

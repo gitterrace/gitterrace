@@ -54,14 +54,7 @@ impl SegmentBuild {
     pub(crate) fn push(&mut self, r: &CommitRecord) -> crate::seg::SegResult<()> {
         let oid = parse_oid(&r.id)?;
         let rank = u32::try_from(self.oids.len()).map_err(|_| too_many())?;
-        fold(
-            &mut self.strings,
-            &mut self.labels,
-            &mut self.builder,
-            &mut self.rows,
-            r,
-            rank,
-        )?;
+        fold(&mut self.strings, &mut self.labels, &mut self.builder, &mut self.rows, r, rank)?;
         self.oids.push(oid);
         Ok(())
     }
@@ -72,11 +65,9 @@ impl SegmentBuild {
     pub(crate) fn discard(self) {
         let (dir, g) = (self.dir.clone(), self.generation);
         drop(self);
-        for name in [
-            format!("rows-{g}.gts.tmp"),
-            format!("cols-{g}.gts.tmp"),
-            format!("spill-{g}.gts.tmp"),
-        ] {
+        for name in
+            [format!("rows-{g}.gts.tmp"), format!("cols-{g}.gts.tmp"), format!("spill-{g}.gts.tmp")]
+        {
             drop(std::fs::remove_file(dir.join(name)));
         }
     }
@@ -101,35 +92,24 @@ impl SegmentBuild {
         let mut rows = self.rows;
         rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
         let paths = self.strings.paths.list.len();
-        self.builder.finish(paths, &mut |sec, items, payload| {
-            w.block(sec, items, payload)
-        })?;
+        self.builder.finish(paths, &mut |sec, items, payload| w.block(sec, items, payload))?;
         rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
         let seg = w.finish()?;
-        drop(std::fs::remove_file(
-            self.dir.join(format!("spill-{g}.gts.tmp")),
-        ));
+        drop(std::fs::remove_file(self.dir.join(format!("spill-{g}.gts.tmp"))));
         let owned = |l: Vec<Box<str>>| l.into_iter().map(String::from).collect();
         let delta = StringDelta {
             paths: owned(self.strings.paths.list),
             identities: owned(self.strings.identities.list),
             labels: owned(self.labels.list),
         };
-        let (strings, _) = write_delta(
-            &self.dir,
-            &format!("str-{g}-0.gts"),
-            StringBase::default(),
-            &delta,
-        )?;
+        let (strings, _) =
+            write_delta(&self.dir, &format!("str-{g}-0.gts"), StringBase::default(), &delta)?;
         let order = write_order(&self.dir, &format!("ord-{g}.gts"), &self.oids)?;
         let mut live = vec![seg, strings, order];
         live.extend(extra);
         let mut retired = previous
             .map(|m| {
-                m.retired
-                    .into_iter()
-                    .chain(m.live.into_iter().map(|f| f.name))
-                    .collect::<Vec<_>>()
+                m.retired.into_iter().chain(m.live.into_iter().map(|f| f.name)).collect::<Vec<_>>()
             })
             .unwrap_or_default();
         retired.retain(|n| !live.iter().any(|f| f.name == *n));
@@ -172,11 +152,8 @@ fn fold(
     let kind = r.kind.as_deref().map(|l| labels.id(l));
     let scope = r.scope.as_deref().map(|l| labels.id(l));
     let (who, paths) = strings.ids(r);
-    let olds: Vec<Option<u32>> = r
-        .files
-        .iter()
-        .map(|f| f.old.as_deref().and_then(|o| strings.paths.get(o)))
-        .collect();
+    let olds: Vec<Option<u32>> =
+        r.files.iter().map(|f| f.old.as_deref().and_then(|o| strings.paths.get(o))).collect();
     builder.push(strings, r, rank)?;
     rows.push(r, who, kind, scope, &paths, &olds)
 }
@@ -209,11 +186,8 @@ pub(crate) fn append_segment<'r>(
     let mut builder = crate::feed::segments::SegmentBuilder::new(move || {
         crate::seg::io::create_no_follow(&spill_dir, &format!("spill-{g}.gts.tmp"))
     });
-    let (paths0, idents0, labels0) = (
-        strings.paths.list.len(),
-        strings.identities.list.len(),
-        labels.list.len(),
-    );
+    let (paths0, idents0, labels0) =
+        (strings.paths.list.len(), strings.identities.list.len(), labels.list.len());
     builder.continue_lives(load_lives(&store, paths0)?);
     let mut rows = crate::feed::RowWriter::new(dir, g)?;
     for r in records {
@@ -225,9 +199,7 @@ pub(crate) fn append_segment<'r>(
     let mut w = ContainerWriter::new(dir, &seg_name, Kind::Segment, base)?;
     rows.commits(&mut |sec, items, payload| w.block(sec, items, payload))?;
     let paths = strings.paths.list.len();
-    builder.finish(paths, &mut |sec, items, payload| {
-        w.block(sec, items, payload)
-    })?;
+    builder.finish(paths, &mut |sec, items, payload| w.block(sec, items, payload))?;
     rows.finish(&mut |sec, items, payload| w.block(sec, items, payload))?;
     let seg = w.finish()?;
     drop(std::fs::remove_file(&spill));
@@ -243,18 +215,10 @@ pub(crate) fn append_segment<'r>(
     // Live order: segments then their deltas in segment order, then the order file, then the
     // plain files: the reader checks string bases in this order.
     let kind = |k: Kind| k as u8;
-    let mut segs: Vec<_> = previous
-        .live
-        .iter()
-        .filter(|f| f.kind == kind(Kind::Segment))
-        .cloned()
-        .collect();
-    let mut strs: Vec<_> = previous
-        .live
-        .iter()
-        .filter(|f| f.kind == kind(Kind::Strings))
-        .cloned()
-        .collect();
+    let mut segs: Vec<_> =
+        previous.live.iter().filter(|f| f.kind == kind(Kind::Segment)).cloned().collect();
+    let mut strs: Vec<_> =
+        previous.live.iter().filter(|f| f.kind == kind(Kind::Strings)).cloned().collect();
     // Plain files, then the message column, whose files stay live: the column step after the
     // append adds the new ranks.
     let plain: Vec<_> = previous
@@ -315,11 +279,8 @@ pub(crate) fn merge_if_needed(
     else {
         return Ok(false);
     };
-    let segments = previous
-        .live
-        .iter()
-        .filter(|f| f.kind == crate::seg::format::Kind::Segment as u8)
-        .count();
+    let segments =
+        previous.live.iter().filter(|f| f.kind == crate::seg::format::Kind::Segment as u8).count();
     if segments <= MAX_SEGMENTS {
         return Ok(false);
     }
@@ -444,10 +405,7 @@ pub(crate) fn load_order(
 }
 
 fn shallow_of(ids: &[String]) -> crate::seg::SegResult<u64> {
-    let oids = ids
-        .iter()
-        .map(|id| parse_oid(id))
-        .collect::<crate::seg::SegResult<Vec<_>>>()?;
+    let oids = ids.iter().map(|id| parse_oid(id)).collect::<crate::seg::SegResult<Vec<_>>>()?;
     Ok(crate::seg::manifest::shallow_fingerprint(&oids))
 }
 
@@ -498,9 +456,5 @@ fn parse_oid(id: &str) -> crate::seg::SegResult<crate::seg::Oid> {
 }
 
 const fn too_many() -> crate::seg::SegError {
-    crate::seg::SegError::TooLong {
-        kind: "commit count",
-        len: usize::MAX,
-        max: u32::MAX as usize,
-    }
+    crate::seg::SegError::TooLong { kind: "commit count", len: usize::MAX, max: u32::MAX as usize }
 }

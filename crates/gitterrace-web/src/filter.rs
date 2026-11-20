@@ -109,21 +109,14 @@ impl Dim {
 
 impl Filter {
     fn of_raw(raw: &Raw) -> Self {
-        let period = raw
-            .period
-            .as_deref()
-            .map(str::trim)
-            .filter(|p| !p.is_empty());
+        let period = raw.period.as_deref().map(str::trim).filter(|p| !p.is_empty());
         // `all` bounds nothing, so the query has no term for it: remembered here, it still
         // overrides a configured default period.
         let all = period == Some(Period::All.as_str());
         let lead: Vec<Term> = period
             .and_then(Period::parse)
             .filter(|p| *p != Period::All)
-            .map(|p| Term {
-                neg: false,
-                leaf: Leaf::After(When::Period(p)),
-            })
+            .map(|p| Term { neg: false, leaf: Leaf::After(When::Period(p)) })
             .into_iter()
             .collect();
         if let Some(p) = period.filter(|p| Period::parse(p).is_none()) {
@@ -132,11 +125,7 @@ impl Filter {
                 query: Query::new(Self::range_terms(raw)),
                 refused: Some((
                     raw.select.q.clone().unwrap_or_default(),
-                    QueryError {
-                        start: 0,
-                        end: 1,
-                        message,
-                    },
+                    QueryError { start: 0, end: 1, message },
                 )),
                 all,
             };
@@ -144,11 +133,7 @@ impl Filter {
         let range = Self::range_terms(raw);
         let with = |q: &Query| Query::new([lead.as_slice(), q.terms(), range.as_slice()].concat());
         match raw.select.query() {
-            Ok(query) => Self {
-                query: with(&query),
-                refused: None,
-                all,
-            },
+            Ok(query) => Self { query: with(&query), refused: None, all },
             // The period and the range still hold; only the text is shown back.
             Err(e) => Self {
                 query: with(&Query::default()),
@@ -161,12 +146,7 @@ impl Filter {
     /// The filter of `text`, as a `?q=` link to it reads.
     #[cfg(test)]
     pub(crate) fn parse(text: &str) -> Self {
-        Self::of_raw(&Raw {
-            select: Selection {
-                q: Some(text.to_owned()),
-            },
-            ..Raw::default()
-        })
+        Self::of_raw(&Raw { select: Selection { q: Some(text.to_owned()) }, ..Raw::default() })
     }
 
     /// The terms of `from` and `to`: both or neither, so a malformed or backwards range reads
@@ -246,9 +226,7 @@ impl Filter {
 
     /// The text the field shows: what was refused, else the canonical text.
     pub(crate) fn text(&self) -> String {
-        self.refused
-            .as_ref()
-            .map_or_else(|| self.query.to_string(), |(t, _)| t.clone())
+        self.refused.as_ref().map_or_else(|| self.query.to_string(), |(t, _)| t.clone())
     }
 
     pub(crate) fn error(&self) -> Option<&QueryError> {
@@ -300,21 +278,9 @@ impl Filter {
     /// root value, as the whole-repository row links it).
     pub(crate) fn with(&self, d: Dim, value: Option<&str>) -> Self {
         let value = value
-            .map(|v| {
-                if d == Dim::Path {
-                    v.trim_matches('/')
-                } else {
-                    v.trim()
-                }
-            })
+            .map(|v| if d == Dim::Path { v.trim_matches('/') } else { v.trim() })
             .filter(|v| !v.is_empty());
-        self.swap(
-            |l| d.is(l),
-            value.map(|v| Term {
-                neg: false,
-                leaf: d.leaf(v),
-            }),
-        )
+        self.swap(|l| d.is(l), value.map(|v| Term { neg: false, leaf: d.leaf(v) }))
     }
 
     /// This filter with the period set; `All` removes it.
@@ -323,20 +289,14 @@ impl Filter {
             all: p == Period::All,
             ..self.unranged().swap(
                 |l| matches!(l, Leaf::After(When::Period(_))),
-                (p != Period::All).then_some(Term {
-                    neg: false,
-                    leaf: Leaf::After(When::Period(p)),
-                }),
+                (p != Period::All)
+                    .then_some(Term { neg: false, leaf: Leaf::After(When::Period(p)) }),
             )
         }
     }
 
     fn swap(&self, drop: impl Fn(&Leaf) -> bool, add: Option<Term>) -> Self {
-        Self {
-            query: self.query.replace(drop, add),
-            refused: None,
-            all: self.all,
-        }
+        Self { query: self.query.replace(drop, add), refused: None, all: self.all }
     }
 
     /// `?q=type%3Afix`, or an empty string when nothing is set. `extra` pairs go last.
@@ -349,11 +309,7 @@ impl Filter {
             parts.push(format!("period={}", Period::All.as_str()));
         }
         parts.extend(extra.iter().map(|(k, v)| format!("{k}={}", enc_seg(v))));
-        if parts.is_empty() {
-            String::new()
-        } else {
-            format!("?{}", parts.join("&"))
-        }
+        if parts.is_empty() { String::new() } else { format!("?{}", parts.join("&")) }
     }
 
     /// Link to `base` with `d` set to `value` on top of the current filters.
@@ -364,11 +320,7 @@ impl Filter {
     /// The selection the scope reads: the filter text without its period, which the scope
     /// applies as the page's period ([`Filter::period_value`]).
     pub(crate) fn selection(&self) -> Selection {
-        Selection::of(
-            &self
-                .query
-                .replace(|l| matches!(l, Leaf::After(When::Period(_))), None),
-        )
+        Selection::of(&self.query.replace(|l| matches!(l, Leaf::After(When::Period(_))), None))
     }
 
     /// One removable chip per term, each linking to `base` without it.
@@ -380,27 +332,17 @@ impl Filter {
             // The period has its own control, which shows it and resets it: never a chip.
             .filter(|(_, t)| !matches!(t.leaf, Leaf::After(When::Period(_))) || t.neg)
             .map(|(i, t)| {
-                let shown = Term {
-                    neg: false,
-                    leaf: t.leaf.clone(),
-                }
-                .to_string();
+                let shown = Term { neg: false, leaf: t.leaf.clone() }.to_string();
                 let key = t.leaf.keyword();
-                let value = shown
-                    .strip_prefix(key)
-                    .and_then(|v| v.strip_prefix(':'))
-                    .unwrap_or(&shown);
+                let value =
+                    shown.strip_prefix(key).and_then(|v| v.strip_prefix(':')).unwrap_or(&shown);
                 let label = match (&t.leaf, src) {
                     (Leaf::Author(v), Some(src)) if v.len() == 1 => author_name(src, &v[0]),
                     _ => value.trim_matches('"').to_owned(),
                 };
                 let label = if t.neg { format!("not {label}") } else { label };
                 let dim = if key.is_empty() { "message" } else { key };
-                let rest = Self {
-                    query: self.query.without(i),
-                    refused: None,
-                    all: self.all,
-                };
+                let rest = Self { query: self.query.without(i), refused: None, all: self.all };
                 Chip {
                     dim,
                     // Plain text: the template escapes it.
@@ -428,19 +370,9 @@ impl Filter {
         let period = Seg::links("Period", choices).no_caption();
         let nothing = Empty::new("No commits match these filters.");
         // With no filter set the period is what is narrowing; its own picker is the next step.
-        let nothing = if chips.is_empty() {
-            nothing
-        } else {
-            nothing.step("Clear all filters", href(base))
-        };
-        FilterBar {
-            chips,
-            period,
-            extra: None,
-            jump: String::new(),
-            clear: href(base),
-            nothing,
-        }
+        let nothing =
+            if chips.is_empty() { nothing } else { nothing.step("Clear all filters", href(base)) };
+        FilterBar { chips, period, extra: None, jump: String::new(), clear: href(base), nothing }
     }
 }
 
@@ -456,9 +388,7 @@ impl FilterBar {
     /// The page head's toolbar: the period, the page's own choice, the options line and
     /// "On this page", as markup.
     pub(crate) fn toolbar(&self, opts: &[OptLink]) -> String {
-        ToolbarMarkup { fb: self, opts }
-            .render()
-            .unwrap_or_default()
+        ToolbarMarkup { fb: self, opts }.render().unwrap_or_default()
     }
 }
 

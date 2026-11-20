@@ -42,14 +42,7 @@ mod tests {
         git_at(d, T, &["checkout", "-q", "--orphan", "side"]);
         let old = commit(d, "2020-01-01T00:00:00+00:00", "old root");
         git_at(d, T, &["checkout", "-q", "main"]);
-        let merge = [
-            "merge",
-            "-q",
-            "--allow-unrelated-histories",
-            "-m",
-            "m",
-            "side",
-        ];
+        let merge = ["merge", "-q", "--allow-unrelated-histories", "-m", "m", "side"];
         git_at(d, T, &merge);
         commit(d, T, "after");
         let want = Some(old[..12].to_owned());
@@ -72,10 +65,7 @@ mod tests {
         let middle: Vec<String> = (0..3).map(|i| commit(&a, T, &format!("c{i}"))).collect();
         commit(&a, T, "tip");
         git_at(&a, T, &["commit-graph", "write", "--reachable"]);
-        let (from, to) = (
-            a.to_string_lossy(),
-            tmp.join("b").to_string_lossy().into_owned(),
-        );
+        let (from, to) = (a.to_string_lossy(), tmp.join("b").to_string_lossy().into_owned());
         git_at(tmp, T, &["clone", "-q", "--shared", &from, &to]);
         (root, middle)
     }
@@ -88,9 +78,7 @@ mod tests {
         let b = tmp.path().join("b");
         assert_eq!(id(&b), Some(root[..12].to_owned()));
         let mut roots = Roots::default();
-        roots
-            .update(&Repo::discover(&b).expect("open"))
-            .expect("roots");
+        roots.update(&Repo::discover(&b).expect("open")).expect("roots");
         assert_eq!(roots.ids().iter().collect::<Vec<_>>(), [&root]);
     }
 
@@ -112,18 +100,9 @@ mod tests {
         assert_eq!(id(&b), None, "the id came from the foreign graph");
         let mut roots = Roots::default();
         let open = Repo::discover(&b).expect("open");
-        assert!(
-            roots.update(&open).is_err(),
-            "the roots came from the foreign graph"
-        );
+        assert!(roots.update(&open).is_err(), "the roots came from the foreign graph");
         let public = Repo::discover(&b).expect("open").committed_only();
-        assert!(
-            public.resolve(&foreign).is_err(),
-            "a commit only in a is public in b"
-        );
-        assert!(
-            public.resolve(&root).is_err(),
-            "the foreign graph fed the public reachable set"
-        );
+        assert!(public.resolve(&foreign).is_err(), "a commit only in a is public in b");
+        assert!(public.resolve(&root).is_err(), "the foreign graph fed the public reachable set");
     }
 }

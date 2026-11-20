@@ -55,10 +55,7 @@ impl Target {
             ),
         };
         let parent = abs.parent().map_or_else(|| abs.clone(), Path::to_path_buf);
-        Ok(Self {
-            parent: real(&parent)?,
-            name,
-        })
+        Ok(Self { parent: real(&parent)?, name })
     }
 
     pub(super) fn path(&self) -> PathBuf {
@@ -88,10 +85,7 @@ pub(super) fn check_out(
         Err(e) => return Err(e).with_context(|| format!("reading {}", out.display())),
     };
     if meta.file_type().is_symlink() {
-        bail!(
-            "{} is a symlink. Name the folder it points to, or another folder",
-            out.display()
-        );
+        bail!("{} is a symlink. Name the folder it points to, or another folder", out.display());
     }
     if !meta.is_dir() {
         bail!("{} is not a folder", out.display());
@@ -137,17 +131,11 @@ pub(super) fn marker(repos: &[PathBuf], owned: &Owned) -> String {
     let names: Vec<String> = repos
         .iter()
         .map(|r| {
-            r.file_name().map_or_else(
-                || r.display().to_string(),
-                |n| n.to_string_lossy().into_owned(),
-            )
+            r.file_name()
+                .map_or_else(|| r.display().to_string(), |n| n.to_string_lossy().into_owned())
         })
         .collect();
-    let mut s = format!(
-        "gitterrace {} {}\n",
-        env!("GITTERRACE_VERSION"),
-        names.join(",")
-    );
+    let mut s = format!("gitterrace {} {}\n", env!("GITTERRACE_VERSION"), names.join(","));
     match owned {
         Owned::All => s.push_str(OWNS_ALL),
         Owned::Entries(names) => {

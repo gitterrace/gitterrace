@@ -81,11 +81,7 @@ pub const RULES: &[Rule] = &[
 /// The deliberate exceptions. Renamed keys get no alias: an old name is an unknown key, which
 /// warns and keeps the default.
 pub const EXCEPTIONS: &[Exception] = &[
-    Exception {
-        name: "multi.depth",
-        sets: "",
-        why: "a level, not a count",
-    },
+    Exception { name: "multi.depth", sets: "", why: "a level, not a count" },
     Exception {
         name: "index.build_on_start",
         sets: "",
@@ -104,12 +100,7 @@ fn excepted(name: &str) -> bool {
 
 /// Every key that breaks [`RULES`], with the rule it breaks.
 pub fn key_violations() -> Vec<String> {
-    let rule = |holds: &str| {
-        RULES
-            .iter()
-            .find(|r| r.holds == holds)
-            .map_or(&[][..], |r| r.parts)
-    };
+    let rule = |holds: &str| RULES.iter().find(|r| r.holds == holds).map_or(&[][..], |r| r.parts);
     let mut bad = Vec::new();
     for k in keys() {
         let n = k.name;
@@ -122,33 +113,21 @@ pub fn key_violations() -> Vec<String> {
         if excepted(k.id) {
             continue;
         }
-        let ends = |parts: &[&str]| {
-            parts
-                .iter()
-                .any(|p| n.ends_with(p) || n == p.trim_start_matches('_'))
-        };
+        let ends =
+            |parts: &[&str]| parts.iter().any(|p| n.ends_with(p) || n == p.trim_start_matches('_'));
         match k.ty {
             "integer"
                 if !(ends(rule("a size")) || ends(rule("a duration")) || ends(rule("a count"))) =>
             {
-                bad.push(format!(
-                    "{}: an integer names its unit or the plural it counts",
-                    k.id
-                ));
+                bad.push(format!("{}: an integer names its unit or the plural it counts", k.id));
             }
             // A feature gate: `_enabled`, never `include_`, which says what data counts.
             _ if k.section == "features" => {
                 if k.ty != "bool" || !ends(rule("a feature switch")) {
-                    bad.push(format!(
-                        "{}: a feature switch is a bool ending in _enabled",
-                        k.id
-                    ));
+                    bad.push(format!("{}: a feature switch is a bool ending in _enabled", k.id));
                 }
                 if n.starts_with("include_") {
-                    bad.push(format!(
-                        "{}: include_ says what data counts, not a feature",
-                        k.id
-                    ));
+                    bad.push(format!("{}: include_ says what data counts, not a feature", k.id));
                 }
             }
             _ if n.ends_with("_enabled") => {
@@ -182,11 +161,7 @@ pub fn doc_table() -> String {
     }
     s.push_str("\nExceptions, each on purpose:\n\n| Name | Why |\n| --- | --- |\n");
     for e in EXCEPTIONS {
-        let sets = if e.sets.is_empty() {
-            String::new()
-        } else {
-            format!(" (sets `{}`)", e.sets)
-        };
+        let sets = if e.sets.is_empty() { String::new() } else { format!(" (sets `{}`)", e.sets) };
         let _ = writeln!(s, "| `{}`{sets} | {} |", e.name, e.why);
     }
     s
@@ -260,22 +235,10 @@ mod tests {
             ("api", "log_max_skip"),
             ("watch", "interval_ms"),
         ] {
-            let v = if ["public", "bots", "generated"].contains(&old) {
-                "true"
-            } else {
-                "3"
-            };
+            let v = if ["public", "bots", "generated"].contains(&old) { "true" } else { "3" };
             let l = parse(&format!("[{sec}]\n{old} = {v}\n")).expect("parse");
-            assert_eq!(
-                l.warnings,
-                [format!("unknown key `{sec}.{old}` ignored")],
-                "{sec}.{old}"
-            );
-            assert_eq!(
-                l.config,
-                crate::Config::default(),
-                "{sec}.{old} took effect"
-            );
+            assert_eq!(l.warnings, [format!("unknown key `{sec}.{old}` ignored")], "{sec}.{old}");
+            assert_eq!(l.config, crate::Config::default(), "{sec}.{old} took effect");
         }
     }
 }

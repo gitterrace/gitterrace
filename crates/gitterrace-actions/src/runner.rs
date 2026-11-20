@@ -69,11 +69,7 @@ impl Default for Limits {
     /// [`MAX_RUNNING`] running, [`PER_MINUTE`] starts a minute and 64 KiB of output kept per
     /// stream.
     fn default() -> Self {
-        Self {
-            max_running: MAX_RUNNING,
-            per_minute: PER_MINUTE,
-            output_bytes: 64 * 1024,
-        }
+        Self { max_running: MAX_RUNNING, per_minute: PER_MINUTE, output_bytes: 64 * 1024 }
     }
 }
 
@@ -135,10 +131,7 @@ impl Drop for Slot {
 
 impl Runner {
     pub fn new(limits: Limits) -> Self {
-        Self {
-            limits,
-            state: Arc::default(),
-        }
+        Self { limits, state: Arc::default() }
     }
 
     /// Runs `action` with `payload`, blocking until it exits or times out. `repo_root` is the
@@ -166,11 +159,7 @@ impl Runner {
                 Cwd::Home => crate::config::home(),
                 Cwd::Path(p) => p.clone(),
             })
-            .stdin(if stdin.is_some() {
-                Stdio::piped()
-            } else {
-                Stdio::null()
-            })
+            .stdin(if stdin.is_some() { Stdio::piped() } else { Stdio::null() })
             .stdout(Stdio::piped())
             .stderr(Stdio::piped());
         new_group(&mut cmd);
@@ -186,15 +175,8 @@ impl Runner {
         // Vars first, payload last: even a colliding name could not replace a payload value.
         cmd.envs(payload.var_env());
         cmd.envs(payload.env());
-        let child = cmd
-            .spawn()
-            .map_err(|e| RunError::Spawn(action.argv[0].clone(), e))?;
-        Ok(supervise(
-            child,
-            stdin,
-            action.timeout,
-            self.limits.output_bytes,
-        ))
+        let child = cmd.spawn().map_err(|e| RunError::Spawn(action.argv[0].clone(), e))?;
+        Ok(supervise(child, stdin, action.timeout, self.limits.output_bytes))
     }
 
     fn acquire(&self, id: &str) -> Result<Slot, RunError> {
@@ -203,11 +185,7 @@ impl Runner {
             return Err(RunError::Busy);
         }
         let now = Instant::now();
-        while s
-            .starts
-            .front()
-            .is_some_and(|t| now.duration_since(*t) >= Duration::from_secs(60))
-        {
+        while s.starts.front().is_some_and(|t| now.duration_since(*t) >= Duration::from_secs(60)) {
             s.starts.pop_front();
         }
         if s.starts.len() >= self.limits.per_minute {
@@ -215,21 +193,14 @@ impl Runner {
         }
         s.starts.push_back(now);
         s.running.insert(id.to_string());
-        Ok(Slot {
-            state: Arc::clone(&self.state),
-            id: id.to_string(),
-        })
+        Ok(Slot { state: Arc::clone(&self.state), id: id.to_string() })
     }
 }
 
 /// The argv `run` spawns for `action`. A shell script is passed verbatim: its braces are shell
 /// text, and the loader has already refused placeholders in it.
 pub fn spawn_argv(action: &Action, payload: &Payload) -> Result<Vec<String>, RunError> {
-    if action.shell {
-        Ok(action.argv.clone())
-    } else {
-        expand(&action.argv, payload)
-    }
+    if action.shell { Ok(action.argv.clone()) } else { expand(&action.argv, payload) }
 }
 
 /// Fills each element of the template with the payload's values. Each element stays one
@@ -339,8 +310,7 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration, keep: 
     signal_group(pgid, Sig::Kill);
 
     let collect = |rx: Option<mpsc::Receiver<Vec<u8>>>| {
-        rx.and_then(|r| r.recv_timeout(KILL_GRACE).ok())
-            .unwrap_or_default()
+        rx.and_then(|r| r.recv_timeout(KILL_GRACE).ok()).unwrap_or_default()
     };
     let (stdout, stderr) = (collect(out), collect(err));
     let exit = status.and_then(|s| s.code());
@@ -348,11 +318,7 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration, keep: 
     let first_line = if timed_out {
         format!("timed out after {}s", timeout.as_secs_f32())
     } else {
-        let pick = if ok || stderr.is_empty() {
-            &stdout
-        } else {
-            &stderr
-        };
+        let pick = if ok || stderr.is_empty() { &stdout } else { &stderr };
         first_line(pick).unwrap_or_else(|| {
             status
                 .and_then(exit_signal)
@@ -367,14 +333,7 @@ fn supervise(mut child: Child, stdin: Option<Vec<u8>>, timeout: Duration, keep: 
         stderr = %String::from_utf8_lossy(&stderr),
         "action finished"
     );
-    Outcome {
-        ok,
-        exit,
-        timed_out,
-        first_line,
-        stdout,
-        stderr,
-    }
+    Outcome { ok, exit, timed_out, first_line, stdout, stderr }
 }
 
 #[derive(Clone, Copy)]
@@ -473,11 +432,8 @@ fn capture(mut r: impl Read + Send + 'static, keep: usize) -> mpsc::Receiver<Vec
 fn first_line(bytes: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(bytes);
     let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
-    let line: String = line
-        .chars()
-        .map(|c| if c.is_control() { ' ' } else { c })
-        .take(MAX_FIRST_LINE)
-        .collect();
+    let line: String =
+        line.chars().map(|c| if c.is_control() { ' ' } else { c }).take(MAX_FIRST_LINE).collect();
     Some(line)
 }
 

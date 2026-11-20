@@ -53,12 +53,7 @@ impl Container {
         read_exact_at(&file, &mut tb, footer.toc_offset)
             .map_err(|_| unreadable(footer.toc_offset, "toc read"))?;
         let toc = decode_toc(&tb, &footer, name)?;
-        Ok(Self {
-            name: name.to_owned(),
-            file,
-            footer,
-            toc,
-        })
+        Ok(Self { name: name.to_owned(), file, footer, toc })
     }
 
     pub fn name(&self) -> &str {
@@ -128,11 +123,7 @@ impl Container {
         let mut first = 0u32;
         for e in blocks {
             if u64::from(e.items) * 4 != u64::from(e.len) {
-                return Err(SegError::unreadable(
-                    &self.name,
-                    e.offset,
-                    "fixed-width block length",
-                ));
+                return Err(SegError::unreadable(&self.name, e.offset, "fixed-width block length"));
             }
             starts.push(first);
             first = first.saturating_add(e.items);
@@ -142,11 +133,7 @@ impl Container {
         for &o in ordinals {
             let i = starts.partition_point(|&s| s <= o).checked_sub(1);
             let Some(i) = i.filter(|&i| o < starts[i].saturating_add(blocks[i].items)) else {
-                return Err(SegError::unreadable(
-                    &self.name,
-                    0,
-                    "record index past the section",
-                ));
+                return Err(SegError::unreadable(&self.name, 0, "record index past the section"));
             };
             if loaded.as_ref().is_none_or(|(at, _)| *at != i) {
                 let mut buf = Vec::new();
@@ -223,20 +210,9 @@ impl Store {
         if let Some(o) = &order
             && o.items() != manifest.commits
         {
-            return Err(SegError::unreadable(
-                o.name(),
-                0,
-                "order count differs from manifest",
-            ));
+            return Err(SegError::unreadable(o.name(), 0, "order count differs from manifest"));
         }
-        Ok(Self {
-            manifest,
-            segments,
-            strings,
-            order,
-            messages,
-            tip,
-        })
+        Ok(Self { manifest, segments, strings, order, messages, tip })
     }
 
     /// Reads every block of every live container (forces every crc and bound check).
@@ -263,11 +239,7 @@ fn check_bases(segments: &[Container], strings: &[Container]) -> SegResult<()> {
     use crate::seg::format::section::{IDENTITIES, LABELS, PATHS};
     let mut bases = Vec::with_capacity(strings.len());
     let mut sum = StringBase::default();
-    let total = |c: &Container, s| {
-        c.blocks(s)
-            .iter()
-            .try_fold(0u32, |a, e| a.checked_add(e.items))
-    };
+    let total = |c: &Container, s| c.blocks(s).iter().try_fold(0u32, |a, e| a.checked_add(e.items));
     for st in strings {
         if st.base() != sum {
             return Err(SegError::unreadable(
@@ -285,11 +257,7 @@ fn check_bases(segments: &[Container], strings: &[Container]) -> SegResult<()> {
         ) else {
             return Err(SegError::unreadable(st.name(), 0, "string count overflow"));
         };
-        sum = StringBase {
-            paths,
-            identities,
-            labels,
-        };
+        sum = StringBase { paths, identities, labels };
     }
     let mut next = 0;
     for seg in segments {
@@ -319,10 +287,7 @@ mod tests {
         for (g, paths) in [(0u32, vec!["a", "b"]), (1, vec!["c"])] {
             let mut w = ContainerWriter::new(dir, &format!("seg-1-{g}.gts"), Kind::Segment, base)?;
             w.block(section::COMMITS, 2, &[g as u8; 40])?;
-            let ranks: Vec<u8> = [g * 2, g * 2 + 1]
-                .iter()
-                .flat_map(|r| r.to_le_bytes())
-                .collect();
+            let ranks: Vec<u8> = [g * 2, g * 2 + 1].iter().flat_map(|r| r.to_le_bytes()).collect();
             w.block(section::RANK, 2, &ranks)?;
             live.push(w.finish()?);
             let delta = StringDelta {
@@ -371,10 +336,7 @@ mod tests {
         let open_all = |d: &Path| Store::open(d).and_then(|s| s.map_or(Ok(()), |s| s.check_all()));
         for cut in [0, 1, good.len() / 2, good.len() - 1] {
             fs::write(&path, &good[..cut])?;
-            assert!(
-                open_all(dir.path()).is_err_and(|e| e.is_unreadable()),
-                "cut {cut}"
-            );
+            assert!(open_all(dir.path()).is_err_and(|e| e.is_unreadable()), "cut {cut}");
         }
         for i in 0..good.len() {
             let mut b = good.clone();

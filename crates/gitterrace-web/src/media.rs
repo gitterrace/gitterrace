@@ -13,8 +13,7 @@ pub(crate) enum Kind {
 }
 
 fn ext(path: &str) -> String {
-    path.rsplit_once('.')
-        .map_or_else(String::new, |(_, e)| e.to_ascii_lowercase())
+    path.rsplit_once('.').map_or_else(String::new, |(_, e)| e.to_ascii_lowercase())
 }
 
 /// What kind of media `path` is, by extension.
@@ -67,35 +66,19 @@ pub fn plain_media(path: &str) -> bool {
 }
 
 fn be16(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from(u16::from_be_bytes([
-        *b.get(at)?,
-        *b.get(at + 1)?,
-    ])))
+    Some(u32::from(u16::from_be_bytes([*b.get(at)?, *b.get(at + 1)?])))
 }
 
 fn be32(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_be_bytes([
-        *b.get(at)?,
-        *b.get(at + 1)?,
-        *b.get(at + 2)?,
-        *b.get(at + 3)?,
-    ]))
+    Some(u32::from_be_bytes([*b.get(at)?, *b.get(at + 1)?, *b.get(at + 2)?, *b.get(at + 3)?]))
 }
 
 fn le16(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from(u16::from_le_bytes([
-        *b.get(at)?,
-        *b.get(at + 1)?,
-    ])))
+    Some(u32::from(u16::from_le_bytes([*b.get(at)?, *b.get(at + 1)?])))
 }
 
 fn le32(b: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_le_bytes([
-        *b.get(at)?,
-        *b.get(at + 1)?,
-        *b.get(at + 2)?,
-        *b.get(at + 3)?,
-    ]))
+    Some(u32::from_le_bytes([*b.get(at)?, *b.get(at + 1)?, *b.get(at + 2)?, *b.get(at + 3)?]))
 }
 
 fn jpeg(b: &[u8]) -> Option<(u32, u32)> {
@@ -179,9 +162,8 @@ fn element_at(k: Kind, url: &str, path: &str, dims: Option<(u32, u32)>) -> Strin
     let name = esc(path.rsplit('/').next().unwrap_or(path));
     match k {
         Kind::Image | Kind::Svg => {
-            let size = dims.map_or_else(String::new, |(w, h)| {
-                format!(r#" width="{w}" height="{h}""#)
-            });
+            let size =
+                dims.map_or_else(String::new, |(w, h)| format!(r#" width="{w}" height="{h}""#));
             format!(r#"<img class="media-img" src="{url}" alt="{name}"{size} loading="lazy">"#)
         }
         // No embedded viewer: a crafted PDF would run in the app's origin.
@@ -230,11 +212,7 @@ pub(crate) fn blob_html(
         "<div class=\"media\"><div class=\"media-stage{}\">{}</div>\
             <p class=\"media-facts muted\">{dims}{} · <a href=\"{url}\">Raw</a> · \
             <a href=\"{url}\" download>Download</a></p></div>",
-        if matches!(k, Kind::Image | Kind::Svg) {
-            " checker"
-        } else {
-            ""
-        },
+        if matches!(k, Kind::Image | Kind::Svg) { " checker" } else { "" },
         element_at(k, &url, path, px),
         size(len),
     );
@@ -254,10 +232,7 @@ pub(crate) struct Facts {
 
 impl Facts {
     pub(crate) fn of(path: &str, bytes: &[u8]) -> Self {
-        Self {
-            len: bytes.len() as u64,
-            dims: dimensions(path, bytes),
-        }
+        Self { len: bytes.len() as u64, dims: dimensions(path, bytes) }
     }
 }
 
@@ -283,10 +258,7 @@ pub(crate) fn diff_counts(old: Option<Facts>, new: Option<Facts>) -> String {
         (Some(o), None) => format!("removed, {}", size(o.len)),
         (None, None) => return String::new(),
     };
-    format!(
-        "<span class=\"counts media-counts muted\">{}</span>",
-        esc(&line)
-    )
+    format!("<span class=\"counts media-counts muted\">{}</span>", esc(&line))
 }
 
 /// One side of an image diff: where it loads from and its pixel size when known.
@@ -400,9 +372,7 @@ mod tests {
         assert_eq!(both.matches("<img").count(), 4);
         assert!(both.contains("/raw/p/a.png") && both.contains("/raw/c/a.png"));
         assert_eq!(
-            diff_html(None, Some((Side::At("c", "a.png"), None)))
-                .matches("<img")
-                .count(),
+            diff_html(None, Some((Side::At("c", "a.png"), None))).matches("<img").count(),
             1
         );
     }
@@ -423,18 +393,13 @@ mod tests {
 
     #[test]
     fn a_modified_image_offers_side_by_side_and_overlay() {
-        let both = diff_html(
-            Some((Side::At("p", "a.png"), None)),
-            Some((Side::At("c", "a.png"), None)),
-        );
+        let both =
+            diff_html(Some((Side::At("p", "a.png"), None)), Some((Side::At("c", "a.png"), None)));
         assert!(both.contains("aria-label=\"Image view\""), "{both}");
         assert!(both.contains("data-show=\"overlay\""), "{both}");
         assert!(both.contains("value=\"sides\" checked"), "{both}");
         assert!(both.contains("data-media-cut"), "{both}");
         let added = diff_html(None, Some((Side::At("c", "a.png"), None)));
-        assert!(
-            !added.contains("data-show"),
-            "one side has nothing to compare: {added}"
-        );
+        assert!(!added.contains("data-show"), "one side has nothing to compare: {added}");
     }
 }

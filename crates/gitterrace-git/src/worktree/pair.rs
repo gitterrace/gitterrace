@@ -50,10 +50,8 @@ pub(super) fn exact_moves(
     if gone.is_empty() {
         return out;
     }
-    let sizes: BTreeSet<u64> = gone
-        .keys()
-        .filter_map(|id| r.find_header(*id).ok().map(|h| h.size()))
-        .collect();
+    let sizes: BTreeSet<u64> =
+        gone.keys().filter_map(|id| r.find_header(*id).ok().map(|h| h.size())).collect();
     for (path, len) in added {
         // Only a file of a deleted file's exact size can be its copy: no read for the rest.
         if !sizes.contains(&len) || len > big {

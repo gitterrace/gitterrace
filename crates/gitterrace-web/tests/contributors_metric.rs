@@ -44,10 +44,7 @@ async fn metric_added_sorts_by_added_lines() {
     assert!(page.contains("class=\"tsb\""), "the two-sided bar shows");
     let net = ready(&r, "/stats/contributors?metric=net&period=3m&bots=1").await;
     assert_eq!(first_person(&net), "Bob", "works with other filters");
-    assert!(
-        net.contains("q=after%3A3m") && net.contains("metric=added"),
-        "{net}"
-    );
+    assert!(net.contains("q=after%3A3m") && net.contains("metric=added"), "{net}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -69,15 +66,9 @@ async fn api_insight_takes_metric() {
         let r = r.clone();
         async move {
             let v: serde_json::Value = serde_json::from_str(&get(&r, uri).await.1).expect("json");
-            v["data"]["contributors"][0]["name"]
-                .as_str()
-                .expect("name")
-                .to_owned()
+            v["data"]["contributors"][0]["name"].as_str().expect("name").to_owned()
         }
     };
     assert_eq!(name("/api/v1/insights/contributors").await, "Ann");
-    assert_eq!(
-        name("/api/v1/insights/contributors?metric=added").await,
-        "Bob"
-    );
+    assert_eq!(name("/api/v1/insights/contributors?metric=added").await, "Bob");
 }

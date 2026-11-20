@@ -24,10 +24,7 @@ pub(crate) fn activity(commits: u64, authors: u64, before: Option<u64>) -> Strin
                 return format!("{what}, about as many as in the period before.");
             }
             let dir = if pct > 0.0 { "more" } else { "fewer" };
-            format!(
-                "{what}, {:.0}% {dir} than the period before.",
-                pct.abs().round()
-            )
+            format!("{what}, {:.0}% {dir} than the period before.", pct.abs().round())
         }
     }
 }
@@ -118,23 +115,14 @@ mod tests {
 
     #[test]
     fn contributors_name_the_new_ones() {
-        assert_eq!(
-            contributors(1200, 3),
-            "1,200 contributors, 3 of them new in this period."
-        );
-        assert_eq!(
-            contributors(2, 2),
-            "2 contributors, all of them new in this period."
-        );
+        assert_eq!(contributors(1200, 3), "1,200 contributors, 3 of them new in this period.");
+        assert_eq!(contributors(2, 2), "2 contributors, all of them new in this period.");
         assert_eq!(contributors(0, 0), "");
     }
 
     #[test]
     fn hotspots_state_the_concentration() {
-        assert_eq!(
-            hotspots(25, 0.62),
-            "A tenth of the 25 changed files takes 62% of all changes."
-        );
+        assert_eq!(hotspots(25, 0.62), "A tenth of the 25 changed files takes 62% of all changes.");
         assert_eq!(hotspots(0, 0.0), "");
     }
 
@@ -161,10 +149,7 @@ mod tests {
 
     #[test]
     fn languages_name_the_largest() {
-        assert_eq!(
-            languages("Rust", "62.0%", 66_500),
-            "Rust is 62.0% of 66,500 lines."
-        );
+        assert_eq!(languages("Rust", "62.0%", 66_500), "Rust is 62.0% of 66,500 lines.");
         assert_eq!(languages("", "", 0), "");
     }
 }

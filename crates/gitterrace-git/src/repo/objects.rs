@@ -12,11 +12,7 @@ const HEAD_BYTES: usize = 512;
 
 /// The bytes `Blob::head` keeps: a prefix of binary data, nothing of text.
 fn head_of(data: &[u8], text: bool) -> Vec<u8> {
-    if text {
-        Vec::new()
-    } else {
-        data[..data.len().min(HEAD_BYTES)].to_vec()
-    }
+    if text { Vec::new() } else { data[..data.len().min(HEAD_BYTES)].to_vec() }
 }
 
 /// A blob over bytes already read: text when it is valid UTF-8 within `limit` and not binary,
@@ -26,12 +22,7 @@ pub(crate) fn blob_of(path: &str, data: &[u8], limit: u64) -> Blob {
     let text = (size <= limit && !crate::diff::is_binary(data))
         .then(|| std::str::from_utf8(data).ok().map(str::to_owned))
         .flatten();
-    Blob {
-        path: path.to_owned(),
-        size,
-        head: head_of(data, text.is_some()),
-        text,
-    }
+    Blob { path: path.to_owned(), size, head: head_of(data, text.is_some()), text }
 }
 
 impl Repo {
@@ -70,11 +61,7 @@ impl Repo {
                 }
                 _ => None,
             };
-            out.push(TreeEntry {
-                name: entry.filename().to_str_lossy().into_owned(),
-                kind,
-                size,
-            });
+            out.push(TreeEntry { name: entry.filename().to_str_lossy().into_owned(), kind, size });
         }
         out.sort_by(|a, b| {
             let dir = |e: &TreeEntry| e.kind != TreeEntryKind::Dir;
@@ -101,11 +88,7 @@ impl Repo {
         } else {
             Some(repo.find_object(id).map_err(git)?.detach().data)
         };
-        Ok(RawBlob {
-            id: id_hex,
-            size,
-            bytes,
-        })
+        Ok(RawBlob { id: id_hex, size, bytes })
     }
 
     /// Raw bytes of the file at `path` in `rev`.
@@ -151,12 +134,8 @@ impl Repo {
             .then(|| std::str::from_utf8(&data).ok().map(str::to_owned))
             .flatten();
         let bytes = if size <= max_bytes { data } else { Vec::new() };
-        let blob = Blob {
-            path: path.to_string(),
-            size,
-            head: head_of(&bytes, text.is_some()),
-            text,
-        };
+        let blob =
+            Blob { path: path.to_string(), size, head: head_of(&bytes, text.is_some()), text };
         Ok((blob, bytes))
     }
 
@@ -170,12 +149,7 @@ impl Repo {
         let size = repo.find_header(id).map_err(git)?.size();
         let limit = self.text_limit();
         if size > limit {
-            return Ok(Blob {
-                path: path.to_string(),
-                size,
-                text: None,
-                head: Vec::new(),
-            });
+            return Ok(Blob { path: path.to_string(), size, text: None, head: Vec::new() });
         }
         let data = repo.find_object(id).map_err(git)?.detach().data;
         Ok(blob_of(path, &data, limit))

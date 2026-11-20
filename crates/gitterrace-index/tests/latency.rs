@@ -65,14 +65,9 @@ fn file_pages_stay_under_their_ceilings_at_100k_commits() {
             let ins = Insights::from_source(&*src, Options::default(), None);
             let own = ins.ownership(&files, period, 1);
             own_ms = own_ms.min(ms(t.elapsed()));
-            assert!(
-                !hot.files.is_empty() && own.overall.lines > 0,
-                "pages are not empty"
-            );
+            assert!(!hot.files.is_empty() && own.overall.lines > 0, "pages are not empty");
         }
-        report.push(format!(
-            "{period:?}: hotspots {hot_ms} ms, ownership {own_ms} ms"
-        ));
+        report.push(format!("{period:?}: hotspots {hot_ms} ms, ownership {own_ms} ms"));
         assert!(
             hot_ms <= hot_max && own_ms <= own_max,
             "{period:?}: hotspots {hot_ms} ms (ceiling {hot_max}), ownership {own_ms} ms \

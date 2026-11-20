@@ -13,9 +13,7 @@ impl Repo {
     /// Several roots (a merged-in history) tie-break on the smaller id, so every clone agrees.
     /// `None` for a repository without commits. Computed once per process, it walks history.
     pub fn id(&self) -> Option<String> {
-        self.id_cache
-            .get_or_init(|| self.root_id().ok().flatten())
-            .clone()
+        self.id_cache.get_or_init(|| self.root_id().ok().flatten()).clone()
     }
 
     /// [`Repo::id`] when it is already known, else `None` at once: never walks and never
@@ -66,17 +64,10 @@ impl Repo {
         let Some(path) = path.map(|p| p.trim_matches('/')).filter(|p| !p.is_empty()) else {
             return true;
         };
-        if path
-            .split('/')
-            .any(|c| c.is_empty() || c == "." || c == "..")
-        {
+        if path.split('/').any(|c| c.is_empty() || c == "." || c == "..") {
             return false;
         }
-        commit
-            .tree()
-            .ok()
-            .and_then(|t| crate::treepath::lookup(&t, path).ok().flatten())
-            .is_some()
+        commit.tree().ok().and_then(|t| crate::treepath::lookup(&t, path).ok().flatten()).is_some()
     }
 }
 
@@ -130,18 +121,7 @@ mod tests {
         git_at(d, t20, &["commit", "-q", "-m", "old root"]);
         let old = git_at(d, t20, &["rev-parse", "HEAD"]);
         git_at(d, t24, &["checkout", "-q", "main"]);
-        git_at(
-            d,
-            t24,
-            &[
-                "merge",
-                "-q",
-                "--allow-unrelated-histories",
-                "-m",
-                "merge",
-                "side",
-            ],
-        );
+        git_at(d, t24, &["merge", "-q", "--allow-unrelated-histories", "-m", "merge", "side"]);
         (tmp, new, old)
     }
 
@@ -157,12 +137,7 @@ mod tests {
         git_at(
             clone.path(),
             "2024-01-01T00:00:00+00:00",
-            &[
-                "clone",
-                "-q",
-                &tmp.path().to_string_lossy(),
-                &dst.to_string_lossy(),
-            ],
+            &["clone", "-q", &tmp.path().to_string_lossy(), &dst.to_string_lossy()],
         );
         assert_eq!(Repo::discover(&dst).expect("open").id(), repo.id());
     }
@@ -184,11 +159,7 @@ mod tests {
             Repo::discover(tmp.path()).expect("open"),
         ];
         let id = repos[1].id().expect("id");
-        let head = git_at(
-            tmp.path(),
-            "2024-01-01T00:00:00+00:00",
-            &["rev-parse", "HEAD"],
-        );
+        let head = git_at(tmp.path(), "2024-01-01T00:00:00+00:00", &["rev-parse", "HEAD"]);
         let hit = |sha: &str, path| resolve_permalink(&repos, &id, sha, path).is_some();
         assert!(hit(&head, None));
         assert!(hit(&head, Some("lib/b.txt")));

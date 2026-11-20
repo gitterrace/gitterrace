@@ -146,19 +146,13 @@ pub(crate) struct ErrorOut {
 
 impl From<Located> for ErrorOut {
     fn from(l: Located) -> Self {
-        Self {
-            line: l.line,
-            col: l.col,
-            key: l.key,
-            msg: l.msg,
-        }
+        Self { line: l.line, col: l.col, key: l.key, msg: l.msg }
     }
 }
 
 fn json<T: serde::Serialize>(status: StatusCode, body: &T) -> Response {
     let mut res = (status, axum::Json(body)).into_response();
-    res.headers_mut()
-        .insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
     res
 }
 
@@ -193,11 +187,7 @@ async fn read(
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
             Err(e) => return Err(e),
         };
-        Ok(FileReply {
-            text,
-            exists: stamp.is_some(),
-            stamp: Stamp::tag(stamp),
-        })
+        Ok(FileReply { text, exists: stamp.is_some(), stamp: Stamp::tag(stamp) })
     })
     .await;
     match r {
@@ -222,18 +212,12 @@ async fn body(s: &Settings, req: Request) -> Result<Edit, Box<Response>> {
         .and_then(|v| v.split(';').next())
         .is_some_and(|m| m.trim().eq_ignore_ascii_case("application/json"));
     if !is_json {
-        return Err(Box::new(plain(
-            StatusCode::UNSUPPORTED_MEDIA_TYPE,
-            "json only\n",
-        )));
+        return Err(Box::new(plain(StatusCode::UNSUPPORTED_MEDIA_TYPE, "json only\n")));
     }
     // The text plus JSON escaping and the change list.
     let limit = MAX_FILE_BYTES * 2;
     let Ok(bytes) = axum::body::to_bytes(req.into_body(), limit).await else {
-        return Err(Box::new(plain(
-            StatusCode::PAYLOAD_TOO_LARGE,
-            "body too large\n",
-        )));
+        return Err(Box::new(plain(StatusCode::PAYLOAD_TOO_LARGE, "body too large\n")));
     };
     serde_json::from_slice(&bytes)
         .map_err(|_| Box::new(plain(StatusCode::BAD_REQUEST, "malformed\n")))
@@ -248,20 +232,17 @@ fn resulting_text(path: &std::path::Path, e: &Edit) -> Result<String, Located> {
     let mut changes = Vec::new();
     for c in &e.changes {
         let value = match (&c.input, e.f) {
-            (Some(input), SettingsFile::Actions) => Some(
-                crate::settings_actions::literal(&c.id, input).map_err(|msg| Located {
+            (Some(input), SettingsFile::Actions) => {
+                Some(crate::settings_actions::literal(&c.id, input).map_err(|msg| Located {
                     line: 0,
                     col: 0,
                     key: Some(c.id.clone()),
                     msg,
-                })?,
-            ),
+                })?)
+            }
             _ => c.value.clone(),
         };
-        changes.push(Change {
-            id: c.id.clone(),
-            value,
-        });
+        changes.push(Change { id: c.id.clone(), value });
     }
     gitterrace_config::apply(&current, &changes)
 }
@@ -286,14 +267,8 @@ pub(crate) fn validate(f: SettingsFile, text: &str, before: &str, env: &Env) -> 
             },
         },
         SettingsFile::Actions => match check_actions(text) {
-            Ok(()) => CheckReply {
-                ok: true,
-                ..CheckReply::default()
-            },
-            Err(l) => CheckReply {
-                errors: vec![l.into()],
-                ..CheckReply::default()
-            },
+            Ok(()) => CheckReply { ok: true, ..CheckReply::default() },
+            Err(l) => CheckReply { errors: vec![l.into()], ..CheckReply::default() },
         },
     }
 }
@@ -303,14 +278,12 @@ pub(crate) fn validate(f: SettingsFile, text: &str, before: &str, env: &Env) -> 
 fn check_actions(text: &str) -> Result<(), Located> {
     gitterrace_config::syntax(text)?;
     let home = gitterrace_config::home_var().map_or_else(PathBuf::new, PathBuf::from);
-    gitterrace_actions::Config::parse(text, &home)
-        .map(drop)
-        .map_err(|e| Located {
-            line: 0,
-            col: 0,
-            key: None,
-            msg: e.to_string(),
-        })
+    gitterrace_actions::Config::parse(text, &home).map(drop).map_err(|e| Located {
+        line: 0,
+        col: 0,
+        key: None,
+        msg: e.to_string(),
+    })
 }
 
 /// `POST /_settings/check`: what a save of this edit would say, with nothing written.
@@ -331,10 +304,7 @@ async fn check(State(s): State<Arc<Settings>>, req: Request) -> Response {
             reply.text = Some(text);
             reply
         }
-        Err(l) => CheckReply {
-            errors: vec![l.into()],
-            ..CheckReply::default()
-        },
+        Err(l) => CheckReply { errors: vec![l.into()], ..CheckReply::default() },
     })
     .await;
     r.map_or_else(
@@ -354,10 +324,7 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
         return plain(StatusCode::NOT_FOUND, "actions are off\n");
     };
     let Some(expect) = e.stamp.as_deref().and_then(Stamp::parse_tag) else {
-        return plain(
-            StatusCode::PRECONDITION_REQUIRED,
-            "a save names the stamp it read\n",
-        );
+        return plain(StatusCode::PRECONDITION_REQUIRED, "a save names the stamp it read\n");
     };
     let env = s.env.clone();
     let r = tokio::task::spawn_blocking(move || {
@@ -376,24 +343,17 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
     .await;
     match r {
         Ok(Ok((mut reply, saved, f))) => {
-            tracing::info!(
-                "settings: {f} saved ({} restart keys changed)",
-                reply.restart.len()
-            );
+            tracing::info!("settings: {f} saved ({} restart keys changed)", reply.restart.len());
             reply.stamp = Some(Stamp::tag(Some(saved.stamp)));
             json(StatusCode::OK, &reply)
         }
         Ok(Err(SaveError::Invalid(l))) => json(
             StatusCode::UNPROCESSABLE_ENTITY,
-            &CheckReply {
-                errors: vec![l.into()],
-                ..CheckReply::default()
-            },
+            &CheckReply { errors: vec![l.into()], ..CheckReply::default() },
         ),
-        Ok(Err(SaveError::Stale)) => plain(
-            StatusCode::CONFLICT,
-            "changed on disk since it was read, reload it\n",
-        ),
+        Ok(Err(SaveError::Stale)) => {
+            plain(StatusCode::CONFLICT, "changed on disk since it was read, reload it\n")
+        }
         Ok(Err(SaveError::NotRegular(_))) => {
             plain(StatusCode::CONFLICT, "not a regular file, not written\n")
         }

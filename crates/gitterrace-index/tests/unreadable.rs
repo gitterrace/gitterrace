@@ -124,10 +124,7 @@ fn a_crash_at_every_step_leaves_the_old_set_or_the_new_one() {
         assert!(r.is_err(), "step {stop} did not stop the sequence");
         let renamed = steps[..=stop].contains(&Step::ManifestRenamed);
         match open_all(d.path()) {
-            Ok(true) => assert!(
-                renamed,
-                "step {stop}: a set served before the manifest rename"
-            ),
+            Ok(true) => assert!(renamed, "step {stop}: a set served before the manifest rename"),
             Ok(false) => assert!(!renamed, "step {stop}: the renamed manifest was lost"),
             Err(e) => panic!("step {stop} ({:?}): {e}", steps[stop]),
         }
@@ -136,9 +133,7 @@ fn a_crash_at_every_step_leaves_the_old_set_or_the_new_one() {
         let strays = gitterrace_index::seg::manifest::strays(d.path(), m.as_ref()).expect("strays");
         for name in fs::read_dir(d.path()).expect("dir").flatten() {
             let name = name.file_name().to_string_lossy().into_owned();
-            let live = m
-                .as_ref()
-                .is_some_and(|m| m.live.iter().any(|f| f.name == name));
+            let live = m.as_ref().is_some_and(|m| m.live.iter().any(|f| f.name == name));
             assert!(
                 live || name == MANIFEST || strays.contains(&name),
                 "step {stop}: {name} is neither live nor a stray"
@@ -153,20 +148,12 @@ fn a_crash_at_every_step_leaves_the_old_set_or_the_new_one() {
 fn a_string_base_out_of_manifest_order_is_unreadable() {
     let d = tempfile::tempdir().expect("tmp");
     let mut m = valid(d.path());
-    let mut second = Interner::new(StringBase {
-        paths: 3,
-        identities: 1,
-        labels: 1,
-    });
+    let mut second = Interner::new(StringBase { paths: 3, identities: 1, labels: 1 });
     second.path("src/c.rs").expect("path");
     let (e, _) = gitterrace_index::seg::strings::write_delta(
         d.path(),
         "str-2-0.gts",
-        StringBase {
-            paths: 3,
-            identities: 1,
-            labels: 1,
-        },
+        StringBase { paths: 3, identities: 1, labels: 1 },
         &second.into_delta(),
     )
     .expect("delta");
@@ -192,10 +179,7 @@ fn repo(dir: &Path) -> (gitterrace_git::Repo, String) {
             .commit(&format!("feat: step {i}"));
     }
     let head = f.git(&["rev-parse", "HEAD"]);
-    (
-        gitterrace_git::Repo::discover(f.path()).expect("open"),
-        head,
-    )
+    (gitterrace_git::Repo::discover(f.path()).expect("open"), head)
 }
 
 /// Every file in the cache folder except the lock, by name.
@@ -230,13 +214,7 @@ fn the_index_rebuilds_an_unreadable_cache_to_a_fresh_build() {
     build(&fresh_dir, &repo, &head);
     let fresh = folder(&fresh_dir);
     let m = Manifest::load(&fresh_dir).expect("load").expect("a set");
-    let seg = m
-        .live
-        .iter()
-        .find(|f| f.name.starts_with("seg-"))
-        .expect("a segment")
-        .name
-        .clone();
+    let seg = m.live.iter().find(|f| f.name.starts_with("seg-")).expect("a segment").name.clone();
     let store = Store::open(&fresh_dir).expect("open").expect("set");
     let block = store.segments[0].blocks(section::COMMITS)[0];
     let in_block = usize::try_from(block.offset).expect("offset") + 1;
@@ -278,11 +256,7 @@ fn the_index_rebuilds_an_unreadable_cache_to_a_fresh_build() {
         build(&dir, &repo, &head);
         corrupt(&dir);
         let index = gitterrace_index::Index::open_dir(dir.clone()).expect("reopen");
-        assert_eq!(
-            index.newer_format(),
-            None,
-            "{case}: taken for a newer cache"
-        );
+        assert_eq!(index.newer_format(), None, "{case}: taken for a newer cache");
         // What survived the open must read whole, or be rebuilt: never served in part.
         match open_all(&dir) {
             Ok(_) => {}
@@ -297,10 +271,7 @@ fn the_index_rebuilds_an_unreadable_cache_to_a_fresh_build() {
             "{case}: files after the rebuild"
         );
         for (name, body) in &fresh {
-            assert!(
-                got[name] == *body,
-                "{case}: {name} differs from a fresh build"
-            );
+            assert!(got[name] == *body, "{case}: {name} differs from a fresh build");
         }
     }
 }
@@ -313,20 +284,13 @@ fn a_newer_cache_is_left_alone_and_no_page_answers_500() {
     let (repo, head) = repo(tmp.path());
     let dir = tmp.path().join("cache");
     build(&dir, &repo, &head);
-    let newer = gitterrace_index::FORMAT_VERSION
-        .parse::<u64>()
-        .expect("numeric")
-        + 1;
+    let newer = gitterrace_index::FORMAT_VERSION.parse::<u64>().expect("numeric") + 1;
     fs::write(dir.join("VERSION"), format!("v{newer}\n")).expect("w");
     // A file this build does not know, as a newer format might add.
     fs::write(dir.join("future.gts"), b"from a newer build").expect("w");
     // Even a corrupt set: a newer build's bytes are not ours to judge.
     let m = Manifest::load(&dir).expect("load").expect("a set");
-    let seg = m
-        .live
-        .iter()
-        .find(|f| f.name.starts_with("seg-"))
-        .expect("seg");
+    let seg = m.live.iter().find(|f| f.name.starts_with("seg-")).expect("seg");
     let mut b = fs::read(dir.join(&seg.name)).expect("r");
     let last = b.len() - 1;
     b[last] ^= 1;
@@ -335,14 +299,9 @@ fn a_newer_cache_is_left_alone_and_no_page_answers_500() {
 
     let index = gitterrace_index::Index::open_dir(dir.clone()).expect("open");
     assert_eq!(index.newer_format(), Some(newer.to_string().as_str()));
-    let e = index
-        .update(&repo, &head, &|_| {})
-        .expect_err("update must refuse");
+    let e = index.update(&repo, &head, &|_| {}).expect_err("update must refuse");
     assert!(e.to_string().contains("newer"), "{e}");
-    assert!(
-        index.rebuild().is_err(),
-        "rebuild must refuse a newer cache"
-    );
+    assert!(index.rebuild().is_err(), "rebuild must refuse a newer cache");
     assert!(index.records(&repo, &head).is_err(), "records must refuse");
     drop(index);
     let again = gitterrace_index::Index::open_dir(dir.clone()).expect("open");

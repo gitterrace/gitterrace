@@ -142,14 +142,10 @@ impl Skeleton {
     /// The oldest chain position whose local day is `first_day` or later, if any. One walk
     /// over commit rows, no file rows.
     pub(crate) fn first_from_day(&self, src: &dyn InsightsSource, first_day: i64) -> Option<usize> {
-        let newest = src
-            .len()
-            .checked_sub(1)
-            .map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
+        let newest = src.len().checked_sub(1).map(|i| Rank(u32::try_from(i).unwrap_or(u32::MAX)));
         let days = walk(src, newest).map(|r| {
-            src.commit(r).map_or(i64::MIN, |c| {
-                gitterrace_index::feed::local_day_of(c.time, c.offset)
-            })
+            src.commit(r)
+                .map_or(i64::MIN, |c| gitterrace_index::feed::local_day_of(c.time, c.offset))
         });
         first_from(days, self.n, first_day)
     }
@@ -192,40 +188,27 @@ impl Skeleton {
                 break;
             };
             let start = (g * self.gap + self.gap - 1).min(self.n - 1);
-            let low = need
-                .range(g * self.gap..=top)
-                .next()
-                .copied()
-                .unwrap_or(top);
+            let low = need.range(g * self.gap..=top).next().copied().unwrap_or(top);
             let low = low.min(top);
             let (mut lines, mut added, mut removed) =
                 (mark.lines.clone(), mark.added, mark.removed);
             let mut pos = start + 1;
-            rows_newest_first(
-                src,
-                walk(src, Some(mark.rank)).take(start - low + 1),
-                |r, files| {
-                    pos -= 1;
-                    if need.contains(&pos) {
-                        extra.insert(pos, point(src, r, lines.clone(), added, removed));
+            rows_newest_first(src, walk(src, Some(mark.rank)).take(start - low + 1), |r, files| {
+                pos -= 1;
+                if need.contains(&pos) {
+                    extra.insert(pos, point(src, r, lines.clone(), added, removed));
+                }
+                for f in files {
+                    if let Some(s) = slot_of(f.path) {
+                        lines[s] -= i64::from(f.add) - i64::from(f.del);
+                        added -= u64::from(f.add);
+                        removed -= u64::from(f.del);
                     }
-                    for f in files {
-                        if let Some(s) = slot_of(f.path) {
-                            lines[s] -= i64::from(f.add) - i64::from(f.del);
-                            added -= u64::from(f.add);
-                            removed -= u64::from(f.del);
-                        }
-                    }
-                },
-            );
+                }
+            });
             need.retain(|p| *p < low);
         }
-        let mut ch = Chain {
-            sk: Arc::clone(self),
-            extra,
-            added: 0,
-            removed: 0,
-        };
+        let mut ch = Chain { sk: Arc::clone(self), extra, added: 0, removed: 0 };
         if self.n > 0 {
             let (from, to) = view.range.unwrap_or((0, self.n - 1));
             let before = |c: &Chain| if from == 0 { (0, 0) } else { c.sums(from - 1) };
@@ -269,17 +252,12 @@ impl Chain {
 
     /// Lines per language after commit `i`.
     pub(super) fn lines(&self, i: usize) -> Vec<i64> {
-        self.at(i)
-            .map_or_else(|| vec![0; self.sk.langs.len()], |p| p.lines.clone())
+        self.at(i).map_or_else(|| vec![0; self.sk.langs.len()], |p| p.lines.clone())
     }
 
     /// Lines per language before commit `i` (all zero before the first).
     pub(super) fn before(&self, i: usize) -> Vec<i64> {
-        if i == 0 {
-            vec![0; self.sk.langs.len()]
-        } else {
-            self.lines(i - 1)
-        }
+        if i == 0 { vec![0; self.sk.langs.len()] } else { self.lines(i - 1) }
     }
 }
 
@@ -353,31 +331,19 @@ struct Fold {
 
 impl Fold {
     fn new(names: &[String], last: &[i64]) -> Self {
-        let mut order: Vec<usize> = (0..names.len())
-            .filter(|s| last[*s] > 0 && is_language(&names[*s]))
-            .collect();
-        order.sort_by(|a, b| {
-            last[*b]
-                .cmp(&last[*a])
-                .then_with(|| names[*a].cmp(&names[*b]))
-        });
+        let mut order: Vec<usize> =
+            (0..names.len()).filter(|s| last[*s] > 0 && is_language(&names[*s])).collect();
+        order.sort_by(|a, b| last[*b].cmp(&last[*a]).then_with(|| names[*a].cmp(&names[*b])));
         // Leaving out a format folds it, so "Other" must show even under the cut.
         let formats = (0..names.len()).any(|s| last[s] != 0 && !is_language(&names[s]));
-        let keep: Vec<usize> = if order.len() <= TOP + usize::from(!formats) {
-            order
-        } else {
-            order[..TOP].to_vec()
-        };
+        let keep: Vec<usize> =
+            if order.len() <= TOP + usize::from(!formats) { order } else { order[..TOP].to_vec() };
         let folded = names.len() > keep.len();
         let mut langs: Vec<String> = keep.iter().map(|s| names[*s].clone()).collect();
         if folded {
             langs.push("Other".to_owned());
         }
-        Self {
-            langs,
-            keep,
-            folded,
-        }
+        Self { langs, keep, folded }
     }
 
     fn apply(&self, row: &[i64]) -> Vec<i64> {
@@ -423,11 +389,7 @@ pub(super) fn first_from(
 /// Every position the page reads for a range: the shown commits, the chain ends, the
 /// commit before the range and before the last ten, and the trend samples.
 fn wanted(n: usize, range: Option<(usize, usize)>) -> BTreeSet<usize> {
-    let view = View {
-        range,
-        picked: range.is_some(),
-        ..unranged()
-    };
+    let view = View { range, picked: range.is_some(), ..unranged() };
     let mut w: BTreeSet<usize> = shown(n, view).into_iter().collect();
     if n == 0 {
         return w;

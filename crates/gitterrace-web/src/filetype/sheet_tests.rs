@@ -136,10 +136,7 @@ fn ods(sheet: &str) -> Vec<u8> {
     let o =
         zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
     for (name, body) in [
-        (
-            "mimetype",
-            "application/vnd.oasis.opendocument.spreadsheet".to_owned(),
-        ),
+        ("mimetype", "application/vnd.oasis.opendocument.spreadsheet".to_owned()),
         (
             "META-INF/manifest.xml",
             format!("<manifest:manifest xmlns:manifest='{OPENDOC}:manifest:1.0'/>"),
@@ -154,11 +151,7 @@ fn ods(sheet: &str) -> Vec<u8> {
 
 /// A row repeated `rows` times of `cols` cells, each a float when `full`, else empty.
 fn row(rows: u64, cols: u64, full: bool) -> String {
-    let v = if full {
-        " office:value-type='float' office:value='7'"
-    } else {
-        ""
-    };
+    let v = if full { " office:value-type='float' office:value='7'" } else { "" };
     format!(
         "<table:table-row table:number-rows-repeated='{rows}'>\
          <table:table-cell table:number-columns-repeated='{cols}'{v}/></table:table-row>"
@@ -174,10 +167,7 @@ fn an_ods_sheet_reads_as_a_table() {
 
 #[test]
 fn ods_repeated_rows_at_the_cap_read_and_one_more_is_refused() {
-    assert_eq!(
-        first_sheet(&ods(&row(4, 1, true)), 1 << 20, 3).map(|t| t.rows.len()),
-        Some(3)
-    );
+    assert_eq!(first_sheet(&ods(&row(4, 1, true)), 1 << 20, 3).map(|t| t.rows.len()), Some(3));
     assert!(first_sheet(&ods(&row(5, 1, true)), 1 << 20, 3).is_none());
 }
 
@@ -185,12 +175,7 @@ fn ods_repeated_rows_at_the_cap_read_and_one_more_is_refused() {
 #[test]
 fn ods_rows_count_from_the_first_value_to_the_last() {
     let g = |s: &str| ods_grid(&ods(s)).expect("grid");
-    let gap = format!(
-        "{}{}{}",
-        row(1, 2, true),
-        row(1_000_000, 2, false),
-        row(1, 2, true)
-    );
+    let gap = format!("{}{}{}", row(1, 2, true), row(1_000_000, 2, false), row(1, 2, true));
     assert_eq!(g(&gap).height, 1_000_002);
     assert!(first_sheet(&ods(&gap), 1 << 20, 10).is_none());
     let tail = format!("{}{}", row(2, 3, true), row(1_000_000, 16_384, false));
@@ -223,20 +208,14 @@ fn a_bad_repeat_count_reads_nothing() {
 #[test]
 fn far_apart_xlsx_cells_are_refused_before_the_box_is_built() {
     let near = sheet_xlsx("<row r='1'><c r='A1'><v>1</v></c><c r='C1'><v>2</v></c></row>");
-    assert_eq!(
-        first_sheet(&near, 1 << 20, 10).expect("near").head,
-        ["1", "", "2"]
-    );
+    assert_eq!(first_sheet(&near, 1 << 20, 10).expect("near").head, ["1", "", "2"]);
     let far = sheet_xlsx(
         "<row r='1'><c r='A1'><v>1</v></c></row>\
          <row r='1048576'><c r='XFD1048576'><v>2</v></c></row>",
     );
     assert!(first_sheet(&far, 1 << 20, 10).is_none());
     let wide = sheet_xlsx("<row r='1'><c r='A1'><v>1</v></c><c r='XFD1'><v>2</v></c></row>");
-    assert_eq!(
-        first_sheet(&wide, 1 << 20, 10).expect("wide").head.len(),
-        16_384
-    );
+    assert_eq!(first_sheet(&wide, 1 << 20, 10).expect("wide").head.len(), 16_384);
 }
 
 proptest! {

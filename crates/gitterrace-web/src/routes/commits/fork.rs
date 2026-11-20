@@ -14,15 +14,7 @@ pub(super) fn since_left(a: &App, rev: &str, id: &str) -> Option<Action> {
         .ok()?
         .iter()
         .any(|r| r.kind == gitterrace_git::RefKind::Branch && r.name == rev);
-    let base = a
-        .repo
-        .merge_base(&default, id)
-        .ok()
-        .flatten()
-        .filter(|_| is_branch)?;
+    let base = a.repo.merge_base(&default, id).ok().flatten().filter(|_| is_branch)?;
     let href = crate::compare::compare_href(Some(&base), rev);
-    (!href.is_empty()).then_some(Action {
-        label: "Since it left the default branch",
-        href,
-    })
+    (!href.is_empty()).then_some(Action { label: "Since it left the default branch", href })
 }

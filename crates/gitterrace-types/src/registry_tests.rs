@@ -12,10 +12,8 @@ fn declared(text: &str) -> Vec<String> {
         let Some(j) = rest.find("pub enum ") else {
             break;
         };
-        let name: String = rest[j + 9..]
-            .chars()
-            .take_while(|c| c.is_alphanumeric() || *c == '_')
-            .collect();
+        let name: String =
+            rest[j + 9..].chars().take_while(|c| c.is_alphanumeric() || *c == '_').collect();
         out.push(name);
     }
     out
@@ -28,9 +26,7 @@ fn collect(dir: &Path, all: &mut String) {
             collect(&p, all);
             continue;
         }
-        if p.file_name()
-            .is_some_and(|n| n == "codec.rs" || n == "registry_tests.rs")
-        {
+        if p.file_name().is_some_and(|n| n == "codec.rs" || n == "registry_tests.rs") {
             continue;
         }
         all.push_str(&fs::read_to_string(p).expect("read"));

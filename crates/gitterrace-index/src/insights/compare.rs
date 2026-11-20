@@ -57,11 +57,7 @@ impl Comparison {
             }
         }
         Self {
-            commits: commits
-                .iter()
-                .filter(|c| !c.merge)
-                .map(|c| c.id.clone())
-                .collect(),
+            commits: commits.iter().filter(|c| !c.merge).map(|c| c.id.clone()).collect(),
             authors: people.len(),
             files_changed: paths.len(),
             added,
@@ -82,12 +78,8 @@ fn sorted(langs: HashMap<String, (u64, u64, u64)>) -> Vec<LangDelta> {
             rewritten,
         })
         .collect();
-    languages.sort_by(|x, y| {
-        y.net
-            .abs()
-            .cmp(&x.net.abs())
-            .then_with(|| x.language.cmp(&y.language))
-    });
+    languages
+        .sort_by(|x, y| y.net.abs().cmp(&x.net.abs()).then_with(|| x.language.cmp(&y.language)));
     languages
 }
 
@@ -109,10 +101,8 @@ impl Insights<'_> {
             seen
         };
         let base = reach(base_id);
-        let mut range: Vec<Rank> = reach(head_id)
-            .into_iter()
-            .filter(|i| !base.contains(i))
-            .collect();
+        let mut range: Vec<Rank> =
+            reach(head_id).into_iter().filter(|i| !base.contains(i)).collect();
         range.sort_unstable();
         let mut langs: HashMap<String, (u64, u64, u64)> = HashMap::new();
         let mut people = HashSet::new();
@@ -186,10 +176,7 @@ mod tests {
             id: id.to_owned(),
             author: who.to_owned(),
             merge,
-            files: files
-                .iter()
-                .map(|(p, a, d)| ((*p).to_owned(), *a, *d, 0))
-                .collect(),
+            files: files.iter().map(|(p, a, d)| ((*p).to_owned(), *a, *d, 0)).collect(),
         };
         let c = Comparison::of_raw(&[
             raw("m", "x", true, &[("a.rs", 99, 99)]),
@@ -197,10 +184,7 @@ mod tests {
             raw("c", "y", false, &[("a.rs", 1, 0)]),
         ]);
         assert_eq!(c.commits, ["d", "c"], "merges are left out");
-        assert_eq!(
-            (c.authors, c.files_changed, c.added, c.removed),
-            (2, 2, 8, 1)
-        );
+        assert_eq!((c.authors, c.files_changed, c.added, c.removed), (2, 2, 8, 1));
         assert_eq!(c.languages[0].language, "Rust");
         assert_eq!(c.languages[0].net, 5);
     }

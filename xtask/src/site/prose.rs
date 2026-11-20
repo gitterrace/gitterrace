@@ -14,11 +14,7 @@ fn site_prose(root: &std::path::Path) -> Vec<(String, String)> {
                     stack.push(p);
                 } else if p.extension().is_some_and(|x| x == "md" || x == "rs") {
                     // `/` on every system, so the suffix checks below match on Windows too.
-                    let rel = p
-                        .strip_prefix(root)
-                        .unwrap()
-                        .to_string_lossy()
-                        .replace('\\', "/");
+                    let rel = p.strip_prefix(root).unwrap().to_string_lossy().replace('\\', "/");
                     files.push(rel);
                 }
             }
@@ -44,14 +40,9 @@ fn one_page_claims(pages: usize, prose: &[(String, String)]) -> Vec<String> {
         }
         for (n, line) in body.lines().enumerate() {
             let l = line.to_lowercase().replace('-', " ");
-            if [
-                "one page site",
-                "single page site",
-                "one page website",
-                "single page website",
-            ]
-            .iter()
-            .any(|p| l.contains(p))
+            if ["one page site", "single page site", "one page website", "single page website"]
+                .iter()
+                .any(|p| l.contains(p))
             {
                 bad.push(format!(
                     "{file}:{}: calls the site one page, but it has {pages} pages",
@@ -69,11 +60,7 @@ fn no_prose_calls_the_multi_page_site_one_page() {
     let (pages, _) = generated();
     let html = pages
         .iter()
-        .filter(|p| {
-            std::path::Path::new(&p.0)
-                .extension()
-                .is_some_and(|x| x == "html")
-        })
+        .filter(|p| std::path::Path::new(&p.0).extension().is_some_and(|x| x == "html"))
         .count();
     let bad = one_page_claims(html, &site_prose(&crate::repo_root()));
     assert!(bad.is_empty(), "{}", bad.join("\n"));
@@ -81,10 +68,7 @@ fn no_prose_calls_the_multi_page_site_one_page() {
 
 #[test]
 fn a_planted_one_page_claim_is_reported() {
-    let prose = vec![(
-        "README.md".to_owned(),
-        "The one-page site is here.\n".to_owned(),
-    )];
+    let prose = vec![("README.md".to_owned(), "The one-page site is here.\n".to_owned())];
     assert_eq!(one_page_claims(1, &prose), [] as [std::string::String; 0]);
     let bad = one_page_claims(5, &prose).join("\n");
     assert!(bad.contains("README.md:1"), "{bad}");

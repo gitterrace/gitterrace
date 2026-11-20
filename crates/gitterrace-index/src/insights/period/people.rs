@@ -76,11 +76,7 @@ impl Counted<'_> {
 
 impl ContributorTally {
     pub fn new(metric: Metric, axis: &TimeAxis) -> Self {
-        Self {
-            metric,
-            len: axis.len(),
-            acc: FastMap::default(),
-        }
+        Self { metric, len: axis.len(), acc: FastMap::default() }
     }
 
     /// The report of what the stream fed in, over the set `set` it came from.
@@ -98,12 +94,9 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
         // New means new to the project: every day, the same options (merges, bots), no
         // selection. A filter chip never turns a long-time contributor into a newcomer, and a
         // merge or an uncounted bot never makes anyone a returning contributor.
-        let ever = Scope::from_params(
-            &ScopeParams::default(),
-            set.scope().options().clone(),
-            Period::All,
-        )
-        .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
+        let ever =
+            Scope::from_params(&ScopeParams::default(), set.scope().options().clone(), Period::All)
+                .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
         for row in ins.counted(&ever, *set.context()).stream() {
             let who = ins.person_of(row.ident);
             if !people.acc.contains_key(&who) {
@@ -130,11 +123,7 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
                 last_commit: acc.last,
                 active_days: acc.days.len(),
                 series: if metric == Metric::Net {
-                    acc.series
-                        .iter()
-                        .zip(&acc.dels)
-                        .map(|(x, y)| x.saturating_sub(*y))
-                        .collect()
+                    acc.series.iter().zip(&acc.dels).map(|(x, y)| x.saturating_sub(*y)).collect()
                 } else {
                     acc.series
                 },
@@ -144,10 +133,7 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
         .collect();
     let key = |row: &Contributor| metric.of(row.commits, row.additions, row.deletions);
     out.sort_by(|x, y| {
-        key(y)
-            .cmp(&key(x))
-            .then_with(|| x.name.cmp(&y.name))
-            .then_with(|| x.emails.cmp(&y.emails))
+        key(y).cmp(&key(x)).then_with(|| x.name.cmp(&y.name)).then_with(|| x.emails.cmp(&y.emails))
     });
     ContributorReport {
         labels: (0..axis.len()).map(|i| axis.label(i)).collect(),

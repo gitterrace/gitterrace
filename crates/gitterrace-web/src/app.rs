@@ -192,12 +192,7 @@ impl Env {
 
     /// `(label, url)` for each Send to target with a `lookup`, filled for `sha`.
     pub(crate) fn lookups(&self, sha: &str) -> Vec<(String, String)> {
-        let Some(config) = self
-            .sends
-            .read()
-            .ok()
-            .and_then(|g| g.as_ref().map(Arc::clone))
-        else {
+        let Some(config) = self.sends.read().ok().and_then(|g| g.as_ref().map(Arc::clone)) else {
             return Vec::new();
         };
         let Ok(config) = config.read() else {
@@ -232,9 +227,7 @@ impl Env {
                 g.clear();
             }
             // An error only says no tab is open.
-            app.changes
-                .send(Arc::new(Change::repos(app.version())))
-                .ok();
+            app.changes.send(Arc::new(Change::repos(app.version()))).ok();
         }
     }
 
@@ -250,16 +243,12 @@ impl Env {
 
     /// The settings in force now.
     pub(crate) fn cfg(&self) -> Arc<Config> {
-        self.cfg
-            .read()
-            .map_or_else(|e| Arc::clone(&e.into_inner()), |g| Arc::clone(&g))
+        self.cfg.read().map_or_else(|e| Arc::clone(&e.into_inner()), |g| Arc::clone(&g))
     }
 
     /// How many repositories are served: more than one shows the switcher from the first paint.
     pub(crate) fn served(&self) -> usize {
-        self.apps
-            .lock()
-            .map_or(1, |g| g.iter().filter(|w| w.strong_count() > 0).count())
+        self.apps.lock().map_or(1, |g| g.iter().filter(|w| w.strong_count() > 0).count())
     }
 
     /// Lets a reload reach `app`.
@@ -510,9 +499,7 @@ impl App {
         // The watcher loop re-reads `watch.*` when woken.
         self.wake.notify_one();
         // An error only says no tab is open.
-        self.changes
-            .send(Arc::new(Change::config(self.version())))
-            .ok();
+        self.changes.send(Arc::new(Change::config(self.version()))).ok();
     }
 
     /// Whether the worktree differs from HEAD, reused for a couple of seconds.

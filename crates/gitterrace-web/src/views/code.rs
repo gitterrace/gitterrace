@@ -80,9 +80,7 @@ pub(crate) fn code_memo_has(memo: &CodeMemo, path: &str, text: &str) -> bool {
 /// Drops every highlighted file and returns whether any was kept. The memo is shared by the
 /// whole process, so the idle release empties it.
 pub(crate) fn clear_code_memo() -> bool {
-    CODE_CACHE
-        .lock()
-        .is_ok_and(|mut g| g.take().is_some_and(|m| !m.map.is_empty()))
+    CODE_CACHE.lock().is_ok_and(|mut g| g.take().is_some_and(|m| !m.map.is_empty()))
 }
 
 /// True when `code_html` of `path` with `text` would be served from the memo.
@@ -113,8 +111,7 @@ pub(crate) fn code(r: &Render, path: &str, text: &str) -> Code {
     }
     let built = code_html_uncached(r, path, text, usize::MAX);
     if let Ok(mut g) = CODE_CACHE.lock() {
-        g.get_or_insert_with(CodeMemo::default)
-            .put(r.cache_bytes, key, &built);
+        g.get_or_insert_with(CodeMemo::default).put(r.cache_bytes, key, &built);
     }
     built
 }
@@ -143,10 +140,7 @@ pub(crate) fn code_tail_html(r: &Render, path: &str, text: &str) -> String {
     let full = code(r, path, text).html;
     let marker = "<div class=\"ch\"";
     let end = full.len() - "</div>".len();
-    let from = full
-        .match_indices(marker)
-        .nth(EAGER_CHUNKS)
-        .map_or(end, |m| m.0);
+    let from = full.match_indices(marker).nth(EAGER_CHUNKS).map_or(end, |m| m.0);
     full[from..end].to_owned()
 }
 
@@ -155,25 +149,12 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> C
     let mut hl = (text.len() <= r.highlight_bytes)
         .then(|| crate::highlight::for_file(path, first))
         .flatten()
-        .map(|h| {
-            if crate::symbols::scoped(path, first) {
-                h.with_symbols()
-            } else {
-                h
-            }
-        });
+        .map(|h| if crate::symbols::scoped(path, first) { h.with_symbols() } else { h });
     let mut symbols = Vec::new();
     let lazy = hl.is_some() && lit_lines != usize::MAX;
     let mut out = String::with_capacity(text.len() + text.len() / 8 + 64);
     // The number column is sized by the widest line number shown, floored at three digits.
-    let digits = text
-        .lines()
-        .count()
-        .min(r.blob_lines)
-        .max(1)
-        .to_string()
-        .len()
-        .max(3);
+    let digits = text.lines().count().min(r.blob_lines).max(1).to_string().len().max(3);
     let _ = write!(
         out,
         "<div class=\"code src\"{} data-digits=\"{digits}\">",
@@ -206,11 +187,7 @@ fn code_html_uncached(r: &Render, path: &str, text: &str, lit_lines: usize) -> C
     if let Some(mut h) = hl {
         symbols = h.take_symbols();
     }
-    Code {
-        html: out,
-        cut,
-        symbols,
-    }
+    Code { html: out, cut, symbols }
 }
 
 /// How recent a line is, 0 (this month) to 4 (older than six years): the class of its heat bar.
@@ -295,21 +272,15 @@ pub(crate) fn blame_rows(
     let to = from.saturating_add(page).min(lines.len());
     let mut out = String::new();
     let mut prev = from.checked_sub(1).map_or("", |i| lines[i].commit.as_str());
-    let mut heat = from
-        .checked_sub(1)
-        .map_or(0, |i| heat_bucket(lines[i].time, now));
+    let mut heat = from.checked_sub(1).map_or(0, |i| heat_bucket(lines[i].time, now));
     for l in &lines[from..to] {
         let first = l.commit != prev;
         prev = &l.commit;
         if first {
             heat = heat_bucket(l.time, now);
         }
-        let _ = write!(
-            out,
-            "<tr id=\"L{}\"{}>",
-            l.line_no,
-            if first { " class=\"run\"" } else { "" }
-        );
+        let _ =
+            write!(out, "<tr id=\"L{}\"{}>", l.line_no, if first { " class=\"run\"" } else { "" });
         if first {
             let _ = write!(
                 out,
@@ -327,8 +298,7 @@ pub(crate) fn blame_rows(
         let _ = write!(
             out,
             "<td class=\"n\"><a href=\"#L{n}\">{n}</a></td><td class=\"c\">{}</td></tr>",
-            hl.as_mut()
-                .map_or_else(|| esc(&l.text), |h| h.line(&l.text)),
+            hl.as_mut().map_or_else(|| esc(&l.text), |h| h.line(&l.text)),
             n = l.line_no
         );
     }
@@ -353,10 +323,8 @@ mod tests {
     fn heat_runs_from_this_month_to_old() {
         let now = 10 * 365 * 86_400;
         let ago = |d: i64| now - d * 86_400;
-        let got: Vec<u8> = [1, 100, 800, 2000, 4000]
-            .into_iter()
-            .map(|d| heat_bucket(ago(d), now))
-            .collect();
+        let got: Vec<u8> =
+            [1, 100, 800, 2000, 4000].into_iter().map(|d| heat_bucket(ago(d), now)).collect();
         assert_eq!(got, [0, 1, 2, 3, 4]);
     }
 
@@ -372,11 +340,7 @@ mod tests {
                 commit: ["a", "b", "c"][(i / 5 % 3) as usize].repeat(40),
                 author: "A".into(),
                 time: now - i64::from(i) * 40 * 86_400,
-                text: if i == 3 {
-                    "/* open".into()
-                } else {
-                    format!("let x{i} = 1; */")
-                },
+                text: if i == 3 { "/* open".into() } else { format!("let x{i} = 1; */") },
             })
             .collect();
         let r = crate::views::Render::fold(400);
@@ -404,12 +368,7 @@ mod tests {
             time: now - days * 86_400,
             text: "x".into(),
         };
-        let lines = [
-            line(1, "a", 3),
-            line(2, "a", 3),
-            line(3, "b", 800),
-            line(4, "c", 4000),
-        ];
+        let lines = [line(1, "a", 3), line(2, "a", 3), line(3, "b", 800), line(4, "c", 4000)];
         let html = super::blame_html(&crate::views::Render::fold(400), "a.txt", &lines, now);
         let said: Vec<&str> = html
             .split("<div class=\"bl\"><span class=\"vh\">")
@@ -418,11 +377,7 @@ mod tests {
             .collect();
         assert_eq!(
             said,
-            [
-                "Changed in the last month",
-                "Changed 1 to 3 years ago",
-                "Changed over 6 years ago"
-            ],
+            ["Changed in the last month", "Changed 1 to 3 years ago", "Changed over 6 years ago"],
             "{html}"
         );
         let problems = gitterrace_testkit::a11y::problems(&format!("<h1>x</h1>{html}"));

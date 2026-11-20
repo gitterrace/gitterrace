@@ -116,10 +116,7 @@ impl Nudger {
                 run(&cfg, watch, watched, &rx, &on_nudge);
             })
             .map_err(|e| NudgeError::Os(e.to_string()))?;
-        Ok(Self {
-            tx,
-            thread: Some(thread),
-        })
+        Ok(Self { tx, thread: Some(thread) })
     }
 }
 
@@ -154,8 +151,7 @@ fn register(
         if per_directory() {
             add_tree(w, root, &cfg.skip, watched, cfg.max_watches)?;
         } else {
-            w.watch(root, RecursiveMode::Recursive)
-                .map_err(|e| os_error(&e))?;
+            w.watch(root, RecursiveMode::Recursive).map_err(|e| os_error(&e))?;
         }
     }
     Ok(())
@@ -231,9 +227,8 @@ fn run_decided<W: Watcher>(
     let mut owed = false;
     loop {
         let now = Instant::now();
-        let mut deadline = first.map_or(rescan_at, |f| {
-            (last + cfg.debounce).min(f + cfg.max_delay).min(rescan_at)
-        });
+        let mut deadline = first
+            .map_or(rescan_at, |f| (last + cfg.debounce).min(f + cfg.max_delay).min(rescan_at));
         if owed && let Some(t) = nudged {
             deadline = deadline.min(t + cfg.max_delay);
         }

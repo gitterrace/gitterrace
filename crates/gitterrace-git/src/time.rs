@@ -62,10 +62,7 @@ mod tests {
     #[test]
     fn iso_utc_and_ymd_write_known_points_and_refuse_out_of_range() {
         assert_eq!(iso_utc(0).as_deref(), Some("1970-01-01T00:00:00Z"));
-        assert_eq!(
-            iso_utc(951_782_400).as_deref(),
-            Some("2000-02-29T00:00:00Z")
-        );
+        assert_eq!(iso_utc(951_782_400).as_deref(), Some("2000-02-29T00:00:00Z"));
         assert_eq!(iso_utc(-1).as_deref(), Some("1969-12-31T23:59:59Z"));
         assert_eq!(iso_utc(i64::MAX), None);
         assert_eq!(iso_utc(i64::MIN), None);

@@ -55,28 +55,15 @@ fn f(path: &str, add: u32, del: u32) -> FileStat {
 }
 
 fn mv(old: &str, new: &str, add: u32) -> FileStat {
-    FileStat {
-        old: Some(old.into()),
-        ..f(new, add, 0)
-    }
+    FileStat { old: Some(old.into()), ..f(new, add, 0) }
 }
 
 fn gone(path: &str) -> FileStat {
-    FileStat {
-        deleted: true,
-        ..f(path, 0, 3)
-    }
+    FileStat { deleted: true, ..f(path, 0, 3) }
 }
 
 fn ws(path: &str) -> FileStat {
-    FileStat {
-        code: Some(CodeStat {
-            additions: 1,
-            deletions: 0,
-            rewritten: 0,
-        }),
-        ..f(path, 6, 4)
-    }
+    FileStat { code: Some(CodeStat { additions: 1, deletions: 0, rewritten: 0 }), ..f(path, 6, 4) }
 }
 
 /// Commit `n` by `who` at `time` (offset seconds east), on the previous commit, or a merge of
@@ -112,69 +99,29 @@ fn steps() -> Vec<Vec<Step>> {
     let m = |d: i64, files: Vec<FileStat>| (String::new(), d, 0, files, true);
     vec![
         vec![
-            c(
-                "Ann",
-                -900,
-                0,
-                vec![f("a.rs", 10, 0), f("b.rs", 4, 0), f("keep.rs", 3, 0)],
-            ),
-            c(
-                "Bob",
-                -800,
-                3600,
-                vec![f("a.rs", 2, 1), f("old/x.py", 7, 0)],
-            ),
-            c(
-                "dependabot[bot]",
-                -700,
-                0,
-                vec![f("keep.rs", 1, 1), f("lock.json", 90, 0)],
-            ),
+            c("Ann", -900, 0, vec![f("a.rs", 10, 0), f("b.rs", 4, 0), f("keep.rs", 3, 0)]),
+            c("Bob", -800, 3600, vec![f("a.rs", 2, 1), f("old/x.py", 7, 0)]),
+            c("dependabot[bot]", -700, 0, vec![f("keep.rs", 1, 1), f("lock.json", 90, 0)]),
             c("Ann", -600, -18_000, vec![ws("b.rs"), f("tmp.rs", 5, 0)]),
             m(-590, vec![f("a.rs", 2, 2), f("b.rs", 1, 0)]),
             c("Cy", -500, 0, vec![gone("tmp.rs")]),
-            c(
-                "Ann Other",
-                -400,
-                0,
-                vec![f("tmp.rs", 9, 0), f("keep.rs", 2, 0)],
-            ),
+            c("Ann Other", -400, 0, vec![f("tmp.rs", 9, 0), f("keep.rs", 2, 0)]),
         ],
         vec![
             // Chain: old/x.py to mid/x.py to new/x.py, and a swap a <-> b.
             c("Bob", -300, 0, vec![mv("old/x.py", "mid/x.py", 1)]),
-            c(
-                "Ann",
-                -200,
-                0,
-                vec![mv("a.rs", "t.rs", 0), mv("b.rs", "a.rs", 1)],
-            ),
-            c(
-                "Ann",
-                -199,
-                0,
-                vec![mv("t.rs", "b.rs", 0), f("keep.rs", 1, 0)],
-            ),
+            c("Ann", -200, 0, vec![mv("a.rs", "t.rs", 0), mv("b.rs", "a.rs", 1)]),
+            c("Ann", -199, 0, vec![mv("t.rs", "b.rs", 0), f("keep.rs", 1, 0)]),
             m(-150, vec![mv("keep.rs", "kept.rs", 0)]),
         ],
         vec![
-            c(
-                "Bob",
-                -100,
-                0,
-                vec![mv("mid/x.py", "new/x.py", 2), f("a.rs", 1, 1)],
-            ),
+            c("Bob", -100, 0, vec![mv("mid/x.py", "new/x.py", 2), f("a.rs", 1, 1)]),
             // Rename onto a freed name: tmp.rs is deleted, then lock.json moves onto it.
             c("Cy", -60, 0, vec![gone("tmp.rs")]),
             c("Cy", -59, 0, vec![mv("lock.json", "tmp.rs", 0)]),
             // Around a month edge in UTC and in +01:00 and -05:00.
             c("Ann", 0, 0, vec![f("new/x.py", 1, 0), f("b.rs", 2, 0)]),
-            c(
-                "Bob",
-                0,
-                3600,
-                vec![f("new/x.py", 1, 1), f("keep.rs", 4, 0)],
-            ),
+            c("Bob", 0, 3600, vec![f("new/x.py", 1, 1), f("keep.rs", 4, 0)]),
             c("Cy", 0, -18_000, vec![f("a.rs", 3, 0), ws("b.rs")]),
             c("Ann", 1, 0, vec![f("a.rs", 1, 0)]),
         ],
@@ -208,20 +155,14 @@ fn head() -> Vec<HeadFile> {
         ("missing.rs", 4),
     ]
     .iter()
-    .map(|(p, l)| HeadFile {
-        path: (*p).into(),
-        lines: *l,
-    })
+    .map(|(p, l)| HeadFile { path: (*p).into(), lines: *l })
     .collect()
 }
 
 /// Head files padded past the per-path lookup, so the many-path read is the one compared.
 fn many() -> Vec<HeadFile> {
     let mut v = head();
-    v.extend((0..80).map(|i| HeadFile {
-        path: format!("pad/{i}.rs"),
-        lines: 1,
-    }));
+    v.extend((0..80).map(|i| HeadFile { path: format!("pad/{i}.rs"), lines: 1 }));
     v
 }
 
@@ -240,13 +181,7 @@ fn tip_files(dir: &Path) -> usize {
 /// Every per-file page under `opts`, as one string.
 fn pages(ins: &Insights<'_>, files: &[HeadFile]) -> String {
     let mut out: Vec<String> = Vec::new();
-    for p in [
-        Period::All,
-        Period::Year,
-        Period::Quarter,
-        Period::Month,
-        Period::Week,
-    ] {
+    for p in [Period::All, Period::Year, Period::Quarter, Period::Month, Period::Week] {
         out.push(format!("{p:?}\n{:?}", ins.hotspots(files, p)));
         out.push(format!("{:?}", ins.ownership(files, p, 1)));
         out.push(format!("{:?}", ins.coupling(files, p, 1, 50)));
@@ -264,15 +199,8 @@ fn pages(ins: &Insights<'_>, files: &[HeadFile]) -> String {
 fn option_sets() -> Vec<Options> {
     vec![
         Options::default(),
-        Options {
-            include_bots: true,
-            count_whitespace: true,
-            ..Options::default()
-        },
-        Options {
-            include_merges: true,
-            ..Options::default()
-        },
+        Options { include_bots: true, count_whitespace: true, ..Options::default() },
+        Options { include_merges: true, ..Options::default() },
     ]
 }
 
@@ -295,10 +223,7 @@ fn same_as_records(dir: &Path, h: &Hist, case: &str) {
 }
 
 fn index(dir: &Path, h: &Hist) {
-    Index::open_dir(dir.to_path_buf())
-        .expect("index")
-        .update(h, "HEAD", &|_| {})
-        .expect("update");
+    Index::open_dir(dir.to_path_buf()).expect("index").update(h, "HEAD", &|_| {}).expect("update");
 }
 
 /// One build of the whole history.
@@ -424,8 +349,7 @@ impl<S: InsightsSource> InsightsSource for Counting<S> {
         &self,
         r: crate::feed::CommitRange,
     ) -> crate::feed::Stream<'_, crate::feed::CommitRow> {
-        self.scans
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.scans.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         self.inner.commits_in(r)
     }
 
@@ -434,8 +358,7 @@ impl<S: InsightsSource> InsightsSource for Counting<S> {
         c: Vec<crate::feed::Rank>,
     ) -> crate::feed::Stream<'_, (crate::feed::Rank, Vec<crate::feed::FileRow>)> {
         Box::new(self.inner.rows_for(c).inspect(|(_, r)| {
-            self.rows
-                .fetch_add(r.len(), std::sync::atomic::Ordering::Relaxed);
+            self.rows.fetch_add(r.len(), std::sync::atomic::Ordering::Relaxed);
         }))
     }
 
@@ -496,12 +419,8 @@ fn per_file_pages_read_no_file_rows_with_a_tip_file() {
     let scans = src.scans.load(std::sync::atomic::Ordering::Relaxed);
     assert_eq!(scans, 0, "cadence without tags scanned the commits");
     // The same pages without the tip file read the rows: the guard can see a row read.
-    let mem_recs: Vec<CommitRecord> = h
-        .order
-        .borrow()
-        .iter()
-        .map(|i| h.recs.borrow()[i].clone())
-        .collect();
+    let mem_recs: Vec<CommitRecord> =
+        h.order.borrow().iter().map(|i| h.recs.borrow()[i].clone()).collect();
     let mem = Counting {
         inner: MemorySource::new(&mem_recs),
         rows: std::sync::atomic::AtomicUsize::new(0),

@@ -26,16 +26,8 @@ fn rec(
         kind: kind.map(str::to_owned),
         scope: scope.map(str::to_owned),
         files: vec![
-            FileStat {
-                path: path.into(),
-                additions: 3,
-                ..FileStat::default()
-            },
-            FileStat {
-                path: "other/x.rs".into(),
-                additions: 1,
-                ..FileStat::default()
-            },
+            FileStat { path: path.into(), additions: 3, ..FileStat::default() },
+            FileStat { path: "other/x.rs".into(), additions: 1, ..FileStat::default() },
         ],
         ..CommitRecord::default()
     }
@@ -75,31 +67,18 @@ fn sample_records() -> Vec<CommitRecord> {
         rec("a", "ann", 1, Some("fix"), Some("web"), "crates/web/a.rs"),
         rec("b", "bob", 50, Some("feat"), None, "crates/git/b.rs"),
         rec("c", "ann", 99, None, None, "crates/web/c.rs"),
-        rec(
-            "d",
-            "ann",
-            100,
-            Some("fix"),
-            Some("git"),
-            "crates/webby/d.rs",
-        ),
+        rec("d", "ann", 100, Some("fix"), Some("git"), "crates/webby/d.rs"),
     ]
 }
 
 fn ids(f: &Filter) -> Vec<String> {
-    recs_of(&kept(f, &sample()))
-        .iter()
-        .map(|r| r.id.clone())
-        .collect()
+    recs_of(&kept(f, &sample())).iter().map(|r| r.id.clone()).collect()
 }
 
 #[test]
 fn parses_q_and_ignores_empty() {
     let f = parse("q=type%3Afix%20path%3Acrates%2Fweb&bogus=1");
-    assert_eq!(
-        (f.kind(), f.scope(), f.path()),
-        (Some("fix"), None, Some("crates/web"))
-    );
+    assert_eq!((f.kind(), f.scope(), f.path()), (Some("fix"), None, Some("crates/web")));
 }
 
 /// The one-key forms (`?type= ?scope= ?author= ?path=`) select nothing: only `?q=` does, so a
@@ -107,13 +86,9 @@ fn parses_q_and_ignores_empty() {
 #[test]
 fn one_key_forms_no_longer_filter() {
     let all = ids(&Filter::default());
-    for old in [
-        "type=fix",
-        "scope=none",
-        "author=ann",
-        "path=%2Fcrates%2Fweb%2F",
-        "type=fix&author=ann",
-    ] {
+    for old in
+        ["type=fix", "scope=none", "author=ann", "path=%2Fcrates%2Fweb%2F", "type=fix&author=ann"]
+    {
         let f = parse(old);
         assert_eq!(f.query_terms().to_string(), "", "{old}");
         assert_eq!(ids(&f), all, "{old}");
@@ -128,31 +103,19 @@ fn the_period_parameter_sets_the_window() {
     assert_eq!(parse("period=3m").query_terms().to_string(), "after:3m");
     assert_eq!(parse("period=3m").period_value(), Some(Period::Quarter));
     assert_eq!(parse("period=all").period_value(), Some(Period::All));
-    assert_eq!(
-        parse("period=all&q=type%3Afix").query(&[]),
-        "?q=type%3Afix&period=all"
-    );
+    assert_eq!(parse("period=all&q=type%3Afix").query(&[]), "?q=type%3Afix&period=all");
     // A period it does not know is refused, as bad text is, never read as no window.
     let bad = parse("period=soon&q=type%3Afix");
     assert!(bad.error().is_some_and(|e| e.message.contains("`period`")));
     // The whole-repository row links an empty path: that removes the term.
-    assert_eq!(
-        parse("q=path%3Asrc%20type%3Afix").link("/s", Dim::Path, ""),
-        "/s?q=type%3Afix"
-    );
-    assert_eq!(
-        parse("q=author%3Aa").link("/s", Dim::Path, "/"),
-        "/s?q=author%3Aa"
-    );
+    assert_eq!(parse("q=path%3Asrc%20type%3Afix").link("/s", Dim::Path, ""), "/s?q=type%3Afix");
+    assert_eq!(parse("q=author%3Aa").link("/s", Dim::Path, "/"), "/s?q=author%3Aa");
 }
 
 #[test]
 fn query_round_trips_and_encodes() {
     let f = parse("q=type%3Afix%20author%3A%22Ann%20B%22&period=3m");
-    assert_eq!(
-        f.query(&[]),
-        "?q=after%3A3m%20type%3Afix%20author%3A%22Ann%20B%22"
-    );
+    assert_eq!(f.query(&[]), "?q=after%3A3m%20type%3Afix%20author%3A%22Ann%20B%22");
     assert_eq!(parse(&f.query(&[])[1..]), f);
     assert_eq!(Filter::default().query(&[]), "");
     assert_eq!(
@@ -185,10 +148,7 @@ fn filters_stack() {
 #[test]
 fn path_filter_keeps_only_files_under_prefix() {
     let out = recs_of(&kept(&parse("q=path%3Acrates%2Fweb"), &sample()));
-    assert_eq!(
-        out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-        ["a", "c"]
-    );
+    assert_eq!(out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["a", "c"]);
     assert!(out.iter().all(|r| r.files.len() == 1));
     assert!(under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web"));
 }
@@ -197,11 +157,7 @@ fn path_filter_keeps_only_files_under_prefix() {
 fn the_bar_never_builds_a_period_chip() {
     // The segmented control shows the period and All resets it: a chip would repeat it and
     // push the control sideways each time a period is chosen.
-    for q in [
-        "period=1w",
-        "period=all&q=type%3Afix",
-        "q=after%3A1y%20path%3Asrc",
-    ] {
+    for q in ["period=1w", "period=all&q=type%3Afix", "q=after%3A1y%20path%3Asrc"] {
         let bar = parse(q).bar("/stats", &MemorySource::new(&[]), Period::Week);
         assert!(bar.chips.iter().all(|c| c.dim != "after"), "{q}");
     }

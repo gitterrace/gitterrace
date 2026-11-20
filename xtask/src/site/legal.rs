@@ -84,10 +84,7 @@ mod tests {
     fn a_planted_placeholder_refuses_the_deploy_and_a_filled_page_passes() {
         let filled = vec![("p.md".to_owned(), "Jane Doe, Main Street 1\n".to_owned())];
         assert_eq!(deploy_problems(&filled), [] as [std::string::String; 0]);
-        let planted = vec![(
-            "p.md".to_owned(),
-            "Jane\n{{STREET_AND_NUMBER}}\n".to_owned(),
-        )];
+        let planted = vec![("p.md".to_owned(), "Jane\n{{STREET_AND_NUMBER}}\n".to_owned())];
         let bad = deploy_problems(&planted);
         assert_eq!(bad, ["p.md:2: {{STREET_AND_NUMBER}}"]);
     }
@@ -119,14 +116,8 @@ mod tests {
             })
             .expect("security.txt");
         let first = txt.lines().next().expect("a line");
-        assert_eq!(
-            first,
-            format!("Contact: mailto:{}", crate::site::SECURITY_EMAIL)
-        );
-        assert!(
-            txt.lines().filter(|l| l.starts_with("Contact:")).count() == 2,
-            "{txt}"
-        );
+        assert_eq!(first, format!("Contact: mailto:{}", crate::site::SECURITY_EMAIL));
+        assert!(txt.lines().filter(|l| l.starts_with("Contact:")).count() == 2, "{txt}");
     }
 
     fn foreign_mailboxes(label: &str, text: &str) -> Vec<String> {
@@ -152,10 +143,8 @@ mod tests {
     /// the site defines. The planted address is seen red.
     #[test]
     fn no_file_names_a_gitterrace_mailbox_the_site_does_not_define() {
-        let planted = foreign_mailboxes(
-            "plant",
-            "write hello@gitterrace.dev or support@gitterrace.dev",
-        );
+        let planted =
+            foreign_mailboxes("plant", "write hello@gitterrace.dev or support@gitterrace.dev");
         assert_eq!(planted, ["plant: hello@gitterrace.dev"]);
 
         let root = crate::repo_root();
@@ -166,11 +155,8 @@ mod tests {
                 bad.extend(foreign_mailboxes(&path, &body));
             }
         }
-        let mut files = vec![
-            root.join("README.md"),
-            root.join("CONTRIBUTING.md"),
-            root.join("SECURITY.md"),
-        ];
+        let mut files =
+            vec![root.join("README.md"), root.join("CONTRIBUTING.md"), root.join("SECURITY.md")];
         markdown_files(&root.join("docs"), &mut files);
         for file in files {
             if let Ok(text) = std::fs::read_to_string(&file) {

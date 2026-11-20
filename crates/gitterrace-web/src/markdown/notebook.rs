@@ -26,11 +26,7 @@ enum Out {
 
 enum Cell {
     Markdown(String),
-    Code {
-        count: String,
-        html: String,
-        outputs: Vec<Out>,
-    },
+    Code { count: String, html: String, outputs: Vec<Out> },
     Raw(String),
 }
 
@@ -57,13 +53,8 @@ pub(crate) fn doc(
         return None;
     }
     let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
-    let html = render(text, || {
-        markdown::Base::new(rev, dir).highlight(r.highlight_bytes)
-    })?;
-    Some(markdown::Doc {
-        html,
-        outline: Vec::new(),
-    })
+    let html = render(text, || markdown::Base::new(rev, dir).highlight(r.highlight_bytes))?;
+    Some(markdown::Doc { html, outline: Vec::new() })
 }
 
 /// The notebook's cells as HTML, or `None` when the text is not a notebook.
@@ -76,17 +67,8 @@ pub(crate) fn render(src: &str, base: impl Fn() -> markdown::Base) -> Option<Str
         .and_then(Value::as_str)
         .unwrap_or("python");
     let mut budget = NOTEBOOK_OUTPUT_CAP;
-    let cells = all
-        .iter()
-        .take(MAX_CELLS)
-        .map(|c| cell(c, lang, &base, &mut budget))
-        .collect();
-    Notebook {
-        cells,
-        cut: all.len().saturating_sub(MAX_CELLS),
-    }
-    .render()
-    .ok()
+    let cells = all.iter().take(MAX_CELLS).map(|c| cell(c, lang, &base, &mut budget)).collect();
+    Notebook { cells, cut: all.len().saturating_sub(MAX_CELLS) }.render().ok()
 }
 
 /// A notebook string is either a string or a list of lines.
@@ -125,11 +107,7 @@ fn cell(c: &Value, lang: &str, base: &impl Fn() -> markdown::Base, budget: &mut 
 fn output(o: &Value, budget: &mut usize) -> Out {
     let out = match o.get("output_type").and_then(Value::as_str) {
         Some("stream") => Out::Text(text(o.get("text"))),
-        Some("error") => Out::Text(format!(
-            "{}: {}",
-            text(o.get("ename")),
-            text(o.get("evalue"))
-        )),
+        Some("error") => Out::Text(format!("{}: {}", text(o.get("ename")), text(o.get("evalue")))),
         Some("execute_result" | "display_data") => rich(o.get("data")),
         _ => Out::Dropped,
     };
@@ -150,20 +128,14 @@ fn output(o: &Value, budget: &mut usize) -> Out {
 fn rich(data: Option<&Value>) -> Out {
     let Some(d) = data else { return Out::Dropped };
     for mime in ["image/png", "image/jpeg"] {
-        let b64: String = text(d.get(mime))
-            .chars()
-            .filter(|c| !c.is_ascii_whitespace())
-            .collect();
+        let b64: String = text(d.get(mime)).chars().filter(|c| !c.is_ascii_whitespace()).collect();
         if !b64.is_empty()
-            && b64
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
+            && b64.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b'='))
         {
             return Out::Image { mime, data: b64 };
         }
     }
-    d.get("text/plain")
-        .map_or(Out::Dropped, |t| Out::Text(text(Some(t))))
+    d.get("text/plain").map_or(Out::Dropped, |t| Out::Text(text(Some(t))))
 }
 
 #[cfg(test)]
@@ -180,21 +152,18 @@ mod tests {
 
     #[test]
     fn markdown_cells_render_as_markdown() {
-        let h = go(&nb(
-            r##"{"cell_type":"markdown","source":["# Title\n","*em*"]}"##,
-        ))
-        .expect("notebook");
+        let h = go(&nb(r##"{"cell_type":"markdown","source":["# Title\n","*em*"]}"##))
+            .expect("notebook");
         assert!(h.contains("<em>em</em>"), "{h}");
         assert!(h.contains("Title"));
     }
 
     #[test]
     fn code_cells_are_highlighted_with_their_count() {
-        let h = go(&nb(
-            r#"{"cell_type":"code","execution_count":3,"source":"import os\nx = '<b>'",
-            "outputs":[{"output_type":"stream","text":["hi <i>\n"]}]}"#,
-        ))
-        .expect("notebook");
+        let h =
+            go(&nb(r#"{"cell_type":"code","execution_count":3,"source":"import os\nx = '<b>'",
+            "outputs":[{"output_type":"stream","text":["hi <i>\n"]}]}"#))
+            .expect("notebook");
         assert!(h.contains("[3]"));
         assert!(h.contains("<span class="), "{h}");
         assert!(h.contains("<pre class=\"nb-out\">hi &#60;i&#62;"), "{h}");
@@ -203,32 +172,24 @@ mod tests {
 
     #[test]
     fn html_and_script_outputs_are_dropped() {
-        let h = go(&nb(
-            r#"{"cell_type":"code","source":"","outputs":[{"output_type":"display_data",
+        let h =
+            go(&nb(r#"{"cell_type":"code","source":"","outputs":[{"output_type":"display_data",
             "data":{"text/html":"<script>alert(1)</script>","application/javascript":"alert(2)"}},
             {"output_type":"execute_result",
-            "data":{"image/png":"iVBO\"><script>","text/html":"<img onerror=x>"}}]}"#,
-        ))
-        .expect("notebook");
-        assert!(
-            !h.contains("<script") && !h.contains("alert") && !h.contains("onerror"),
-            "{h}"
-        );
+            "data":{"image/png":"iVBO\"><script>","text/html":"<img onerror=x>"}}]}"#))
+            .expect("notebook");
+        assert!(!h.contains("<script") && !h.contains("alert") && !h.contains("onerror"), "{h}");
         assert!(!h.contains("data:image"));
         assert!(h.contains("Output not shown"));
     }
 
     #[test]
     fn png_outputs_show_as_data_images() {
-        let h = go(&nb(
-            r#"{"cell_type":"code","source":"","outputs":[{"output_type":"display_data",
-            "data":{"image/png":"iVBORw0K\nGgo=","text/plain":"<Figure>"}}]}"#,
-        ))
-        .expect("notebook");
-        assert!(
-            h.contains("src=\"data:image/png;base64,iVBORw0KGgo=\""),
-            "{h}"
-        );
+        let h =
+            go(&nb(r#"{"cell_type":"code","source":"","outputs":[{"output_type":"display_data",
+            "data":{"image/png":"iVBORw0K\nGgo=","text/plain":"<Figure>"}}]}"#))
+            .expect("notebook");
+        assert!(h.contains("src=\"data:image/png;base64,iVBORw0KGgo=\""), "{h}");
     }
 
     #[test]
@@ -243,10 +204,8 @@ mod tests {
     fn outputs_past_the_byte_budget_are_dropped() {
         let big = "x".repeat(NOTEBOOK_OUTPUT_CAP / 2 + 1);
         let o = format!(r#"{{"output_type":"stream","text":"{big}"}}"#);
-        let h = go(&nb(&format!(
-            r#"{{"cell_type":"code","source":"","outputs":[{o},{o}]}}"#
-        )))
-        .expect("notebook");
+        let h = go(&nb(&format!(r#"{{"cell_type":"code","source":"","outputs":[{o},{o}]}}"#)))
+            .expect("notebook");
         assert_eq!(h.matches(&big).count(), 1);
     }
 

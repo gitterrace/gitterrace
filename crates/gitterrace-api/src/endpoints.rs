@@ -76,21 +76,11 @@ fn of<T: JsonSchema>(g: &mut SchemaGenerator) -> Schema {
 }
 
 const fn p(name: &'static str, ty: &'static str, description: &'static str) -> Param {
-    Param {
-        name,
-        ty,
-        required: false,
-        description,
-    }
+    Param { name, ty, required: false, description }
 }
 
 const fn req(name: &'static str, ty: &'static str, description: &'static str) -> Param {
-    Param {
-        name,
-        ty,
-        required: true,
-        description,
-    }
+    Param { name, ty, required: true, description }
 }
 
 const REV: Param = p("rev", "string", "Revision to read, default `HEAD`.");
@@ -108,33 +98,15 @@ const PERIOD: Param = p(
     "`1w`, `1m`, `3m`, `1y` or `all` (default): the window, ending at the newest \
     commit. Sets the bucket unit.",
 );
-const BOTS: Param = p(
-    "bots",
-    "string",
-    "`1` counts bot accounts, `0` leaves them out.",
-);
-const MERGES: Param = p(
-    "merges",
-    "string",
-    "`1` counts merge commits as commits, never their lines or files.",
-);
-const GENERATED: Param = p(
-    "generated",
-    "string",
-    "`1` counts lock files and minified output.",
-);
-const IGNORE: Param = p(
-    "ignore",
-    "string",
-    "`0` counts paths that `.gitignore` rules out.",
-);
+const BOTS: Param = p("bots", "string", "`1` counts bot accounts, `0` leaves them out.");
+const MERGES: Param =
+    p("merges", "string", "`1` counts merge commits as commits, never their lines or files.");
+const GENERATED: Param = p("generated", "string", "`1` counts lock files and minified output.");
+const IGNORE: Param = p("ignore", "string", "`0` counts paths that `.gitignore` rules out.");
 const WS: Param = p("ws", "string", "`1` counts whitespace-only changes.");
 const EXCLUDE: Param = p("exclude", "string", "Comma-separated globs left out.");
-const PATH: Param = p(
-    "path",
-    "string",
-    "Directory to list, relative to the repository root, default the root.",
-);
+const PATH: Param =
+    p("path", "string", "Directory to list, relative to the repository root, default the root.");
 
 /// [`ENDPOINTS`] behind a function call: `index` is itself a route in the registry, and naming the
 /// const inside its own body would be a type cycle.
@@ -172,11 +144,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
             REV,
             p("path", "string", "Only commits touching this path."),
             p("page", "integer", "1-based page, default `1`."),
-            p(
-                "per_page",
-                "integer",
-                "Page size, default `50`, at most `api.log_page_commits`.",
-            ),
+            p("per_page", "integer", "Page size, default `50`, at most `api.log_page_commits`."),
         ],
         schema: of::<LogResponse>,
         route: || get(http::log),
@@ -186,11 +154,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
         summary: "One commit with its diff.",
         params: &[
             p("diff", "boolean", "Include hunks, default `true`."),
-            p(
-                "max_lines",
-                "integer",
-                "Most diff lines, at most `api.diff_lines`.",
-            ),
+            p("max_lines", "integer", "Most diff lines, at most `api.diff_lines`."),
         ],
         schema: of::<CommitResponse>,
         route: || get(http::commit),
@@ -207,11 +171,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
                 "boolean",
                 "`true` compares from the merge base of `base` and `head`, like `base...head`.",
             ),
-            p(
-                "max_lines",
-                "integer",
-                "Most diff lines, at most `api.diff_lines`.",
-            ),
+            p("max_lines", "integer", "Most diff lines, at most `api.diff_lines`."),
         ],
         schema: of::<CompareResponse>,
         route: || get(http::compare),
@@ -220,16 +180,8 @@ pub const ENDPOINTS: &[Endpoint] = &[
         path: "/worktree",
         summary: "Uncommitted changes against HEAD. Refused on a public server.",
         params: &[
-            p(
-                "scope",
-                "string",
-                "`all` (default), `staged` or `unstaged`.",
-            ),
-            p(
-                "max_lines",
-                "integer",
-                "Most diff lines, at most `api.diff_lines`.",
-            ),
+            p("scope", "string", "`all` (default), `staged` or `unstaged`."),
+            p("max_lines", "integer", "Most diff lines, at most `api.diff_lines`."),
         ],
         schema: of::<WorktreeResponse>,
         route: || get(http::worktree),
@@ -247,16 +199,8 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[
             REV,
             req("path", "string", "File to read."),
-            p(
-                "start_line",
-                "integer",
-                "First line of the window, 1-based, default `1`.",
-            ),
-            p(
-                "limit",
-                "integer",
-                "Lines in the window, at most `api.blob_lines`.",
-            ),
+            p("start_line", "integer", "First line of the window, 1-based, default `1`."),
+            p("limit", "integer", "Lines in the window, at most `api.blob_lines`."),
         ],
         schema: of::<BlobResponse>,
         route: || get(http::blob),

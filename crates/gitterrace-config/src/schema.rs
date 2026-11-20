@@ -203,10 +203,7 @@ fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, cr
                 });
             }
             None => {
-                return Err(ConfigError::Expected {
-                    key: id,
-                    expected: "bool".to_owned(),
-                });
+                return Err(ConfigError::Expected { key: id, expected: "bool".to_owned() });
             }
         }
     }
@@ -467,16 +464,10 @@ impl Config {
     /// Rejects values a running server cannot honour. Errors name the key.
     pub fn validate(&self) -> Result<(), crate::ConfigError> {
         let bad = |k: &str, why: &str| {
-            Err(crate::ConfigError::Invalid {
-                key: k.to_owned(),
-                why: why.to_owned(),
-            })
+            Err(crate::ConfigError::Invalid { key: k.to_owned(), why: why.to_owned() })
         };
         if self.server.addr.parse::<std::net::SocketAddr>().is_err() {
-            return bad(
-                "server.addr",
-                &format!("expected host:port, for example {DEFAULT_ADDR}"),
-            );
+            return bad("server.addr", &format!("expected host:port, for example {DEFAULT_ADDR}"));
         }
         if let Some(why) = self.public_problem() {
             return bad(why.0, &why.1);
@@ -507,12 +498,7 @@ impl Config {
                 return bad(k, &format!("must be between {lo} and {hi}"));
             }
         }
-        if let Some(s) = self
-            .display
-            .sidebar
-            .iter()
-            .find(|s| !SIDEBAR.contains(&s.as_str()))
-        {
+        if let Some(s) = self.display.sidebar.iter().find(|s| !SIDEBAR.contains(&s.as_str())) {
             return bad(
                 "display.sidebar",
                 &format!(
@@ -524,17 +510,10 @@ impl Config {
         if let Some(p) = pages.iter().find(|p| !INSIGHT_PAGES.contains(&p.as_str())) {
             return bad(
                 "insights.pages",
-                &format!(
-                    "unknown page {p}, expected one of {}",
-                    INSIGHT_PAGES.join(", ")
-                ),
+                &format!("unknown page {p}, expected one of {}", INSIGHT_PAGES.join(", ")),
             );
         }
-        if let Some(p) = pages
-            .iter()
-            .enumerate()
-            .find(|(i, p)| pages[..*i].contains(p))
-        {
+        if let Some(p) = pages.iter().enumerate().find(|(i, p)| pages[..*i].contains(p)) {
             return bad("insights.pages", &format!("{} is listed twice", p.1));
         }
         if self.multi.depth == 0 || self.multi.depth > 6 {

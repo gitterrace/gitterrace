@@ -48,11 +48,7 @@ pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
     match fs::create_dir(dir) {
         Err(e) if e.kind() == io::ErrorKind::AlreadyExists => {
             // Lost a race: accept only a real directory.
-            if fs::symlink_metadata(dir)?.is_dir() {
-                Ok(())
-            } else {
-                Err(refused(dir))
-            }
+            if fs::symlink_metadata(dir)?.is_dir() { Ok(()) } else { Err(refused(dir)) }
         }
         r => r,
     }
@@ -74,10 +70,7 @@ pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
         Ok(m) if m.is_file() => {}
         Ok(m) if m.is_dir() => return Err(refused(&path)),
         Ok(_) => {
-            eprintln!(
-                "gitterrace: {} is not a regular file, discarding it",
-                path.display()
-            );
+            eprintln!("gitterrace: {} is not a regular file, discarding it", path.display());
             fs::remove_file(&path)?;
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}

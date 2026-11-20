@@ -28,10 +28,7 @@ mod tests {
         parse_subject(s)
     }
 
-    #[expect(
-        clippy::unnecessary_wraps,
-        reason = "the signature must match the unix variant"
-    )]
+    #[expect(clippy::unnecessary_wraps, reason = "the signature must match the unix variant")]
     fn some(s: &str) -> Option<String> {
         Some(s.to_owned())
     }
@@ -50,15 +47,9 @@ mod tests {
 
     #[test]
     fn rejects_non_conventional() {
-        for s in [
-            "update readme",
-            "fix:no space",
-            "fix(: x",
-            "fix(): x",
-            "two words: x",
-            ": x",
-            "a1: x",
-        ] {
+        for s in
+            ["update readme", "fix:no space", "fix(: x", "fix(): x", "two words: x", ": x", "a1: x"]
+        {
             assert_eq!(p(s), (None, None), "{s}");
         }
     }

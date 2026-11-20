@@ -48,14 +48,7 @@ pub(crate) struct Progress {
 
 impl Progress {
     pub(crate) fn new(mode: Mode, out: Box<dyn Write + Send>) -> Self {
-        Self {
-            mode,
-            out,
-            start: Instant::now(),
-            last: None,
-            open: false,
-            width: 0,
-        }
+        Self { mode, out, start: Instant::now(), last: None, open: false, width: 0 }
     }
 
     /// A reporter that prints nothing, for tests.
@@ -73,11 +66,7 @@ impl Progress {
     /// Pages written so far against the pages known so far, which grows as links are found.
     pub(crate) fn pages(&mut self, written: usize, planned: usize) {
         let now = Instant::now();
-        let every = if self.mode == Mode::Tty {
-            TTY_EVERY
-        } else {
-            PLAIN_EVERY
-        };
+        let every = if self.mode == Mode::Tty { TTY_EVERY } else { PLAIN_EVERY };
         if self.last.is_some_and(|t| now.duration_since(t) < every) {
             return;
         }
@@ -179,11 +168,7 @@ mod tests {
         assert!(!s.contains('\r') && !s.contains('\x1b'), "{s:?}");
         assert_eq!(
             s.lines().collect::<Vec<_>>(),
-            [
-                "building the cache (0:00)",
-                "writing pages: 1 / 10 (0:00)",
-                "wrote 12 pages (0:00)"
-            ]
+            ["building the cache (0:00)", "writing pages: 1 / 10 (0:00)", "wrote 12 pages (0:00)"]
         );
     }
 

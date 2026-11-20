@@ -41,10 +41,7 @@ pub(crate) struct Render {
 impl Render {
     pub(crate) fn of(a: &crate::app::App) -> Self {
         let c = a.cfg();
-        Self {
-            cache_bytes: a.code_cache_bytes(),
-            ..Self::from_config(&c, 0)
-        }
+        Self { cache_bytes: a.code_cache_bytes(), ..Self::from_config(&c, 0) }
     }
 
     /// The defaults, with a cache of `cache_bytes`.
@@ -56,10 +53,7 @@ impl Render {
     /// The defaults, folding at `fold_lines`.
     #[cfg(test)]
     pub(crate) fn fold(fold_lines: usize) -> Self {
-        Self {
-            fold_lines,
-            ..Self::test(32 << 20)
-        }
+        Self { fold_lines, ..Self::test(32 << 20) }
     }
 
     pub(crate) const fn from_config(c: &gitterrace_config::Config, cache_bytes: usize) -> Self {
@@ -200,10 +194,7 @@ pub(crate) fn day_groups(list: &[CommitSummary], now: i64) -> Vec<crate::routes:
         let label = crate::fmt::day_label(c.committer.time, c.committer.offset, now);
         match out.last_mut() {
             Some(g) if g.label == label => g.rows.push(commit_row(c, now)),
-            _ => out.push(crate::routes::DayGroup {
-                label,
-                rows: vec![commit_row(c, now)],
-            }),
+            _ => out.push(crate::routes::DayGroup { label, rows: vec![commit_row(c, now)] }),
         }
     }
     out
@@ -249,11 +240,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
                 })
                 .collect()
         }),
-        banner: if app.public() {
-            None
-        } else {
-            banner(&app.repo.head_state(), &app.base)
-        },
+        banner: if app.public() { None } else { banner(&app.repo.head_state(), &app.base) },
         actions_note: app.actions_note(),
         theme: match app.cfg().display.theme {
             ColorScheme::System => String::new(),
@@ -311,11 +298,7 @@ impl Chrome {
 
     /// How this page reacts to changes in the repository.
     pub(crate) fn live(self, mode: crate::live::Mode) -> Self {
-        Self {
-            live_how: mode.how,
-            live_on: mode.on,
-            ..self
-        }
+        Self { live_how: mode.how, live_on: mode.on, ..self }
     }
 
     /// Marks `key` as the open top nav entry, for a page that sits under another one.
@@ -328,10 +311,7 @@ impl Chrome {
 
     /// A page about a fixed commit or tag: nothing in the repository can change it.
     pub(crate) fn pinned(self) -> Self {
-        Self {
-            live: false,
-            ..self
-        }
+        Self { live: false, ..self }
     }
 }
 
@@ -347,11 +327,7 @@ pub(crate) fn banner(h: &gitterrace_git::HeadState, base: &str) -> Option<String
         P::Bisect => "Bisect in progress",
         P::ApplyMailbox => "Applying patches (git am) in progress",
     });
-    let at = h
-        .commit
-        .as_deref()
-        .map(|c| crate::fmt::sha_link_at(base, c))
-        .unwrap_or_default();
+    let at = h.commit.as_deref().map(|c| crate::fmt::sha_link_at(base, c)).unwrap_or_default();
     match (op, &h.branch) {
         (None, Some(_)) => None,
         (None, None) => Some(format!("HEAD is detached at {at}")),
@@ -387,12 +363,7 @@ pub(crate) fn stats_tabs(active: &str) -> Tabs {
         .iter()
         .filter_map(|p| crate::features::page_route(p))
         .filter_map(|r| STATS_TABS.iter().find(|t| t.0 == r).copied())
-        .map(|(path, label, key)| Nav {
-            href: href(path),
-            label,
-            key,
-            on: key == active,
-        })
+        .map(|(path, label, key)| Nav { href: href(path), label, key, on: key == active })
         .collect();
     Tabs { primary: all }
 }
@@ -429,11 +400,7 @@ pub(crate) fn initials(name: &str) -> String {
 /// The first letter of a word, uppercased, with the combining marks that follow it.
 fn letter(word: &str) -> String {
     let mut chars = word.chars().skip_while(|c| !c.is_alphanumeric());
-    let mut out: String = chars
-        .next()
-        .into_iter()
-        .flat_map(char::to_uppercase)
-        .collect();
+    let mut out: String = chars.next().into_iter().flat_map(char::to_uppercase).collect();
     out.extend(chars.take_while(|&c| is_combining(c)));
     out
 }
@@ -456,18 +423,12 @@ fn is_cjk(s: &str) -> bool {
 
 /// Stable avatar hue per name.
 pub(crate) fn hue(name: &str) -> u32 {
-    name.bytes()
-        .fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b)))
-        % 360
+    name.bytes().fold(7u32, |h, b| h.wrapping_mul(31).wrapping_add(u32::from(b))) % 360
 }
 
 /// Link to the commit list of one author.
 pub(crate) fn author_href(email: &str) -> String {
-    log_href(
-        &crate::filter::Filter::default(),
-        crate::filter::Dim::Author,
-        email,
-    )
+    log_href(&crate::filter::Filter::default(), crate::filter::Dim::Author, email)
 }
 
 /// The log of the selected revision with `d` set to `value`: every link into a filtered log.
@@ -482,10 +443,7 @@ pub(crate) fn commit_row(c: &CommitSummary, now: i64) -> CommitRow {
 /// Breadcrumbs for `path` under `rev`; `kind` is `tree` for every part but the last of a blob.
 pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
     let r = enc_seg(rev);
-    let mut out = vec![Crumb {
-        name: rev.to_owned(),
-        href: href(&format!("/tree/{r}")),
-    }];
+    let mut out = vec![Crumb { name: rev.to_owned(), href: href(&format!("/tree/{r}")) }];
     let parts: Vec<&str> = path.split('/').filter(|p| !p.is_empty()).collect();
     let mut acc = String::new();
     for (i, p) in parts.iter().enumerate() {
@@ -493,11 +451,7 @@ pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
             acc.push('/');
         }
         acc.push_str(p);
-        let kind = if last_is_file && i + 1 == parts.len() {
-            "blob"
-        } else {
-            "tree"
-        };
+        let kind = if last_is_file && i + 1 == parts.len() { "blob" } else { "tree" };
         out.push(Crumb {
             name: (*p).to_owned(),
             href: href(&format!("/{kind}/{r}/{}", enc_path(&acc))),
@@ -507,11 +461,7 @@ pub(crate) fn crumbs(rev: &str, path: &str, last_is_file: bool) -> Vec<Crumb> {
 }
 
 pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
-    let base = if path.is_empty() {
-        String::new()
-    } else {
-        format!("{}/", path.trim_matches('/'))
-    };
+    let base = if path.is_empty() { String::new() } else { format!("{}/", path.trim_matches('/')) };
     list.iter()
         .map(|e| {
             let full = enc_path(&format!("{base}{}", e.name));
@@ -520,11 +470,7 @@ pub(crate) fn entries(rev: &str, path: &str, list: &[TreeEntry]) -> Vec<Entry> {
                 TreeEntryKind::Dir => (href(&format!("/tree/{r}/{full}")), "dir"),
                 TreeEntryKind::File => (
                     href(&format!("/blob/{r}/{full}")),
-                    if crate::media::is_image(&e.name) {
-                        "img"
-                    } else {
-                        "file"
-                    },
+                    if crate::media::is_image(&e.name) { "img" } else { "file" },
                 ),
                 TreeEntryKind::Symlink => (href(&format!("/blob/{r}/{full}")), "link"),
                 TreeEntryKind::Submodule => (String::new(), "module"),
@@ -550,11 +496,7 @@ pub(crate) fn ref_rows(
 ) -> crate::error::Result<Vec<CommitRow>> {
     let picked: Vec<&RefInfo> = refs.iter().filter(|r| r.kind == kind).take(limit).collect();
     let ids: Vec<String> = picked.iter().map(|r| r.target.clone()).collect();
-    let page = if kind == gitterrace_git::RefKind::Tag {
-        "tag"
-    } else {
-        "log"
-    };
+    let page = if kind == gitterrace_git::RefKind::Tag { "tag" } else { "log" };
     Ok(app
         .repo
         .summaries(&ids)?
@@ -562,11 +504,7 @@ pub(crate) fn ref_rows(
         .zip(picked)
         .map(|(c, r)| {
             // An annotated tag's own subject says more about it than its commit's does.
-            let note = r
-                .annotation
-                .as_ref()
-                .map(|n| n.subject.clone())
-                .unwrap_or_default();
+            let note = r.annotation.as_ref().map(|n| n.subject.clone()).unwrap_or_default();
             CommitRow::of(c, now).note(note).led_by(Lead {
                 name: r.name.clone(),
                 href: href(&format!("/{page}/{}", enc_seg(&r.name))),

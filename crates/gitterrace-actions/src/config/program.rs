@@ -37,11 +37,9 @@ fn is_executable(p: &Path) -> bool {
 #[cfg(windows)]
 fn is_executable(p: &Path) -> bool {
     let ext_ok = |p: &Path| {
-        p.extension().and_then(|e| e.to_str()).is_some_and(|e| {
-            ["exe", "cmd", "bat", "com"]
-                .iter()
-                .any(|x| e.eq_ignore_ascii_case(x))
-        })
+        p.extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| ["exe", "cmd", "bat", "com"].iter().any(|x| e.eq_ignore_ascii_case(x)))
     };
     std::fs::metadata(p).is_ok_and(|m| m.is_file()) && ext_ok(p)
 }

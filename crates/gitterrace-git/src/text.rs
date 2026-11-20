@@ -29,11 +29,8 @@ pub struct Mailmap(gix::mailmap::Snapshot);
 impl Mailmap {
     /// `name <email>` after the mailmap, as commit search matches it.
     pub fn show(&self, name: &[u8], email: &[u8]) -> String {
-        let sig = gix::actor::SignatureRef {
-            name: name.as_bstr(),
-            email: email.as_bstr(),
-            time: "",
-        };
+        let sig =
+            gix::actor::SignatureRef { name: name.as_bstr(), email: email.as_bstr(), time: "" };
         let got = self.0.resolve(sig);
         format!("{} <{}>", got.name.to_str_lossy(), got.email.to_str_lossy())
     }
@@ -71,11 +68,7 @@ impl Repo {
                     committer_time,
                     author_name: author.name.to_vec(),
                     author_email: author.email.to_vec(),
-                    message: commit
-                        .message_raw()
-                        .map_err(git)?
-                        .to_str_lossy()
-                        .into_owned(),
+                    message: commit.message_raw().map_err(git)?.to_str_lossy().into_owned(),
                 })
             },
             |t| t.message.len() + t.author_name.len() + t.author_email.len() + 128,
@@ -112,11 +105,7 @@ impl Repo {
             .map(|id| {
                 let commit = repo.find_commit(self.full_id(&repo, id)?).map_err(git)?;
                 self.count_commit_read();
-                Ok(commit
-                    .message_raw()
-                    .map_err(git)?
-                    .to_str_lossy()
-                    .into_owned())
+                Ok(commit.message_raw().map_err(git)?.to_str_lossy().into_owned())
             })
             .collect()
     }

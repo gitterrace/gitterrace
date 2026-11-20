@@ -11,51 +11,22 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
     let big = "x\n".repeat(400);
     f = f.write("solo/a.txt", &big).write("shared/b.txt", "a\n");
     f.git(&["add", "-A"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Ann <ann@x.io>",
-        "-m",
-        "feat: ann",
-    ]);
-    f = f
-        .write("shared/b.txt", &"b\n".repeat(50))
-        .write("solo/c.txt", "c\n");
+    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann"]);
+    f = f.write("shared/b.txt", &"b\n".repeat(50)).write("solo/c.txt", "c\n");
     f.git(&["add", "-A"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Bob <bob@x.io>",
-        "-m",
-        "feat: bob",
-    ]);
+    f.git(&["commit", "-q", "--author", "Bob <bob@x.io>", "-m", "feat: bob"]);
     f = f.write("shared/d.txt", &"d\n".repeat(50));
     f.git(&["add", "-A"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Ann <ann@x.io>",
-        "-m",
-        "feat: ann again",
-    ]);
+    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann again"]);
     let router = gitterrace_web::app_router(f.path()).expect("router");
     gitterrace_testkit::oracle::ready(&router).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
     let table = body.split("class=\"entries own\"").nth(1).expect("table");
     let table = table.split("</table>").next().unwrap_or_default();
-    assert!(
-        !table.contains("class=\"del\""),
-        "bus factor shown as an error"
-    );
+    assert!(!table.contains("class=\"del\""), "bus factor shown as an error");
     assert!(!body.contains("data-solo"), "two owners named as one");
-    assert!(
-        table.contains("<th scope=\"col\">Owners</th>"),
-        "the Owners column is gone"
-    );
+    assert!(table.contains("<th scope=\"col\">Owners</th>"), "the Owners column is gone");
     for row in table.split("<tr>").skip(2) {
         let bus = row
             .split("<td class=\"r bus\">")
@@ -63,15 +34,9 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
             .and_then(|c| c.split("</td>").next())
             .unwrap_or_default();
         if bus.contains(">1</b>") {
-            assert!(
-                bus.contains("class=\"warn\""),
-                "a lone owner without the warning: {row}"
-            );
+            assert!(bus.contains("class=\"warn\""), "a lone owner without the warning: {row}");
         } else {
-            assert!(
-                !bus.contains("<b"),
-                "a bus factor of 2 or more is marked: {row}"
-            );
+            assert!(!bus.contains("<b"), "a bus factor of 2 or more is marked: {row}");
         }
         assert!(!row.contains(">0%<"), "an owner at 0% is listed: {row}");
     }
@@ -83,32 +48,16 @@ async fn one_owner_everywhere_drops_the_owner_columns() {
     let mut f = Fixture::init(dir.path());
     f = f.write("src/a.txt", "a\n").write("docs/b.txt", "b\n");
     f.git(&["add", "-A"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Ann <ann@x.io>",
-        "-m",
-        "feat: ann",
-    ]);
+    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann"]);
     let router = gitterrace_web::app_router(f.path()).expect("router");
     gitterrace_testkit::oracle::ready(&router).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
-    assert!(
-        body.contains("Every directory has one owner, Ann."),
-        "no single-owner line"
-    );
+    assert!(body.contains("Every directory has one owner, Ann."), "no single-owner line");
     let table = body.split("class=\"entries own\"").nth(1).expect("table");
     let table = table.split("</table>").next().unwrap_or_default();
-    assert!(
-        !table.contains(">Owners</th>"),
-        "the Owners column is shown"
-    );
-    assert!(
-        !table.contains("Bus factor"),
-        "the Bus factor column is shown"
-    );
+    assert!(!table.contains(">Owners</th>"), "the Owners column is shown");
+    assert!(!table.contains("Bus factor"), "the Bus factor column is shown");
     let kpis = body.split("class=\"kpis\"").nth(1).expect("kpis");
     assert!(
         kpis.contains("<b class=\"warn\">1</b><span>Bus factor</span>"),

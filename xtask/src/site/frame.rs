@@ -200,29 +200,18 @@ mod tests {
         let a = footer(&site(), None);
         let b = footer(&site(), Some(("docs/why.md", false)));
         let c = footer(&site(), Some(("docs/cli.md", true)));
-        let legal = |f: &str| {
-            f.split_once("<nav aria-label=\"Legal\"")
-                .map(|x| x.1.to_owned())
-        };
+        let legal = |f: &str| f.split_once("<nav aria-label=\"Legal\"").map(|x| x.1.to_owned());
         assert_eq!(legal(&a), legal(&b), "{a}\n{b}");
         assert!(!a.contains("class=\"edit\""), "{a}");
         assert!(b.contains("/edit/main/docs/why.md\">Edit this page"), "{b}");
-        assert!(
-            c.contains("/blob/main/docs/cli.md\">View page source"),
-            "{c}"
-        );
+        assert!(c.contains("/blob/main/docs/cli.md\">View page source"), "{c}");
     }
 
     #[test]
     fn values_are_escaped_and_the_title_carries_the_name() {
         let p = page(
             &site(),
-            &Body {
-                title: "a<b",
-                desc: "d\"e",
-                inner: "<h1>x</h1>",
-                ..Body::default()
-            },
+            &Body { title: "a<b", desc: "d\"e", inner: "<h1>x</h1>", ..Body::default() },
         );
         assert!(!p.contains("a<b") && p.contains(" - r</title>"), "{p}");
         assert!(!p.contains("d\"e"), "{p}");
@@ -239,10 +228,7 @@ mod tests {
         assert_eq!(packed.replace('\n', ""), list);
         assert!(packed.lines().all(|l| l.chars().count() <= 100), "{packed}");
         assert!(
-            packed
-                .lines()
-                .skip(1)
-                .all(|l| l.starts_with('<') && !l.starts_with("</")),
+            packed.lines().skip(1).all(|l| l.starts_with('<') && !l.starts_with("</")),
             "{packed}"
         );
     }

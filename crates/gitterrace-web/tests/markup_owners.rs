@@ -86,10 +86,7 @@ const RULES: &[Rule] = &[
         exts: &[],
         owners: &["commit_line.rs", "commit_line.html", "app.css"],
         find: commit_rows,
-        red: &[
-            "<li class=\"crow\"><div class=\"cmain\">",
-            "\"<li class=\\\"crow\\\">\"",
-        ],
+        red: &["<li class=\"crow\"><div class=\"cmain\">", "\"<li class=\\\"crow\\\">\""],
         green: &["<li class=\"row\">"],
     },
     Rule {
@@ -156,10 +153,7 @@ const RULES: &[Rule] = &[
             "seg_control.html",
         ],
         find: docheads,
-        red: &[
-            "<div class=\"dochead sticky\" data-dochead>",
-            "<b class=\"outlinebtn\">",
-        ],
+        red: &["<div class=\"dochead sticky\" data-dochead>", "<b class=\"outlinebtn\">"],
         green: &["<div class=\"card\">"],
     },
     Rule {
@@ -169,11 +163,7 @@ const RULES: &[Rule] = &[
         exts: &["html"],
         owners: &["_base.html", "repos.html"],
         find: top_bars,
-        red: &[
-            "<header class=\"top\">",
-            "<div class=\"topbar\">",
-            "<!doctype html><html></html>",
-        ],
+        red: &["<header class=\"top\">", "<div class=\"topbar\">", "<!doctype html><html></html>"],
         green: &["{% extends \"_base.html\" %}<!doctype html>"],
     },
     Rule {
@@ -217,33 +207,20 @@ const RULES: &[Rule] = &[
 
 /// Each needle `code` contains, once.
 fn any_of(code: &str, needles: &[&str]) -> Vec<String> {
-    needles
-        .iter()
-        .filter(|n| code.contains(**n))
-        .map(|n| (*n).to_owned())
-        .collect()
+    needles.iter().filter(|n| code.contains(**n)).map(|n| (*n).to_owned()).collect()
 }
 
 /// Each occurrence of each needle.
 fn each_of(code: &str, needles: &[&str]) -> Vec<String> {
-    needles
-        .iter()
-        .flat_map(|n| code.matches(n).map(str::to_owned))
-        .collect()
+    needles.iter().flat_map(|n| code.matches(n).map(str::to_owned)).collect()
 }
 
 fn avatars(code: &str) -> Vec<String> {
-    each_of(
-        code,
-        &["class=\"av ", "class=\\\"av ", "class=\"av\"", "'av h"],
-    )
+    each_of(code, &["class=\"av ", "class=\\\"av ", "class=\"av\"", "'av h"])
 }
 
 fn deltas(code: &str) -> Vec<String> {
-    each_of(
-        code,
-        &["</b> <b class=\"del\">", "</b> <b class=\\\"del\\\">"],
-    )
+    each_of(code, &["</b> <b class=\"del\">", "</b> <b class=\\\"del\\\">"])
 }
 
 fn kpi_rows(code: &str) -> Vec<String> {
@@ -251,15 +228,7 @@ fn kpi_rows(code: &str) -> Vec<String> {
 }
 
 fn commit_rows(code: &str) -> Vec<String> {
-    any_of(
-        code,
-        &[
-            "class=\"crow",
-            "class=\"cmain",
-            "class=\\\"crow",
-            "class=\\\"cmain",
-        ],
-    )
+    any_of(code, &["class=\"crow", "class=\"cmain", "class=\\\"crow", "class=\\\"cmain"])
 }
 
 fn switches(code: &str) -> Vec<String> {
@@ -279,16 +248,7 @@ fn switches(code: &str) -> Vec<String> {
 }
 
 fn docheads(code: &str) -> Vec<String> {
-    any_of(
-        code,
-        &[
-            "data-dochead",
-            "class=\"dochead",
-            "doctabs",
-            "data-show=",
-            "outlinebtn",
-        ],
-    )
+    any_of(code, &["data-dochead", "class=\"dochead", "doctabs", "data-show=", "outlinebtn"])
 }
 
 fn top_bars(code: &str) -> Vec<String> {
@@ -333,16 +293,8 @@ fn empties(code: &str) -> Vec<String> {
     for (i, _) in code.match_indices("class=") {
         let rest = code[i + 6..].trim_start_matches(['"', '\\']);
         let class = rest.split(['"', '\\']).next().unwrap_or_default();
-        let after = rest
-            .split_once('>')
-            .map_or("", |(_, a)| a)
-            .trim_start_matches(['"', '#']);
-        if rest
-            .split('>')
-            .next()
-            .unwrap_or_default()
-            .contains(" hidden")
-        {
+        let after = rest.split_once('>').map_or("", |(_, a)| a).trim_start_matches(['"', '#']);
+        if rest.split('>').next().unwrap_or_default().contains(" hidden") {
             continue;
         }
         let words: Vec<&str> = class.split_whitespace().collect();
@@ -377,10 +329,8 @@ fn scoped_buttons(css: &str) -> Vec<String> {
             continue;
         };
         for s in sel.split(',').map(str::trim) {
-            let words: Vec<&str> = s
-                .split([' ', '>', '+', '~'])
-                .filter(|w| !w.is_empty())
-                .collect();
+            let words: Vec<&str> =
+                s.split([' ', '>', '+', '~']).filter(|w| !w.is_empty()).collect();
             let scoped = words.len() > 1 && words.last().is_some_and(|w| w.starts_with("button"));
             if scoped && !allowed.iter().any(|a| s.contains(a)) {
                 bad.push(s.to_owned());
@@ -407,9 +357,7 @@ fn every_rule_finds_its_red_samples_and_passes_its_green_ones() {
     }
     // Test modules may spell the markup back in asserts.
     assert_eq!(
-        avatars(scan::product(
-            "fn a() {}\n#[cfg(test)]\nmod t { \"class=\\\"av \" }"
-        )),
+        avatars(scan::product("fn a() {}\n#[cfg(test)]\nmod t { \"class=\\\"av \" }")),
         [] as [std::string::String; 0]
     );
     assert!(fails.is_empty(), "{}", fails.join("\n"));
@@ -424,11 +372,7 @@ fn only_its_owner_writes_a_shared_component() {
             bad.push(format!("{}: {b}", r.name));
         }
     }
-    assert!(
-        bad.is_empty(),
-        "written outside its owner:\n{}",
-        bad.join("\n")
-    );
+    assert!(bad.is_empty(), "written outside its owner:\n{}", bad.join("\n"));
 }
 
 /// A class selector in the static CSS that nothing emits is dead weight. Families built as
@@ -452,15 +396,8 @@ fn every_css_class_is_emitted_somewhere() {
         + &read(&["src"], &["rs"])
         + &read(&["static"], &["js"]);
     let ramps = ["w", "h", "lw", "kw", "m", "s", "c"];
-    let rendered = [
-        "footnote-definition",
-        "markdown-alert-",
-        "markdown-h",
-        "footnote-definition-label",
-    ];
+    let rendered =
+        ["footnote-definition", "markdown-alert-", "markdown-h", "footnote-definition-label"];
     let dead = css::dead_classes(&styles, &code, &ramps, &rendered);
-    assert!(
-        dead.is_empty(),
-        "classes in static CSS that nothing emits: {dead:?}"
-    );
+    assert!(dead.is_empty(), "classes in static CSS that nothing emits: {dead:?}");
 }

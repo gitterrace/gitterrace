@@ -6,12 +6,7 @@ use crate::charttip::COMMITS;
 
 #[test]
 fn bars_escape_labels_and_scale() {
-    let svg = bars(
-        "t",
-        &[("<a>\"&".to_owned(), 5), ("b".to_owned(), 0)],
-        COMMITS,
-    )
-    .to_string();
+    let svg = bars("t", &[("<a>\"&".to_owned(), 5), ("b".to_owned(), 0)], COMMITS).to_string();
     assert!(svg.contains("&lt;a&gt;&quot;&amp;"), "{svg}");
     assert!(svg.contains("&lt;a&gt;"));
     assert!(!svg.contains("<a>"));
@@ -53,10 +48,8 @@ fn hover_bands_paint_under_the_data() {
     ] {
         for col in svg.split(r#"<g class="col">"#).skip(1) {
             let hit = col.find(r#"class="hit""#).expect("hit");
-            let mark = col
-                .find(r#"class="bar""#)
-                .or_else(|| col.find(r#"class="up""#))
-                .expect("mark");
+            let mark =
+                col.find(r#"class="bar""#).or_else(|| col.find(r#"class="up""#)).expect("mark");
             assert!(hit < mark, "hover band drawn over a bar");
         }
     }
@@ -75,30 +68,15 @@ fn nice(step: u64) -> bool {
 /// one step to spare, and the ticks never number more than the budget.
 #[test]
 fn ticks_are_nice_cover_the_range_and_stay_few() {
-    let maxes = (0..2000u64).chain([
-        9_999,
-        10_000,
-        10_001,
-        30_000,
-        95_395,
-        184_815,
-        999_999,
-        1 << 40,
-    ]);
+    let maxes =
+        (0..2000u64).chain([9_999, 10_000, 10_001, 30_000, 95_395, 184_815, 999_999, 1 << 40]);
     for max in maxes {
         for n in 2..=6 {
             let (step, top) = ticks(max, n);
             assert!(nice(step), "max {max}: step {step}");
-            assert!(
-                top >= max.max(1) && top - max.max(1) < step,
-                "max {max}: top {top}"
-            );
+            assert!(top >= max.max(1) && top - max.max(1) < step, "max {max}: top {top}");
             assert_eq!(top % step, 0, "max {max}");
-            assert!(
-                top / step < n.max(2),
-                "max {max}, n {n}: {} ticks",
-                top / step + 1
-            );
+            assert!(top / step < n.max(2), "max {max}, n {n}: {} ticks", top / step + 1);
         }
     }
 }
@@ -107,9 +85,8 @@ fn ticks_are_nice_cover_the_range_and_stay_few() {
 /// than a step to spare, and at most 5 ticks in all.
 #[test]
 fn split_ticks_cover_both_sides_on_one_step() {
-    let maxes: Vec<u64> = (0..300u64)
-        .chain([999, 1_000, 1_001, 9_999, 30_000, 95_395, 184_815, 1 << 40])
-        .collect();
+    let maxes: Vec<u64> =
+        (0..300u64).chain([999, 1_000, 1_001, 9_999, 30_000, 95_395, 184_815, 1 << 40]).collect();
     for &up in &maxes {
         for &down in maxes.iter().step_by(7) {
             let (step, a, d) = split_ticks(up, down, 5);
@@ -153,9 +130,7 @@ fn labels_step_by_calendar() {
     assert_eq!(label_every(1, true), 1);
     assert_eq!(label_every(3, false), 5);
     assert_eq!(label_every(12, false), 20);
-    let keys: Vec<String> = (0..40)
-        .map(|i| format!("Q{} {}", i % 4 + 1, 2016 + i / 4))
-        .collect();
+    let keys: Vec<String> = (0..40).map(|i| format!("Q{} {}", i % 4 + 1, 2016 + i / 4)).collect();
     let pts: Vec<(String, u64)> = keys.iter().map(|k| (k.clone(), 1)).collect();
     let svg = bars("t", &pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
@@ -163,27 +138,18 @@ fn labels_step_by_calendar() {
         .skip(1)
         .map(|t| t.split('<').next().unwrap_or_default())
         .collect();
-    assert!(
-        !shown.is_empty() && shown.iter().all(|t| t.starts_with("Q1")),
-        "{shown:?}"
-    );
+    assert!(!shown.is_empty() && shown.iter().all(|t| t.starts_with("Q1")), "{shown:?}");
 }
 
 #[test]
 fn a_repeated_day_is_labelled_once() {
-    let pts: Vec<(String, u64)> = (0..12)
-        .map(|i| (format!("2026-11-{:02}", 1 + i / 4), 1))
-        .collect();
+    let pts: Vec<(String, u64)> =
+        (0..12).map(|i| (format!("2026-11-{:02}", 1 + i / 4), 1)).collect();
     let svg = bars("t", &pts, COMMITS).to_string();
     let shown: Vec<&str> = svg
         .split(r#"class="ax""#)
         .skip(1)
-        .map(|t| {
-            t.split('>')
-                .nth(1)
-                .and_then(|t| t.split('<').next())
-                .unwrap_or_default()
-        })
+        .map(|t| t.split('>').nth(1).and_then(|t| t.split('<').next()).unwrap_or_default())
         .collect();
     let mut uniq = shown.clone();
     uniq.dedup();
@@ -194,9 +160,8 @@ fn a_repeated_day_is_labelled_once() {
 #[test]
 fn labels_after_dropping_repeats_are_evenly_spaced() {
     for (days, run) in [(9, 3), (13, 4), (20, 5), (11, 7)] {
-        let pts: Vec<(String, u64)> = (0..days * run)
-            .map(|i| (format!("2026-11-{:02}", 1 + i / run), 1))
-            .collect();
+        let pts: Vec<(String, u64)> =
+            (0..days * run).map(|i| (format!("2026-11-{:02}", 1 + i / run), 1)).collect();
         let svg = bars("t", &pts, COMMITS).to_string();
         let xs: Vec<f64> = svg
             .split(r#"<text class="ax" x=""#)
@@ -204,10 +169,7 @@ fn labels_after_dropping_repeats_are_evenly_spaced() {
             .filter(|t| t.contains(r#"y="212.0""#))
             .filter_map(|t| t.split('"').next()?.parse().ok())
             .collect();
-        let gaps: Vec<i64> = xs
-            .windows(2)
-            .map(|w| (w[1] - w[0]).round() as i64)
-            .collect();
+        let gaps: Vec<i64> = xs.windows(2).map(|w| (w[1] - w[0]).round() as i64).collect();
         let (lo, hi) = (gaps.iter().min(), gaps.iter().max());
         let step = (pts.len() as f64 / xs.len().max(1) as f64).ceil() as i64;
         assert!(
@@ -233,19 +195,9 @@ fn a_chart_of_links_is_one_tab_stop() {
             name: format!("f{i}"),
         })
         .collect();
-    for svg in [
-        linked_bars("t", &pts, &links).to_string(),
-        scatter(&dots, "changes").to_string(),
-    ] {
-        let open = svg
-            .split("<svg")
-            .nth(1)
-            .and_then(|t| t.split('>').next())
-            .expect("svg tag");
-        assert!(
-            open.contains("tabindex=\"0\"") && open.contains("data-marks"),
-            "{open}"
-        );
+    for svg in [linked_bars("t", &pts, &links).to_string(), scatter(&dots, "changes").to_string()] {
+        let open = svg.split("<svg").nth(1).and_then(|t| t.split('>').next()).expect("svg tag");
+        assert!(open.contains("tabindex=\"0\"") && open.contains("data-marks"), "{open}");
         let anchors = svg.matches("<a ").count();
         assert_eq!(anchors, 30, "{svg}");
         assert_eq!(svg.matches("<a tabindex=\"-1\" ").count(), anchors, "{svg}");
@@ -259,9 +211,8 @@ fn a_chart_of_links_is_one_tab_stop() {
 #[test]
 fn a_short_per_commit_axis_still_names_its_first_and_last_day() {
     for n in 2..=9 {
-        let pts: Vec<(String, u64)> = (0..n)
-            .map(|i| (format!("2026-11-{:02}", 1 + i / 3), 1))
-            .collect();
+        let pts: Vec<(String, u64)> =
+            (0..n).map(|i| (format!("2026-11-{:02}", 1 + i / 3), 1)).collect();
         let svg = bars("t", &pts, COMMITS).to_string();
         let shown: Vec<&str> = svg
             .split(r#"class="ax""#)
@@ -271,11 +222,7 @@ fn a_short_per_commit_axis_still_names_its_first_and_last_day() {
             .collect();
         let first = &pts[0].0;
         let last = &pts[pts.len() - 1].0;
-        let named = |d: &str| {
-            shown
-                .iter()
-                .any(|s| d.ends_with(&s[s.len().saturating_sub(2)..]))
-        };
+        let named = |d: &str| shown.iter().any(|s| d.ends_with(&s[s.len().saturating_sub(2)..]));
         assert!(!shown.is_empty(), "{n}: no day labels in {svg}");
         assert!(named(first), "{n}: first day {first} unnamed in {shown:?}");
         assert!(named(last), "{n}: last day {last} unnamed in {shown:?}");

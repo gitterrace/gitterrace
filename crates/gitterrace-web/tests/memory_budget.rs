@@ -53,26 +53,17 @@ fn apply_and_assert_allocator() {
             "transparent huge pages still on"
         );
     }
-    let version: &str = b"version\0"
-        .name()
-        .read()
-        .expect("jemalloc is the global allocator");
+    let version: &str = b"version\0".name().read().expect("jemalloc is the global allocator");
     // The binary's index workers run with a thread cache, flushed when each ends.
     gitterrace_git::set_worker_hook(|on| {
-        b"thread.tcache.enabled\0"
-            .name()
-            .write(on)
-            .expect("switch thread cache");
+        b"thread.tcache.enabled\0".name().write(on).expect("switch thread cache");
     });
     for key in ["dirty_decay_ms", "muzzy_decay_ms"] {
         for at in ["arenas", "arena.0"] {
             let name = format!("{at}.{key}\0");
             name.as_str().name().write(0_isize).expect("set decay");
             let ms: isize = name.as_str().name().read().expect("read decay");
-            assert_eq!(
-                ms, 0,
-                "jemalloc {version}: {at}.{key} is {ms}, the server sets 0"
-            );
+            assert_eq!(ms, 0, "jemalloc {version}: {at}.{key} is {ms}, the server sets 0");
         }
     }
 }
@@ -84,10 +75,8 @@ fn apply_and_assert_allocator() {
 fn report_heap(out: PathBuf) {
     use tikv_jemalloc_ctl::{epoch, stats};
     std::thread::spawn(move || {
-        let (e, allocated) = (
-            epoch::mib().expect("epoch"),
-            stats::allocated::mib().expect("allocated"),
-        );
+        let (e, allocated) =
+            (epoch::mib().expect("epoch"), stats::allocated::mib().expect("allocated"));
         let tmp = out.with_extension("tmp");
         // Runs for the life of the test process.
         let reset = out.with_extension("reset");
@@ -126,15 +115,8 @@ fn serve_if_child() -> bool {
     let mut cfg = gitterrace_config::Config::default();
     cfg.server.is_public = std::env::var_os(PUBLIC_VAR).is_some();
     let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(gitterrace_web::serve_in(
-        vec![PathBuf::from(path)],
-        addr,
-        None,
-        cfg,
-        None,
-        None,
-    ))
-    .expect("serve");
+    rt.block_on(gitterrace_web::serve_in(vec![PathBuf::from(path)], addr, None, cfg, None, None))
+        .expect("serve");
     true
 }
 
@@ -176,8 +158,7 @@ impl Server {
     /// GET `path` under the lone repository; returns status and body.
     fn get(&self, path: &str) -> (u16, String) {
         let mut s = TcpStream::connect(self.addr).expect("connect");
-        s.set_read_timeout(Some(Duration::from_secs(600)))
-            .expect("timeout");
+        s.set_read_timeout(Some(Duration::from_secs(600))).expect("timeout");
         write!(
             s,
             "GET {path} HTTP/1.1\r\nHost: localhost:{}\r\nConnection: close\r\n\r\n",
@@ -187,11 +168,7 @@ impl Server {
         let mut buf = Vec::new();
         s.read_to_end(&mut buf).expect("read");
         let text = String::from_utf8_lossy(&buf).into_owned();
-        let status = text
-            .split(' ')
-            .nth(1)
-            .and_then(|c| c.parse().ok())
-            .unwrap_or(0);
+        let status = text.split(' ').nth(1).and_then(|c| c.parse().ok()).unwrap_or(0);
         (status, text)
     }
 
@@ -243,9 +220,7 @@ impl Server {
         let (_, body) = self.get(&format!("{base}/api/progress"));
         let json = body.split("\r\n\r\n").nth(1).unwrap_or_default();
         let v: serde_json::Value = serde_json::from_str(json.trim()).expect("progress json");
-        v.get("releases")
-            .and_then(serde_json::Value::as_u64)
-            .expect("progress has a release count")
+        v.get("releases").and_then(serde_json::Value::as_u64).expect("progress has a release count")
     }
 
     /// Dirty memory of the server in bytes.
@@ -288,10 +263,7 @@ impl Server {
             {
                 return n;
             }
-            assert!(
-                Instant::now() < end,
-                "the server stopped reporting its heap"
-            );
+            assert!(Instant::now() < end, "the server stopped reporting its heap");
             gitterrace_testkit::wait::pause_blocking(Duration::from_millis(50));
         }
     }
@@ -309,10 +281,8 @@ impl Drop for Server {
 
 #[cfg(target_os = "macos")]
 fn dirty_of(pid: u32) -> u64 {
-    let out = Command::new("footprint")
-        .args(["-p", &pid.to_string()])
-        .output()
-        .expect("run footprint");
+    let out =
+        Command::new("footprint").args(["-p", &pid.to_string()]).output().expect("run footprint");
     let text = String::from_utf8_lossy(&out.stdout);
     let line = text
         .lines()
@@ -356,10 +326,7 @@ fn sweep(s: &Server, base: &str, side: usize) {
     let api = |path: &str, rev: &str| {
         let (status, body) = s.get(path);
         if far && !rev.is_empty() {
-            assert!(
-                status == 409 && body.contains("needs_reindex"),
-                "{path}: {status}"
-            );
+            assert!(status == 409 && body.contains("needs_reindex"), "{path}: {status}");
         } else {
             assert_eq!(status, 200, "{path}");
         }
@@ -379,23 +346,14 @@ fn sweep(s: &Server, base: &str, side: usize) {
                     } else {
                         "another page"
                     };
-                    assert!(
-                        body.contains("need a reindex"),
-                        "{path}: no reindex notice, {what}"
-                    );
+                    assert!(body.contains("need a reindex"), "{path}: no reindex notice, {what}");
                 }
             }
             for n in &names {
-                api(
-                    &format!("{base}/api/v1/insights/{n}?period={period}{rev}"),
-                    rev,
-                );
+                api(&format!("{base}/api/v1/insights/{n}?period={period}{rev}"), rev);
             }
         }
-        api(
-            &format!("{base}/api/v1/contributors?{}", rev.trim_start_matches('&')),
-            rev,
-        );
+        api(&format!("{base}/api/v1/contributors?{}", rev.trim_start_matches('&')), rev);
     }
 }
 
@@ -408,13 +366,7 @@ fn measure(repo: &Path, test: &str, side: usize) -> (u64, u64, u64, u64) {
     // at once, so its first reading would already hold the build.
     let start = {
         let tiny = tempfile::tempdir().expect("tmp");
-        synthetic::build(
-            tiny.path(),
-            Shape {
-                commits: 1,
-                ..Shape::sized(1)
-            },
-        );
+        synthetic::build(tiny.path(), Shape { commits: 1, ..Shape::sized(1) });
         let t = Server::start(tiny.path(), test);
         let b = t.base();
         t.wait_ready(&b);
@@ -469,19 +421,10 @@ fn memory_stays_in_budget_at_every_size() {
             continue;
         }
         let repo = dir.path().join(format!("r{n}"));
-        synthetic::build(
-            &repo,
-            Shape {
-                side,
-                ..Shape::sized(n)
-            },
-        );
+        synthetic::build(&repo, Shape { side, ..Shape::sized(n) });
         let ahead = gitterrace_testkit::git(&repo, &["rev-list", "--count", "main..side"]);
         assert_eq!(ahead, side.to_string(), "side branch length");
-        got.push((
-            n,
-            measure(&repo, "memory_stays_in_budget_at_every_size", side),
-        ));
+        got.push((n, measure(&repo, "memory_stays_in_budget_at_every_size", side)));
     }
     let mut bad = Vec::new();
     for &(n, (start, idle, swept, _)) in &got {
@@ -547,10 +490,8 @@ fn idle_memory_is_flat_in_tree_size() {
     if cfg!(not(any(target_os = "macos", target_os = "linux"))) {
         return;
     }
-    let wide: usize = std::env::var("TEST_MEMORY_WIDE")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(50_000);
+    let wide: usize =
+        std::env::var("TEST_MEMORY_WIDE").ok().and_then(|v| v.parse().ok()).unwrap_or(50_000);
     let dir = tempfile::tempdir().expect("tmp");
     let mut idle = Vec::new();
     for files in [1_000, wide] {
@@ -566,20 +507,13 @@ fn idle_memory_is_flat_in_tree_size() {
             .expect("a tracked file")
             .to_owned();
         let before = s.releases(&base);
-        for path in [
-            format!("{base}/blame/HEAD/{file}"),
-            format!("{base}/tree/HEAD"),
-        ] {
+        for path in [format!("{base}/blame/HEAD/{file}"), format!("{base}/tree/HEAD")] {
             assert_eq!(s.get(&path).0, 200, "{path}");
         }
         s.wait_released(&base, before);
         let v = s.dirty();
-        writeln!(
-            std::io::stderr(),
-            "{files} files: idle after release {} MB",
-            v / MB
-        )
-        .expect("stderr");
+        writeln!(std::io::stderr(), "{files} files: idle after release {} MB", v / MB)
+            .expect("stderr");
         idle.push((files, v));
     }
     let (small, large) = (idle[0].1, idle[1].1);

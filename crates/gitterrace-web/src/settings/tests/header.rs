@@ -9,9 +9,7 @@ use crate::settings::tests::{page, repo};
 /// the background: this returns once both are served, so no page races the second one.
 async fn two_repos(root: &Path, dir: &Path) -> axum::Router {
     let second = root.join("s");
-    let built = gitterrace_testkit::Fixture::init(&second)
-        .write("b.txt", "b\n")
-        .commit("two");
+    let built = gitterrace_testkit::Fixture::init(&second).write("b.txt", "b\n").commit("two");
     let mut env = Env::new(gitterrace_config::Config::default());
     env.settings_dir = Some(dir.to_path_buf());
     let router = crate::build_server(
@@ -33,10 +31,7 @@ async fn two_repos(root: &Path, dir: &Path) -> axum::Router {
 /// leaves out only what needs a repository. A page with a header of its own fails here.
 #[tokio::test]
 async fn every_page_kind_renders_the_shared_header() {
-    let (root, dir) = (
-        tempfile::tempdir().expect("t"),
-        tempfile::tempdir().expect("t"),
-    );
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     let app = two_repos(root.path(), dir.path()).await;
     for (uri, repo_page) in [
         ("/r/r/", true),
@@ -83,9 +78,6 @@ async fn every_page_kind_renders_the_shared_header() {
         html.contains("<a href=\"/_settings\" class=\"on\" aria-current=\"page\">Settings</a>"),
         "Settings is the current tab"
     );
-    assert!(
-        html.contains("name=\"gitterrace-settings\""),
-        "token meta stays"
-    );
+    assert!(html.contains("name=\"gitterrace-settings\""), "token meta stays");
     assert!(html.contains("/static/settings.css"), "settings.css stays");
 }

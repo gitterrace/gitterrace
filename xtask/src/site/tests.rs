@@ -4,11 +4,7 @@ use super::*;
 /// The built landing page, from the real sources.
 fn landing() -> String {
     let (pages, _) = generated();
-    pages
-        .into_iter()
-        .find(|p| p.0 == "index.html")
-        .map(|p| p.1)
-        .expect("landing page")
+    pages.into_iter().find(|p| p.0 == "index.html").map(|p| p.1).expect("landing page")
 }
 
 /// One figure per shot, a light/dark pair inside it, and a lightbox that is labelled, takes
@@ -40,20 +36,11 @@ fn tiles_never_reference_the_full_size_screenshot() {
         let rest = &page[at..];
         let (tile, after) = rest.split_once("<a class=\"lightbox\"").expect("lightbox");
         let lightbox = after.split_once("</a>").map_or(after, |l| l.0);
-        assert!(
-            !rest
-                .split("</figure>")
-                .next()
-                .unwrap_or("")
-                .contains(".png")
-        );
+        assert!(!rest.split("</figure>").next().unwrap_or("").contains(".png"));
         for c in ["light", "dark"] {
             assert!(!tile.contains(&format!("screenshots/{name}-{c}.webp")));
             assert!(tile.contains(&format!("screenshots/{name}-{c}.thumb.webp")));
-            assert!(
-                !lightbox.contains(".thumb."),
-                "lightbox {name} loads a thumbnail"
-            );
+            assert!(!lightbox.contains(".thumb."), "lightbox {name} loads a thumbnail");
         }
         assert!(lightbox.contains(&format!("screenshots/{name}-dark.webp")));
         assert!(tile.contains("width=\"1280\" height=\"800\" loading=\"lazy\""));
@@ -110,10 +97,8 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
     let text = "# Title\n\n## Code age and releases\n\ntext\n";
     assert_eq!(docs::anchors(text), ["title", "code-age-and-releases"]);
     let links = docs::Links::new("https://r");
-    let html = docs::body(text, "docs/internals/x.md", &links, &mut |_, h| {
-        docs::slug(h)
-    })
-    .expect("body");
+    let html =
+        docs::body(text, "docs/internals/x.md", &links, &mut |_, h| docs::slug(h)).expect("body");
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
     assert_eq!(docs::page_path("architecture"), "docs/architecture/");
 }
@@ -173,9 +158,7 @@ pub(super) fn unresolved(pages: &[(String, String)], files: &[String]) -> Vec<St
 
 /// `path` relative to the built site.
 fn site_rel(path: &str) -> &str {
-    path.strip_prefix(SITE_DIR)
-        .and_then(|p| p.strip_prefix('/'))
-        .unwrap_or(path)
+    path.strip_prefix(SITE_DIR).and_then(|p| p.strip_prefix('/')).unwrap_or(path)
 }
 
 /// The generated site, as (site path, content) of every page and the paths of every file.
@@ -189,10 +172,7 @@ pub(super) fn generated() -> (Vec<(String, String)>, Vec<String>) {
         match out {
             Out::File { path, body } => {
                 let rel = site_rel(&path).to_owned();
-                if std::path::Path::new(&rel)
-                    .extension()
-                    .is_some_and(|e| e == "html")
-                {
+                if std::path::Path::new(&rel).extension().is_some_and(|e| e == "html") {
                     pages.push((rel.clone(), body));
                 }
                 files.push(rel);
@@ -227,9 +207,7 @@ fn no_generated_page_repeats_an_id() {
 #[test]
 fn a_planted_duplicate_heading_id_is_reported() {
     let html = "<h2 id=\"a\">A</h2><h3 id=\"b\">B</h3><h2 id=\"a\">A</h2>";
-    let err = docs::check_unique_ids("docs/x/", html)
-        .expect_err("duplicate")
-        .to_string();
+    let err = docs::check_unique_ids("docs/x/", html).expect_err("duplicate").to_string();
     assert!(err.contains("docs/x/") && err.contains("id a"), "{err}");
     assert!(docs::check_unique_ids("docs/x/", "<h2 id=\"a\"></h2>").is_ok());
 }
@@ -241,14 +219,8 @@ fn a_planted_bad_link_or_anchor_is_reported() {
         "<a href=\"/docs/nope/#x\">a</a><a href=\"/docs/why/#nope\">b</a><a href=\"#nope\">c</a>",
     );
     let bad = unresolved(&pages, &files).join("\n");
-    assert!(
-        bad.contains("/docs/nope/#x: no generated file docs/nope/index.html"),
-        "{bad}"
-    );
-    assert!(
-        bad.contains("#nope: no id nope in docs/why/index.html"),
-        "{bad}"
-    );
+    assert!(bad.contains("/docs/nope/#x: no generated file docs/nope/index.html"), "{bad}");
+    assert!(bad.contains("#nope: no id nope in docs/why/index.html"), "{bad}");
     assert!(bad.contains("#nope: no id nope in "), "{bad}");
 }
 
@@ -287,9 +259,7 @@ fn sibling_problems(pages: &[(String, String)]) -> Vec<String> {
         for href in attrs(html, "href") {
             let host = href.split("://").nth(1).and_then(|r| r.split('/').next());
             if let Some(host) = host
-                && SIBLING_HOSTS
-                    .iter()
-                    .any(|s| host == *s || host.ends_with(&format!(".{s}")))
+                && SIBLING_HOSTS.iter().any(|s| host == *s || host.ends_with(&format!(".{s}")))
             {
                 bad.push(format!("{path}: links the sibling site {href}"));
             }
@@ -311,14 +281,8 @@ fn no_page_links_a_sibling_site() {
 fn a_planted_sibling_line_or_link_is_reported() {
     let pages = vec![
         ("a".to_owned(), "<p>Also from the same fleet</p>".to_owned()),
-        (
-            "b".to_owned(),
-            "<a href=\"https://www.tendir.app/x\">t</a>".to_owned(),
-        ),
-        (
-            "c".to_owned(),
-            "<a href=\"https://github.com/o/tendir.app\">ok</a>".to_owned(),
-        ),
+        ("b".to_owned(), "<a href=\"https://www.tendir.app/x\">t</a>".to_owned()),
+        ("c".to_owned(), "<a href=\"https://github.com/o/tendir.app\">ok</a>".to_owned()),
     ];
     let bad = sibling_problems(&pages).join("\n");
     assert!(bad.contains("a: names the sibling sites"), "{bad}");
@@ -362,10 +326,7 @@ fn rust_files(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
 #[test]
 fn every_markdown_parse_uses_the_shared_options() {
     let mut files = Vec::new();
-    rust_files(
-        &std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"),
-        &mut files,
-    );
+    rust_files(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
     let ext = ["Parser", "::new_ext("].concat();
     let bare = ["Parser", "::new("].concat();
     let ad_hoc = ["pulldown_cmark", "::Options"].concat();
@@ -393,11 +354,7 @@ fn every_markdown_parse_uses_the_shared_options() {
             }
         }
     }
-    assert!(
-        bad.is_empty(),
-        "markdown parsed without the shared options:\n{}",
-        bad.join("\n")
-    );
+    assert!(bad.is_empty(), "markdown parsed without the shared options:\n{}", bad.join("\n"));
 }
 
 /// A docs page whose source has a table renders a table, never the raw delimiter row.
@@ -420,15 +377,9 @@ fn docs_pages_with_a_table_render_a_table() {
         let page = format!("{}index.html", docs::page_path(docs::stem(path)));
         let html = &pages.iter().find(|p| p.0 == page).expect("built page").1;
         assert!(html.contains("<table"), "{path}: no table on the site");
-        assert!(
-            !html.contains(&delimiter),
-            "{path}: raw table row on the site"
-        );
+        assert!(!html.contains(&delimiter), "{path}: raw table row on the site");
     }
-    assert!(
-        seen > 0,
-        "no docs page has a table, the guard checks nothing"
-    );
+    assert!(seen > 0, "no docs page has a table, the guard checks nothing");
 }
 
 /// The class this guards: a generated page with a line over the width that a break could have
@@ -445,10 +396,7 @@ fn no_generated_line_is_wider_than_the_width_where_it_could_break() {
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
     let planted = format!("<p>{}</p>\n", "a wide line of prose ".repeat(8));
-    assert_ne!(
-        super::fit::breakable_wide_lines(&planted),
-        [] as [std::string::String; 0]
-    );
+    assert_ne!(super::fit::breakable_wide_lines(&planted), [] as [std::string::String; 0]);
 }
 
 /// Guard class: every heading id of every published page is the id the app gives that heading,
@@ -516,10 +464,7 @@ fn docs_nav_headings_order_and_pager_follow_the_index() {
             }
         }
         assert_eq!(got, want, "{p}: nav differs from the index");
-        let under = html
-            .split_once("<nav class=\"pager\"")
-            .map(|(_, r)| r)
-            .expect("pager");
+        let under = html.split_once("<nav class=\"pager\"").map(|(_, r)| r).expect("pager");
         let prev = i.checked_sub(1).map(|j| &order[j]);
         let next = order.get(i + 1);
         for (rel, link) in [("prev", prev), ("next", next)] {
@@ -576,10 +521,7 @@ fn every_asset_version_is_the_hash_of_the_file_served() {
             let v: String = tail.chars().take_while(char::is_ascii_hexdigit).collect();
             seen += 1;
             if built.get(file) != Some(&v) {
-                bad.push(format!(
-                    "{path}: /assets/{file}?v={v}, built {:?}",
-                    built.get(file)
-                ));
+                bad.push(format!("{path}: /assets/{file}?v={v}, built {:?}", built.get(file)));
             }
         }
     }

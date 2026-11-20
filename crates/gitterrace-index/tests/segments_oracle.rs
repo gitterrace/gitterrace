@@ -42,10 +42,7 @@ fn from_git(repo: &Repo, order: Option<&[String]>, pin: bool) -> MemorySource<'s
 
 /// Every source method, both sides. Ids are the oracle's first-use numbering, which the set
 /// keeps (one numbering per cache), so ids are compared directly.
-#[expect(
-    clippy::many_single_char_names,
-    reason = "d and m are the two sides throughout"
-)]
+#[expect(clippy::many_single_char_names, reason = "d and m are the two sides throughout")]
 fn same_source(
     d: &dyn InsightsSource,
     m: &dyn InsightsSource,
@@ -146,9 +143,7 @@ fn same_lives(cache: &Path, repo: &Repo, order: Option<&[String]>, case: &str) {
     let walked = CommitSource::rev_list(repo, "HEAD").expect("rev list");
     let order = order.unwrap_or(&walked);
     let recs: Vec<CommitRecord> = CommitSource::records(repo, order).expect("records");
-    let store = gitterrace_index::seg::read::Store::open(cache)
-        .expect("store")
-        .expect("a set");
+    let store = gitterrace_index::seg::read::Store::open(cache).expect("store").expect("a set");
     let (canon, _) = gitterrace_index::seg::canon::dump(&store).expect("canon");
     let (want, _) = gitterrace_index::seg::canon::canon_of(&recs);
     assert_eq!(canon, want, "{case}: lives");
@@ -168,9 +163,7 @@ fn segments_answer_like_the_oracle_over_the_golden_corpus() {
         return;
     }
     let tmp = tempfile::tempdir().expect("tmp");
-    for (k, mailmap) in [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold]
-        .into_iter()
-        .enumerate()
+    for (k, mailmap) in [Mailmap::AsIs, Mailmap::Edited, Mailmap::CaseFold].into_iter().enumerate()
     {
         let (repo, _) = matrix_repo(&tmp.path().join(format!("m{k}")), mailmap);
         check(&repo, &format!("matrix {k}"));
@@ -201,11 +194,7 @@ fn an_appended_segment_answers_like_the_oracle() {
     index.update(&repo, "HEAD", &|_| {}).expect("first step");
     git(&path, &["checkout", "-q", tip.trim()]);
     index.update(&repo, "HEAD", &|_| {}).expect("second step");
-    let set = index
-        .disk_source(&repo, "HEAD")
-        .expect("open")
-        .expect("set")
-        .unchecked();
+    let set = index.disk_source(&repo, "HEAD").expect("open").expect("set").unchecked();
     // The appended set ranks old order then new commits: the oracle follows the same order.
     let order: Vec<String> = (0..u32::try_from(set.len()).expect("len"))
         .filter_map(|r| set.commit_id(Rank(r)).map(|id| id.to_string()))

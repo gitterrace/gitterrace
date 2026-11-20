@@ -73,9 +73,6 @@ mod tests {
     fn a_class_no_source_mentions_is_dead_and_a_longer_name_does_not_save_it() {
         let css = ".a, .b:hover { x: y } /* .c { } */ .w3 { }";
         assert_eq!(dead_classes(css, "class=\"a-b\"", &["w"], &[]), ["a", "b"]);
-        assert_eq!(
-            dead_classes(css, "a b", &["w"], &[]),
-            [] as [std::string::String; 0]
-        );
+        assert_eq!(dead_classes(css, "a b", &["w"], &[]), [] as [std::string::String; 0]);
     }
 }

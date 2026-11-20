@@ -43,10 +43,7 @@ async fn pages_are_the_same_built_fresh_or_by_appends() {
     {
         let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
-        let ids = git(
-            &r.repo,
-            &["rev-list", "--first-parent", "--reverse", "HEAD"],
-        );
+        let ids = git(&r.repo, &["rev-list", "--first-parent", "--reverse", "HEAD"]);
         for id in ids.lines().step_by(4) {
             index.update(&repo, id, &|_| {}).expect("append");
         }
@@ -60,10 +57,7 @@ async fn pages_are_the_same_built_fresh_or_by_appends() {
     }
     let appended = answers(&r.repo).await;
     assert_eq!(fresh.len(), appended.len());
-    let bad: Vec<&String> = fresh
-        .iter()
-        .filter(|(k, v)| appended.get(*k) != Some(v))
-        .map(|(k, _)| k)
-        .collect();
+    let bad: Vec<&String> =
+        fresh.iter().filter(|(k, v)| appended.get(*k) != Some(v)).map(|(k, _)| k).collect();
     assert!(bad.is_empty(), "differ: {bad:?}");
 }

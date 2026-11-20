@@ -187,10 +187,7 @@ impl Highlighter {
 
     /// The symbols recorded so far, in source order; empty without [`Self::with_symbols`].
     pub(crate) fn take_symbols(&mut self) -> Vec<crate::symbols::Symbol> {
-        self.symbols
-            .as_mut()
-            .map(|c| std::mem::take(&mut c.out))
-            .unwrap_or_default()
+        self.symbols.as_mut().map(|c| std::mem::take(&mut c.out)).unwrap_or_default()
     }
 
     fn class(&mut self) -> Option<&'static str> {
@@ -305,10 +302,7 @@ mod tests {
         ("a.toml", "[package]\nname = \"x\"\n"),
         ("Cargo.lock", "[[package]]\nname = \"x\"\n"),
         ("a.ts", "const x: string = \"a\";\nexport function f() {}\n"),
-        (
-            "a.tsx",
-            "const x = <div className=\"a\">hi</div>;\nexport default x;\n",
-        ),
+        ("a.tsx", "const x = <div className=\"a\">hi</div>;\nexport default x;\n"),
         ("a.swift", "import Foundation\nlet x = \"a\"\nfunc f() {}\n"),
         ("a.kt", "package a\nfun main() { val x = \"a\" }\n"),
         ("a.go", "package main\nfunc main() { x := \"a\" }\n"),
@@ -325,37 +319,25 @@ mod tests {
     fn render(path: &str, src: &str) -> Option<String> {
         let first = src.lines().next().unwrap_or("");
         let mut h = for_file(path, first)?;
-        Some(
-            src.lines()
-                .map(|l| h.line(l))
-                .collect::<Vec<_>>()
-                .join("\n"),
-        )
+        Some(src.lines().map(|l| h.line(l)).collect::<Vec<_>>().join("\n"))
     }
 
     #[test]
     fn common_languages_get_keyword_or_string_spans() {
         for (path, src) in CASES {
             let out = render(path, src).unwrap_or_else(|| panic!("{path}: no syntax"));
-            assert!(
-                out.contains("s-keyword") || out.contains("s-string"),
-                "{path}: {out}"
-            );
+            assert!(out.contains("s-keyword") || out.contains("s-string"), "{path}: {out}");
         }
-        let md = block(
-            "# T\n\n```rust\nfn x() {}\n```\n",
-            "md",
-            super::HIGHLIGHT_BYTES,
-        )
-        .expect("md");
+        let md =
+            block("# T\n\n```rust\nfn x() {}\n```\n", "md", super::HIGHLIGHT_BYTES).expect("md");
         assert!(md.contains("s-"), "{md}");
     }
 
     #[test]
     fn fence_aliases_resolve() {
-        for t in [
-            "ts", "tsx", "sh", "zsh", "shell", "console", "yml", "rs", "py", "kt", "swift", "toml",
-        ] {
+        for t in
+            ["ts", "tsx", "sh", "zsh", "shell", "console", "yml", "rs", "py", "kt", "swift", "toml"]
+        {
             assert!(syntax_for_token(t).is_some(), "{t}");
         }
     }
@@ -374,10 +356,7 @@ mod tests {
                 _ => {}
             }
         }
-        let text = text
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&amp;", "&");
+        let text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&");
         assert_eq!(text, src.trim_end_matches('\n'));
     }
 }

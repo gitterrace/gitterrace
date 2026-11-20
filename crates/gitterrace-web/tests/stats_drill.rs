@@ -19,10 +19,7 @@ fn router() -> (tempfile::TempDir, axum::Router) {
     let p = root.path().join("repo");
     let mut f = Fixture::init(&p);
     for (i, d) in DATES.iter().enumerate() {
-        f = f
-            .at(d)
-            .write("a.txt", &format!("{i}\n"))
-            .commit(&format!("feat: n{i}"));
+        f = f.at(d).write("a.txt", &format!("{i}\n")).commit(&format!("feat: n{i}"));
     }
     (root, gitterrace_web::app_router(&p).expect("router"))
 }
@@ -33,9 +30,7 @@ async fn body(r: &axum::Router, uri: &str) -> String {
 
 /// The `href` of the bar link whose label says `needle`.
 fn bar_href(page: &str, needle: &str) -> String {
-    let at = page
-        .find(&format!("aria-label=\"{needle}"))
-        .expect("bar link");
+    let at = page.find(&format!("aria-label=\"{needle}")).expect("bar link");
     let tag = &page[page[..at].rfind("<a ").expect("a")..at];
     let h = tag.split("href=\"").nth(1).expect("href");
     h.split('"').next().expect("end").replace("&amp;", "&")
@@ -51,10 +46,7 @@ async fn a_bar_link_narrows_to_its_bucket() {
             || href.contains("q=after%3A2024-03-04%20before%3A2024-03-11"),
         "the range is two terms of q, the end day exclusive: {href}"
     );
-    assert!(
-        !href.contains("from=") && !href.contains("to="),
-        "links write q only: {href}"
-    );
+    assert!(!href.contains("from=") && !href.contains("to="), "links write q only: {href}");
     let href = href.replacen("/r/repo", "", 1);
     let narrowed = body(&r, &href).await;
     assert!(narrowed.contains("Wednesday: 2"), "{narrowed}");
@@ -78,11 +70,8 @@ async fn the_chip_removes_the_range() {
     assert!(chips.contains("<i>after</i> 2024-03-04"), "{chips}");
     assert!(chips.contains("<i>before</i> 2024-03-11"), "{chips}");
     // Each bound removes itself: dropping one leaves no range, so no range card.
-    let remove = chips
-        .split("href=\"")
-        .skip(1)
-        .find_map(|s| s.split('"').next())
-        .expect("a chip link");
+    let remove =
+        chips.split("href=\"").skip(1).find_map(|s| s.split('"').next()).expect("a chip link");
     let remove = remove.replacen("/r/repo", "", 1).replace("&amp;", "&");
     let back = body(&r, &remove).await;
     assert!(!back.contains("<h2>Commits by weekday</h2>"));
@@ -99,17 +88,9 @@ async fn without_a_range_there_is_no_range_markup() {
 
 /// The commit total of the pulse table.
 fn kpi_commits(page: &str) -> u64 {
-    let row = page
-        .split("Commits without merges</th>")
-        .nth(1)
-        .expect("commits row");
+    let row = page.split("Commits without merges</th>").nth(1).expect("commits row");
     let b = row.split("<b>").nth(1).expect("value");
-    b.split("</b>")
-        .next()
-        .expect("end")
-        .replace(',', "")
-        .parse()
-        .expect("number")
+    b.split("</b>").next().expect("end").replace(',', "").parse().expect("number")
 }
 
 /// The commits of every bar of the per-bucket chart, summed.
@@ -141,9 +122,6 @@ async fn every_section_of_a_narrowed_page_covers_the_range() {
         .nth(1)
         .and_then(|s| s.split("</p>").next())
         .expect("span line");
-    assert!(
-        span.contains("2024-03-04") && span.contains("2024-03-10"),
-        "{span}"
-    );
+    assert!(span.contains("2024-03-04") && span.contains("2024-03-10"), "{span}");
     assert!(narrow.contains("Commits per day"), "{narrow}");
 }

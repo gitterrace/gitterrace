@@ -10,11 +10,7 @@ struct Data;
 
 /// A repository with one commit adding `a.txt`.
 fn one_file(dir: &std::path::Path) -> std::path::PathBuf {
-    gitterrace_testkit::Fixture::init(dir)
-        .write("a.txt", "a\n")
-        .commit("feat: a")
-        .path()
-        .to_owned()
+    gitterrace_testkit::Fixture::init(dir).write("a.txt", "a\n").commit("feat: a").path().to_owned()
 }
 
 /// An app over `p` whose index is built but not marked ready.
@@ -22,9 +18,7 @@ fn built(p: &std::path::Path) -> Arc<App> {
     let repo = gitterrace_git::Repo::discover(p).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app
 }
 
@@ -48,17 +42,11 @@ async fn the_indexing_page_is_never_memoized() {
     let app = Arc::new(App::new(repo, index));
     // The build has finished (the index generation moved) but the ready flag is not set
     // yet: a request in that window renders the indexing page under the final memo key.
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
-    let first = super::cached(&app, "a", None, |_, _, _| Data)
-        .await
-        .expect("page");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
+    let first = super::cached(&app, "a", None, |_, _, _| Data).await.expect("page");
     assert!(first.0.contains("data-progress"), "{}", first.0);
     app.mark_ready();
-    let second = super::cached(&app, "a", None, |_, _, _| Data)
-        .await
-        .expect("page");
+    let second = super::cached(&app, "a", None, |_, _, _| Data).await.expect("page");
     assert_eq!(second.0, "data");
 }
 
@@ -94,10 +82,7 @@ async fn concurrent_requests_for_one_cold_page_render_it_once() {
         assert_eq!(t.await.expect("task"), "data");
     }
     assert_eq!(builds.load(Ordering::SeqCst), 1, "renders of one cold page");
-    assert!(
-        app.rendering.lock().expect("lock").is_empty(),
-        "no render lock left behind"
-    );
+    assert!(app.rendering.lock().expect("lock").is_empty(), "no render lock left behind");
 }
 
 /// Walks of HEAD's counted sets so far, over the tables every unfiltered page of HEAD shares.
@@ -132,11 +117,7 @@ async fn a_cold_activity_page_walks_its_counted_set_once() {
     let (status, body) = gitterrace_testkit::get(&router, "/stats").await;
     assert_eq!(status, 200, "{body}");
     assert!(body.contains("id=\"types\""), "the types section rendered");
-    assert_eq!(
-        walks(&app) - before,
-        1,
-        "walks of the counted set for one cold /stats"
-    );
+    assert_eq!(walks(&app) - before, 1, "walks of the counted set for one cold /stats");
 }
 
 /// Guard class: one table set per tip. The cold overview after an insights page builds no
@@ -153,8 +134,7 @@ async fn the_overview_reuses_the_shared_tables_of_head() {
     let builds = || {
         let head = app.repo.resolve("HEAD").expect("head");
         let src = app.source(&head).expect("source").expect("ready");
-        src.run(|s| gitterrace_index::table_builds(&**s))
-            .expect("run")
+        src.run(|s| gitterrace_index::table_builds(&**s)).expect("run")
     };
     let before = builds();
     let (status, body) = gitterrace_testkit::get(&router, "/").await;
@@ -171,8 +151,7 @@ async fn pages_after_the_warm_up_build_no_tables() {
     let (app, head) = warmed(&p);
     let builds = || {
         let src = app.source(&head).expect("source").expect("ready");
-        src.run(|s| gitterrace_index::table_builds(&**s))
-            .expect("run")
+        src.run(|s| gitterrace_index::table_builds(&**s)).expect("run")
     };
     let before = builds();
     let router = crate::routes::router(Arc::clone(&app));
@@ -212,10 +191,7 @@ async fn a_cold_overview_reads_no_file_rows() {
     let router = crate::routes::router(Arc::clone(&app));
     let (status, body) = gitterrace_testkit::get(&router, "/").await;
     assert_eq!(status, 200, "{body}");
-    assert!(
-        body.contains("<b>2</b> files touched"),
-        "the file count is still shown"
-    );
+    assert!(body.contains("<b>2</b> files touched"), "the file count is still shown");
     assert_eq!(rows() - before, 0, "row walks of a cold overview");
 }
 
@@ -250,51 +226,30 @@ async fn a_cold_languages_page_after_the_warm_up_walks_no_chain() {
 #[tokio::test]
 async fn another_repository_going_idle_keeps_these_tables() {
     let app = |dir: &std::path::Path| {
-        drop(
-            gitterrace_testkit::Fixture::init(dir)
-                .write("a.txt", "a\n")
-                .commit("feat: a"),
-        );
+        drop(gitterrace_testkit::Fixture::init(dir).write("a.txt", "a\n").commit("feat: a"));
         let repo = gitterrace_git::Repo::discover(dir).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
         let app = Arc::new(App::new(repo, index));
-        app.index
-            .update(&app.repo, "HEAD", &|_| {})
-            .expect("update");
+        app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         let head = app.repo.resolve("HEAD").expect("head");
         super::warm_shared(&app, &head);
         app.mark_ready();
         (app, head)
     };
-    let (d1, d2) = (
-        tempfile::tempdir().expect("tmp"),
-        tempfile::tempdir().expect("tmp"),
-    );
+    let (d1, d2) = (tempfile::tempdir().expect("tmp"), tempfile::tempdir().expect("tmp"));
     let (ours, head) = app(d1.path());
     let (other, _) = app(d2.path());
-    assert!(
-        other.release_idle(std::time::Duration::ZERO),
-        "the other app held nothing"
-    );
-    assert_eq!(
-        ours.caches.tables.len(),
-        1,
-        "another app's idle release took our tables"
-    );
+    assert!(other.release_idle(std::time::Duration::ZERO), "the other app held nothing");
+    assert_eq!(ours.caches.tables.len(), 1, "another app's idle release took our tables");
     let builds = || {
         let src = ours.source(&head).expect("source").expect("ready");
-        src.run(|s| gitterrace_index::table_builds(&**s))
-            .expect("run")
+        src.run(|s| gitterrace_index::table_builds(&**s)).expect("run")
     };
     let before = builds();
     let router = crate::routes::router(Arc::clone(&ours));
     let (status, _) = gitterrace_testkit::get(&router, "/stats").await;
     assert_eq!(status, 200);
-    assert_eq!(
-        builds() - before,
-        0,
-        "table sets rebuilt after another app idled"
-    );
+    assert_eq!(builds() - before, 0, "table sets rebuilt after another app idled");
 }
 
 /// Guard class: the API reads the pages' copy of the derived tables. One page and one API
@@ -318,20 +273,12 @@ async fn a_page_and_an_api_request_over_one_tip_build_the_tables_once() {
     let pages = app.source(&head).expect("source").expect("ready");
     let ours = api.insights_source("HEAD").expect("api source");
     let count = |s: gitterrace_index::feed::Checked<dyn gitterrace_index::feed::InsightsSource>| {
-        s.run(|s| (gitterrace_index::table_builds(&**s), Arc::clone(s)))
-            .expect("run")
+        s.run(|s| (gitterrace_index::table_builds(&**s), Arc::clone(s))).expect("run")
     };
     let (by_pages, pages) = count(pages);
     let (by_api, ours) = count(ours);
-    let built = if Arc::ptr_eq(&pages, &ours) {
-        by_pages
-    } else {
-        by_pages + by_api
-    };
-    assert_eq!(
-        built, 1,
-        "table sets built over one page and one API request"
-    );
+    let built = if Arc::ptr_eq(&pages, &ours) { by_pages } else { by_pages + by_api };
+    assert_eq!(built, 1, "table sets built over one page and one API request");
 }
 
 /// Guard class: a visitor queued behind a warm-up render for as long as it takes. A fake
@@ -346,16 +293,11 @@ async fn a_page_request_during_a_slow_warmer_answers_with_the_pending_page() {
     let p = one_file(dir.path());
     let app = built(&p);
     assert!(app.advance(crate::app::RepoState::Warming));
-    let (rendering, answered) = (
-        Arc::new(AtomicBool::new(false)),
-        Arc::new(AtomicBool::new(false)),
-    );
+    let (rendering, answered) =
+        (Arc::new(AtomicBool::new(false)), Arc::new(AtomicBool::new(false)));
     let warmer = {
-        let (app, rendering, answered) = (
-            Arc::clone(&app),
-            Arc::clone(&rendering),
-            Arc::clone(&answered),
-        );
+        let (app, rendering, answered) =
+            (Arc::clone(&app), Arc::clone(&rendering), Arc::clone(&answered));
         tokio::spawn(async move {
             let _warm = app.warming();
             super::cached(&app, "slow", None, move |_, _, _| {
@@ -375,16 +317,11 @@ async fn a_page_request_during_a_slow_warmer_answers_with_the_pending_page() {
         async move { r.load(Ordering::SeqCst) }
     })
     .await;
-    let visitor = super::cached(&app, "slow", None, |_, _, _| Data)
-        .await
-        .expect("visitor page")
-        .0;
+    let visitor = super::cached(&app, "slow", None, |_, _, _| Data).await.expect("visitor page").0;
     answered.store(true, Ordering::SeqCst);
     assert!(visitor.contains("data-progress"), "{visitor}");
     assert_eq!(warmer.await.expect("warmer"), "data");
     app.mark_ready();
-    let next = super::cached(&app, "slow", None, |_, _, _| Data)
-        .await
-        .expect("next page");
+    let next = super::cached(&app, "slow", None, |_, _, _| Data).await.expect("next page");
     assert_eq!(next.0, "data", "the pending page was memoized");
 }

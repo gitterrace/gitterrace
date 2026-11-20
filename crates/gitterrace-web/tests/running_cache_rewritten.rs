@@ -43,11 +43,7 @@ async fn api(router: &axum::Router, uri: &str) -> (u16, Option<String>) {
         .body(axum::body::Body::empty())
         .expect("request");
     let res = router.clone().oneshot(req).await.expect("response");
-    let retry = res
-        .headers()
-        .get("retry-after")
-        .and_then(|v| v.to_str().ok())
-        .map(str::to_owned);
+    let retry = res.headers().get("retry-after").and_then(|v| v.to_str().ok()).map(str::to_owned);
     (res.status().as_u16(), retry)
 }
 
@@ -83,15 +79,8 @@ async fn a_running_server_rebuilds_a_cache_corrupted_underneath_for_the_api_too(
     assert_eq!(s, 200, "the API answers before the corruption");
     corrupt(&cache);
     let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
-    assert!(
-        errors.is_empty(),
-        "while rebuilding:\n{}",
-        errors.join("\n")
-    );
-    assert!(
-        took.is_some(),
-        "the API answers 200 again after the rebuild"
-    );
+    assert!(errors.is_empty(), "while rebuilding:\n{}", errors.join("\n"));
+    assert!(took.is_some(), "the API answers 200 again after the rebuild");
     // The pages answer from the rebuilt cache too, and never with a 5xx.
     for p in ["/", "/stats", "/log/HEAD"] {
         let (s, _) = get(&router, &format!("{prefix}{p}?q=author:after")).await;
@@ -114,16 +103,10 @@ async fn a_running_server_survives_its_cache_being_rewritten_underneath() {
         wait::pause(std::time::Duration::from_millis(50)).await;
     }
     // Another build rewrites the cache while the server runs.
-    let newer = gitterrace_index::FORMAT_VERSION
-        .parse::<u64>()
-        .expect("numeric")
-        + 1;
+    let newer = gitterrace_index::FORMAT_VERSION.parse::<u64>().expect("numeric") + 1;
     std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
     corrupt(&cache);
-    let before: Vec<_> = segments(&cache)
-        .iter()
-        .map(|p| std::fs::read(p).expect("read"))
-        .collect();
+    let before: Vec<_> = segments(&cache).iter().map(|p| std::fs::read(p).expect("read")).collect();
     let mut errors = Vec::new();
     for round in 0..20 {
         for p in ["/", "/stats", "/log/HEAD"] {
@@ -137,21 +120,12 @@ async fn a_running_server_survives_its_cache_being_rewritten_underneath() {
         let (status, retry) = api(&router, &u).await;
         let (_, body) = get(&router, &u).await;
         if status != 503 || retry.is_none() || !body.contains("index_newer") {
-            errors.push(format!(
-                "round {round}: {u} -> {status}, Retry-After {retry:?}"
-            ));
+            errors.push(format!("round {round}: {u} -> {status}, Retry-After {retry:?}"));
         }
         wait::pause(std::time::Duration::from_millis(100)).await;
     }
-    assert!(
-        errors.is_empty(),
-        "after the rewrite:\n{}",
-        errors.join("\n")
-    );
-    let after: Vec<_> = segments(&cache)
-        .iter()
-        .map(|p| std::fs::read(p).expect("read"))
-        .collect();
+    assert!(errors.is_empty(), "after the rewrite:\n{}", errors.join("\n"));
+    let after: Vec<_> = segments(&cache).iter().map(|p| std::fs::read(p).expect("read")).collect();
     assert!(before == after, "a newer build's cache was written");
 }
 
@@ -174,8 +148,7 @@ fn segments(cache: &std::path::Path) -> Vec<std::path::PathBuf> {
         .map(|e| e.path())
         .filter(|p| {
             p.extension().is_some_and(|x| x == "gts")
-                && p.file_name()
-                    .is_some_and(|n| n.to_string_lossy().starts_with("seg-"))
+                && p.file_name().is_some_and(|n| n.to_string_lossy().starts_with("seg-"))
         })
         .collect()
 }
@@ -203,11 +176,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             let mut damaged = Vec::new();
             for p in &segs {
                 let b = std::fs::read(p).expect("read");
-                let bad = if garbage {
-                    vec![0xa5; b.len()]
-                } else {
-                    b[..20.min(b.len())].to_vec()
-                };
+                let bad = if garbage { vec![0xa5; b.len()] } else { b[..20.min(b.len())].to_vec() };
                 std::fs::write(p, &bad).expect("damage");
                 damaged.push(bad);
             }
@@ -226,14 +195,10 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
                             errors.lock().expect("errors").push(format!("{u} -> {s}"));
                         }
                     }
-                    let now: Vec<Option<Vec<u8>>> = segments(cache)
-                        .iter()
-                        .map(|p| std::fs::read(p).ok())
-                        .collect();
+                    let now: Vec<Option<Vec<u8>>> =
+                        segments(cache).iter().map(|p| std::fs::read(p).ok()).collect();
                     !now.is_empty()
-                        && now
-                            .iter()
-                            .all(|n| n.as_ref().is_some_and(|n| !damaged.contains(n)))
+                        && now.iter().all(|n| n.as_ref().is_some_and(|n| !damaged.contains(n)))
                 }
             })
             .await;
@@ -289,10 +254,7 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
     })
     .await;
     // A newer build owns the cache and made it read-only.
-    let newer = gitterrace_index::FORMAT_VERSION
-        .parse::<u64>()
-        .expect("numeric")
-        + 1;
+    let newer = gitterrace_index::FORMAT_VERSION.parse::<u64>().expect("numeric") + 1;
     std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
     let before = snapshot(&cache);
     // HEAD moves, so the running server wants to index: it must not write.
@@ -302,11 +264,8 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
     for round in 0..30 {
         for p in ["/", "/stats", "/log/HEAD", "/api/v1/repo"] {
             // The API refuses a parameter it does not list: probe it bare.
-            let q = if p.starts_with("/api/") {
-                String::new()
-            } else {
-                format!("?q=author:ro{round}")
-            };
+            let q =
+                if p.starts_with("/api/") { String::new() } else { format!("?q=author:ro{round}") };
             let u = format!("{prefix}{p}{q}");
             let (s, _) = get(&router, &u).await;
             if s >= 500 {
@@ -318,9 +277,7 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
     let after = snapshot(&cache);
     assert!(errors.is_empty(), "5xx:\n{}", errors.join("\n"));
     let names = |v: &Vec<(std::ffi::OsString, Vec<u8>)>| {
-        v.iter()
-            .map(|(n, b)| format!("{n:?}:{}", b.len()))
-            .collect::<Vec<_>>()
+        v.iter().map(|(n, b)| format!("{n:?}:{}", b.len())).collect::<Vec<_>>()
     };
     assert!(
         before == after,
@@ -337,9 +294,7 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
     let tmp = tempfile::tempdir().expect("tmp");
-    let repo = Fixture::standard(&tmp.path().join("repo"))
-        .path()
-        .to_owned();
+    let repo = Fixture::standard(&tmp.path().join("repo")).path().to_owned();
     let cache = repo.join(".git/gitterrace");
     let old = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/cache-v6");
     std::fs::create_dir_all(&cache).expect("mkdir");
@@ -347,24 +302,14 @@ async fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
         std::fs::copy(e.path(), cache.join(e.file_name())).expect("copy");
     }
     let seg = std::fs::read(cache.join("seg-1-0.gts")).expect("v6 segment");
-    assert_eq!(
-        &seg[..8],
-        b"GTS1\x06\0\0\0",
-        "the fixture holds segment version 6"
-    );
-    assert_eq!(
-        std::fs::read_to_string(cache.join("VERSION")).expect("v"),
-        "6\n"
-    );
+    assert_eq!(&seg[..8], b"GTS1\x06\0\0\0", "the fixture holds segment version 6");
+    assert_eq!(std::fs::read_to_string(cache.join("VERSION")).expect("v"), "6\n");
 
     let router = gitterrace_web::app_router(&repo).expect("router");
     let prefix = base(&router).await;
     gitterrace_testkit::oracle::ready(&router).await;
     let mut errors = Vec::new();
-    for p in gitterrace_web::WARM_PAGES
-        .iter()
-        .chain(&["/", "/api/v1/insights/hotspots"])
-    {
+    for p in gitterrace_web::WARM_PAGES.iter().chain(&["/", "/api/v1/insights/hotspots"]) {
         let (s, _) = get(&router, &format!("{prefix}{p}")).await;
         if s != 200 {
             errors.push(format!("{p} -> {s}"));
@@ -372,20 +317,12 @@ async fn a_version_6_cache_is_rebuilt_to_7_without_a_500() {
     }
     assert!(errors.is_empty(), "{}", errors.join("\n"));
     let version = std::fs::read_to_string(cache.join("VERSION")).expect("version");
-    assert_eq!(
-        version.trim(),
-        format!("v{}", gitterrace_index::FORMAT_VERSION)
-    );
+    assert_eq!(version.trim(), format!("v{}", gitterrace_index::FORMAT_VERSION));
     let rebuilt = segments(&cache);
     assert!(!rebuilt.is_empty(), "no segment after the rebuild");
     for p in rebuilt {
         let b = std::fs::read(&p).expect("read");
-        assert_eq!(
-            &b[..8],
-            b"GTS1\x01\0\0\0",
-            "{} is segment version 1",
-            p.display()
-        );
+        assert_eq!(&b[..8], b"GTS1\x01\0\0\0", "{} is segment version 1", p.display());
     }
 }
 
@@ -402,27 +339,13 @@ async fn a_repository_initialized_again_under_a_running_server_recovers() {
     // The server may still be writing its cache below `.git` (warm-up runs after ready), so
     // one pass can find a file it just made: `rm -rf` racing a writer. Retry until gone.
     let git = repo.join(".git");
-    wait::until_blocking("drop .git", || {
-        std::fs::remove_dir_all(&git).is_ok() || !git.exists()
-    });
-    let again = Fixture::init(&repo)
-        .write("again.txt", "x\n")
-        .commit("feat: start over");
+    wait::until_blocking("drop .git", || std::fs::remove_dir_all(&git).is_ok() || !git.exists());
+    let again = Fixture::init(&repo).write("again.txt", "x\n").commit("feat: start over");
     assert_eq!(again.path(), repo, "the same folder, a new history");
     let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
-    assert!(
-        errors.is_empty(),
-        "while rebuilding:\n{}",
-        errors.join("\n")
-    );
-    assert!(
-        took.is_some(),
-        "the API answers 200 again after the rebuild"
-    );
-    assert!(
-        repo.join(".git/gitterrace").is_dir(),
-        "the cache folder was made again"
-    );
+    assert!(errors.is_empty(), "while rebuilding:\n{}", errors.join("\n"));
+    assert!(took.is_some(), "the API answers 200 again after the rebuild");
+    assert!(repo.join(".git/gitterrace").is_dir(), "the cache folder was made again");
     for p in ["/", "/stats", "/log/HEAD"] {
         let (s, _) = get(&router, &format!("{prefix}{p}")).await;
         assert!(s < 500, "{p} -> {s} after the reset");

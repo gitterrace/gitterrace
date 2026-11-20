@@ -44,11 +44,7 @@ impl Proof {
     /// exactly, matched up to ties, and the rest. A missing key counts as the rest.
     pub fn against_golden(&mut self, golden: &str, full: &BTreeMap<String, String>) {
         let (mut exact, mut tie, mut rest) = (0, 0, Vec::new());
-        for (k, (e, c)) in golden
-            .lines()
-            .filter(|l| !l.starts_with('#'))
-            .filter_map(golden_line)
-        {
+        for (k, (e, c)) in golden.lines().filter(|l| !l.starts_with('#')).filter_map(golden_line) {
             match full.get(k) {
                 Some(v) if digest(v) == e => exact += 1,
                 Some(v) if digest(&canonical(v)) == c => tie += 1,
@@ -64,10 +60,7 @@ impl Proof {
         let mut t = String::new();
         let mut line = |s: String| writeln!(t, "{s}").expect("write string");
         line(head.to_owned());
-        line(format!(
-            "full answers {}, golden-set answers {}",
-            self.full, self.small
-        ));
+        line(format!("full answers {}, golden-set answers {}", self.full, self.small));
         line(format!(
             "completeness at one commit: shared {}, equal {}, chrome-only {}, tie-only {}, \
              lost {}, golden-set only {}",
@@ -87,11 +80,7 @@ impl Proof {
                 line(format!("  other {k}"));
             }
         }
-        for (name, keys) in [
-            ("chrome", &self.chrome),
-            ("tie", &self.ties),
-            ("lost", &self.real),
-        ] {
+        for (name, keys) in [("chrome", &self.chrome), ("tie", &self.ties), ("lost", &self.real)] {
             for k in keys {
                 line(format!("  {name} {k}"));
             }

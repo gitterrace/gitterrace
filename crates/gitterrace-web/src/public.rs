@@ -82,15 +82,8 @@ pub(crate) fn public_route(route: &str) -> bool {
 
 /// Route layer of a public server: an unclassified or local route answers 404, as if absent.
 pub(crate) async fn only_public(req: Request, next: Next) -> Response {
-    let allowed = req
-        .extensions()
-        .get::<MatchedPath>()
-        .is_some_and(|m| public_route(m.as_str()));
-    if allowed {
-        next.run(req).await
-    } else {
-        crate::error::not_found("Not served here.")
-    }
+    let allowed = req.extensions().get::<MatchedPath>().is_some_and(|m| public_route(m.as_str()));
+    if allowed { next.run(req).await } else { crate::error::not_found("Not served here.") }
 }
 
 #[cfg(test)]

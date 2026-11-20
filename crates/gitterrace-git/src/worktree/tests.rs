@@ -12,10 +12,7 @@ fn a_bare_repository_is_never_dirty() {
     git(&src, &["add", "."]);
     git(&src, &["commit", "-qm", "init"]);
     let bare = dir.path().join("bare.git");
-    git(
-        dir.path(),
-        &["clone", "-q", "--bare", "src", bare.to_str().expect("utf8")],
-    );
+    git(dir.path(), &["clone", "-q", "--bare", "src", bare.to_str().expect("utf8")]);
     let repo = Repo::discover(&bare).expect("repo");
     assert!(!crate::is_dirty(&repo));
     assert_eq!(crate::worktree_signature(&repo).expect("sig"), 0);
@@ -110,10 +107,7 @@ fn symlinked_directory_is_not_followed() {
     std::fs::remove_dir_all(p.join("docs")).expect("rm");
     std::os::unix::fs::symlink(outside.path(), p.join("docs")).expect("link");
     let d = worktree_diff(&Repo::discover(p).expect("repo")).expect("diff");
-    let leaked = d
-        .iter()
-        .flat_map(|f| &f.hunks)
-        .flat_map(|h| &h.lines)
-        .any(|l| l.text.contains("secret"));
+    let leaked =
+        d.iter().flat_map(|f| &f.hunks).flat_map(|h| &h.lines).any(|l| l.text.contains("secret"));
     assert!(!leaked, "{d:?}");
 }

@@ -39,24 +39,14 @@ async fn about_tabs_follow_the_docs_present() {
         .nth(1)
         .and_then(|t| t.split("</nav>").next())
         .unwrap_or_default();
-    let labels: Vec<&str> = nav
-        .split("</a>")
-        .filter_map(|t| t.rsplit('>').next())
-        .filter(|t| !t.is_empty())
-        .collect();
-    assert_eq!(
-        labels,
-        ["README", "LICENSE", "CONTRIBUTING", "SECURITY"],
-        "{nav}"
-    );
+    let labels: Vec<&str> =
+        nav.split("</a>").filter_map(|t| t.rsplit('>').next()).filter(|t| !t.is_empty()).collect();
+    assert_eq!(labels, ["README", "LICENSE", "CONTRIBUTING", "SECURITY"], "{nav}");
     let (_, body) = get(&app, "/?doc=license").await;
     assert!(body.contains("Permission &lt;is&gt; granted"));
     assert!(body.contains("aria-current=\"page\""));
     let (_, body) = get(&app, "/tree/HEAD/docs").await;
-    assert!(
-        !body.contains("doctabs"),
-        "a folder called LICENSE is no doc"
-    );
+    assert!(!body.contains("doctabs"), "a folder called LICENSE is no doc");
 }
 
 #[tokio::test]
@@ -71,10 +61,7 @@ async fn readme_alone_has_no_tab_row() {
 }
 
 #[tokio::test]
-#[expect(
-    clippy::too_many_lines,
-    reason = "one linear sequence, splitting it hides the flow"
-)]
+#[expect(clippy::too_many_lines, reason = "one linear sequence, splitting it hides the flow")]
 async fn serves_every_page() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
@@ -96,27 +83,15 @@ async fn serves_every_page() {
     assert!(body.contains("<h2 class=\"markdown-h1\" id=\"hello"));
     // Code needs no index: while it builds, only insights pages show the progress, so a
     // page that never waits for it never reloads for it.
-    assert!(
-        !body.contains("data-progress"),
-        "the overview waits for nothing"
-    );
+    assert!(!body.contains("data-progress"), "the overview waits for nothing");
     let (s, body) = get(&app, "/log/HEAD").await;
     assert_eq!((s, body.contains("fix: second")), (200, true));
     // One field, a GET form that submits on Enter: no button beside it, no Compare link.
     let (_, page) = get(&app, "/log/HEAD").await;
-    let form = page
-        .split("<form class=\"filter\"")
-        .nth(1)
-        .and_then(|f| f.split("</form>").next());
+    let form = page.split("<form class=\"filter\"").nth(1).and_then(|f| f.split("</form>").next());
     assert!(form.is_some_and(|f| f.contains("name=\"q\"") && !f.contains("<button")));
-    assert!(
-        !page.contains(">Compare</a>"),
-        "Compare left the log toolbar"
-    );
-    for uri in [
-        "/log/HEAD?q=path:src%2Fa.rs&page=0",
-        "/log/HEAD?q=path%3Asrc%2Fa.rs&page=0",
-    ] {
+    assert!(!page.contains(">Compare</a>"), "Compare left the log toolbar");
+    for uri in ["/log/HEAD?q=path:src%2Fa.rs&page=0", "/log/HEAD?q=path%3Asrc%2Fa.rs&page=0"] {
         let (s, body) = get(&app, uri).await;
         assert_eq!((s, body.contains("first")), (200, true), "{uri}");
         assert!(body.contains("<i>path</i> src/a.rs"), "{uri}: a chip");
@@ -124,26 +99,17 @@ async fn serves_every_page() {
     // A refused filter keeps the text, says what is supported and never fails the page.
     let (s, body) = get(&app, "/log/HEAD?q=a+%7C+b").await;
     assert_eq!(s, 200);
-    assert!(
-        body.contains("value=\"a | b\"") && body.contains("Supported:"),
-        "{body}"
-    );
+    assert!(body.contains("value=\"a | b\"") && body.contains("Supported:"), "{body}");
     let (s, body) = get(&app, "/tree/HEAD/src").await;
     assert_eq!((s, body.contains("a.rs")), (200, true));
     let (s, body) = get(&app, "/blob/HEAD/src/a.rs").await;
-    assert_eq!(
-        (s, body.contains("<span class=\"s-keyword\">fn</span>")),
-        (200, true)
-    );
+    assert_eq!((s, body.contains("<span class=\"s-keyword\">fn</span>")), (200, true));
     assert_eq!(get(&app, "/blame/HEAD/src/a.rs").await.0, 200);
     assert_eq!(get(&app, "/refs").await.0, 200);
     let (s, body) = get(&app, "/stats").await;
     assert_eq!((s, body.contains("data-progress")), (200, true));
     // The indexing page names itself, says what works meanwhile and links there.
-    assert!(
-        body.contains("<span class=\"doc-title\">Indexing history</span>"),
-        "{body}"
-    );
+    assert!(body.contains("<span class=\"doc-title\">Indexing history</span>"), "{body}");
     assert!(body.contains("Code and commits work now."), "{body}");
     assert!(body.contains("/log/HEAD\">Commits</a>"), "{body}");
     assert_eq!(get(&app, "/nope/x").await.0, 404);
@@ -153,10 +119,7 @@ async fn serves_every_page() {
     assert_eq!(get(&app, "/static/app.css").await.0, 200);
 
     let (s, body) = get(&app, "/log/HEAD?q=author:nobody%40example.com").await;
-    assert_eq!(
-        (s, body.contains("<i>author</i> nobody@example.com")),
-        (200, true)
-    );
+    assert_eq!((s, body.contains("<i>author</i> nobody@example.com")), (200, true));
     let (_, body) = get(&app, "/log/HEAD?q=author:t%40e.x").await;
     assert!(body.contains("fix: second") && body.contains("first"));
 
@@ -190,17 +153,13 @@ async fn serves_every_page() {
     let (s, body) = get(&app, &format!("/commit/{head}")).await;
     assert_eq!((s, body.contains("class=\"diff\"")), (200, true));
 
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     // Forms with several fields only submit on Enter through a default button, kept hidden.
     for (u, name) in [("/compare", "cmp"), ("/search", "searchbar")] {
         let (_, page) = get(&app, u).await;
         let f = page.split(&format!("<form class=\"{name}\"")).nth(1);
-        let f = f
-            .and_then(|f| f.split("</form>").next())
-            .unwrap_or_default();
+        let f = f.and_then(|f| f.split("</form>").next()).unwrap_or_default();
         assert!(f.contains("<button type=\"submit\" hidden>"), "{u}");
         assert_eq!(f.matches("<button").count(), 1, "{u}");
     }
@@ -251,10 +210,7 @@ async fn serves_every_page() {
     assert!(css.contains(".blame td.who .sha{border-color:transparent}"));
     // Every page that names an author links to their log, branch rows included.
     let (_, body) = get(&app, "/refs").await;
-    assert!(
-        body.contains("class=\"who\" href=\"/log/HEAD?q=author%3A"),
-        "refs"
-    );
+    assert!(body.contains("class=\"who\" href=\"/log/HEAD?q=author%3A"), "refs");
 }
 
 #[tokio::test]
@@ -289,11 +245,7 @@ async fn huge_blobs_are_refused_before_they_are_loaded() {
     };
     let mut png = b"\x89PNG\r\n\x1a\n\0\0\0\rIHDR".to_vec();
     png.extend([0, 0, 0, 7, 0, 0, 0, 5, 8, 6, 0, 0, 0]);
-    zeros(
-        "big.png",
-        &png,
-        gitterrace_config::Config::default().limits.preview_mb as usize,
-    );
+    zeros("big.png", &png, gitterrace_config::Config::default().limits.preview_mb as usize);
     std::fs::write(
         p.join("big.txt"),
         "x\n".repeat(gitterrace_git::MAX_TEXT_BYTES as usize / 2 + 10),
@@ -348,51 +300,24 @@ async fn media_renders_inline_and_in_diffs() {
         "{body}"
     );
     let res = routes::router(Arc::clone(&app))
-        .oneshot(
-            Request::get("/raw/HEAD/d.pdf")
-                .body(Body::empty())
-                .expect("req"),
-        )
+        .oneshot(Request::get("/raw/HEAD/d.pdf").body(Body::empty()).expect("req"))
         .await
         .expect("res");
     let h = res.headers();
     assert_eq!(h["content-type"], "application/pdf");
-    assert!(
-        h["content-disposition"]
-            .to_str()
-            .expect("s")
-            .starts_with("attachment")
-    );
+    assert!(h["content-disposition"].to_str().expect("s").starts_with("attachment"));
     let res = routes::router(Arc::clone(&app))
-        .oneshot(
-            Request::get("/raw/HEAD/a.png")
-                .body(Body::empty())
-                .expect("req"),
-        )
+        .oneshot(Request::get("/raw/HEAD/a.png").body(Body::empty()).expect("req"))
         .await
         .expect("res");
     let h = res.headers();
     assert_eq!(h["content-disposition"], "inline");
-    assert!(
-        !h["content-security-policy"]
-            .to_str()
-            .expect("s")
-            .contains("sandbox")
-    );
+    assert!(!h["content-security-policy"].to_str().expect("s").contains("sandbox"));
     let res = routes::router(Arc::clone(&app))
-        .oneshot(
-            Request::get("/raw/HEAD/v.svg")
-                .body(Body::empty())
-                .expect("req"),
-        )
+        .oneshot(Request::get("/raw/HEAD/v.svg").body(Body::empty()).expect("req"))
         .await
         .expect("res");
-    assert!(
-        res.headers()["content-security-policy"]
-            .to_str()
-            .expect("s")
-            .contains("sandbox")
-    );
+    assert!(res.headers()["content-security-policy"].to_str().expect("s").contains("sandbox"));
 }
 
 #[tokio::test]
@@ -409,10 +334,7 @@ async fn app_router_nests_api_and_drops_badges() {
         let (r, uri) = (router.clone(), format!("{base}{uri}"));
         async move {
             r.oneshot(
-                Request::get(uri)
-                    .header("host", "localhost")
-                    .body(Body::empty())
-                    .expect("request"),
+                Request::get(uri).header("host", "localhost").body(Body::empty()).expect("request"),
             )
             .await
             .expect("response")
@@ -438,10 +360,7 @@ async fn one_week_selection_renders_seven_day_columns() {
     // The commits chart, then the code frequency section's chart, of the activity page.
     let (s, body) = get(&app, "/stats?period=1w").await;
     assert_eq!(s, 200);
-    let freq = body
-        .split("id=\"frequency\"")
-        .nth(1)
-        .expect("frequency section");
+    let freq = body.split("id=\"frequency\"").nth(1).expect("frequency section");
     for (page, html) in [("commits", body.as_str()), ("frequency", freq)] {
         let chart = html.split("<svg class=\"chart\"").nth(1).expect("chart");
         let chart = chart.split("</svg>").next().unwrap_or_default();
@@ -463,9 +382,7 @@ async fn hotspots_memo_follows_head() {
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
     let refresh = |app: &Arc<App>| {
-        app.index
-            .update(&app.repo, "HEAD", &|_| {})
-            .expect("update");
+        app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         app.mark_ready();
     };
     refresh(&app);
@@ -515,9 +432,7 @@ async fn router_rejects_foreign_and_missing_host() {
         if let Some(s) = site {
             b = b.header("sec-fetch-site", s);
         }
-        router
-            .clone()
-            .oneshot(b.body(Body::empty()).expect("request"))
+        router.clone().oneshot(b.body(Body::empty()).expect("request"))
     };
     // Another port on localhost is same-site, so it is refused as well.
     for site in ["cross-site", "same-site"] {
@@ -534,9 +449,7 @@ async fn router_rejects_foreign_and_missing_host() {
         let csp = h["content-security-policy"].to_str().expect("ascii");
         assert!(csp.contains("frame-ancestors 'none'") && csp.contains("script-src 'self'"));
     }
-    let res = send(&format!("{base}/api/v1/repo"), None)
-        .await
-        .expect("response");
+    let res = send(&format!("{base}/api/v1/repo"), None).await.expect("response");
     assert_eq!(res.headers()["x-content-type-options"], "nosniff");
     assert!(!res.headers().contains_key("content-security-policy"));
 }
@@ -546,9 +459,7 @@ pub(crate) fn ready_app(p: impl AsRef<std::path::Path>) -> Arc<App> {
     let repo = gitterrace_git::Repo::discover(p.as_ref()).expect("repo");
     let index = gitterrace_index::Index::open(&repo).expect("index");
     let app = Arc::new(App::new(repo, index));
-    app.index
-        .update(&app.repo, "HEAD", &|_| {})
-        .expect("update");
+    app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
     app.mark_ready();
     app
 }
@@ -558,10 +469,7 @@ pub(crate) fn unchecked_src(
     app: &App,
     head: &str,
 ) -> Arc<dyn gitterrace_index::feed::InsightsSource> {
-    app.source(head)
-        .expect("source")
-        .expect("ready")
-        .unchecked()
+    app.source(head).expect("source").expect("ready").unchecked()
 }
 
 pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf {
@@ -571,12 +479,7 @@ pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf 
 pub(crate) async fn fetch(router: &axum::Router, uri: &str, host: &str) -> (u16, String) {
     let res = router
         .clone()
-        .oneshot(
-            Request::get(uri)
-                .header("host", host)
-                .body(Body::empty())
-                .expect("req"),
-        )
+        .oneshot(Request::get(uri).header("host", host).body(Body::empty()).expect("req"))
         .await
         .expect("res");
     let s = res.status().as_u16();

@@ -27,12 +27,7 @@ pub(crate) struct Cursor<'a> {
 impl<'a> Cursor<'a> {
     /// `base` is the slice's offset in `file`, for the error message only.
     pub(crate) const fn new(buf: &'a [u8], file: &'a str, base: u64) -> Self {
-        Self {
-            buf,
-            pos: 0,
-            file,
-            base,
-        }
+        Self { buf, pos: 0, file, base }
     }
 
     pub(crate) fn err(&self, what: &'static str) -> SegError {
@@ -93,10 +88,7 @@ impl<'a> Cursor<'a> {
     /// A count that must fit `max`, for sizing a buffer.
     pub(crate) fn count(&mut self, max: usize) -> SegResult<usize> {
         let n = self.varint()?;
-        usize::try_from(n)
-            .ok()
-            .filter(|&n| n <= max)
-            .ok_or_else(|| self.err("count over limit"))
+        usize::try_from(n).ok().filter(|&n| n <= max).ok_or_else(|| self.err("count over limit"))
     }
 }
 

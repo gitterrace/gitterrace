@@ -35,11 +35,7 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
         "Browse: the repository page with README, last commit, file list and key numbers.",
         "Browse",
     ),
-    (
-        "commit",
-        "Commit: the message, the changed files and a highlighted diff.",
-        "Commit",
-    ),
+    ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
     (
         "blame",
         "Blame: who last changed each line, with the commit and its age beside the code.",
@@ -66,11 +62,7 @@ const HERO_ALT: &str =
 /// the docs do not.
 const LINES: [(&str, &str, &str); 2] = [
     ("Actions", "docs/actions.md", "Actions"),
-    (
-        "Many repositories",
-        "docs/using.md",
-        "Browse several repositories",
-    ),
+    ("Many repositories", "docs/using.md", "Browse several repositories"),
 ];
 
 /// Where a finding goes, shown as a row under the pitch so "any tool" reads at a glance:
@@ -108,10 +100,7 @@ pub(crate) fn body(
     links: &Links,
     read: &dyn Fn(&str) -> anyhow::Result<String>,
 ) -> anyhow::Result<String> {
-    let pkg = ws
-        .packages
-        .get("gitterrace")
-        .ok_or_else(|| anyhow::anyhow!("package gitterrace"))?;
+    let pkg = ws.packages.get("gitterrace").ok_or_else(|| anyhow::anyhow!("package gitterrace"))?;
     let copy = read(LANDING)?;
     let promises = section(&copy, SAFETY)
         .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {SAFETY}' section"))?;
@@ -128,11 +117,7 @@ pub(crate) fn body(
             anyhow::anyhow!("{doc} '## {head}' opens with no sentence that stands alone")
         })?;
         let path = crate::site::docs::page_path(crate::site::docs::stem(doc));
-        rows.push((
-            title,
-            format!("{path}#{}", crate::site::docs::slug(head)),
-            plain(para),
-        ));
+        rows.push((title, format!("{path}#{}", crate::site::docs::slug(head)), plain(para)));
     }
     let shots = SHOTS
         .iter()
@@ -174,11 +159,8 @@ pub(crate) fn requirements(ws: &Workspace) -> Vec<String> {
             ws.windows_archive.trim_start_matches('.')
         ));
     }
-    if let Some(msrv) = ws
-        .packages
-        .get("gitterrace")
-        .map(|p| p.rust_version.as_str())
-        .filter(|v| !v.is_empty())
+    if let Some(msrv) =
+        ws.packages.get("gitterrace").map(|p| p.rust_version.as_str()).filter(|v| !v.is_empty())
     {
         parts.push(format!("With cargo, Rust {msrv} or newer"));
     }
@@ -189,9 +171,7 @@ pub(crate) fn requirements(ws: &Workspace) -> Vec<String> {
 pub(crate) fn section<'a>(text: &'a str, title: &str) -> Option<&'a str> {
     let head = format!("\n## {title}\n");
     let start = text.find(&head)? + head.len();
-    let end = text[start..]
-        .find("\n## ")
-        .map_or(text.len(), |i| start + i);
+    let end = text[start..].find("\n## ").map_or(text.len(), |i| start + i);
     Some(&text[start..end])
 }
 
@@ -248,17 +228,11 @@ pub(crate) fn check_facts(text: &str) -> anyhow::Result<()> {
                 f.is_empty() || gitterrace_index::CACHE_FILES.iter().any(|(n, _)| *n == f)
             });
             if !known {
-                wrong.push(format!(
-                    "`{span}` is not the cache folder {CACHE_DIR} or a file in it"
-                ));
+                wrong.push(format!("`{span}` is not the cache folder {CACHE_DIR} or a file in it"));
             }
         }
     }
-    if wrong.is_empty() {
-        Ok(())
-    } else {
-        anyhow::bail!("{LANDING}: {}", wrong.join("; "))
-    }
+    if wrong.is_empty() { Ok(()) } else { anyhow::bail!("{LANDING}: {}", wrong.join("; ")) }
 }
 
 /// Markdown from the landing copy as HTML, with its relative links pointed at the site's
@@ -303,14 +277,8 @@ mod tests {
         let safety = section(&copy, SAFETY).expect("safety section");
         check_facts(safety).expect("landing.md agrees with the code");
         assert!(safety.contains(&format!("`{}`", gitterrace_config::DEFAULT_ADDR)));
-        for bad in [
-            "`127.0.0.1:8080`",
-            "`.git/terrace/`",
-            "`.git/gitterrace/blobs`",
-        ] {
-            let err = check_facts(&format!("serves on {bad}"))
-                .expect_err(bad)
-                .to_string();
+        for bad in ["`127.0.0.1:8080`", "`.git/terrace/`", "`.git/gitterrace/blobs`"] {
+            let err = check_facts(&format!("serves on {bad}")).expect_err(bad).to_string();
             assert!(err.contains(bad), "{err}");
         }
         check_facts("`.git/gitterrace/`, `.git/info/exclude` and `127.0.0.1:4242`").expect("ok");
@@ -336,10 +304,7 @@ mod tests {
     #[test]
     fn why_links_point_at_the_site_pages() {
         let links = Links::new("R");
-        let s = md(
-            "[a](online.md) [b](../SECURITY.md#x) [c](https://e.org)",
-            &links,
-        );
+        let s = md("[a](online.md) [b](../SECURITY.md#x) [c](https://e.org)", &links);
         assert!(s.contains("href=\"/docs/online/\""), "{s}");
         assert!(s.contains("href=\"R/blob/main/SECURITY.md#x\""), "{s}");
         assert!(s.contains("href=\"https://e.org\""), "{s}");
@@ -350,10 +315,7 @@ mod tests {
         let text = "# T\n\n## A\n\nOne [link](x.md) and `code`\nwrapped.\n\nTwo.\n\n## B\n\nb\n";
         let a = section(text, "A").expect("A");
         assert!(!a.contains("## B") && a.contains("Two."), "{a:?}");
-        assert_eq!(
-            plain("One [link](x.md) and `code`\nwrapped."),
-            "One link and code wrapped."
-        );
+        assert_eq!(plain("One [link](x.md) and `code`\nwrapped."), "One link and code wrapped.");
         assert!(section(text, "C").is_none());
     }
 }

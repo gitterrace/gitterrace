@@ -45,13 +45,7 @@ pub(crate) fn spawn(table: Arc<Table>, site: Arc<Site>) {
 async fn run(table: Arc<Table>, site: Arc<Site>) {
     let nudged = Arc::new(Notify::new());
     let cfg = table.env.cfg();
-    let roots: Vec<PathBuf> = table
-        .env
-        .search
-        .iter()
-        .map(PathBuf::as_path)
-        .map(canon)
-        .collect();
+    let roots: Vec<PathBuf> = table.env.search.iter().map(PathBuf::as_path).map(canon).collect();
     let watch = NudgeConfig {
         roots: roots.clone(),
         skip: skipper(roots.clone(), cfg.multi.depth, cfg.multi.skip_dirs.clone()),
@@ -154,10 +148,7 @@ fn skipper(roots: Vec<PathBuf>, depth: usize, skip: Vec<String>) -> gitterrace_g
         let Some(rel) = roots.iter().find_map(|r| p.strip_prefix(r).ok()) else {
             return true;
         };
-        let parts: Vec<_> = rel
-            .components()
-            .map(std::path::Component::as_os_str)
-            .collect();
+        let parts: Vec<_> = rel.components().map(std::path::Component::as_os_str).collect();
         let Some(last) = parts.last() else {
             return false;
         };

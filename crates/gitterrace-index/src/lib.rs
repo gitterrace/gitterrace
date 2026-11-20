@@ -230,15 +230,13 @@ impl Index {
     /// On, the next update builds it once and extends it with every later update. Off, the next
     /// update drops it and commit search walks git.
     pub fn set_message_index(&self, on: bool) {
-        self.messages
-            .store(on, std::sync::atomic::Ordering::Relaxed);
+        self.messages.store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Runs a segment merge inside [`Index::update`], not on a thread of its own: for a process
     /// that exits when the update returns, which would kill the merge half done.
     pub fn set_merge_inline(&self, on: bool) {
-        self.merge_inline
-            .store(on, std::sync::atomic::Ordering::Relaxed);
+        self.merge_inline.store(on, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// Stops every update of this handle for good: one running returns an `Interrupted` error
@@ -247,8 +245,7 @@ impl Index {
     /// a manifest rename, so readers see the set before or after it, never half of it. For a
     /// repository taken off the server, whose cache must not change any more.
     pub fn halt(&self) {
-        self.halted
-            .store(true, std::sync::atomic::Ordering::Release);
+        self.halted.store(true, std::sync::atomic::Ordering::Release);
     }
 
     /// Whether [`Index::halt`] was called.
@@ -259,10 +256,7 @@ impl Index {
     /// `Interrupted` once halted: called before each write step of an update.
     fn go_on(&self) -> io::Result<()> {
         if self.halted() {
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
-                "index update halted",
-            ));
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "index update halted"));
         }
         Ok(())
     }
@@ -311,8 +305,7 @@ impl Index {
     /// Bytes of segment blocks each source opened from now on keeps between reads: the block
     /// share of `resources.cache_mb`, set again on a reload.
     pub fn set_block_cache(&self, bytes: usize) {
-        self.block_cache
-            .store(bytes, std::sync::atomic::Ordering::Relaxed);
+        self.block_cache.store(bytes, std::sync::atomic::Ordering::Relaxed);
     }
 
     /// The cap set by [`Index::with_fresh_cap`].
@@ -405,10 +398,7 @@ impl Index {
         let Some(store) = seg::read::Store::open(&self.dir).map_err(seg)? else {
             return Ok(HashSet::new());
         };
-        Ok(store::load_order(&store)
-            .map_err(seg)?
-            .into_iter()
-            .collect())
+        Ok(store::load_order(&store).map_err(seg)?.into_iter().collect())
     }
 
     /// Commits reachable from `rev` that [`Index::update`] would read: those the segment set
@@ -486,20 +476,14 @@ fn todo<'a>(order: &'a [String], held: &HashSet<seg::Oid>) -> Vec<&'a String> {
     reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
 )]
 fn skipped(n: usize, dir: &std::path::Path) {
-    eprintln!(
-        "gitterrace: {n} commits could not be read and stay pending in {}",
-        dir.display()
-    );
+    eprintln!("gitterrace: {n} commits could not be read and stay pending in {}", dir.display());
 }
 
 /// Seconds since the epoch on this machine's clock, frozen by `GITTERRACE_TEST_NOW`. The one
 /// reader of the clock: the web pages and the registry stamp through it.
 pub fn wall_clock() -> i64 {
     // The equivalence oracle freezes the clock so period windows do not move between runs.
-    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW")
-        .ok()
-        .and_then(|v| v.parse().ok())
-    {
+    if let Some(t) = std::env::var("GITTERRACE_TEST_NOW").ok().and_then(|v| v.parse().ok()) {
         return t;
     }
     std::time::SystemTime::now()

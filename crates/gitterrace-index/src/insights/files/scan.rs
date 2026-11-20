@@ -29,10 +29,8 @@ impl Insights<'_> {
                 names.entry(old).or_default().push((i, head));
             }
         }
-        let kept: Vec<CommitRow> = src
-            .commits_in(CommitRange::All)
-            .filter(|c| !c.merge && keep(c))
-            .collect();
+        let kept: Vec<CommitRow> =
+            src.commits_in(CommitRange::All).filter(|c| !c.merge && keep(c)).collect();
         let ranks: Vec<Rank> = kept.iter().map(|c| c.rank).collect();
         let mut commits = kept.into_iter();
         let mut out: Vec<Vec<(TouchRaw, CommitRow)>> = vec![Vec::new(); paths.len()];
@@ -50,12 +48,7 @@ impl Insights<'_> {
                         continue;
                     }
                     let l = self.row_lines_unfiltered(r);
-                    let touch = TouchRaw {
-                        commit: rank,
-                        row,
-                        path: r.path,
-                        lines: l.add + l.del,
-                    };
+                    let touch = TouchRaw { commit: rank, row, path: r.path, lines: l.add + l.del };
                     out[at].push((touch, c));
                 }
             }
@@ -63,9 +56,7 @@ impl Insights<'_> {
         // The order of the per-path lookup: newest commit first, rows ascending.
         for list in &mut out {
             list.sort_unstable_by(|x, y| {
-                y.0.commit
-                    .cmp(&x.0.commit)
-                    .then_with(|| x.0.row.cmp(&y.0.row))
+                y.0.commit.cmp(&x.0.commit).then_with(|| x.0.row.cmp(&y.0.row))
             });
             list.dedup_by_key(|t| (t.0.commit, t.0.row));
         }

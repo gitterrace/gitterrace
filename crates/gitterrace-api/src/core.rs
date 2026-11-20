@@ -141,13 +141,8 @@ impl ApiState {
     /// while the cache fills and when the configured defaults change, with no ref moving.
     pub fn etag(&self) -> Option<String> {
         let head = self.repo.resolve(DEFAULT_REV).ok()?;
-        let mut refs: Vec<(String, String)> = self
-            .repo
-            .refs()
-            .ok()?
-            .into_iter()
-            .map(|r| (r.name, r.target))
-            .collect();
+        let mut refs: Vec<(String, String)> =
+            self.repo.refs().ok()?.into_iter().map(|r| (r.name, r.target)).collect();
         refs.sort();
         // FNV-1a: stable across Rust releases, unlike `DefaultHasher`.
         let defaults = serde_json::to_string(&self.settings().defaults).unwrap_or_default();
@@ -218,10 +213,9 @@ impl ApiState {
     ) -> Result<Option<Checked<dyn InsightsSource>>, ApiError> {
         match self.index.source_for(&*self.repo, rev, tip)? {
             Some(Selected::Ready(src)) => Ok(Some(src)),
-            Some(Selected::NeedsReindex { read }) => Err(ApiError::NeedsReindex {
-                read,
-                cap: self.index.fresh_cap(),
-            }),
+            Some(Selected::NeedsReindex { read }) => {
+                Err(ApiError::NeedsReindex { read, cap: self.index.fresh_cap() })
+            }
             None => Ok(None),
         }
     }
@@ -271,15 +265,7 @@ impl ApiState {
         });
         let name = self.repo.name();
         let go = gitterrace_actions::permalink("", Some(&id), &name, sha, path, lines);
-        let link = styled(
-            self.settings().style,
-            "",
-            Some(&id),
-            &name,
-            sha,
-            path,
-            lines,
-        );
+        let link = styled(self.settings().style, "", Some(&id), &name, sha, path, lines);
         (Some(go), Some(link))
     }
 
@@ -392,18 +378,8 @@ impl ApiState {
         let rev = Self::rev(rev)?;
         let id = self.repo.resolve(rev)?;
         let path = path.unwrap_or("");
-        let entries = self
-            .repo
-            .tree(&id, path)?
-            .iter()
-            .map(wire::tree_item)
-            .collect();
-        Ok(TreeResponse {
-            commit: id,
-            entries,
-            path: path.to_owned(),
-            rev: rev.to_owned(),
-        })
+        let entries = self.repo.tree(&id, path)?.iter().map(wire::tree_item).collect();
+        Ok(TreeResponse { commit: id, entries, path: path.to_owned(), rev: rev.to_owned() })
     }
 
     /// Text content of a file. Binary files report `binary: true` and no text.
@@ -436,11 +412,7 @@ impl ApiState {
                 }
                 text.truncate(cut);
             }
-            (
-                Some(text),
-                Some(all.len()),
-                over || end < all.len() || start > 0,
-            )
+            (Some(text), Some(all.len()), over || end < all.len() || start > 0)
         });
         let shown = match (&text, total_lines) {
             (Some(t), Some(_)) if !t.is_empty() => {
@@ -486,10 +458,7 @@ impl ApiState {
     /// The ignore rules committed at `rev`. The files are found once per commit.
     fn ignore_set(&self, rev: &str) -> Option<gitterrace_git::IgnoreSet> {
         let id = self.repo.resolve(rev).ok()?;
-        let mut memo = self
-            .head
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut memo = self.head.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((k, files)) = &memo.ignores
             && *k == id
         {
@@ -502,10 +471,7 @@ impl ApiState {
 
     /// Line count of every file in the tree of `tip`, built once per commit.
     fn head_lines(&self, tip: &str) -> Arc<Vec<gitterrace_index::HeadFile>> {
-        let mut memo = self
-            .head
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let mut memo = self.head.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if let Some((k, files)) = &memo.lines
             && k == tip
         {

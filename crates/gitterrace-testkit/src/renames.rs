@@ -19,11 +19,7 @@ fn body(tag: &str, lines: usize) -> String {
 /// Commits as `name` from here on.
 fn by(f: Fixture, name: &str) -> Fixture {
     f.git(&["config", "user.name", name]);
-    f.git(&[
-        "config",
-        "user.email",
-        &format!("{}@x.io", name.to_lowercase()),
-    ]);
+    f.git(&["config", "user.email", &format!("{}@x.io", name.to_lowercase())]);
     f
 }
 
@@ -75,9 +71,7 @@ impl RenameChain {
             .commit("fix: edit b");
         let f = by(f, "Bob").at("2024-01-20T10:00:00Z");
         f.git(&["mv", "b.rs", "c.rs"]);
-        let f = f
-            .write("keep.rs", &(body("keep", 5) + "with c\n"))
-            .commit("refactor: b to c");
+        let f = f.write("keep.rs", &(body("keep", 5) + "with c\n")).commit("refactor: b to c");
         let f = by(f, "Cy").at("2024-01-25T10:00:00Z");
         f.git(&["mv", "x.rs", "y.rs"]);
         let f = f.commit("refactor: x to y");
@@ -126,15 +120,10 @@ impl RenameChain {
         f.git(&["mv", "x2.rs", "z2.rs"]);
         let f = f.commit("refactor: x2 to z2");
         let f = by(f, "Cy").at("2024-02-17T10:00:00Z");
-        drop(crate::try_git(
-            f.path(),
-            &["merge", "-q", "--no-ff", "fork"],
-        ));
+        drop(crate::try_git(f.path(), &["merge", "-q", "--no-ff", "fork"]));
         f.git(&["checkout", "fork", "--", "y2.rs"]);
         f.git(&["rm", "-q", "--cached", "--ignore-unmatch", "x2.rs"]);
-        let f = f
-            .write("z2.rs", &body("x2", 20))
-            .commit("merge fork, keep y2 and z2");
+        let f = f.write("z2.rs", &body("x2", 20)).commit("merge fork, keep y2 and z2");
         f.git(&["branch", "-q", "-D", "fork"]);
         let f = by(f, "Ann")
             .at("2024-02-18T10:00:00Z")
@@ -142,11 +131,7 @@ impl RenameChain {
             .write("z2.rs", &(body("x2", 20) + "z2 edit\n"))
             .commit("fix: edit y2 and z2");
         let tip = f.git(&["rev-parse", "HEAD"]);
-        Self {
-            repo,
-            month_end,
-            tip,
-        }
+        Self { repo, month_end, tip }
     }
 }
 

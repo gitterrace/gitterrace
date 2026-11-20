@@ -82,10 +82,7 @@ mod tests {
     fn cells_are_escaped() {
         let t = parse("<b>\n<script>x</script>\n", b',', 10).expect("table");
         let h = html("t.csv", &t);
-        assert!(
-            !h.contains("<script>") && h.contains("&#60;script&#62;"),
-            "{h}"
-        );
+        assert!(!h.contains("<script>") && h.contains("&#60;script&#62;"), "{h}");
     }
 
     #[test]

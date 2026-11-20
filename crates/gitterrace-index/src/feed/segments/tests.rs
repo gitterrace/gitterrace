@@ -51,9 +51,7 @@ fn write(
     let name = format!("seg-1-{n}.gts");
     let mut w = ContainerWriter::new(dir, &name, Kind::Segment, StringBase::default())?;
     let n_paths = s.paths.list.len();
-    write_tables(&a, &p, ranks, n_paths, &mut |sec, items, b| {
-        w.block(sec, items, b)
-    })?;
+    write_tables(&a, &p, ranks, n_paths, &mut |sec, items, b| w.block(sec, items, b))?;
     w.finish()?;
     Container::open(dir, &name, Kind::Segment)
 }
@@ -94,22 +92,13 @@ fn segments_answer_like_the_memory_adapter() -> SegResult<()> {
         }
         for p in 0..mem.paths() {
             let k = Posting::Path(crate::feed::PathId(u32::try_from(p).unwrap_or(0)));
-            assert_eq!(
-                src.postings(k).collect::<Vec<_>>(),
-                mem.postings(k).collect::<Vec<_>>()
-            );
+            assert_eq!(src.postings(k).collect::<Vec<_>>(), mem.postings(k).collect::<Vec<_>>());
         }
         for i in 0..mem.idents() {
             let k = Posting::Author(crate::feed::IdentId(u32::try_from(i).unwrap_or(0)));
-            assert_eq!(
-                src.postings(k).collect::<Vec<_>>(),
-                mem.postings(k).collect::<Vec<_>>()
-            );
+            assert_eq!(src.postings(k).collect::<Vec<_>>(), mem.postings(k).collect::<Vec<_>>());
         }
-        assert_eq!(
-            src.rename_edges().collect::<Vec<_>>(),
-            mem.rename_edges().collect::<Vec<_>>()
-        );
+        assert_eq!(src.rename_edges().collect::<Vec<_>>(), mem.rename_edges().collect::<Vec<_>>());
     }
     Ok(())
 }
@@ -170,37 +159,20 @@ fn path_postings_through_the_block_index_equal_a_full_scan() -> SegResult<()> {
     use crate::seg::postings::{Hit, decode_path_postings};
     let paths = 200_000u32;
     let mut by_path: Vec<Vec<Hit>> = (0..paths)
-        .map(|p| {
-            (0..(p % 7))
-                .map(|i| Hit {
-                    ordinal: p * 8 + i,
-                    row: i,
-                })
-                .collect()
-        })
+        .map(|p| (0..(p % 7)).map(|i| Hit { ordinal: p * 8 + i, row: i }).collect())
         .collect();
     // One long list in the middle: more than a chunk, so it spans blocks.
-    by_path[12_345] = (0..1_500_000u32)
-        .map(|i| Hit {
-            ordinal: 1_700_000 + i,
-            row: 0,
-        })
-        .collect();
+    by_path[12_345] = (0..1_500_000u32).map(|i| Hit { ordinal: 1_700_000 + i, row: 0 }).collect();
     let post = Postings::from_parts(by_path, Vec::new(), Vec::new());
     let ranks: Vec<u32> = (0..3_200_000u32).collect();
     let dir = tempfile::tempdir()?;
     let name = "seg-1-0.gts";
     let mut w = ContainerWriter::new(dir.path(), name, Kind::Segment, StringBase::default())?;
-    write_tables(&Aggregates::default(), &post, &ranks, 0, &mut |s, n, b| {
-        w.block(s, n, b)
-    })?;
+    write_tables(&Aggregates::default(), &post, &ranks, 0, &mut |s, n, b| w.block(s, n, b))?;
     w.finish()?;
     let seg = Container::open(dir.path(), name, Kind::Segment)?;
     let blocks = seg.blocks(crate::seg::format::section::PATH_POSTINGS).len();
-    assert!(
-        blocks >= 3,
-        "the fixture must spread over blocks, got {blocks}"
-    );
+    assert!(blocks >= 3, "the fixture must spread over blocks, got {blocks}");
     let mut want: Vec<Vec<(u32, u32)>> = vec![Vec::new(); paths as usize];
     let mut buf = Vec::new();
     for e in seg.blocks(crate::seg::format::section::PATH_POSTINGS) {
@@ -305,28 +277,19 @@ fn counters_near_max_in_two_segments_are_unreadable() -> SegResult<()> {
         let (_, _, failure) = got.unwrap_or_else(|_| panic!("counter {k}: the read panicked"));
         let failure =
             failure.unwrap_or_else(|| panic!("counter {k}: a summed-past-u64 read was served"));
-        assert!(
-            failure.0.contains(crate::seg::agg::SUM_OVER),
-            "counter {k}: {failure}"
-        );
+        assert!(failure.0.contains(crate::seg::agg::SUM_OVER), "counter {k}: {failure}");
         // The merge of the same two parts.
         let n = crate::seg::merge::Renumber::new(&s, std::iter::empty());
         let merge_parts: Vec<crate::seg::merge::Part<'_>> = parts
             .iter()
-            .map(|(a, p)| crate::seg::merge::Part {
-                agg: a,
-                postings: p,
-                rank: &ranks,
-            })
+            .map(|(a, p)| crate::seg::merge::Part { agg: a, postings: p, rank: &ranks })
             .collect();
         let merged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             crate::seg::merge::aggregates(&merge_parts, &n).map(|_| ())
         }))
         .unwrap_or_else(|_| panic!("counter {k}: the merge panicked"));
         assert!(
-            merged
-                .as_ref()
-                .is_err_and(crate::seg::SegError::is_unreadable),
+            merged.as_ref().is_err_and(crate::seg::SegError::is_unreadable),
             "counter {k}: the merge gave {merged:?}"
         );
     }

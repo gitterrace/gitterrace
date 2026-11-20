@@ -13,10 +13,7 @@ struct Paths {
 
 impl Paths {
     fn new(tag: &'static str, n: usize) -> Self {
-        Self {
-            ids: (0..n).map(|i| format!("{tag}{i:039x}")).collect(),
-            tag,
-        }
+        Self { ids: (0..n).map(|i| format!("{tag}{i:039x}")).collect(), tag }
     }
 }
 
@@ -91,22 +88,14 @@ fn a_halted_update_leaves_the_previous_set_unchanged() -> io::Result<()> {
             at: crate::BATCH + 5,
             read: Cell::new(0),
         };
-        let err = idx
-            .update(&src, "HEAD", &|_| {})
-            .expect_err("a halted update fails");
+        let err = idx.update(&src, "HEAD", &|_| {}).expect_err("a halted update fails");
         assert_eq!(err.kind(), io::ErrorKind::Interrupted, "{tag}: {err}");
-        assert!(
-            src.read.get() < n,
-            "{tag}: read every commit after the halt"
-        );
+        assert!(src.read.get() < n, "{tag}: read every commit after the halt");
         let after = snapshot(&path)?;
         let names = |s: &[(String, Vec<u8>)]| s.iter().map(|f| f.0.clone()).collect::<Vec<_>>();
         assert_eq!(names(&after), names(&before), "{tag}: files changed");
         assert!(after == before, "{tag}: file contents changed");
-        assert!(
-            idx.update(&src, "HEAD", &|_| {}).is_err(),
-            "{tag}: a halted handle updated again"
-        );
+        assert!(idx.update(&src, "HEAD", &|_| {}).is_err(), "{tag}: a halted handle updated again");
         let fresh = Index::open_dir(path)?;
         assert_eq!(
             fresh.pending(&Paths::new("a", 10), "HEAD")?,

@@ -86,10 +86,7 @@ fn zip_list(bytes: &[u8], cap: usize) -> Option<Listing> {
             date,
         });
     }
-    Some(Listing {
-        entries,
-        more: n > cap,
-    })
+    Some(Listing { entries, more: n > cap })
 }
 
 fn tar_list(r: impl Read, cap: usize) -> Option<Listing> {
@@ -119,13 +116,7 @@ fn tar_list(r: impl Read, cap: usize) -> Option<Listing> {
 
 /// The listing's markup, every name escaped by the template.
 pub(crate) fn html(name: &str, l: &Listing) -> String {
-    ListingMarkup {
-        name,
-        l,
-        cap: ENTRY_CAP,
-    }
-    .render()
-    .unwrap_or_default()
+    ListingMarkup { name, l, cap: ENTRY_CAP }.render().unwrap_or_default()
 }
 
 #[cfg(test)]

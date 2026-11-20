@@ -15,10 +15,7 @@ fn json<T: serde::Serialize>(v: &T) -> Response {
     match serde_json::to_vec(v) {
         Ok(b) => (
             [
-                (
-                    header::CONTENT_TYPE,
-                    HeaderValue::from_static("application/json"),
-                ),
+                (header::CONTENT_TYPE, HeaderValue::from_static("application/json")),
                 (header::CACHE_CONTROL, HeaderValue::from_static("no-cache")),
             ],
             b,
@@ -54,11 +51,7 @@ pub(super) async fn refs(State(app): Shared) -> Result<Response> {
             .into_iter()
             .filter(|r| r.kind != RefKind::Remote)
             .map(|r| RefBody {
-                kind: if r.kind == RefKind::Tag {
-                    "tag"
-                } else {
-                    "branch"
-                },
+                kind: if r.kind == RefKind::Tag { "tag" } else { "branch" },
                 when: fmt::ago(r.time, now),
                 name: r.name,
             })

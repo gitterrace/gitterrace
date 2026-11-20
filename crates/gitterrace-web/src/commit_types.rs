@@ -77,17 +77,13 @@ fn matrix_figure(m: Matrix) -> Option<MatrixFigure> {
         return None;
     }
     let width = m.cols.len();
-    let col_sums: Vec<u64> = (0..width)
-        .map(|c| m.rows.iter().map(|r| r.cells[c].n as u64).sum())
-        .collect();
+    let col_sums: Vec<u64> =
+        (0..width).map(|c| m.rows.iter().map(|r| r.cells[c].n as u64).sum()).collect();
     let all: u64 = col_sums.iter().sum();
     let row = |label: &str, vals: &[u64]| {
         let mut cells: Vec<String> = vals.iter().map(|v| fmt::thousands(*v)).collect();
         cells.push(fmt::thousands(vals.iter().sum::<u64>()));
-        charts::view::Row {
-            label: label.to_owned(),
-            cells,
-        }
+        charts::view::Row { label: label.to_owned(), cells }
     };
     let mut head = vec!["Type".to_owned()];
     head.extend(m.cols.iter().map(|c| c.label.clone()));
@@ -173,11 +169,7 @@ fn matrix(
     scopes: &[LabelCount],
     f: &Filter,
 ) -> Matrix {
-    let kinds: Vec<String> = kinds
-        .iter()
-        .take(TOP_KINDS)
-        .map(|l| l.label.clone())
-        .collect();
+    let kinds: Vec<String> = kinds.iter().take(TOP_KINDS).map(|l| l.label.clone()).collect();
     let scopes: Vec<String> = scopes
         .iter()
         .filter(|l| l.label != NO_SCOPE)
@@ -189,19 +181,14 @@ fn matrix(
         *ids.entry((r.kind, r.scope)).or_default() += 1;
     }
     let name = |id: Option<LabelId>, missing: &str| -> String {
-        id.and_then(|i| src.label(i))
-            .map_or_else(|| missing.to_owned(), |s| s.to_string())
+        id.and_then(|i| src.label(i)).map_or_else(|| missing.to_owned(), |s| s.to_string())
     };
     let mut named: HashMap<(String, String), usize> = HashMap::new();
     for ((k, sc), n) in ids {
-        *named
-            .entry((name(k, Selection::OTHER), name(sc, NO_SCOPE)))
-            .or_default() += n;
+        *named.entry((name(k, Selection::OTHER), name(sc, NO_SCOPE))).or_default() += n;
     }
-    let grid: HashMap<(&str, &str), usize> = named
-        .iter()
-        .map(|((k, sc), n)| ((k.as_str(), sc.as_str()), *n))
-        .collect();
+    let grid: HashMap<(&str, &str), usize> =
+        named.iter().map(|((k, sc), n)| ((k.as_str(), sc.as_str()), *n)).collect();
     let all: usize = scopes
         .iter()
         .flat_map(|s| kinds.iter().map(move |k| (k, s)))
@@ -216,10 +203,7 @@ fn matrix(
     Matrix {
         cols: scopes
             .iter()
-            .map(|s| MatrixCol {
-                label: s.clone(),
-                href: f.link(BASE, Dim::Scope, s),
-            })
+            .map(|s| MatrixCol { label: s.clone(), href: f.link(BASE, Dim::Scope, s) })
             .collect(),
         rows: kinds
             .iter()
@@ -235,9 +219,7 @@ fn matrix(
                             level: level(n, max),
                             href: href(&format!(
                                 "{BASE}{}",
-                                f.with(Dim::Kind, Some(k))
-                                    .with(Dim::Scope, Some(s))
-                                    .query(&[])
+                                f.with(Dim::Kind, Some(k)).with(Dim::Scope, Some(s)).query(&[])
                             )),
                             tip: crate::charttip::part(
                                 &format!("{k} / {s}"),
@@ -269,10 +251,7 @@ fn churn_rows(v: Vec<(String, String, usize, u64, u64)>) -> Vec<Row> {
 }
 
 fn page_link(f: &Filter, n: usize) -> String {
-    href(&format!(
-        "{BASE}{}#commits",
-        f.query(&[("page", &n.to_string())])
-    ))
+    href(&format!("{BASE}{}#commits", f.query(&[("page", &n.to_string())])))
 }
 
 /// The section's markup for the commits `q` selects, at commit-list page `page`.
@@ -289,31 +268,18 @@ pub(crate) fn section(
     let sum = &fold.summary.current;
     let n = sum.commits;
     let people = &fold.people.contributors;
-    let size = if n == 0 {
-        0
-    } else {
-        (sum.additions + sum.deletions) / n as u64
-    };
+    let size = if n == 0 { 0 } else { (sum.additions + sum.deletions) / n as u64 };
     let kpis = vec![
         Kpi("Commits without merges", fmt::thousands(n)),
         Kpi("Authors", fmt::thousands(sum.authors)),
         Kpi("Lines added", format!("+{}", fmt::thousands(sum.additions))),
-        Kpi(
-            "Lines removed",
-            format!("-{}", fmt::thousands(sum.deletions)),
-        ),
+        Kpi("Lines removed", format!("-{}", fmt::thousands(sum.deletions))),
         Kpi("Average commit", fmt::count(size, "line", "lines")),
     ];
 
     let (kind_counts, scope_counts) = (&fold.kinds.0, &fold.scopes.0);
     let (kinds, mx) = if f.kind().is_some() {
-        (
-            Vec::new(),
-            Matrix {
-                cols: Vec::new(),
-                rows: Vec::new(),
-            },
-        )
+        (Vec::new(), Matrix { cols: Vec::new(), rows: Vec::new() })
     } else {
         (
             label_rows(kind_counts, |l| f.link(BASE, Dim::Kind, l)),
@@ -322,11 +288,7 @@ pub(crate) fn section(
     };
 
     let by_scope = f.kind().is_some();
-    let over = if by_scope {
-        &fold.scopes.1
-    } else {
-        &fold.kinds.1
-    };
+    let over = if by_scope { &fold.scopes.1 } else { &fold.kinds.1 };
     let unit = set.axis().unit().noun();
     let (over_title, over_hint) = if by_scope {
         (
@@ -356,17 +318,9 @@ pub(crate) fn section(
         // Only the first LIST rows render: links for the rest cost most of a cold build.
         .take(LIST)
         .map(|d| {
-            let h = if d.path == "." {
-                String::new()
-            } else {
-                f.link(BASE, Dim::Path, &d.path)
-            };
+            let h = if d.path == "." { String::new() } else { f.link(BASE, Dim::Path, &d.path) };
             (
-                if d.path == "." {
-                    "(repository root)".to_owned()
-                } else {
-                    d.path.clone()
-                },
+                if d.path == "." { "(repository root)".to_owned() } else { d.path.clone() },
                 h,
                 d.commits,
                 d.additions,
@@ -388,11 +342,7 @@ pub(crate) fn section(
         .map(|x| {
             (
                 x.path.clone(),
-                href(&format!(
-                    "/blob/{}/{}",
-                    fmt::selected_seg(),
-                    fmt::enc_path(&x.path)
-                )),
+                href(&format!("/blob/{}/{}", fmt::selected_seg(), fmt::enc_path(&x.path))),
                 x.commits,
                 x.additions,
                 x.deletions,
@@ -440,14 +390,9 @@ pub(crate) fn section(
         .skip(pg.saturating_mul(PAGE))
         .take(PAGE)
         .map(|r| {
-            let (author, email) = src
-                .ident(r.ident)
-                .map(|(n, e)| (n.to_string(), e.to_string()))
-                .unwrap_or_default();
-            let id = src
-                .commit_id(r.rank)
-                .map(|s| s.to_string())
-                .unwrap_or_default();
+            let (author, email) =
+                src.ident(r.ident).map(|(n, e)| (n.to_string(), e.to_string())).unwrap_or_default();
+            let id = src.commit_id(r.rank).map(|s| s.to_string()).unwrap_or_default();
             (id, author, email, r.time, r.offset)
         })
         .collect();

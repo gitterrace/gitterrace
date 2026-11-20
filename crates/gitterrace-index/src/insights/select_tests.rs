@@ -27,9 +27,7 @@ fn sample() -> Vec<CommitRecord> {
 }
 
 fn sel(q: &str) -> Selection {
-    Selection {
-        q: Some(q.to_owned()),
-    }
+    Selection { q: Some(q.to_owned()) }
 }
 
 fn matcher(s: &Selection) -> Matcher {
@@ -37,11 +35,7 @@ fn matcher(s: &Selection) -> Matcher {
 }
 
 fn ids(s: &Selection) -> Vec<String> {
-    matcher(s)
-        .apply(&sample(), i64::MAX)
-        .iter()
-        .map(|r| r.id.clone())
-        .collect()
+    matcher(s).apply(&sample(), i64::MAX).iter().map(|r| r.id.clone()).collect()
 }
 
 #[test]
@@ -65,10 +59,7 @@ fn selections_stack() {
 fn the_selection_is_q_alone() {
     assert_eq!(sel("  ").query(), Ok(crate::query::Query::default()));
     assert_eq!(
-        sel("author:ann type:fix")
-            .query()
-            .map(|q| q.to_string())
-            .as_deref(),
+        sel("author:ann type:fix").query().map(|q| q.to_string()).as_deref(),
         Ok("author:ann type:fix")
     );
     assert!(sel("a | b").query().is_err());
@@ -77,21 +68,15 @@ fn the_selection_is_q_alone() {
 #[test]
 fn path_keeps_only_files_under_the_prefix() {
     let out = matcher(&sel("path:/crates/web/")).apply(&sample(), i64::MAX);
-    assert_eq!(
-        out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(),
-        ["a", "c"]
-    );
+    assert_eq!(out.iter().map(|r| r.id.as_str()).collect::<Vec<_>>(), ["a", "c"]);
     assert!(out.iter().all(|r| r.files.len() == 1));
     assert!(under("crates/web/a.rs", "crates/web") && !under("crates/webby/d.rs", "crates/web"));
 }
 
 #[test]
 fn url_options_override_the_defaults() {
-    let defaults = Options {
-        exclude: vec!["docs/*".into()],
-        include_bots: true,
-        ..Options::default()
-    };
+    let defaults =
+        Options { exclude: vec!["docs/*".into()], include_bots: true, ..Options::default() };
     let p = OptionParams {
         bots: Some("0".into()),
         ignore: Some("0".into()),

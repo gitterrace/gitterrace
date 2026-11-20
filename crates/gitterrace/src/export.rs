@@ -73,10 +73,7 @@ impl Project {
         if name.trim().is_empty() || !(url.starts_with("https://") || url.starts_with("http://")) {
             bail!("--project takes NAME=URL with an http(s) URL, got {s:?}");
         }
-        Ok(Self {
-            name: name.trim().to_owned(),
-            url: url.to_owned(),
-        })
+        Ok(Self { name: name.trim().to_owned(), url: url.to_owned() })
     }
 }
 
@@ -86,10 +83,7 @@ pub(crate) const DEFAULT_OUT: &str = "gitterrace-export";
 /// An export written straight into a worktree (`export` run in a checkout) would show as
 /// untracked; list it in that clone's `.git/info/exclude`, which is local and never committed.
 /// Only a folder directly under the worktree root qualifies; anything else is left alone.
-#[expect(
-    clippy::print_stderr,
-    reason = "a CLI note: the user sees why their exclude file changed"
-)]
+#[expect(clippy::print_stderr, reason = "a CLI note: the user sees why their exclude file changed")]
 fn exclude_from_worktree(out: &Path) {
     let Ok(out) = out.canonicalize() else { return };
     let (Some(parent), Some(name)) = (out.parent(), out.file_name()) else {
@@ -123,9 +117,7 @@ pub(crate) async fn export(
 /// The export page budget: `--export-pages` wins over `limits.export_pages`, and neither set
 /// means no cap.
 pub(crate) fn budget(flag: Option<u64>, config: &gitterrace_config::Config) -> Option<usize> {
-    flag.map_or(config.limits.export_pages, |n| {
-        Some(usize::try_from(n).unwrap_or(usize::MAX))
-    })
+    flag.map_or(config.limits.export_pages, |n| Some(usize::try_from(n).unwrap_or(usize::MAX)))
 }
 
 /// Writes the scoped site to `out` and returns how many files were written. One repository
@@ -189,10 +181,7 @@ async fn crawl(
         let repo = gitterrace_git::Repo::discover(repo_path).context("opening the repository")?;
         let head = repo.resolve("HEAD").context("resolving HEAD")?;
         queue_seeds(&mut queue, site, &scope.config);
-        for c in repo
-            .log(&head, None, 0, scope.commits)
-            .context("reading the log")?
-        {
+        for c in repo.log(&head, None, 0, scope.commits).context("reading the log")? {
             queue.push_back(format!("{site}/commit/{}", c.id));
         }
         let name = repo.name();
@@ -205,14 +194,9 @@ async fn crawl(
         });
     }
     if let Some(p) = scope.projects.iter().find(|p| {
-        !site_of
-            .iter()
-            .any(|s| s.credit.is_some_and(|i| scope.projects[i].name == p.name))
+        !site_of.iter().any(|s| s.credit.is_some_and(|i| scope.projects[i].name == p.name))
     }) {
-        bail!(
-            "--project {}: no exported repository has that folder name",
-            p.name
-        );
+        bail!("--project {}: no exported repository has that folder name", p.name);
     }
     // The longest prefix wins, so `/r/a-2/` never matches `/r/a`. The root site (one repo, or
     // the index of several) has the empty prefix and catches the rest.
@@ -295,11 +279,7 @@ fn write_for_disk(out: &Path, path: &str, content_type: &str, body: &[u8]) -> an
     let is_html = content_type.starts_with("text/html");
     if is_html || content_type.starts_with("text/css") {
         let raw = String::from_utf8_lossy(body);
-        let raw = if is_html {
-            fonts::drop_font_preloads(&raw)
-        } else {
-            fonts::inline_fonts(&raw)
-        };
+        let raw = if is_html { fonts::drop_font_preloads(&raw) } else { fonts::inline_fonts(&raw) };
         let text = relativize(&raw, path, is_html);
         return write_page(out, path, content_type, text.as_bytes());
     }
@@ -315,17 +295,10 @@ fn footer_for(
     scope: &Scope,
 ) -> String {
     // `features.credit_enabled = false`: no credit line at the foot of the pages.
-    if !scope
-        .config
-        .feature_on(gitterrace_config::Feature::Credit, None)
-    {
+    if !scope.config.feature_on(gitterrace_config::Feature::Credit, None) {
         return String::new();
     }
-    let url = scope
-        .projects
-        .iter()
-        .find(|p| p.name == name)
-        .map(|p| p.url.as_str());
+    let url = scope.projects.iter().find(|p| p.name == name).map(|p| p.url.as_str());
     Credit::read(repo, head, name, url).footer(prefix)
 }
 
@@ -385,11 +358,7 @@ async fn sites(router: &Router, repos: &[PathBuf]) -> anyhow::Result<Vec<String>
         .map(|h| h.trim_end_matches('/').to_owned())
         .collect();
     if prefixes.len() != repos.len() {
-        bail!(
-            "the server lists {} repositories, expected {}",
-            prefixes.len(),
-            repos.len()
-        );
+        bail!("the server lists {} repositories, expected {}", prefixes.len(), repos.len());
     }
     Ok(prefixes)
 }
@@ -402,9 +371,7 @@ async fn wait_for_index(
     progress: &mut Progress,
 ) -> anyhow::Result<()> {
     let name = if prefix.is_empty() { "/" } else { prefix };
-    progress.phase(&format!(
-        "building the cache for {name} (first run reads every commit once)"
-    ));
+    progress.phase(&format!("building the cache for {name} (first run reads every commit once)"));
     for _ in 0..3_600 {
         let (_, _, body) = fetch(router, &format!("{prefix}/api/progress")).await?;
         let v = serde_json::from_slice::<serde_json::Value>(&body).unwrap_or_default();
@@ -467,11 +434,7 @@ impl Allowed {
             .collect();
         let mut tree = BTreeSet::new();
         walk(repo, head, "", scope.max_file, &mut tree)?;
-        Ok(Self {
-            commits,
-            tree,
-            seeds: seeds(&scope.config).collect(),
-        })
+        Ok(Self { commits, tree, seeds: seeds(&scope.config).collect() })
     }
 
     fn contains(&self, link: &str) -> bool {
@@ -522,10 +485,7 @@ fn walk(
     out: &mut BTreeSet<String>,
 ) -> anyhow::Result<()> {
     let mut names = HashMap::new();
-    for e in repo
-        .tree(rev, dir)
-        .with_context(|| format!("listing {dir}"))?
-    {
+    for e in repo.tree(rev, dir).with_context(|| format!("listing {dir}"))? {
         match names.entry(fold(&e.name)) {
             Entry::Occupied(first) => {
                 eprintln!(
@@ -539,11 +499,7 @@ fn walk(
                 v.insert(e.name.clone());
             }
         }
-        let path = if dir.is_empty() {
-            e.name.clone()
-        } else {
-            format!("{dir}/{}", e.name)
-        };
+        let path = if dir.is_empty() { e.name.clone() } else { format!("{dir}/{}", e.name) };
         match e.kind {
             gitterrace_git::TreeEntryKind::Dir => {
                 out.insert(path.clone());
@@ -583,10 +539,7 @@ fn links(html: &str) -> Vec<String> {
 }
 
 fn decode_entities(s: &str) -> String {
-    let s = s
-        .replace("&amp;", "&")
-        .replace("&#x2F;", "/")
-        .replace("&#47;", "/");
+    let s = s.replace("&amp;", "&").replace("&#x2F;", "/").replace("&#47;", "/");
     percent_decode(&s)
 }
 

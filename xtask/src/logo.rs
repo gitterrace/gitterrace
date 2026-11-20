@@ -75,20 +75,14 @@ impl Re {
     /// The text paths of a header, outside the mark's group (which draws a path of its own).
     fn text_paths(&self, header: &str) -> Vec<String> {
         let bare = self.mark_group.replace_all(header, "");
-        self.paths
-            .find_iter(&bare)
-            .map(|m| m.as_str().to_owned())
-            .collect()
+        self.paths.find_iter(&bare).map(|m| m.as_str().to_owned()).collect()
     }
 }
 
 /// A coordinate with at most three decimals and no trailing zeros, so output is stable.
 fn num(v: f64) -> String {
     let s = format!("{v:.3}");
-    let s = s
-        .trim_end_matches('0')
-        .trim_end_matches('.')
-        .replace("-0", "0");
+    let s = s.trim_end_matches('0').trim_end_matches('.').replace("-0", "0");
     if s.is_empty() { "0".to_owned() } else { s }
 }
 
@@ -151,21 +145,12 @@ fn halves() -> (String, String) {
         (TREAD_X, TREAD_Y),
     ];
     let top = TREAD_Y + BAR_GAP;
-    let bar = [
-        (s0, top),
-        (BAR_END, top),
-        (BAR_END, top + ARM),
-        (s0, top + ARM),
-    ];
+    let bar = [(s0, top), (BAR_END, top), (BAR_END, top + ARM), (s0, top + ARM)];
     (outline(&ink, 1.0, true), outline(&bar, 1.0, true))
 }
 
 fn ink(theme: &str) -> (&'static str, &'static str) {
-    if theme == "light" {
-        ("#21272e", "#5b5e8d")
-    } else {
-        ("#e3ecf6", "#9ca1d4")
-    }
+    if theme == "light" { ("#21272e", "#5b5e8d") } else { ("#e3ecf6", "#9ca1d4") }
 }
 
 /// The mark as the README header draws it, in `theme`'s colors.
@@ -187,9 +172,7 @@ fn app_logo() -> String {
 
 fn numbers(args: &str) -> Result<Vec<f64>> {
     let n = Regex::new(r"-?\d*\.?\d+(?:e-?\d+)?")?;
-    n.find_iter(args)
-        .map(|m| m.as_str().parse::<f64>().map_err(Into::into))
-        .collect()
+    n.find_iter(args).map(|m| m.as_str().parse::<f64>().map_err(Into::into)).collect()
 }
 
 /// The box of every point a path of absolute M, L, H, V, Q and Z commands names.
@@ -218,10 +201,7 @@ fn bbox(d: &str) -> Result<(f64, f64, f64, f64)> {
 
 /// The path data of one outlined path element.
 fn data(path: &str) -> Result<&str> {
-    let start = path
-        .find(" d=\"")
-        .context("header layout changed: a path without data")?
-        + 4;
+    let start = path.find(" d=\"").context("header layout changed: a path without data")? + 4;
     let end = path.rfind('"').context("path end")?;
     Ok(&path[start..end])
 }
@@ -235,9 +215,8 @@ fn wordmark(re: &Re, header: &str) -> Result<String> {
     let mut ds = Vec::new();
     for p in paths.iter().take(2) {
         let d = long.replace_all(data(p)?, |m: &Captures| {
-            let v: f64 = format!("{:.2}", m[0].parse::<f64>().unwrap_or(0.0))
-                .parse()
-                .unwrap_or(0.0);
+            let v: f64 =
+                format!("{:.2}", m[0].parse::<f64>().unwrap_or(0.0)).parse().unwrap_or(0.0);
             num(v)
         });
         ds.push(d.into_owned());
@@ -250,9 +229,7 @@ fn wordmark(re: &Re, header: &str) -> Result<String> {
         boxes.iter().map(f).fold(f64::NEG_INFINITY, f64::max).ceil()
     };
     let (x0, y0, x1, y1) = (lo(|b| b.0), lo(|b| b.1), hi(|b| b.2), hi(|b| b.3));
-    let [git, terrace] = ds.as_slice() else {
-        bail!("header layout changed: no wordmark paths")
-    };
+    let [git, terrace] = ds.as_slice() else { bail!("header layout changed: no wordmark paths") };
     Ok(format!(
         "<svg class=\"wordmark\" viewBox=\"{x0} {y0} {} {}\" aria-hidden=\"true\">\
          <path class=\"w-git\" d=\"{git}\"/><path class=\"w-terrace\" d=\"{terrace}\"/></svg>",
@@ -266,15 +243,9 @@ fn contrast(a: &str, b: &str) -> Result<f64> {
     let lum = |h: &str| -> Result<f64> {
         let mut c = [0.0; 3];
         for (i, slot) in c.iter_mut().enumerate() {
-            let x = f64::from(u8::from_str_radix(
-                h.get(1 + 2 * i..3 + 2 * i).unwrap_or(""),
-                16,
-            )?) / 255.0;
-            *slot = if x <= 0.03928 {
-                x / 12.92
-            } else {
-                ((x + 0.055) / 1.055).powf(2.4)
-            };
+            let x = f64::from(u8::from_str_radix(h.get(1 + 2 * i..3 + 2 * i).unwrap_or(""), 16)?)
+                / 255.0;
+            *slot = if x <= 0.03928 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) };
         }
         Ok(0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2])
     };
@@ -344,12 +315,7 @@ fn build(re: &Re, header: &str) -> Result<(String, String)> {
     let fills = paths
         .iter()
         .take(2)
-        .map(|p| {
-            re.fill
-                .captures(p)
-                .map(|c| c[1].to_owned())
-                .context("path fill")
-        })
+        .map(|p| re.fill.captures(p).map(|c| c[1].to_owned()).context("path fill"))
         .collect::<Result<Vec<_>>>()?;
     let split = contrast(&fills[0], &fills[1])?;
     if split < MIN_SPLIT {
@@ -401,10 +367,7 @@ pub fn outs(root: &Path) -> Result<Vec<Out>> {
         if !re.mark_group.is_match(&header) {
             bail!("{path}: no mark group {MARK_AT}");
         }
-        let marked = re
-            .mark_group
-            .replace(&header, |_: &Captures| mark_group(theme))
-            .into_owned();
+        let marked = re.mark_group.replace(&header, |_: &Captures| mark_group(theme)).into_owned();
         tagline::verify(&marked).with_context(|| path.clone())?;
         let header = marked;
         let (logo, square) = build(&re, &header)?;
@@ -432,26 +395,16 @@ pub fn outs(root: &Path) -> Result<Vec<Out>> {
             && text.contains("<head>")
             && !text.contains("{% include \"_favicon.html\" %}")
         {
-            problems.push(format!(
-                "{page}: has a <head> without {{% include \"_favicon.html\" %}}"
-            ));
+            problems
+                .push(format!("{page}: has a <head> without {{% include \"_favicon.html\" %}}"));
         }
         if has {
             let fit = |s: String| {
-                if page.starts_with(SITE_TEMPLATES) {
-                    wrap(&s, 100)
-                } else {
-                    s
-                }
+                if page.starts_with(SITE_TEMPLATES) { wrap(&s, 100) } else { s }
             };
-            let text = re
-                .app_logo
-                .replace_all(&text, |_: &Captures| fit(app_logo()))
-                .into_owned();
-            let text = re
-                .wordmark
-                .replace_all(&text, |_: &Captures| fit(word.clone()))
-                .into_owned();
+            let text = re.app_logo.replace_all(&text, |_: &Captures| fit(app_logo())).into_owned();
+            let text =
+                re.wordmark.replace_all(&text, |_: &Captures| fit(word.clone())).into_owned();
             outs.push(Out::file(page, text));
         }
     }

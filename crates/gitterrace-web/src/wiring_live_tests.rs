@@ -40,12 +40,7 @@ async fn read_until(body: &mut Body, want: &str, within: Duration) -> Option<Str
 async fn open_events(r: &Router, uri: &str) -> axum::response::Response {
     let uri = format!("{}{uri}", gitterrace_testkit::base(r).await);
     r.clone()
-        .oneshot(
-            Request::get(uri)
-                .header("host", "localhost")
-                .body(Body::empty())
-                .expect("req"),
-        )
+        .oneshot(Request::get(uri).header("host", "localhost").body(Body::empty()).expect("req"))
         .await
         .expect("res")
 }
@@ -68,11 +63,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
     let second = open_events(&server, "/events").await;
     assert_eq!(second.status(), 200);
     let third = open_events(&server, "/events").await;
-    assert_eq!(
-        third.status(),
-        503,
-        "server.live_streams = 2 refuses the third"
-    );
+    assert_eq!(third.status(), 503, "server.live_streams = 2 refuses the third");
     drop(second);
     drop(third);
     // The watcher's first reading is its baseline: a commit made before it lands is not a
@@ -88,10 +79,7 @@ async fn events_deliver_each_kind_and_respect_the_stream_cap() {
         if let Some(g) = read_until(&mut first, "\"refs\"", Duration::from_secs(2)).await {
             break g;
         }
-        assert!(
-            std::time::Instant::now() < deadline,
-            "no change event, {n} tries"
-        );
+        assert!(std::time::Instant::now() < deadline, "no change event, {n} tries");
     };
     assert!(got.contains("\"refs\""), "a commit moves the refs: {got}");
     // The slot of a closed stream is free again.
@@ -107,10 +95,7 @@ async fn a_stream_that_missed_a_change_hears_it_on_connect() {
     gitterrace_testkit::wait::pause(Duration::from_millis(600)).await;
     let mut body = open_events(&r, "/events?v=1").await.into_body();
     let got = read_until(&mut body, "event: change", Duration::from_secs(2)).await;
-    assert!(
-        got.is_some_and(|g| g.contains("\"index\"")),
-        "a stale version hears everything"
-    );
+    assert!(got.is_some_and(|g| g.contains("\"index\"")), "a stale version hears everything");
 }
 
 #[tokio::test]
@@ -119,28 +104,16 @@ async fn pages_carry_their_live_mode() {
     let p = repo(dir.path(), "r");
     let r = router(&p, Config::default());
     let attr = |body: &str| {
-        body.split("data-live=\"")
-            .nth(1)
-            .and_then(|s| s.split('"').next())
-            .map(str::to_owned)
+        body.split("data-live=\"").nth(1).and_then(|s| s.split('"').next()).map(str::to_owned)
     };
     let (_, wt) = get(&r, "/worktree").await;
     assert_eq!(attr(&wt).as_deref(), Some("refresh"));
     assert!(wt.contains("/static/live.js"));
     for notice in ["/log/HEAD", "/refs", "/stats", "/"] {
-        assert_eq!(
-            attr(&get(&r, notice).await.1).as_deref(),
-            Some("notice"),
-            "{notice}"
-        );
+        assert_eq!(attr(&get(&r, notice).await.1).as_deref(), Some("notice"), "{notice}");
     }
     let id = get(&r, "/log/HEAD").await.1;
-    let id = id
-        .split("/commit/")
-        .nth(1)
-        .and_then(|s| s.split('"').next())
-        .expect("id")
-        .to_owned();
+    let id = id.split("/commit/").nth(1).and_then(|s| s.split('"').next()).expect("id").to_owned();
     let (_, commit) = get(&r, &format!("/commit/{id}")).await;
     assert_eq!(attr(&commit), None, "a pinned commit never listens");
     assert!(!commit.contains("/static/live.js"));
@@ -180,10 +153,7 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     std::fs::write(p.join("small.txt"), "edited without a subscriber\n").expect("write");
     // The cheap dirty check may announce the flip, but never a full worktree scan.
     while let Ok(Ok(c)) = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await {
-        assert!(
-            !kinds(c).contains(&"worktree"),
-            "no worktree scan without a subscriber"
-        );
+        assert!(!kinds(c).contains(&"worktree"), "no worktree scan without a subscriber");
     }
 
     // The subscriber's first scan is its baseline; an edit before it finishes is the baseline.
@@ -316,10 +286,7 @@ async fn links_style_switches_copy_permalink() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let (_, body) = get(&router(&p, Config::default()), "/blob/HEAD/small.txt").await;
-    assert!(
-        body.contains("data-link=\"gitterrace\""),
-        "default gitterrace"
-    );
+    assert!(body.contains("data-link=\"gitterrace\""), "default gitterrace");
     let go = with(|c| c.links.style = gitterrace_types::LinkStyle::Go);
     let (_, body) = get(&router(&p, go), "/blob/HEAD/small.txt").await;
     assert!(body.contains("data-link=\"go\""), "links.style = go");
@@ -357,10 +324,7 @@ async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
         "menu carries the key"
     );
     let nav = include_str!("../static/nav.js");
-    assert!(
-        nav.contains("\"a \" + a.key"),
-        "the ? sheet lists `a <key>`"
-    );
+    assert!(nav.contains("\"a \" + a.key"), "the ? sheet lists `a <key>`");
 }
 
 #[tokio::test]
@@ -387,10 +351,7 @@ async fn commit_page_links_only_the_targets_with_a_lookup() {
         .to_owned();
     let (_, page) = get(&app, &format!("/commit/{id}")).await;
     assert!(page.contains("Find this commit in"), "{page}");
-    assert!(
-        page.contains(&format!("https://alpha.test/s?q={id}&#38;s={}", &id[..7])),
-        "{page}"
-    );
+    assert!(page.contains(&format!("https://alpha.test/s?q={id}&#38;s={}", &id[..7])), "{page}");
     assert!(page.contains(">alpha.test</a>") && !page.contains("Alpha") && !page.contains("Beta"));
     let (_, plain) = get(&router(&p, Config::default()), &format!("/commit/{id}")).await;
     assert!(!plain.contains("Find this commit in"));
@@ -411,25 +372,13 @@ async fn overview_shows_how_far_behind_its_upstream_the_branch_is() {
         .path()
         .to_owned();
     let (_, plain) = get(&router(&p, Config::default()), "/").await;
-    assert!(
-        !plain.contains("behind") && !plain.contains("up to date"),
-        "{plain}"
-    );
+    assert!(!plain.contains("behind") && !plain.contains("up to date"), "{plain}");
     let tip = git(&p, &["rev-parse", "HEAD"]);
     let branch = git(&p, &["rev-parse", "--abbrev-ref", "HEAD"]);
     let (tip, branch) = (tip.trim(), branch.trim());
-    git(
-        &p,
-        &["update-ref", &format!("refs/remotes/origin/{branch}"), tip],
-    );
-    git(
-        &p,
-        &["remote", "add", "origin", "https://example.invalid/r.git"],
-    );
-    git(
-        &p,
-        &["config", &format!("branch.{branch}.remote"), "origin"],
-    );
+    git(&p, &["update-ref", &format!("refs/remotes/origin/{branch}"), tip]);
+    git(&p, &["remote", "add", "origin", "https://example.invalid/r.git"]);
+    git(&p, &["config", &format!("branch.{branch}.remote"), "origin"]);
     let merge = format!("refs/heads/{branch}");
     git(&p, &["config", &format!("branch.{branch}.merge"), &merge]);
     let (_, even) = get(&router(&p, Config::default()), "/").await;

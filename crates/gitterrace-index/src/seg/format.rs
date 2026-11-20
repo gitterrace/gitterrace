@@ -173,11 +173,7 @@ impl Footer {
         let items = c.u32()?;
         let zero = c.u32()?;
         let file_len = c.u64()?;
-        let base = StringBase {
-            paths: c.u32()?,
-            identities: c.u32()?,
-            labels: c.u32()?,
-        };
+        let base = StringBase { paths: c.u32()?, identities: c.u32()?, labels: c.u32()? };
         if zero != 0 || file_len != len {
             return Err(bad("footer file length"));
         }
@@ -188,15 +184,7 @@ impl Footer {
         if toc_offset < HEADER_LEN || toc_end != len.checked_sub(FOOTER_LEN) {
             return Err(bad("toc range"));
         }
-        Ok(Self {
-            kind,
-            toc_offset,
-            toc_count,
-            toc_crc,
-            items,
-            file_len,
-            base,
-        })
+        Ok(Self { kind, toc_offset, toc_count, toc_crc, items, file_len, base })
     }
 }
 
@@ -224,13 +212,8 @@ pub(crate) fn decode_toc(bytes: &[u8], footer: &Footer, file: &str) -> SegResult
     for _ in 0..footer.toc_count {
         let section = c.u16()?;
         let zero = c.u16()?;
-        let e = TocEntry {
-            section,
-            items: c.u32()?,
-            offset: c.u64()?,
-            len: c.u32()?,
-            crc: c.u32()?,
-        };
+        let e =
+            TocEntry { section, items: c.u32()?, offset: c.u64()?, len: c.u32()?, crc: c.u32()? };
         let end = e.offset.checked_add(u64::from(e.len));
         if zero != 0 || e.len as usize > MAX_BLOCK || e.offset < HEADER_LEN {
             return Err(c.err("toc entry"));
@@ -249,11 +232,7 @@ pub(crate) fn decode_toc(bytes: &[u8], footer: &Footer, file: &str) -> SegResult
         out.push(e);
     }
     if items != u64::from(footer.items) {
-        return Err(SegError::unreadable(
-            file,
-            footer.toc_offset,
-            "toc item total",
-        ));
+        return Err(SegError::unreadable(file, footer.toc_offset, "toc item total"));
     }
     Ok(out)
 }
@@ -270,21 +249,14 @@ mod tests {
             toc_crc: 7,
             items: 3,
             file_len: 40 + 24 + 64,
-            base: StringBase {
-                paths: 1,
-                identities: 2,
-                labels: 3,
-            },
+            base: StringBase { paths: 1, identities: 2, labels: 3 },
         }
     }
 
     #[test]
     fn footer_round_trips() -> SegResult<()> {
         let f = footer();
-        assert_eq!(
-            Footer::decode(&f.encode(), f.file_len, Kind::Segment, "t")?,
-            f
-        );
+        assert_eq!(Footer::decode(&f.encode(), f.file_len, Kind::Segment, "t")?, f);
         Ok(())
     }
 
@@ -325,22 +297,10 @@ mod tests {
     #[test]
     fn hostile_footer_fields_with_valid_crc_are_unreadable() {
         for bad in [
-            Footer {
-                toc_count: u32::MAX,
-                ..footer()
-            },
-            Footer {
-                toc_offset: u64::MAX,
-                ..footer()
-            },
-            Footer {
-                toc_offset: 0,
-                ..footer()
-            },
-            Footer {
-                file_len: u64::MAX,
-                ..footer()
-            },
+            Footer { toc_count: u32::MAX, ..footer() },
+            Footer { toc_offset: u64::MAX, ..footer() },
+            Footer { toc_offset: 0, ..footer() },
+            Footer { file_len: u64::MAX, ..footer() },
         ] {
             let r = Footer::decode(&bad.encode(), bad.file_len, Kind::Segment, "t");
             assert!(r.is_err_and(|e| e.is_unreadable()), "{bad:?}");
@@ -350,13 +310,7 @@ mod tests {
     #[test]
     fn toc_rejects_out_of_range_and_overlap() {
         let mut f = footer();
-        let e = TocEntry {
-            section: 1,
-            items: 3,
-            offset: 16,
-            len: 24,
-            crc: 0,
-        };
+        let e = TocEntry { section: 1, items: 3, offset: 16, len: 24, crc: 0 };
         let check = |entries: &[TocEntry], f: &mut Footer| {
             let b = encode_toc(entries);
             f.toc_crc = crc32fast::hash(&b);
@@ -366,16 +320,7 @@ mod tests {
         };
         assert!(check(&[e], &mut f).is_ok());
         assert!(check(&[TocEntry { len: 25, ..e }], &mut f).is_err());
-        assert!(
-            check(
-                &[TocEntry {
-                    offset: u64::MAX,
-                    ..e
-                }],
-                &mut f
-            )
-            .is_err()
-        );
+        assert!(check(&[TocEntry { offset: u64::MAX, ..e }], &mut f).is_err());
         assert!(check(&[TocEntry { len: u32::MAX, ..e }], &mut f).is_err());
         let half = TocEntry { len: 12, ..e };
         assert!(check(&[half, TocEntry { offset: 20, ..half }], &mut f).is_err());

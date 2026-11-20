@@ -12,11 +12,7 @@ fn template_images_have_alt() {
         };
         for tag in html.split("<img").skip(1) {
             let tag = tag.split('>').next().unwrap_or_default();
-            assert!(
-                tag.contains("alt="),
-                "{} has an <img> without alt",
-                entry.path().display()
-            );
+            assert!(tag.contains("alt="), "{} has an <img> without alt", entry.path().display());
         }
     }
 }
@@ -34,11 +30,7 @@ fn clipboard_writes_go_through_gt_copy() {
         }
         let text = fs::read_to_string(&path).expect("read script");
         checked += 1;
-        for needle in [
-            "clipboard.writeText",
-            "execCommand(\"copy\")",
-            "execCommand('copy')",
-        ] {
+        for needle in ["clipboard.writeText", "execCommand(\"copy\")", "execCommand('copy')"] {
             assert!(
                 !text.contains(needle),
                 "{} calls {needle}: copy through window.gtCopy so the copy shows an indicator",
@@ -87,9 +79,7 @@ fn counted_noun(s: &str) -> Option<&str> {
     if word.len() == s.len() {
         return None;
     }
-    let end = word
-        .find(|c: char| !c.is_ascii_alphabetic())
-        .unwrap_or(word.len());
+    let end = word.find(|c: char| !c.is_ascii_alphabetic()).unwrap_or(word.len());
     COUNTED_NOUNS.contains(&&word[..end]).then(|| &word[..end])
 }
 
@@ -121,9 +111,7 @@ fn fixed_plural_in_code(src: &str) -> Option<String> {
             // `{}`/`{name}`/`{n:>3}` only: not `}}` escapes, not a closing block brace.
             let open = before.rfind('{');
             let placeholder = open.is_some_and(|o| {
-                before[o + 1..]
-                    .chars()
-                    .all(|c| c.is_ascii_alphanumeric() || "_.:<>^".contains(c))
+                before[o + 1..].chars().all(|c| c.is_ascii_alphanumeric() || "_.:<>^".contains(c))
             });
             if placeholder
                 && !rest.starts_with('}')
@@ -227,13 +215,7 @@ fn own_heads() -> Option<Vec<String>> {
     let path =
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../schwarzwald/config/own-heads.json");
     let v: serde_json::Value = serde_json::from_str(&fs::read_to_string(path).ok()?).ok()?;
-    Some(
-        v["own_heads"]
-            .as_array()?
-            .iter()
-            .filter_map(|s| s.as_str().map(str::to_owned))
-            .collect(),
-    )
+    Some(v["own_heads"].as_array()?.iter().filter_map(|s| s.as_str().map(str::to_owned)).collect())
 }
 
 /// Whether `src` writes an h1 tag outside its test module.
@@ -276,10 +258,7 @@ fn only_the_page_head_writes_an_h1() {
     }
     found.sort();
     let new: Vec<&String> = found.iter().filter(|f| !allowed.contains(f)).collect();
-    assert!(
-        new.is_empty(),
-        "{new:?} write an h1: fill a PageHead (pagehead.rs) instead"
-    );
+    assert!(new.is_empty(), "{new:?} write an h1: fill a PageHead (pagehead.rs) instead");
     let moved: Vec<&String> = allowed.iter().filter(|f| !found.contains(f)).collect();
     assert!(
         moved.is_empty(),
@@ -369,12 +348,8 @@ fn every_page_route_is_walked_by_the_anatomy_check() {
     let start = sitemap.find("pub const PAGES").expect("PAGES");
     let body = &sitemap[start..];
     let body = &body[..body.find("\n];").expect("end of PAGES")];
-    let routes: Vec<&str> = body
-        .split('"')
-        .skip(1)
-        .step_by(2)
-        .filter(|s| s.starts_with('/'))
-        .collect();
+    let routes: Vec<&str> =
+        body.split('"').skip(1).step_by(2).filter(|s| s.starts_with('/')).collect();
     for r in &routes {
         let page = PAGE_ROUTES.iter().find(|(p, _)| p == r);
         match page {

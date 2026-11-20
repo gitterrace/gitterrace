@@ -140,8 +140,5 @@ async fn every_commit_id_is_a_sha_link() {
             with_links += 1;
         }
     }
-    assert!(
-        with_links >= 8,
-        "the fixture should show ids on most pages, got {with_links}"
-    );
+    assert!(with_links >= 8, "the fixture should show ids on most pages, got {with_links}");
 }

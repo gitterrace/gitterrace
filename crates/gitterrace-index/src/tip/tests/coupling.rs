@@ -56,12 +56,7 @@ fn coupling_counts_every_pair_of_a_commit() {
     index(&dir, &h);
     let d = disk(&dir);
     assert!(d.has_tip());
-    let files: Vec<HeadFile> = (0..104)
-        .map(|i| HeadFile {
-            path: name(i),
-            lines: 3,
-        })
-        .collect();
+    let files: Vec<HeadFile> = (0..104).map(|i| HeadFile { path: name(i), lines: 3 }).collect();
     let ins = Insights::from_source(&d, Options::default(), None);
     for min in 1..=7 {
         let got: HashMap<(String, String), usize> = ins
@@ -69,11 +64,8 @@ fn coupling_counts_every_pair_of_a_commit() {
             .into_iter()
             .map(|c| ((c.a, c.b), c.together))
             .collect();
-        let expect: HashMap<(String, String), usize> = want
-            .iter()
-            .filter(|(_, n)| **n >= min)
-            .map(|(k, n)| (k.clone(), *n))
-            .collect();
+        let expect: HashMap<(String, String), usize> =
+            want.iter().filter(|(_, n)| **n >= min).map(|(k, n)| (k.clone(), *n)).collect();
         let mut diff: Vec<_> = got
             .iter()
             .filter(|(k, v)| expect.get(*k) != Some(*v))
@@ -86,9 +78,6 @@ fn coupling_counts_every_pair_of_a_commit() {
             )
             .collect();
         diff.sort();
-        assert!(
-            diff.is_empty(),
-            "min_together {min}: (pair, got, want) {diff:?}"
-        );
+        assert!(diff.is_empty(), "min_together {min}: (pair, got, want) {diff:?}");
     }
 }

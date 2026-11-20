@@ -29,10 +29,7 @@ fn an_unreadable_cache_is_deleted_whole() -> io::Result<()> {
     fs::write(dir.join("seg-1-0.gts"), "old segment")?;
     assert_eq!(ensure_dir(&dir)?, None);
     assert_eq!(names(&dir)?, [VERSION_FILE, LOCK_FILE]);
-    assert_eq!(
-        fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
-        version_stamp()
-    );
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?.trim(), version_stamp());
     Ok(())
 }
 
@@ -63,10 +60,7 @@ fn a_pre_release_cache_is_rebuilt_not_refused() -> io::Result<()> {
         fs::write(dir.join("seg-1-0.gts"), "pre-release")?;
         assert_eq!(ensure_dir(&dir)?, None, "VERSION {old}");
         assert_eq!(names(&dir)?, [VERSION_FILE, LOCK_FILE], "VERSION {old}");
-        assert_eq!(
-            fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
-            version_stamp()
-        );
+        assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?.trim(), version_stamp());
     }
     Ok(())
 }
@@ -193,10 +187,8 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
         }
         batch.push(old);
         if u % 5 == 4 {
-            let extra = crate::FileStat {
-                path: format!("m{u}").into(),
-                ..batch[0].files[0].clone()
-            };
+            let extra =
+                crate::FileStat { path: format!("m{u}").into(), ..batch[0].files[0].clone() };
             batch[0].merge = true;
             batch[0].files.push(extra);
         }
@@ -219,12 +211,8 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
         let ids: Vec<String> = canonical.iter().map(|r| r.id.clone()).collect();
         let by_id: std::collections::HashMap<String, crate::CommitRecord> =
             all.iter().map(|r| (r.id.clone(), r.clone())).collect();
-        let mut fetch = |id: &str| {
-            by_id
-                .get(id)
-                .cloned()
-                .ok_or_else(|| io::Error::other("missing record"))
-        };
+        let mut fetch =
+            |id: &str| by_id.get(id).cloned().ok_or_else(|| io::Error::other("missing record"));
         if super::merge_if_needed(&dir, &ids, &[], Vec::new(), &mut fetch)? {
             merges += 1;
             let one = tempfile::tempdir()?;
@@ -232,11 +220,8 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
             let m = crate::seg::manifest::Manifest::load(&dir)
                 .map_err(io::Error::other)?
                 .ok_or_else(|| io::Error::other("no manifest"))?;
-            let got: Vec<Vec<u8>> = m
-                .live
-                .iter()
-                .map(|f| fs::read(dir.join(&f.name)))
-                .collect::<io::Result<_>>()?;
+            let got: Vec<Vec<u8>> =
+                m.live.iter().map(|f| fs::read(dir.join(&f.name))).collect::<io::Result<_>>()?;
             assert_eq!(got, want, "after update {u}");
             assert_eq!(m.live.len(), 4, "segment, delta, order file and tip file");
             // The merge rewrites the commit rows too, one row per commit, not only the
@@ -258,14 +243,8 @@ fn twenty_updates_with_background_merges_equal_one_step() -> io::Result<()> {
         }
         // The set itself must stay readable whole between merges.
         crate::seg::read::Store::open(&dir).map_err(io::Error::other)?;
-        let segs = names(&dir)?
-            .iter()
-            .filter(|n| n.starts_with("seg-"))
-            .count();
-        assert!(
-            segs <= super::MAX_SEGMENTS,
-            "{segs} segments after update {u}"
-        );
+        let segs = names(&dir)?.iter().filter(|n| n.starts_with("seg-")).count();
+        assert!(segs <= super::MAX_SEGMENTS, "{segs} segments after update {u}");
     }
     assert_eq!(merges, 2);
     Ok(())
@@ -283,10 +262,7 @@ fn the_sweep_removes_only_files_not_live() -> io::Result<()> {
     fs::write(dir.join("retired-seg.gts"), "x")?;
     fs::write(dir.join(".lines.json.1.2.tmp"), "x")?;
     assert_eq!(ensure_dir(&dir)?, None);
-    assert_eq!(
-        names(&dir)?,
-        [".lines.json.1.2.tmp", VERSION_FILE, LOCK_FILE]
-    );
+    assert_eq!(names(&dir)?, [".lines.json.1.2.tmp", VERSION_FILE, LOCK_FILE]);
     Ok(())
 }
 
@@ -309,12 +285,7 @@ fn a_crashed_state_write_is_cleaned_at_the_next_open() -> io::Result<()> {
     aged.set_modified(std::time::UNIX_EPOCH)?;
     drop(aged);
     assert_eq!(ensure_dir(&dir)?, None);
-    let mut want = vec![
-        young,
-        state.to_owned(),
-        VERSION_FILE.to_owned(),
-        LOCK_FILE.to_owned(),
-    ];
+    let mut want = vec![young, state.to_owned(), VERSION_FILE.to_owned(), LOCK_FILE.to_owned()];
     want.sort();
     assert_eq!(names(&dir)?, want);
     Ok(())
@@ -342,14 +313,8 @@ fn a_read_only_cache_falls_back_to_a_stable_folder() -> io::Result<()> {
     }
     let base = t.path().join("cache");
     let a = super::fallback_in(&base, std::path::Path::new("/repos/a/.git"));
-    assert_eq!(
-        a,
-        super::fallback_in(&base, std::path::Path::new("/repos/a/.git"))
-    );
-    assert_ne!(
-        a,
-        super::fallback_in(&base, std::path::Path::new("/repos/b/.git"))
-    );
+    assert_eq!(a, super::fallback_in(&base, std::path::Path::new("/repos/a/.git")));
+    assert_ne!(a, super::fallback_in(&base, std::path::Path::new("/repos/b/.git")));
     assert!(a.starts_with(&base));
     ensure_dir(&a)?;
     super::writable(&a)
@@ -369,15 +334,9 @@ fn a_cache_of_another_repository_is_wiped_on_claim() -> io::Result<()> {
     super::claim(&dir, a)?;
     assert!(dir.join("tip").exists());
     super::claim(&dir, std::path::Path::new("/repos/b/.git"))?;
-    assert!(
-        !dir.join("tip").exists(),
-        "the other repository's files survived"
-    );
+    assert!(!dir.join("tip").exists(), "the other repository's files survived");
     assert_eq!(fs::read(dir.join(super::OWNER_FILE))?, b"/repos/b/.git");
-    assert_eq!(
-        fs::read_to_string(dir.join(VERSION_FILE))?.trim(),
-        version_stamp()
-    );
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?.trim(), version_stamp());
     Ok(())
 }
 
@@ -451,44 +410,21 @@ fn appends_and_a_failed_then_good_merge_keep_every_named_file() -> io::Result<()
         if n > 5 {
             return Err(io::Error::other("record gone"));
         }
-        recs.iter()
-            .find(|r| r.id == id)
-            .cloned()
-            .ok_or_else(|| io::Error::other("missing"))
+        recs.iter().find(|r| r.id == id).cloned().ok_or_else(|| io::Error::other("missing"))
     };
     assert!(super::merge_if_needed(&dir, &ids, &[], Vec::new(), &mut broken).is_err());
-    assert_eq!(
-        assert_whole(&dir)?,
-        before,
-        "a failed merge publishes nothing"
-    );
+    assert_eq!(assert_whole(&dir)?, before, "a failed merge publishes nothing");
     ensure_dir(&dir)?;
-    assert_eq!(
-        assert_whole(&dir)?,
-        before,
-        "nor does the sweep after it take a file"
-    );
+    assert_eq!(assert_whole(&dir)?, before, "nor does the sweep after it take a file");
     let mut fetch = |id: &str| {
-        recs.iter()
-            .find(|r| r.id == id)
-            .cloned()
-            .ok_or_else(|| io::Error::other("missing"))
+        recs.iter().find(|r| r.id == id).cloned().ok_or_else(|| io::Error::other("missing"))
     };
-    assert!(super::merge_if_needed(
-        &dir,
-        &ids,
-        &[],
-        Vec::new(),
-        &mut fetch
-    )?);
+    assert!(super::merge_if_needed(&dir, &ids, &[], Vec::new(), &mut fetch)?);
     let merged = assert_whole(&dir)?;
     let one = tempfile::tempdir()?;
     let want = build(one.path(), &recs)?;
-    let got: Vec<Vec<u8>> = merged
-        .live
-        .iter()
-        .map(|f| fs::read(dir.join(&f.name)))
-        .collect::<io::Result<_>>()?;
+    let got: Vec<Vec<u8>> =
+        merged.live.iter().map(|f| fs::read(dir.join(&f.name))).collect::<io::Result<_>>()?;
     assert_eq!(got, want, "the merged set is the one-step build");
     Ok(())
 }
@@ -504,10 +440,7 @@ fn a_cache_never_makes_a_deleted_git_folder_again() -> io::Result<()> {
     fs::create_dir_all(&git)?;
     ensure_dir(&dir)?;
     fs::remove_dir_all(t.path().join("repo"))?;
-    assert!(
-        ensure_dir(&dir).is_err(),
-        "the cache came back without its repository"
-    );
+    assert!(ensure_dir(&dir).is_err(), "the cache came back without its repository");
     assert!(!git.exists(), "a deleted .git was made again");
     Ok(())
 }

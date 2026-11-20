@@ -5,9 +5,8 @@ use crate::symbols::lex::Kind;
 use crate::symbols::walk::Walk;
 
 /// Words that start a statement: a declarator list without a `;` ends before one.
-const STATEMENTS: [&str; 8] = [
-    "const", "let", "var", "function", "class", "export", "if", "return",
-];
+const STATEMENTS: [&str; 8] =
+    ["const", "let", "var", "function", "class", "export", "if", "return"];
 
 /// TypeScript and JavaScript member modifiers, which may stand before a method name.
 const MODIFIERS: [&str; 10] = [
@@ -52,11 +51,7 @@ pub(crate) fn script(w: &mut Walk<'_>) {
         }
         match w.text(t) {
             "function" if !expression_position(w, i) => {
-                let k = if w.punct(i + 1) == Some(b'*') {
-                    i + 2
-                } else {
-                    i + 1
-                };
+                let k = if w.punct(i + 1) == Some(b'*') { i + 2 } else { i + 1 };
                 if let Some(name) = w.word(k) {
                     w.emit(name.to_owned(), k, SymbolKind::Function);
                 }
@@ -64,9 +59,8 @@ pub(crate) fn script(w: &mut Walk<'_>) {
             "class" => {
                 let declared = !expression_position(w, i);
                 if declared
-                    && let Some(name) = w
-                        .word(i + 1)
-                        .filter(|n| *n != "extends" && *n != "implements")
+                    && let Some(name) =
+                        w.word(i + 1).filter(|n| *n != "extends" && *n != "implements")
                 {
                     w.emit(name.to_owned(), i + 1, SymbolKind::Class);
                 }
@@ -78,37 +72,21 @@ pub(crate) fn script(w: &mut Walk<'_>) {
                 skip_to_body(w, i + 1);
             }
             "interface" if w.word(i + 1).is_some() => {
-                w.emit(
-                    w.word(i + 1).unwrap_or_default().to_owned(),
-                    i + 1,
-                    SymbolKind::Interface,
-                );
+                w.emit(w.word(i + 1).unwrap_or_default().to_owned(), i + 1, SymbolKind::Interface);
             }
             "enum" if w.word(i + 1).is_some() => {
-                w.emit(
-                    w.word(i + 1).unwrap_or_default().to_owned(),
-                    i + 1,
-                    SymbolKind::Enum,
-                );
+                w.emit(w.word(i + 1).unwrap_or_default().to_owned(), i + 1, SymbolKind::Enum);
             }
             "type" if w.word(i + 1).is_some() && matches!(w.punct(i + 2), Some(b'=' | b'<')) => {
-                w.emit(
-                    w.word(i + 1).unwrap_or_default().to_owned(),
-                    i + 1,
-                    SymbolKind::Type,
-                );
+                w.emit(w.word(i + 1).unwrap_or_default().to_owned(), i + 1, SymbolKind::Type);
             }
             "namespace" | "module"
-                if w.tok(i + 1)
-                    .is_some_and(|n| !matches!(n.kind, Kind::Punct(_)))
+                if w.tok(i + 1).is_some_and(|n| !matches!(n.kind, Kind::Punct(_)))
                     && w.punct(i + 2) == Some(b'{') =>
             {
                 let name = w.text(w.toks[i + 1]).to_owned();
-                let kind = if w.text(t) == "module" {
-                    SymbolKind::Module
-                } else {
-                    SymbolKind::Namespace
-                };
+                let kind =
+                    if w.text(t) == "module" { SymbolKind::Module } else { SymbolKind::Namespace };
                 w.emit(name, i + 1, kind);
                 w.pending = Some(false);
             }
@@ -130,10 +108,7 @@ fn expression_position(w: &Walk<'_>, k: usize) -> bool {
     };
     match p.kind {
         Kind::Punct(c) => {
-            matches!(
-                c,
-                b'=' | b'(' | b',' | b':' | b'?' | b'[' | b'!' | b'&' | b'|' | b'>'
-            )
+            matches!(c, b'=' | b'(' | b',' | b':' | b'?' | b'[' | b'!' | b'&' | b'|' | b'>')
         }
         Kind::Ident => matches!(w.text(p), "return" | "new" | "yield" | "await"),
         Kind::Lit => false,
@@ -226,10 +201,7 @@ fn fn_value(w: &Walk<'_>, k: usize) -> bool {
         (Some(_), _) => w.punct(k + 1) == Some(b'=') && w.punct(k + 2) == Some(b'>'),
         (None, Some(b'(')) => {
             let end = w.skip_balanced(k, b'(', b')');
-            matches!(
-                (w.punct(end), w.punct(end + 1)),
-                (Some(b'='), Some(b'>')) | (Some(b':'), _)
-            )
+            matches!((w.punct(end), w.punct(end + 1)), (Some(b'='), Some(b'>')) | (Some(b':'), _))
         }
         // Generic arrow `<T>(x: T) => x`, not a type assertion `<const> {}`.
         (None, Some(b'<')) => {
@@ -270,8 +242,7 @@ fn class_member(w: &mut Walk<'_>, k: usize) {
         let name = w.text(t);
         // A modifier followed by a name is not the member's name.
         if MODIFIERS.contains(&name)
-            && w.tok(k + 1)
-                .is_some_and(|n| n.kind == Kind::Ident || n.kind == Kind::Punct(b'['))
+            && w.tok(k + 1).is_some_and(|n| n.kind == Kind::Ident || n.kind == Kind::Punct(b'['))
         {
             return;
         }

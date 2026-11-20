@@ -34,10 +34,7 @@ fn plate_rect(color: &str, class: &str) -> String {
 /// `mark-plate.svg`: the plated mark.
 pub fn plated(dark_svg: &str, color: &str) -> Result<String> {
     let g = mark_paths(dark_svg)?;
-    Ok(format!(
-        "{HEAD}{}<g transform=\"{MARK_PLACE}\">{g}</g></svg>\n",
-        plate_rect(color, "")
-    ))
+    Ok(format!("{HEAD}{}<g transform=\"{MARK_PLACE}\">{g}</g></svg>\n", plate_rect(color, "")))
 }
 
 /// The favicon: the plate in light mode, the bare light-on-dark mark in dark mode. The mark
@@ -77,10 +74,7 @@ pub fn outs(root: &Path, color: &str) -> Result<Vec<Out>> {
     let fav = favicon(&dark, color)?;
     Ok(vec![
         Out::file("docs/brand/mark-plate.svg", plated(&dark, color)?),
-        Out::file(
-            "crates/gitterrace-web/templates/_favicon.html",
-            favicon_link(&fav),
-        ),
+        Out::file("crates/gitterrace-web/templates/_favicon.html", favicon_link(&fav)),
         Out::file("docs/brand/mark.svg", fav),
     ])
 }

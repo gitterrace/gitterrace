@@ -66,9 +66,7 @@ fn escaped(b: &[u8], k: usize) -> bool {
 }
 
 fn ident_len(s: &str) -> usize {
-    s.bytes()
-        .take_while(|c| c.is_ascii_alphanumeric() || *c == b'_' || *c >= 0x80)
-        .count()
+    s.bytes().take_while(|c| c.is_ascii_alphanumeric() || *c == b'_' || *c >= 0x80).count()
 }
 
 /// What an open block is: its body decides how a `def` inside it is listed.
@@ -83,9 +81,8 @@ enum Block {
 }
 
 /// Keywords that open a flow block.
-const FLOW: [&str; 11] = [
-    "if", "elif", "else", "try", "except", "finally", "with", "for", "while", "match", "case",
-];
+const FLOW: [&str; 11] =
+    ["if", "elif", "else", "try", "except", "finally", "with", "for", "while", "match", "case"];
 
 /// The symbols of a Python source.
 pub(crate) fn symbols(src: &str) -> Vec<Symbol> {
@@ -117,11 +114,7 @@ pub(crate) fn symbols(src: &str) -> Vec<Symbol> {
         let rest = rest.trim_start();
         let len = ident_len(rest);
         let listed = !blocks.iter().any(|b| b.1 == Block::Def);
-        let owner = blocks
-            .iter()
-            .rev()
-            .find(|b| b.1 != Block::Flow)
-            .map(|b| b.1);
+        let owner = blocks.iter().rev().find(|b| b.1 != Block::Flow).map(|b| b.1);
         if len > 0 && listed {
             out.push(Symbol {
                 name: rest[..len].to_owned(),

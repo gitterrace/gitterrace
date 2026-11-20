@@ -26,11 +26,7 @@ fn safety_problems(landing: &str, addr: &str) -> Vec<String> {
 #[test]
 fn the_built_landing_page_has_the_safety_section_with_the_real_address() {
     let (pages, _) = generated();
-    let landing = &pages
-        .iter()
-        .find(|p| p.0 == "index.html")
-        .expect("landing")
-        .1;
+    let landing = &pages.iter().find(|p| p.0 == "index.html").expect("landing").1;
     let bad = safety_problems(landing, gitterrace_config::DEFAULT_ADDR);
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }
@@ -38,11 +34,7 @@ fn the_built_landing_page_has_the_safety_section_with_the_real_address() {
 #[test]
 fn a_landing_page_without_the_section_or_with_another_address_is_reported() {
     let (pages, _) = generated();
-    let landing = &pages
-        .iter()
-        .find(|p| p.0 == "index.html")
-        .expect("landing")
-        .1;
+    let landing = &pages.iter().find(|p| p.0 == "index.html").expect("landing").1;
     let gone = landing.replace("What it does with your code", "Safety");
     assert!(safety_problems(&gone, "127.0.0.1:4242")[0].contains("has no"));
     let bad = safety_problems(landing, "127.0.0.1:9");

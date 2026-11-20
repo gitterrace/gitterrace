@@ -22,11 +22,7 @@ fn outline_links(body: &str) -> Vec<Vec<&str>> {
         .skip(1)
         .map(|block| {
             let end = block.find("</ol>").unwrap_or(block.len());
-            block[..end]
-                .split("<a href=\"#")
-                .skip(1)
-                .filter_map(|a| a.split('"').next())
-                .collect()
+            block[..end].split("<a href=\"#").skip(1).filter_map(|a| a.split('"').next()).collect()
         })
         .collect()
 }
@@ -36,10 +32,7 @@ async fn a_source_page_outlines_its_symbols_as_rail_and_menu_linked_to_shown_lin
     let dir = tempfile::tempdir().expect("tmp");
     let p = Fixture::init(&dir.path().join("r"))
         .write("src/geo.rs", SOURCE)
-        .write(
-            "notes.txt",
-            "fn not_code() {}\nfn still_not() {}\nfn nope() {}\n",
-        )
+        .write("notes.txt", "fn not_code() {}\nfn still_not() {}\nfn nope() {}\n")
         .commit("feat: geometry")
         .path()
         .to_owned();
@@ -51,10 +44,7 @@ async fn a_source_page_outlines_its_symbols_as_rail_and_menu_linked_to_shown_lin
         assert!(body.contains(&format!("id=\"{id}\"")), "{id} has no line");
     }
     assert!(body.contains("title=\"impl Point\""), "{body}");
-    assert!(
-        body.contains("data-outline"),
-        "app.js loads outline.js for it"
-    );
+    assert!(body.contains("data-outline"), "app.js loads outline.js for it");
 
     // Lines past `limits.blob_lines` are not on the page, so their symbols are not listed.
     let cut = router(&p, with(|c| c.limits.blob_lines = 4));

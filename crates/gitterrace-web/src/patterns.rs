@@ -73,11 +73,7 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
             .into_iter()
             .map(|b| (b.year.to_string(), b.lines))
             .collect();
-        let sizes: Vec<_> = set
-            .sizes()
-            .into_iter()
-            .map(|b| (b.label, b.commits as u64))
-            .collect();
+        let sizes: Vec<_> = set.sizes().into_iter().map(|b| (b.label, b.commits as u64)).collect();
         let tags = gitterrace_index::release_tags(&a.repo.refs().unwrap_or_default());
         let cad = whole.cadence_in(&tags, &ever);
         let cadence = match (cad.median_days_between, cad.days_since_last) {
@@ -101,9 +97,7 @@ pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String
                 name: rl.name.clone(),
                 when: crate::when::When::new(fmt::day(rl.time), rl.time, 0),
                 commits: fmt::thousands(rl.commits_since),
-                days: rl
-                    .days_since
-                    .map_or_else(|| "-".to_owned(), |d| d.to_string()),
+                days: rl.days_since.map_or_else(|| "-".to_owned(), |d| d.to_string()),
             })
             .collect();
         if set.stream().next().is_none() {

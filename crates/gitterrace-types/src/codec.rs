@@ -46,10 +46,7 @@ impl std::error::Error for ParseError {}
 ///
 /// When `s` is neither a canonical value nor an alias of `T`.
 pub fn parse<T: StringEnum>(s: &str) -> Result<T, ParseError> {
-    T::parse(s).ok_or_else(|| ParseError {
-        got: s.to_owned(),
-        expected: T::expected(),
-    })
+    T::parse(s).ok_or_else(|| ParseError { got: s.to_owned(), expected: T::expected() })
 }
 
 /// Declares a string-encoded enum and its one codec.

@@ -26,13 +26,7 @@ const fn item(
     default: &'static str,
     doc: &'static str,
 ) -> Item {
-    Item {
-        name,
-        ty,
-        required,
-        default,
-        doc,
-    }
+    Item { name, ty, required, default, doc }
 }
 
 /// Every kind an action can be offered on, with what the selection is.
@@ -43,32 +37,20 @@ pub const KINDS: [(Kind, &str); 8] = [
     (Kind::Hunk, "One hunk of a diff."),
     (Kind::Blame, "One line of a blame view."),
     (Kind::SearchHit, "A code or commit search hit."),
-    (
-        Kind::Insight,
-        "A row of an insights page, such as a hotspot.",
-    ),
+    (Kind::Insight, "A row of an insights page, such as a hotspot."),
     (Kind::Page, "The page being shown."),
 ];
 
 /// The kebab-case name of `kind`, as written in `actions.toml` and the payload.
 pub fn kind_name(kind: Kind) -> String {
-    serde_json::to_value(kind)
-        .ok()
-        .and_then(|v| v.as_str().map(str::to_owned))
-        .unwrap_or_default()
+    serde_json::to_value(kind).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
 }
 
 /// Payload v1, the JSON a script reads on stdin. `required` means always present.
 pub const PAYLOAD_FIELDS: [Item; 16] = [
     item("v", "integer", true, "", "Payload version, `1`."),
     item("action", "string", true, "", "The action's `id`."),
-    item(
-        "kind",
-        "string",
-        true,
-        "",
-        "What was selected, one of the kinds below.",
-    ),
+    item("kind", "string", true, "", "What was selected, one of the kinds below."),
     item(
         "repo",
         "object",
@@ -77,34 +59,10 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "`name`, `root` (absolute path) and `id` (stable repository id, absent for a repository \
         without commits).",
     ),
-    item(
-        "rev",
-        "string",
-        true,
-        "",
-        "The revision the page was showing, as named in the URL.",
-    ),
-    item(
-        "sha",
-        "string",
-        true,
-        "",
-        "The full commit id `rev` resolves to.",
-    ),
-    item(
-        "path",
-        "string",
-        false,
-        "",
-        "Repository-relative path, when the selection is in a file.",
-    ),
-    item(
-        "lines",
-        "object",
-        false,
-        "",
-        "`start` and `end`, 1-based and inclusive.",
-    ),
+    item("rev", "string", true, "", "The revision the page was showing, as named in the URL."),
+    item("sha", "string", true, "", "The full commit id `rev` resolves to."),
+    item("path", "string", false, "", "Repository-relative path, when the selection is in a file."),
+    item("lines", "object", false, "", "`start` and `end`, 1-based and inclusive."),
     item(
         "text",
         "string",
@@ -118,20 +76,8 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
             " lines."
         ),
     ),
-    item(
-        "text_truncated",
-        "boolean",
-        false,
-        "",
-        "Set with `text`: true when a cap cut it.",
-    ),
-    item(
-        "query",
-        "string",
-        false,
-        "",
-        "The search query, for a search hit.",
-    ),
+    item("text_truncated", "boolean", false, "", "Set with `text`: true when a cap cut it."),
+    item("query", "string", false, "", "The search query, for a search hit."),
     item(
         "permalink",
         "string",
@@ -140,27 +86,9 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "`gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, or the `/go` URL with `links.style = \
         \"go\"`. Survives clones and renames.",
     ),
-    item(
-        "title",
-        "string",
-        true,
-        "",
-        "A short label such as `guard.rs:44-60 @ 4f0c2e9`.",
-    ),
-    item(
-        "commit",
-        "object",
-        false,
-        "",
-        "`subject`, `author` and `date` (RFC 3339) of `sha`.",
-    ),
-    item(
-        "markdown",
-        "string",
-        true,
-        "",
-        "The same text the Copy as markdown built-in produces.",
-    ),
+    item("title", "string", true, "", "A short label such as `guard.rs:44-60 @ 4f0c2e9`."),
+    item("commit", "object", false, "", "`subject`, `author` and `date` (RFC 3339) of `sha`."),
+    item("markdown", "string", true, "", "The same text the Copy as markdown built-in produces."),
     item(
         "vars",
         "object",
@@ -181,10 +109,7 @@ pub const ENV_VARS: [(&str, &str); 11] = [
     ("GITTERRACE_TITLE", "The title."),
     ("GITTERRACE_URL", "The permalink."),
     ("GITTERRACE_PATH", "The path, when there is one."),
-    (
-        "GITTERRACE_LINE_START",
-        "First line, when there is a range.",
-    ),
+    ("GITTERRACE_LINE_START", "First line, when there is a range."),
     ("GITTERRACE_LINE_END", "Last line, when there is a range."),
 ];
 
@@ -202,11 +127,7 @@ pub const PLACEHOLDERS: [(&str, bool, &str); 12] = [
     ("repo", false, "The repository name."),
     ("root", false, "The repository root."),
     ("kind", false, "The kind."),
-    (
-        "var.<name>",
-        false,
-        "A value from `[action.vars]`. An undefined name is a load error.",
-    ),
+    ("var.<name>", false, "A value from `[action.vars]`. An undefined name is a load error."),
 ];
 
 /// Modifiers any placeholder may take as `{name:modifier}`; another is a load error.
@@ -227,13 +148,7 @@ pub const FILE_KEYS: [Item; 4] = [
         "",
         "`[[script]]` blocks: a command line written once for several actions.",
     ),
-    item(
-        "action",
-        "array of tables",
-        false,
-        "",
-        "`[[action]]` blocks: what the menu offers.",
-    ),
+    item("action", "array of tables", false, "", "`[[action]]` blocks: what the menu offers."),
     item(
         "send",
         "array of tables",
@@ -245,20 +160,8 @@ pub const FILE_KEYS: [Item; 4] = [
 
 /// Keys of a `[[send]]` block.
 pub const SEND_KEYS: [Item; 6] = [
-    item(
-        "id",
-        "string",
-        true,
-        "",
-        "`[a-z0-9-]`, 1 to 32 characters, unique among sends.",
-    ),
-    item(
-        "label",
-        "string",
-        true,
-        "",
-        "Text in the Send window, 1 to 80 characters.",
-    ),
+    item("id", "string", true, "", "`[a-z0-9-]`, 1 to 32 characters, unique among sends."),
+    item("label", "string", true, "", "Text in the Send window, 1 to 80 characters."),
     item(
         "url",
         "string",
@@ -302,19 +205,13 @@ pub const SEND_KEYS: [Item; 6] = [
 /// Placeholders a `[[send]]` url may hold; the page fills them, each percent-encoded.
 pub const SEND_PLACEHOLDERS: [(&str, &str); 8] = [
     ("title", "The note's first line, or the selection's name."),
-    (
-        "notes",
-        "The rest of the note, the quoted selection and the permalink.",
-    ),
+    ("notes", "The rest of the note, the quoted selection and the permalink."),
     ("permalink", "The permalink, in `links.style`."),
     ("path", "The repository-relative path, or empty."),
     ("lines", "The line range, like `L3-L7`, or empty."),
     ("sha", "The full commit id."),
     ("repo", "The repository name."),
-    (
-        "var.<name>",
-        "A value from `[send.vars]`, inserted verbatim, so it may hold the base URL.",
-    ),
+    ("var.<name>", "A value from `[send.vars]`, inserted verbatim, so it may hold the base URL."),
 ];
 
 /// Keys of a `[[script]]` block.
@@ -355,11 +252,7 @@ pub const SCRIPT_KEYS: [Item; 6] = [
         "string",
         false,
         "`10s`",
-        concat!(
-            "Like `10s` or `500ms`, at most `",
-            numbers::timeout_secs!(),
-            "s`."
-        ),
+        concat!("Like `10s` or `500ms`, at most `", numbers::timeout_secs!(), "s`."),
     ),
     item(
         "shell",
@@ -373,20 +266,8 @@ pub const SCRIPT_KEYS: [Item; 6] = [
 
 /// Keys of an `[[action]]` block.
 pub const ACTION_KEYS: [Item; 14] = [
-    item(
-        "id",
-        "string",
-        true,
-        "",
-        "`[a-z0-9-]`, 1 to 32 characters, unique.",
-    ),
-    item(
-        "label",
-        "string",
-        true,
-        "",
-        "Menu text, 1 to 80 characters.",
-    ),
+    item("id", "string", true, "", "`[a-z0-9-]`, 1 to 32 characters, unique."),
+    item("label", "string", true, "", "Menu text, 1 to 80 characters."),
     item(
         "enabled",
         "boolean",
@@ -416,20 +297,8 @@ pub const ACTION_KEYS: [Item; 14] = [
         "",
         "The `id` of a `[[script]]`. `shell` is not allowed beside it.",
     ),
-    item(
-        "cwd",
-        "string",
-        false,
-        "`home`",
-        "As in a script. Overrides the script's.",
-    ),
-    item(
-        "timeout",
-        "string",
-        false,
-        "`10s`",
-        "As in a script. Overrides the script's.",
-    ),
+    item("cwd", "string", false, "`home`", "As in a script. Overrides the script's."),
+    item("timeout", "string", false, "`10s`", "As in a script. Overrides the script's."),
     item(
         "output",
         "string",
@@ -437,13 +306,7 @@ pub const ACTION_KEYS: [Item; 14] = [
         "`toast`",
         "`toast` shows the first output line, `ignore` shows failures only.",
     ),
-    item(
-        "stdin",
-        "string",
-        false,
-        "`json`",
-        "As in a script. Overrides the script's.",
-    ),
+    item("stdin", "string", false, "`json`", "As in a script. Overrides the script's."),
     item("shell", "boolean", false, "`false`", "As in a script."),
     item(
         "key",

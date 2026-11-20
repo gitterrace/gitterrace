@@ -75,8 +75,7 @@ fn host_allowed(host: &str, gate: &Gate) -> bool {
         return true;
     }
     let Some(ip) = gate.bound else { return false };
-    name.parse::<IpAddr>()
-        .is_ok_and(|n| ip.is_unspecified() || n == ip)
+    name.parse::<IpAddr>().is_ok_and(|n| ip.is_unspecified() || n == ip)
 }
 
 /// Why a request is refused, if it is. Absent `Sec-Fetch-Site` (curl, MCP, old clients)
@@ -91,10 +90,7 @@ fn refusal(
         .and_then(|h| h.to_str().ok())
         .is_some_and(|h| host_allowed(h, gate));
     if !host_ok {
-        return Some((
-            StatusCode::FORBIDDEN,
-            "forbidden: unrecognised Host header\n",
-        ));
+        return Some((StatusCode::FORBIDDEN, "forbidden: unrecognised Host header\n"));
     }
     if gate.public {
         // Nothing public writes, so no other method is routed and no body is read. A link to
@@ -139,51 +135,29 @@ pub(crate) fn same_origin_write(
 pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Next) -> Response {
     let mut res = match refusal(req.method(), req.headers(), &gate) {
         Some((code, why)) => (code, why).into_response(),
-        None if gate.public => tokio::time::timeout(gate.timeout, next.run(req))
-            .await
-            .unwrap_or_else(|_| {
-                (
-                    StatusCode::SERVICE_UNAVAILABLE,
-                    "took too long, try again\n",
-                )
-                    .into_response()
-            }),
+        None if gate.public => {
+            tokio::time::timeout(gate.timeout, next.run(req)).await.unwrap_or_else(|_| {
+                (StatusCode::SERVICE_UNAVAILABLE, "took too long, try again\n").into_response()
+            })
+        }
         None => next.run(req).await,
     };
     let h = res.headers_mut();
-    h.insert(
-        "cross-origin-resource-policy",
-        HeaderValue::from_static("same-origin"),
-    );
-    h.insert(
-        header::X_CONTENT_TYPE_OPTIONS,
-        HeaderValue::from_static("nosniff"),
-    );
+    h.insert("cross-origin-resource-policy", HeaderValue::from_static("same-origin"));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
     // The value an export's `_headers` sets, so both deployments leak the same referrer.
-    h.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("strict-origin-when-cross-origin"),
-    );
+    h.insert(header::REFERRER_POLICY, HeaderValue::from_static("strict-origin-when-cross-origin"));
     // A route that knows its lifetime (hashed assets, raw with an ETag, no-store forms) says so.
     // Everything else is named by something that moves (HEAD, a branch, the worktree), and
     // even a page pinned to a commit shows refs and the live tree in its chrome, so the
     // browser revalidates instead of guessing. Local data stays out of shared caches.
     if !h.contains_key(header::CACHE_CONTROL) {
-        let default = if gate.public {
-            "no-cache"
-        } else {
-            "private, no-cache"
-        };
+        let default = if gate.public { "no-cache" } else { "private, no-cache" };
         h.insert(header::CACHE_CONTROL, HeaderValue::from_static(default));
     }
-    let html = h
-        .get(header::CONTENT_TYPE)
-        .is_some_and(|v| v.as_bytes().starts_with(b"text/html"));
+    let html = h.get(header::CONTENT_TYPE).is_some_and(|v| v.as_bytes().starts_with(b"text/html"));
     if html && !h.contains_key(header::CONTENT_SECURITY_POLICY) {
-        h.insert(
-            header::CONTENT_SECURITY_POLICY,
-            HeaderValue::from_static(CSP),
-        );
+        h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
     }
     res
 }
@@ -221,9 +195,8 @@ mod tests {
     #[tokio::test]
     async fn every_response_carries_the_referrer_policy_and_html_the_csp() {
         let dir = tempfile::tempdir().expect("tmp");
-        let f = gitterrace_testkit::Fixture::init(dir.path())
-            .write("a.txt", "a\n")
-            .commit("feat: a");
+        let f =
+            gitterrace_testkit::Fixture::init(dir.path()).write("a.txt", "a\n").commit("feat: a");
         let router = crate::app_router(f.path()).expect("router");
         let base = gitterrace_testkit::base(&router).await;
         let head = |uri: String| {
@@ -237,18 +210,10 @@ mod tests {
                 (res.status().as_u16(), res.headers().clone())
             }
         };
-        for uri in [
-            "/".to_owned(),
-            format!("{base}/raw/HEAD/a.txt"),
-            "/nope".to_owned(),
-        ] {
+        for uri in ["/".to_owned(), format!("{base}/raw/HEAD/a.txt"), "/nope".to_owned()] {
             let (_, h) = head(uri.clone()).await;
             let referrer = h.get("referrer-policy").map(|v| v.as_bytes().to_vec());
-            assert_eq!(
-                referrer.as_deref(),
-                Some(&b"strict-origin-when-cross-origin"[..]),
-                "{uri}"
-            );
+            assert_eq!(referrer.as_deref(), Some(&b"strict-origin-when-cross-origin"[..]), "{uri}");
         }
         let (status, h) = head(format!("{base}/tree/HEAD")).await;
         assert_eq!(status, 200);
@@ -270,12 +235,7 @@ mod tests {
     #[test]
     fn proxy_hosts_are_exact() {
         let g = gate(None, &["git.example.com"]);
-        for h in [
-            "git.example.com",
-            "GIT.example.com",
-            "git.example.com:443",
-            "localhost",
-        ] {
+        for h in ["git.example.com", "GIT.example.com", "git.example.com:443", "localhost"] {
             assert!(host_allowed(h, &g), "{h}");
         }
         for h in [
@@ -335,10 +295,7 @@ mod tests {
             for chunk in text.split("<script>").skip(1) {
                 let body = chunk.split("</script>").next().expect("closed");
                 let hash = sha256_b64(body);
-                assert!(
-                    CSP.contains(&format!("'sha256-{hash}'")),
-                    "unhashed: {body}"
-                );
+                assert!(CSP.contains(&format!("'sha256-{hash}'")), "unhashed: {body}");
             }
         }
     }
@@ -351,16 +308,8 @@ mod tests {
             .stdout(std::process::Stdio::piped())
             .spawn()
             .expect("openssl");
-        child
-            .stdin
-            .take()
-            .expect("stdin")
-            .write_all(s.as_bytes())
-            .expect("write");
+        child.stdin.take().expect("stdin").write_all(s.as_bytes()).expect("write");
         let out = child.wait_with_output().expect("wait");
-        String::from_utf8(out.stdout)
-            .expect("utf8")
-            .trim()
-            .to_owned()
+        String::from_utf8(out.stdout).expect("utf8").trim().to_owned()
     }
 }

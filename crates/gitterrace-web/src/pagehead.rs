@@ -60,11 +60,7 @@ impl Tagline {
             }
             match parts.last_mut() {
                 Some(p) if p.num == num && p.href.is_empty() => p.text.push_str(text),
-                _ => parts.push(Part {
-                    text: text.to_owned(),
-                    num,
-                    href: String::new(),
-                }),
+                _ => parts.push(Part { text: text.to_owned(), num, href: String::new() }),
             }
         };
         let b = s.as_bytes();
@@ -104,11 +100,7 @@ impl Tagline {
     /// Appends `text` as words, its digits not set apart (a timing that is not a finding).
     #[must_use]
     pub(crate) fn plain(mut self, text: &str) -> Self {
-        self.parts.push(Part {
-            text: text.to_owned(),
-            num: false,
-            href: String::new(),
-        });
+        self.parts.push(Part { text: text.to_owned(), num: false, href: String::new() });
         self
     }
 
@@ -116,17 +108,9 @@ impl Tagline {
     #[must_use]
     pub(crate) fn link(mut self, sep: &str, label: impl Into<String>, href: String) -> Self {
         if !sep.is_empty() {
-            self.parts.push(Part {
-                text: sep.to_owned(),
-                num: false,
-                href: String::new(),
-            });
+            self.parts.push(Part { text: sep.to_owned(), num: false, href: String::new() });
         }
-        self.parts.push(Part {
-            text: label.into(),
-            num: false,
-            href,
-        });
+        self.parts.push(Part { text: label.into(), num: false, href });
         self
     }
 }
@@ -161,11 +145,7 @@ pub(crate) struct PageHead {
 impl PageHead {
     /// A head with `title` and `tagline`, every other slot empty.
     pub(crate) fn new(title: impl Into<String>, tagline: Tagline) -> Self {
-        Self {
-            title: title.into(),
-            tagline,
-            ..Self::default()
-        }
+        Self { title: title.into(), tagline, ..Self::default() }
     }
 }
 
@@ -179,12 +159,7 @@ struct PageHeadMarkup<'a> {
 
 impl fmt::Display for PageHead {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        PageHeadMarkup {
-            h: self,
-            tabs: self.tabs.len() > 1,
-        }
-        .render_into(f)
-        .map_err(|_| fmt::Error)
+        PageHeadMarkup { h: self, tabs: self.tabs.len() > 1 }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 
@@ -201,12 +176,7 @@ mod tests {
     #[test]
     fn numbers_in_the_tagline_are_set_apart() {
         let t = Tagline::of("1,234 commits by 2 authors, 48% in 3.5 days.");
-        let nums: Vec<String> = t
-            .parts
-            .iter()
-            .filter(|p| p.num)
-            .map(|p| p.text.clone())
-            .collect();
+        let nums: Vec<String> = t.parts.iter().filter(|p| p.num).map(|p| p.text.clone()).collect();
         assert_eq!(nums, ["1,234", "2", "48%", "3.5"]);
         assert_eq!(texts(&t).last().map(|p| p.0.as_str()), Some(" days."));
     }
@@ -235,16 +205,9 @@ mod tests {
 
     #[test]
     fn one_tab_is_no_tab_row_and_two_are() {
-        let tab = |label: &str, on| Tab {
-            label: label.into(),
-            href: format!("/{label}"),
-            on,
-        };
-        let one = PageHead {
-            tabs: vec![tab("A", true)],
-            ..PageHead::new("T", Tagline::of("x"))
-        }
-        .to_string();
+        let tab = |label: &str, on| Tab { label: label.into(), href: format!("/{label}"), on };
+        let one = PageHead { tabs: vec![tab("A", true)], ..PageHead::new("T", Tagline::of("x")) }
+            .to_string();
         assert!(!one.contains("class=\"tabs\"") && one.contains("ph-sep"));
         let two = PageHead {
             tabs: vec![tab("A", true), tab("B&C", false)],
@@ -253,24 +216,15 @@ mod tests {
         .to_string();
         assert!(two.contains("<nav class=\"tabs\">") && !two.contains("ph-sep"));
         assert!(two.contains("aria-current=\"page\">A<"));
-        assert!(
-            two.contains(">B&amp;C<") || two.contains(">B&#38;C<"),
-            "{two}"
-        );
+        assert!(two.contains(">B&amp;C<") || two.contains(">B&#38;C<"), "{two}");
     }
 
     #[test]
     fn a_path_title_links_each_part_and_escapes() {
         let h = PageHead {
             crumbs: vec![
-                Crumb {
-                    name: "main".into(),
-                    href: "/tree/main".into(),
-                },
-                Crumb {
-                    name: "<a>".into(),
-                    href: "/tree/main/x".into(),
-                },
+                Crumb { name: "main".into(), href: "/tree/main".into() },
+                Crumb { name: "<a>".into(), href: "/tree/main/x".into() },
             ],
             ..PageHead::new("ignored", Tagline::of("x"))
         }

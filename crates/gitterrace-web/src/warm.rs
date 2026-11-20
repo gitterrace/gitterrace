@@ -37,31 +37,19 @@ const HOTSPOT_PERIODS: &[&str] = &["/stats/hotspots?period=1y", "/stats/hotspots
 /// Every warmer, in the order they run. The shared tables come first: every per-file page
 /// after them slices the tables instead of building its own.
 pub(crate) const WARMERS: &[Warmer] = &[
-    Warmer {
-        name: "repo_id",
-        routes: &[],
-        run: Run::Blocking(repo_id),
-    },
+    Warmer { name: "repo_id", routes: &[], run: Run::Blocking(repo_id) },
     Warmer {
         name: "shared_tables",
         routes: &["/stats/hotspots", "/stats/ownership", "/stats/languages"],
         run: Run::Blocking(crate::insights::warm_shared),
     },
-    Warmer {
-        name: "pages",
-        routes: &crate::WARM_PAGES,
-        run: Run::Pages,
-    },
+    Warmer { name: "pages", routes: &crate::WARM_PAGES, run: Run::Pages },
     Warmer {
         name: "hotspot_periods",
         routes: &["/stats/hotspots"],
         run: Run::Paths(HOTSPOT_PERIODS),
     },
-    Warmer {
-        name: "blame",
-        routes: &["/blame/{rev}/{*path}"],
-        run: Run::Blame,
-    },
+    Warmer { name: "blame", routes: &["/blame/{rev}/{*path}"], run: Run::Blame },
 ];
 
 /// Runs every warmer for `head`, in order. A warmer that fails only means its first visitor
@@ -87,10 +75,7 @@ pub(crate) async fn run(app: &Arc<App>, head: &str) {
                 pages(app, on.collect()).await;
             }
             Run::Blame => {
-                if app
-                    .cfg()
-                    .feature_on(gitterrace_config::Feature::Blame, Some(&app.name))
-                {
+                if app.cfg().feature_on(gitterrace_config::Feature::Blame, Some(&app.name)) {
                     crate::routes::prewarm_blame(Arc::clone(app)).await;
                 }
             }

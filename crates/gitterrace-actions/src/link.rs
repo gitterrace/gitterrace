@@ -57,9 +57,7 @@ impl Link {
             return Err(LinkError::TooLong);
         }
         if !input.is_ascii()
-            || input
-                .bytes()
-                .any(|b| b.is_ascii_control() || b == b' ' || b == b'\\')
+            || input.bytes().any(|b| b.is_ascii_control() || b == b' ' || b == b'\\')
         {
             return Err(LinkError::BadChar);
         }
@@ -67,9 +65,8 @@ impl Link {
             r
         } else if let Some(r) = input.strip_prefix("/go/") {
             r
-        } else if let Some(r) = input
-            .strip_prefix("http://")
-            .or_else(|| input.strip_prefix("https://"))
+        } else if let Some(r) =
+            input.strip_prefix("http://").or_else(|| input.strip_prefix("https://"))
         {
             let (host, path) = r.split_once('/').ok_or(LinkError::Scheme)?;
             // The host is ignored (the link is resolved locally), but a user part is a classic
@@ -102,24 +99,12 @@ impl Link {
         if lines.is_some() && path.is_none() {
             return Err(LinkError::Lines);
         }
-        Ok(Self {
-            id: id.to_owned(),
-            sha: sha.to_owned(),
-            path,
-            lines,
-        })
+        Ok(Self { id: id.to_owned(), sha: sha.to_owned(), path, lines })
     }
 
     /// The `/go` form rooted at `origin` (empty for the path form).
     pub fn go(&self, origin: &str) -> String {
-        permalink(
-            origin,
-            Some(&self.id),
-            "",
-            &self.sha,
-            self.path.as_deref(),
-            self.lines,
-        )
+        permalink(origin, Some(&self.id), "", &self.sha, self.path.as_deref(), self.lines)
     }
 }
 
@@ -232,24 +217,14 @@ mod tests {
         };
         for s in [
             format!("gitterrace://{ID}/{SHA}/src/a%20b.rs#L3-L7"),
-            format!(
-                "{}/go/{ID}/{SHA}/src/a%20b.rs#L3-L7",
-                gitterrace_testkit::base_url()
-            ),
+            format!("{}/go/{ID}/{SHA}/src/a%20b.rs#L3-L7", gitterrace_testkit::base_url()),
             format!("https://example.org/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"),
             format!("/go/{ID}/{SHA}/src/a%20b.rs#L3-L7"),
         ] {
             assert_eq!(Link::parse(&s), Ok(want.clone()), "{s}");
         }
-        let gt = styled(
-            LinkStyle::Gitterrace,
-            "",
-            Some(ID),
-            "",
-            SHA,
-            want.path.as_deref(),
-            want.lines,
-        );
+        let gt =
+            styled(LinkStyle::Gitterrace, "", Some(ID), "", SHA, want.path.as_deref(), want.lines);
         assert_eq!(gt, format!("gitterrace://{ID}/{SHA}/src/a%20b.rs#L3-L7"));
         assert_eq!(
             Link::parse(&gt).map(|l| l.go("")),
@@ -332,15 +307,7 @@ mod tests {
     #[test]
     fn styled_switches_form() {
         let l = Some(Lines { start: 2, end: 2 });
-        let gt = styled(
-            LinkStyle::Gitterrace,
-            "http://h",
-            Some(ID),
-            "n",
-            SHA,
-            Some("a"),
-            l,
-        );
+        let gt = styled(LinkStyle::Gitterrace, "http://h", Some(ID), "n", SHA, Some("a"), l);
         assert_eq!(gt, format!("gitterrace://{ID}/{SHA}/a#L2"));
         let go = styled(LinkStyle::Go, "http://h", Some(ID), "n", SHA, Some("a"), l);
         assert_eq!(go, format!("http://h/go/{ID}/{SHA}/a#L2"));

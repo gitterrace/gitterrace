@@ -65,15 +65,11 @@ pub fn files(repo: &Repo, rev: &str) -> Result<Vec<FileRef>> {
 }
 
 fn files_capped(repo: &Repo, rev: &str, cap: usize) -> Result<Vec<FileRef>> {
-    repo.tree_walks
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    repo.tree_walks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let id = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let tree = r.find_commit(id).map_err(git)?.tree().map_err(git)?;
-    let mut rec = Capped {
-        rec: gix::traverse::tree::Recorder::default(),
-        cap,
-    };
+    let mut rec = Capped { rec: gix::traverse::tree::Recorder::default(), cap };
     // The cap stops the walk with a cancel: that ends it cleanly, anything else is an error.
     if let Err(e) = tree.traverse().breadthfirst(&mut rec)
         && rec.rec.records.len() < cap
@@ -85,10 +81,7 @@ fn files_capped(repo: &Repo, rev: &str, cap: usize) -> Result<Vec<FileRef>> {
         .records
         .into_iter()
         .filter(|e| e.mode.is_blob())
-        .map(|e| FileRef {
-            path: e.filepath.to_str_lossy().into_owned(),
-            blob: BlobId(e.oid),
-        })
+        .map(|e| FileRef { path: e.filepath.to_str_lossy().into_owned(), blob: BlobId(e.oid) })
         .collect();
     out.sort_by(|a, b| a.path.cmp(&b.path));
     // The collect reuses the walk's buffer, sized for every entry with directories; callers
@@ -108,11 +101,7 @@ impl Capped {
         &self,
         act: gix::traverse::tree::visit::Action,
     ) -> gix::traverse::tree::visit::Action {
-        if self.rec.records.len() >= self.cap {
-            std::ops::ControlFlow::Break(())
-        } else {
-            act
-        }
+        if self.rec.records.len() >= self.cap { std::ops::ControlFlow::Break(()) } else { act }
     }
 }
 
@@ -191,9 +180,7 @@ pub fn tree_id(repo: &Repo, rev: &str, path: &str) -> Result<String> {
     let id = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let commit = r.find_commit(id).map_err(git)?;
-    Ok(dir_oid(&commit, path.trim_matches('/'))?
-        .map(|o| o.to_string())
-        .unwrap_or_default())
+    Ok(dir_oid(&commit, path.trim_matches('/'))?.map(|o| o.to_string()).unwrap_or_default())
 }
 
 /// Work done by one [`scan_commits`]: commits walked, and summaries built for the visitor.
@@ -230,11 +217,7 @@ pub fn scan_commits(
         let raw = commit.message_raw().map_err(git)?.to_str_lossy();
         let author = commit.author().map_err(git)?;
         let named = mailmap.resolve_cow(author);
-        if !keep(
-            &raw,
-            &named.name.to_str_lossy(),
-            &named.email.to_str_lossy(),
-        ) {
+        if !keep(&raw, &named.name.to_str_lossy(), &named.email.to_str_lossy()) {
             continue;
         }
         scan.built += 1;
@@ -252,11 +235,7 @@ pub(crate) fn search_summary(
     commit: &gix::Commit<'_>,
     mailmap: &gix::mailmap::Snapshot,
 ) -> Result<CommitSummary> {
-    let message = commit
-        .message_raw()
-        .map_err(git)?
-        .to_str_lossy()
-        .into_owned();
+    let message = commit.message_raw().map_err(git)?.to_str_lossy().into_owned();
     summary_of(commit, mailmap, &message)
 }
 
@@ -293,20 +272,11 @@ pub fn canonical_order(repo: &Repo, rev: &str) -> Result<Vec<String>> {
         let info = info.map_err(git)?;
         let time = match info.commit_time {
             Some(t) => t,
-            None => {
-                r.find_commit(info.id)
-                    .map_err(git)?
-                    .time()
-                    .map_err(git)?
-                    .seconds
-            }
+            None => r.find_commit(info.id).map_err(git)?.time().map_err(git)?.seconds,
         };
         nodes.push((time, info.id, info.parent_ids.to_vec()));
     }
-    Ok(topo_sort(&nodes)
-        .into_iter()
-        .map(|i| nodes[i].1.to_string())
-        .collect())
+    Ok(topo_sort(&nodes).into_iter().map(|i| nodes[i].1.to_string()).collect())
 }
 
 /// Kahn's algorithm over `(time, id, parents)`, picking the smallest (time, id) among the ready
@@ -347,9 +317,7 @@ fn dir_oid(commit: &gix::Commit<'_>, dir: &str) -> Result<Option<gix::ObjectId>>
     if dir.is_empty() {
         return Ok(Some(tree.id));
     }
-    Ok(crate::treepath::lookup(&tree, dir)?
-        .filter(|e| e.mode().is_tree())
-        .map(|e| e.object_id()))
+    Ok(crate::treepath::lookup(&tree, dir)?.filter(|e| e.mode().is_tree()).map(|e| e.object_id()))
 }
 
 fn entries(repo: &gix::Repository, id: Option<gix::ObjectId>) -> HashMap<Vec<u8>, gix::ObjectId> {
@@ -372,10 +340,9 @@ fn steps<'l>(
     among: Option<&'l [(String, Vec<String>)]>,
 ) -> Result<Box<dyn Iterator<Item = Step<'l>> + 'l>> {
     Ok(match among {
-        Some(list) => Box::new(
-            list.iter()
-                .map(|(id, names)| Ok((oid(id)?, Some(names.as_slice())))),
-        ),
+        Some(list) => {
+            Box::new(list.iter().map(|(id, names)| Ok((oid(id)?, Some(names.as_slice())))))
+        }
         None => Box::new(
             r.rev_walk([tip])
                 .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
@@ -424,9 +391,8 @@ pub fn last_commits_among(
     let tip_commit = r.find_commit(tip).map_err(git)?;
     // Ordered, so entries one commit resolves come out by name and not in a per-process
     // random hash order.
-    let mut pending: std::collections::BTreeMap<_, _> = entries(&r, dir_oid(&tip_commit, dir)?)
-        .into_iter()
-        .collect();
+    let mut pending: std::collections::BTreeMap<_, _> =
+        entries(&r, dir_oid(&tip_commit, dir)?).into_iter().collect();
     let ids = steps(&r, tip, among)?;
     let mut found: Vec<(Vec<u8>, gix::ObjectId)> = Vec::new();
     let mut complete = true;
@@ -553,10 +519,8 @@ mod tests {
             (20, id(3), vec![id(1)]),
             (10, id(1), vec![id(99)]),
         ];
-        let got: Vec<u8> = topo_sort(&nodes)
-            .into_iter()
-            .map(|i| nodes[i].1.as_bytes()[0])
-            .collect();
+        let got: Vec<u8> =
+            topo_sort(&nodes).into_iter().map(|i| nodes[i].1.as_bytes()[0]).collect();
         assert_eq!(got, [1, 3, 2, 4, 5, 6, 7]);
     }
 

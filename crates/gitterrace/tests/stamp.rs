@@ -12,11 +12,7 @@ use gitterrace_testkit::git;
 fn repo() -> tempfile::TempDir {
     let tmp = tempfile::tempdir().expect("tmp");
     let root = tmp.path();
-    for f in [
-        "crates/app/build.rs",
-        "crates/other/lib.rs",
-        "tests/bench/results/run.json",
-    ] {
+    for f in ["crates/app/build.rs", "crates/other/lib.rs", "tests/bench/results/run.json"] {
         let p = root.join(f);
         fs::create_dir_all(p.parent().expect("parent")).expect("mkdir");
         fs::write(&p, "a").expect("write");

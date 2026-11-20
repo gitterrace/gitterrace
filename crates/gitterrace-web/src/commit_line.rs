@@ -127,13 +127,8 @@ mod tests {
     #[test]
     fn a_row_shows_avatar_subject_author_time_then_id() {
         let s = CommitRow::of(&summary(), 1_700_000_100).to_string();
-        let order = [
-            "class=\"av ",
-            "class=\"subj\"",
-            "class=\"who\"",
-            "datetime=",
-            "class=\"sha\"",
-        ];
+        let order =
+            ["class=\"av ", "class=\"subj\"", "class=\"who\"", "datetime=", "class=\"sha\""];
         let at: Vec<usize> = order.iter().map(|m| s.find(m).expect(m)).collect();
         assert!(at.windows(2).all(|w| w[0] < w[1]), "{s}");
         assert!(!s.contains("a < b") && !s.contains("Ada <x>"), "{s}");
@@ -155,10 +150,7 @@ mod tests {
         let s = r.to_string();
         let lead = s.find("class=\"ref\"").expect("lead");
         assert!(lead < s.find("class=\"av ").expect("avatar"), "{s}");
-        assert!(
-            s.contains("<span class=\"tag default\">default</span>"),
-            "{s}"
-        );
+        assert!(s.contains("<span class=\"tag default\">default</span>"), "{s}");
         assert!(s.find("class=\"cnums\"").expect("counts") > s.find("class=\"sha\"").expect("id"));
     }
 }

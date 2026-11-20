@@ -46,14 +46,8 @@ fn a_tip_naming_only_its_mark_is_caught() {
     // The languages area once named the language alone, the share bar a name and a share.
     assert_eq!(lacks("Rust"), Some("no number"));
     assert_eq!(lacks("Rust 62.0%"), Some("no total"));
-    assert_eq!(
-        lacks("Rust, 4 May 2026: 41,230 lines (62%) of 66,500"),
-        None
-    );
-    assert_eq!(
-        lacks("Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"),
-        None
-    );
+    assert_eq!(lacks("Rust, 4 May 2026: 41,230 lines (62%) of 66,500"), None);
+    assert_eq!(lacks("Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"), None);
 }
 
 #[tokio::test]
@@ -111,9 +105,8 @@ fn chart_templates_print_built_tips_only() {
     let mut bad = Vec::new();
     for e in std::fs::read_dir(dir).expect("templates").flatten() {
         let name = e.file_name().to_string_lossy().into_owned();
-        let svg = std::path::Path::new(&name)
-            .extension()
-            .is_some_and(|x| x.eq_ignore_ascii_case("svg"));
+        let svg =
+            std::path::Path::new(&name).extension().is_some_and(|x| x.eq_ignore_ascii_case("svg"));
         let chart = name.starts_with("chart_") && svg;
         if !(chart || name == "languages_body.html") {
             continue;

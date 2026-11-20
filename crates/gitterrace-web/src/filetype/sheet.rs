@@ -57,9 +57,7 @@ pub(crate) fn first_sheet(bytes: &[u8], cap: u64, rows: usize) -> Option<Table> 
     if range.height() > rows.saturating_add(1) {
         return None;
     }
-    let mut it = range
-        .rows()
-        .map(|r| r.iter().map(ToString::to_string).collect::<Vec<_>>());
+    let mut it = range.rows().map(|r| r.iter().map(ToString::to_string).collect::<Vec<_>>());
     Some(split(&mut it))
 }
 
@@ -70,10 +68,7 @@ pub(crate) fn table(bytes: &[u8]) -> Option<Table> {
 
 fn split(it: &mut impl Iterator<Item = Vec<String>>) -> Table {
     let head = it.next().unwrap_or_default();
-    Table {
-        head,
-        rows: it.collect(),
-    }
+    Table { head, rows: it.collect() }
 }
 
 /// The xlsx's first sheet, its non-empty cells read one at a time and placed in their
@@ -89,10 +84,7 @@ fn xlsx_sheet<RS: std::io::Read + std::io::Seek>(wb: &mut Xlsx<RS>, rows: usize)
         if cells.len() as u64 >= CELL_CAP {
             return None;
         }
-        cells.push((
-            c.get_position(),
-            Data::from(c.get_value().clone()).to_string(),
-        ));
+        cells.push((c.get_position(), Data::from(c.get_value().clone()).to_string()));
     }
     let Some(&((r0, c0), _)) = cells.first() else {
         return Some(split(&mut std::iter::empty()));

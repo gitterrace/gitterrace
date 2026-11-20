@@ -18,9 +18,7 @@ fn the_app_icon_is_an_icns_with_every_size() {
     }
     // 16, 32, 128, 256, 512 at 1x and @2x, as iconutil writes them (ic04 is 16, ic05 32,
     // ic10 is 512@2x, 1024 px).
-    for t in [
-        "ic04", "ic11", "ic05", "ic12", "ic07", "ic13", "ic08", "ic14", "ic09", "ic10",
-    ] {
+    for t in ["ic04", "ic11", "ic05", "ic12", "ic07", "ic13", "ic08", "ic14", "ic09", "ic10"] {
         assert!(types.iter().any(|x| x == t), "missing {t} in {types:?}");
     }
 }
@@ -53,10 +51,7 @@ fn golden_desktop_entry() {
 #[test]
 fn desktop_entry_escapes_exec_specials() {
     let e = desktop_entry(Path::new("/o/100%/a\"b$c`d\\e/git-terrace"));
-    assert!(
-        e.contains(r#" "/o/100%%/a\\"b\\$c\\`d\\\\e/git-terrace" %u"#),
-        "{e}"
-    );
+    assert!(e.contains(r#" "/o/100%%/a\\"b\\$c\\`d\\\\e/git-terrace" %u"#), "{e}");
 }
 
 /// Splits an `Exec` value as a launcher does: the key-file layer undoes `\\`, then
@@ -78,15 +73,7 @@ fn exec_argv(exec: &str, url: &str) -> Vec<String> {
         }
     }
     out.push(cur);
-    out.into_iter()
-        .map(|a| {
-            if a == "%u" {
-                url.to_owned()
-            } else {
-                a.replace("%%", "%")
-            }
-        })
-        .collect()
+    out.into_iter().map(|a| if a == "%u" { url.to_owned() } else { a.replace("%%", "%") }).collect()
 }
 
 #[test]
@@ -98,28 +85,16 @@ fn desktop_entry_exec_safe_for_sh_c_invocation() {
     let exe = t.path().join("a $b`c`/git-terrace");
     std::fs::create_dir_all(exe.parent().expect("parent")).expect("mkdir");
     let log = t.path().join("args");
-    std::fs::write(
-        &exe,
-        format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", log.display()),
-    )
-    .expect("write");
+    std::fs::write(&exe, format!("#!/bin/sh\nprintf '%s\\n' \"$@\" > '{}'\n", log.display()))
+        .expect("write");
     std::fs::set_permissions(&exe, std::fs::Permissions::from_mode(0o755)).expect("chmod");
     let pwned = t.path().join("pwned");
-    let url = format!(
-        "gitterrace://x;touch {}|$(touch {0})`touch {0}`",
-        pwned.display()
-    );
+    let url = format!("gitterrace://x;touch {}|$(touch {0})`touch {0}`", pwned.display());
     let entry = desktop_entry(&exe);
-    let exec = entry
-        .lines()
-        .find_map(|l| l.strip_prefix("Exec="))
-        .expect("exec");
+    let exec = entry.lines().find_map(|l| l.strip_prefix("Exec=")).expect("exec");
     let argv = exec_argv(exec, &url);
     assert_eq!(argv[0], "sh", "{exec}");
-    let ran = Command::new(&argv[0])
-        .args(&argv[1..])
-        .status()
-        .expect("run");
+    let ran = Command::new(&argv[0]).args(&argv[1..]).status().expect("run");
     assert!(ran.success());
     assert!(!pwned.exists(), "the url ran as a command");
     let got = std::fs::read_to_string(&log).expect("log");
@@ -170,15 +145,9 @@ fn an_unmarked_app_is_refused() {
     std::fs::create_dir_all(app.join("Contents")).expect("dir");
     std::fs::write(app.join("Contents/Info.plist"), plist(&id())).expect("w");
     let why = macos(home, Path::new("/x"), false).expect_err("reinstall refused");
-    assert!(
-        why.to_string().contains(&app.display().to_string()),
-        "{why}"
-    );
+    assert!(why.to_string().contains(&app.display().to_string()), "{why}");
     assert!(why.to_string().contains("remove it once"), "{why}");
-    assert!(
-        macos(home, Path::new("/x"), true).is_err(),
-        "uninstall refused"
-    );
+    assert!(macos(home, Path::new("/x"), true).is_err(), "uninstall refused");
     assert!(app.join("Contents/Info.plist").exists(), "left in place");
 }
 
@@ -206,18 +175,10 @@ fn a_marked_app_is_upgraded_in_place() {
     assert_eq!(owner_of(&app), Owner::Ours(Some(new.to_path_buf())));
     assert_eq!(std::fs::read(&icon).expect("icon"), ICON);
     let main = app.join("Contents/Resources/Scripts/main.scpt");
-    let src = Command::new("osadecompile")
-        .arg(&main)
-        .output()
-        .expect("osadecompile");
+    let src = Command::new("osadecompile").arg(&main).output().expect("osadecompile");
     let src = String::from_utf8_lossy(&src.stdout);
     assert!(src.contains("/new place/bin/git-terrace"), "{src}");
-    tool(
-        Command::new("codesign")
-            .args(["--verify", "--strict"])
-            .arg(&app),
-    )
-    .expect("signature");
+    tool(Command::new("codesign").args(["--verify", "--strict"]).arg(&app)).expect("signature");
 }
 
 /// Guard class: `open` hints when the handler runs a missing or another program, stays
@@ -242,21 +203,14 @@ fn open_hints_at_a_stale_handler_without_touching_it() {
     assert_eq!(hint_for(&app, &here), None);
     with(Path::new("/gone/git-terrace"));
     let hint = hint_for(&app, &here).expect("hint");
-    assert!(
-        hint.contains("a missing program") && hint.contains("install-handler"),
-        "{hint}"
-    );
+    assert!(hint.contains("a missing program") && hint.contains("install-handler"), "{hint}");
     assert!(
         std::fs::read_to_string(app.join("Contents/Info.plist"))
             .expect("r")
             .contains("/gone/git-terrace")
     );
     with(tmp.path());
-    assert!(
-        hint_for(&app, &here)
-            .expect("hint")
-            .contains("another program")
-    );
+    assert!(hint_for(&app, &here).expect("hint").contains("another program"));
 }
 
 #[test]

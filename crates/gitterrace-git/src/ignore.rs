@@ -36,11 +36,7 @@ impl IgnoreSet {
                 let name = f.path.rsplit('/').next().unwrap_or(&f.path);
                 FILE_NAMES.contains(&name)
             })
-            .filter_map(|f| {
-                reader
-                    .text(f.blob, MAX_CONFIG_BYTES)
-                    .map(|text| (f.path, text))
-            })
+            .filter_map(|f| reader.text(f.blob, MAX_CONFIG_BYTES).map(|text| (f.path, text)))
             .collect();
         // Shallow first: the search tries the last added list first, so deeper rules win.
         found.sort_by_key(|(path, _)| path.matches('/').count());
@@ -107,13 +103,8 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tmp");
         let dir = tmp.path();
         gitterrace_testkit::git(dir, &["init", "-q", "-b", "main"]);
-        let files = (0..10_000).map(|i| {
-            format!(
-                "M 100644 inline d{}/f{i}.txt\ndata 2\n{}\n\n",
-                i % 100,
-                i % 10
-            )
-        });
+        let files = (0..10_000)
+            .map(|i| format!("M 100644 inline d{}/f{i}.txt\ndata 2\n{}\n\n", i % 100, i % 10));
         let ignores = [".gitignore", "d1/.gitignore", "d2/.ignore"]
             .map(|p| format!("M 100644 inline {p}\ndata 4\n*.o\n\n"));
         let script: String = std::iter::once(
@@ -134,11 +125,7 @@ mod tests {
     }
 
     fn set(files: &[(&str, &str)]) -> IgnoreSet {
-        IgnoreSet::from_files(
-            files
-                .iter()
-                .map(|(p, t)| ((*p).to_owned(), (*t).to_owned())),
-        )
+        IgnoreSet::from_files(files.iter().map(|(p, t)| ((*p).to_owned(), (*t).to_owned())))
     }
 
     #[test]
@@ -155,10 +142,7 @@ mod tests {
 
     #[test]
     fn nested_files_are_scoped_and_override() {
-        let s = set(&[
-            (".gitignore", "*.gen\n"),
-            ("web/.gitignore", "dist/\n!a.gen\n"),
-        ]);
+        let s = set(&[(".gitignore", "*.gen\n"), ("web/.gitignore", "dist/\n!a.gen\n")]);
         assert!(s.is_ignored("web/dist/app.js"));
         assert!(!s.is_ignored("dist/app.js"));
         assert!(s.is_ignored("x/b.gen"));

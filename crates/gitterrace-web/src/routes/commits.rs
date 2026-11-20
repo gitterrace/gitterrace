@@ -65,12 +65,8 @@ const GUTTER_STEP: u32 = 16;
 
 /// The gutter step the labels of `rows` need, 0 when no row has one, at most 12.
 fn gutter(rows: &[CommitRow]) -> u32 {
-    let chars = rows
-        .iter()
-        .flat_map(|r| r.refs.iter())
-        .map(|(n, _)| n.chars().count())
-        .max()
-        .unwrap_or(0);
+    let chars =
+        rows.iter().flat_map(|r| r.refs.iter()).map(|(n, _)| n.chars().count()).max().unwrap_or(0);
     let px = match u32::try_from(chars) {
         Ok(0) | Err(_) => 0,
         Ok(n) => n.saturating_mul(LABEL_CH) + LABEL_PAD,
@@ -118,11 +114,7 @@ pub(super) async fn log(
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         // The graph's lines: every branch tip, or only this ref's.
-        let tips = if all {
-            lane_tips(a, &id)?
-        } else {
-            vec![id.clone()]
-        };
+        let tips = if all { lane_tips(a, &id)? } else { vec![id.clone()] };
         let (mut list, more, capped) = if all {
             let (l, more) = all_lanes_page(a, &tips, pg)?;
             (l, more, false)
@@ -152,21 +144,14 @@ pub(super) async fn log(
             .render()?,
             ..head
         };
-        let graph_rows = if graph {
-            graph_rows(a, &tips, &list, pg, now)?
-        } else {
-            Vec::new()
-        };
+        let graph_rows = if graph { graph_rows(a, &tips, &list, pg, now)? } else { Vec::new() };
         Ok(LogPage {
             gutter: gutter(&graph_rows),
             c: views::chrome_at(a, "log", &rev).live(Mode::NOTICE),
             head,
             newer: (pg > 0).then(|| link(pg - 1)),
             older: more.then(|| link(pg + 1)),
-            fb: ChipRow {
-                chips: chips(&f, &base, &list),
-                clear: fmt::href(&base),
-            },
+            fb: ChipRow { chips: chips(&f, &base, &list), clear: fmt::href(&base) },
             empty: list.is_empty().then(|| {
                 let e = crate::empty::Empty::new(if capped {
                     "No match in the newest 2,000 commits."
@@ -175,18 +160,10 @@ pub(super) async fn log(
                 } else {
                     "No commits."
                 });
-                if filtered {
-                    e.step("Show every commit", fmt::href(&base))
-                } else {
-                    e
-                }
+                if filtered { e.step("Show every commit", fmt::href(&base)) } else { e }
             }),
             graph: graph_rows,
-            days: if graph {
-                Vec::new()
-            } else {
-                views::day_groups(&list, now)
-            },
+            days: if graph { Vec::new() } else { views::day_groups(&list, now) },
         })
     })
     .await?;
@@ -219,11 +196,7 @@ fn filtered_page(
             let ids = &log.ids;
             let from = pg.saturating_mul(PAGE).min(ids.len());
             let to = (from + PAGE).min(ids.len());
-            return Ok((
-                a.repo.summaries_at(id, &ids[from..to])?,
-                ids.len() > to,
-                false,
-            ));
+            return Ok((a.repo.summaries_at(id, &ids[from..to])?, ids.len() > to, false));
         }
         let mut list = a.repo.log(id, Some(p), pg.saturating_mul(PAGE), PAGE + 1)?;
         let more = list.len() > PAGE;
@@ -238,18 +211,14 @@ fn filtered_page(
 /// The filter's chips, an author's shown by the name the listed commits carry.
 fn chips(f: &Filter, base: &str, list: &[gitterrace_git::CommitSummary]) -> Vec<Chip> {
     let name = |w: &str| {
-        list.iter()
-            .find(|c| by(w, &c.author.name, &c.author.email))
-            .map(|c| c.author.name.clone())
+        list.iter().find(|c| by(w, &c.author.name, &c.author.email)).map(|c| c.author.name.clone())
     };
     f.chips(base, None)
         .into_iter()
         .map(|mut ch| {
             if ch.dim == "author" {
-                let (not, who) = ch
-                    .label
-                    .strip_prefix("not ")
-                    .map_or(("", ch.label.as_str()), |w| ("not ", w));
+                let (not, who) =
+                    ch.label.strip_prefix("not ").map_or(("", ch.label.as_str()), |w| ("not ", w));
                 if let Some(n) = name(who) {
                     ch.label = format!("{not}{n}");
                 }
@@ -285,19 +254,13 @@ const FILTER_DOCS: &str = "https://gitterrace.dev/docs/using/#find-commits";
 /// The filter help lines, one per keyword of the table, so a new keyword shows up here with no
 /// second list to edit.
 fn filter_help() -> Vec<(&'static str, &'static str)> {
-    gitterrace_index::query::KEYWORDS
-        .iter()
-        .map(|k| (k.syntax, k.description))
-        .collect()
+    gitterrace_index::query::KEYWORDS.iter().map(|k| (k.syntax, k.description)).collect()
 }
 
 /// The log links of the other served repositories sharing a root commit, as `(href, name)`.
 fn related_logs(a: &App) -> Vec<(String, String)> {
     let names = a.env.related.related(&a.key);
-    names
-        .into_iter()
-        .map(|name| (format!("/r/{}/log", fmt::enc_seg(&name)), name))
-        .collect()
+    names.into_iter().map(|name| (format!("/r/{}/log", fmt::enc_seg(&name)), name)).collect()
 }
 
 /// The log's page head: "Commits" with the revision, a tagline saying what the list holds,
@@ -333,11 +296,7 @@ fn log_head(
     if pg > 0 {
         let _ = write!(said, ", page {}", pg + 1);
     }
-    let _ = write!(
-        said,
-        " \u{b7} {} on this page",
-        fmt::count(list.len(), "commit", "commits")
-    );
+    let _ = write!(said, " \u{b7} {} on this page", fmt::count(list.len(), "commit", "commits"));
     let tab = |label: &str, href: String, on: bool| Tab {
         label: label.to_owned(),
         href: fmt::href(&href),
@@ -351,11 +310,7 @@ fn log_head(
             vec![
                 tab("List", format!("/log/{rev_enc}"), !graph),
                 tab("Graph", format!("/log/{rev_enc}?view=graph"), graph && all),
-                tab(
-                    "This ref",
-                    format!("/log/{rev_enc}?view=graph&lanes=one"),
-                    graph && !all,
-                ),
+                tab("This ref", format!("/log/{rev_enc}?view=graph&lanes=one"), graph && !all),
             ]
         },
         ..PageHead::new("Commits", Tagline::of(&said))
@@ -412,9 +367,7 @@ fn graph_rows(
     if tips.len() > 1 && crate::gitstate::local_state(a) {
         for w in a.repo.linked_worktrees()? {
             if let (None, Some(c)) = (w.branch, w.commit) {
-                refs.entry(c)
-                    .or_default()
-                    .push((format!("worktree {}", w.id), false));
+                refs.entry(c).or_default().push((format!("worktree {}", w.id), false));
             }
         }
     }
@@ -552,9 +505,7 @@ fn media_facts(
                 .then_some(parent)
                 .flatten()
                 .and_then(|p| read(p, old_path));
-            let new = (f.kind != ChangeKind::Deleted)
-                .then(|| read(rev, &f.path))
-                .flatten();
+            let new = (f.kind != ChangeKind::Deleted).then(|| read(rev, &f.path)).flatten();
             (f.path.clone(), (old, new))
         })
         .collect()
@@ -567,10 +518,7 @@ mod tests {
     use super::{FILTER_DOCS, LogFilter, filter_help};
 
     fn escaped(s: &str) -> String {
-        s.replace('&', "&#38;")
-            .replace('<', "&#60;")
-            .replace('>', "&#62;")
-            .replace('"', "&#34;")
+        s.replace('&', "&#38;").replace('<', "&#60;").replace('>', "&#62;").replace('"', "&#34;")
     }
 
     #[test]
@@ -588,11 +536,7 @@ mod tests {
         .expect("render");
         for k in gitterrace_index::query::KEYWORDS {
             let line = format!("<code>{}</code>", escaped(k.syntax));
-            assert!(
-                html.contains(&line),
-                "no help line for {}: {html}",
-                k.keyword
-            );
+            assert!(html.contains(&line), "no help line for {}: {html}", k.keyword);
         }
         assert!(html.contains("aria-label=\"Filter help\""));
         assert!(html.contains(FILTER_DOCS));

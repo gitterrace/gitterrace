@@ -23,9 +23,8 @@ pub(super) struct LineMap {
 
 impl LineMap {
     pub(super) fn new(body: &str, skip: usize) -> Self {
-        let starts = std::iter::once(0)
-            .chain(body.match_indices('\n').map(|(i, _)| i + 1))
-            .collect();
+        let starts =
+            std::iter::once(0).chain(body.match_indices('\n').map(|(i, _)| i + 1)).collect();
         Self { starts, skip }
     }
 
@@ -158,10 +157,7 @@ mod tests {
             ),
             "{out}"
         );
-        assert!(
-            out.contains("markdown-alert-note\" data-line=\"3-4\">"),
-            "{out}"
-        );
+        assert!(out.contains("markdown-alert-note\" data-line=\"3-4\">"), "{out}");
         assert!(out.contains("<p data-line=\"10-10\">para</p>"), "{out}");
     }
 
@@ -173,10 +169,7 @@ mod tests {
         let out = render("x \u{E000}9-9\u{E001}<b>y</b> \u{E000}\n\nz\n");
         assert!(!out.contains("data-line=\"9-9\""), "{out}");
         assert!(!out.contains(['\u{E000}', '\u{E001}']), "{out}");
-        assert!(
-            out.contains("<p data-line=\"1-1\">x \u{FFFD}9-9\u{FFFD}<b>"),
-            "{out}"
-        );
+        assert!(out.contains("<p data-line=\"1-1\">x \u{FFFD}9-9\u{FFFD}<b>"), "{out}");
     }
 
     #[test]

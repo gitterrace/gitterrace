@@ -76,10 +76,7 @@ pub fn language(path: &str) -> String {
         _ => None,
     };
     if let Some(ext) = ext {
-        if let Some((lang, _)) = LANGUAGES
-            .iter()
-            .find(|(_, exts)| exts.contains(&ext.as_str()))
-        {
+        if let Some((lang, _)) = LANGUAGES.iter().find(|(_, exts)| exts.contains(&ext.as_str())) {
             return (*lang).to_owned();
         }
         return format!(".{ext}");

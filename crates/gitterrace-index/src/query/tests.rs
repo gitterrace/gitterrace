@@ -54,10 +54,7 @@ fn refusals_say_what_is_supported() {
         assert!(e.end > e.start && e.end <= s.len().max(1), "{s}: {e:?}");
     }
     assert!(
-        Query::parse("committer:ann")
-            .expect_err("committer")
-            .message
-            .contains("not supported")
+        Query::parse("committer:ann").expect_err("committer").message.contains("not supported")
     );
 }
 
@@ -67,10 +64,7 @@ fn chips_remove_one_term() {
     assert_eq!(a.without(1).to_string(), "type:fix crash");
     let b = a.replace(
         |l| matches!(l, Leaf::After(_)),
-        Some(Term {
-            neg: false,
-            leaf: Leaf::After(When::Period(Period::Week)),
-        }),
+        Some(Term { neg: false, leaf: Leaf::After(When::Period(Period::Week)) }),
     );
     assert_eq!(b.to_string(), "type:fix author:ann crash after:1w");
     let c = q("after:3m fix").replace(|l| matches!(l, Leaf::After(_)), b.terms()[3].clone().into());
@@ -88,13 +82,8 @@ fn path() -> impl Strategy<Value = String> {
 
 fn when() -> impl Strategy<Value = When> {
     prop_oneof![
-        prop::sample::select(vec![
-            Period::Week,
-            Period::Month,
-            Period::Quarter,
-            Period::Year
-        ])
-        .prop_map(When::Period),
+        prop::sample::select(vec![Period::Week, Period::Month, Period::Quarter, Period::Year])
+            .prop_map(When::Period),
         (0..50_000i64).prop_map(When::Day),
     ]
 }
@@ -150,10 +139,7 @@ fn a_day_range_reads_both_ends_inclusive() {
     let [from, to] = day_range("2024-03-04", "2024-03-04").expect("range");
     assert_eq!(
         (from.to_string(), to.to_string()),
-        (
-            "after:2024-03-04".to_owned(),
-            "before:2024-03-05".to_owned()
-        )
+        ("after:2024-03-04".to_owned(), "before:2024-03-05".to_owned())
     );
     let [_, leap] = day_range("2024-02-28", "2024-02-29").expect("range");
     assert_eq!(leap.to_string(), "before:2024-03-01");

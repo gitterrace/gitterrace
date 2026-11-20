@@ -56,22 +56,14 @@ impl Insights<'_> {
                 score: count as f64 * f64::from(f.lines).sqrt(),
             });
         }
-        rows.sort_by(|a, b| {
-            b.score
-                .total_cmp(&a.score)
-                .then_with(|| a.path.cmp(&b.path))
-        });
+        rows.sort_by(|a, b| b.score.total_cmp(&a.score).then_with(|| a.path.cmp(&b.path)));
         let total: usize = rows.iter().map(|r| r.changes).sum();
         let tenth = rows.len().div_ceil(10).max(1);
         let mut by_changes: Vec<usize> = rows.iter().map(|r| r.changes).collect();
         by_changes.sort_unstable_by(|a, b| b.cmp(a));
         let top: usize = by_changes.iter().take(tenth).sum();
         HotspotReport {
-            concentration: if total == 0 {
-                0.0
-            } else {
-                top as f64 / total as f64
-            },
+            concentration: if total == 0 { 0.0 } else { top as f64 / total as f64 },
             top_tenth: tenth,
             single_author_files: rows.iter().filter(|r| r.authors == 1).count(),
             total_changes: total,
@@ -100,18 +92,13 @@ impl Insights<'_> {
         };
         // The stored tip touches answer every file in one pass, cheaper than the aggregate.
         let whole = whole && !src.has_tip();
-        let ids: Vec<Option<PathId>> = files
-            .iter()
-            .map(|f| if whole { plain(f) } else { None })
-            .collect();
+        let ids: Vec<Option<PathId>> =
+            files.iter().map(|f| if whole { plain(f) } else { None }).collect();
         let mut out: Vec<BTreeMap<usize, u64>> = vec![BTreeMap::new(); files.len()];
         // Ordered by person (most commits first), so a tie for top owner and the float sums
         // come out the same on every run; a HashMap made "Stale lines" vary.
-        let at: FastMap<PathId, usize> = ids
-            .iter()
-            .enumerate()
-            .filter_map(|(i, id)| id.map(|id| (id, i)))
-            .collect();
+        let at: FastMap<PathId, usize> =
+            ids.iter().enumerate().filter_map(|(i, id)| id.map(|id| (id, i))).collect();
         if !at.is_empty() {
             let bots = self.opts.include_bots;
             for row in src.agg_path_author("") {
@@ -206,10 +193,7 @@ impl Insights<'_> {
                 let w = f64::from(f.lines) * c as f64 / changed as f64;
                 *d.w.entry(p).or_default() += w;
                 *all.w.entry(p).or_default() += w;
-                if w.total_cmp(&top_w)
-                    .then_with(|| self.person_order(top_p, p))
-                    .is_gt()
-                {
+                if w.total_cmp(&top_w).then_with(|| self.person_order(top_p, p)).is_gt() {
                     top_w = w;
                     top_p = p;
                 }
@@ -227,15 +211,8 @@ impl Insights<'_> {
         }
         let finish = |path: String, a: Acc| -> DirOwnership {
             let mut owners: Vec<(usize, f64)> = a.w.into_iter().collect();
-            owners.sort_by(|x, y| {
-                y.1.total_cmp(&x.1)
-                    .then_with(|| self.person_order(x.0, y.0))
-            });
-            let total: f64 = owners
-                .iter()
-                .map(|o| o.1)
-                .sum::<f64>()
-                .max(f64::MIN_POSITIVE);
+            owners.sort_by(|x, y| y.1.total_cmp(&x.1).then_with(|| self.person_order(x.0, y.0)));
+            let total: f64 = owners.iter().map(|o| o.1).sum::<f64>().max(f64::MIN_POSITIVE);
             let bus = crate::insights::bus_factor(owners.iter().map(|o| o.1));
             DirOwnership {
                 path,
@@ -288,11 +265,8 @@ impl Insights<'_> {
     ) -> Vec<Coupling> {
         let counted = c;
         let files = under_path(files, c);
-        let mut head: Vec<&str> = files
-            .iter()
-            .filter(|f| !self.skips_head(&f.path))
-            .map(|f| &*f.path)
-            .collect();
+        let mut head: Vec<&str> =
+            files.iter().filter(|f| !self.skips_head(&f.path)).map(|f| &*f.path).collect();
         head.sort_unstable();
         head.dedup();
         // Flat (commit, file) pairs sorted by commit replace a map of vectors: one allocation

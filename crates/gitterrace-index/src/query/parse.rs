@@ -37,9 +37,7 @@ pub(super) fn terms(text: &str) -> Result<Vec<Term>, QueryError> {
 pub(super) fn quote(v: &str) -> String {
     let bare = !v.is_empty()
         && !v.starts_with('!')
-        && !v
-            .chars()
-            .any(|c| c.is_whitespace() || "\",|()\\".contains(c));
+        && !v.chars().any(|c| c.is_whitespace() || "\",|()\\".contains(c));
     if bare { v.to_owned() } else { quoted(v) }
 }
 
@@ -47,8 +45,7 @@ pub(super) fn quote(v: &str) -> String {
 pub(super) fn quote_text(v: &str) -> String {
     let bare = !v.is_empty()
         && v != "merge"
-        && v.chars()
-            .all(|c| c.is_alphanumeric() || "-_./#@'".contains(c))
+        && v.chars().all(|c| c.is_alphanumeric() || "-_./#@'".contains(c))
         && !v.starts_with(['-', '!']);
     if bare { v.to_owned() } else { quoted(v) }
 }
@@ -109,17 +106,13 @@ impl Scan<'_> {
         match self.peek() {
             Some(c @ ('|' | '(' | ')')) => {
                 self.bump();
-                return Err(self.err(
-                    start,
-                    format!("`{c}` is not supported yet. Supported: {SUPPORTED}."),
-                ));
+                return Err(
+                    self.err(start, format!("`{c}` is not supported yet. Supported: {SUPPORTED}."))
+                );
             }
             Some('"') => {
                 let text = self.quoted()?;
-                return Ok(Term {
-                    neg,
-                    leaf: Leaf::Text(text),
-                });
+                return Ok(Term { neg, leaf: Leaf::Text(text) });
             }
             None => return Err(self.err(start, "`!` needs a term after it".to_owned())),
             Some(c) if c.is_whitespace() => {
@@ -128,10 +121,7 @@ impl Scan<'_> {
             Some(_) => {}
         }
         let word_at = self.at;
-        while self
-            .peek()
-            .is_some_and(|c| !c.is_whitespace() && !"\":|()".contains(c))
-        {
+        while self.peek().is_some_and(|c| !c.is_whitespace() && !"\":|()".contains(c)) {
             self.bump();
         }
         let word = &self.text[word_at..self.at];
@@ -139,17 +129,10 @@ impl Scan<'_> {
             if matches!(self.peek(), Some('|' | '(' | ')' | '"')) {
                 return Err(self.err(
                     self.at,
-                    format!(
-                        "unexpected `{}`. Supported: {SUPPORTED}.",
-                        self.peek().unwrap_or(' ')
-                    ),
+                    format!("unexpected `{}`. Supported: {SUPPORTED}.", self.peek().unwrap_or(' ')),
                 ));
             }
-            let leaf = if word == "merge" {
-                Leaf::Merge
-            } else {
-                Leaf::Text(word.to_owned())
-            };
+            let leaf = if word == "merge" { Leaf::Merge } else { Leaf::Text(word.to_owned()) };
             return Ok(Term { neg, leaf });
         }
         self.bump();
@@ -166,11 +149,8 @@ impl Scan<'_> {
             "scope" => Leaf::Scope(self.list(start)?),
             "author" => Leaf::Author(self.list(start)?),
             "path" => {
-                let v: Vec<String> = self
-                    .list(start)?
-                    .into_iter()
-                    .map(|p| p.trim_matches('/').to_owned())
-                    .collect();
+                let v: Vec<String> =
+                    self.list(start)?.into_iter().map(|p| p.trim_matches('/').to_owned()).collect();
                 if v.iter().any(String::is_empty) {
                     return Err(self.err(start, "`path:` needs a path".to_owned()));
                 }
@@ -187,18 +167,11 @@ impl Scan<'_> {
                         ),
                     ));
                 };
-                if word == "before" {
-                    Leaf::Before(w)
-                } else {
-                    Leaf::After(w)
-                }
+                if word == "before" { Leaf::Before(w) } else { Leaf::After(w) }
             }
             _ => {
-                let known: Vec<&str> = KEYWORDS
-                    .iter()
-                    .filter(|k| k.syntax.contains(':'))
-                    .map(|k| k.keyword)
-                    .collect();
+                let known: Vec<&str> =
+                    KEYWORDS.iter().filter(|k| k.syntax.contains(':')).map(|k| k.keyword).collect();
                 return Err(self.err(
                     start,
                     format!(
@@ -231,10 +204,7 @@ impl Scan<'_> {
             return Ok(v);
         }
         let at = self.at;
-        while self
-            .peek()
-            .is_some_and(|c| !c.is_whitespace() && !",\"|()".contains(c))
-        {
+        while self.peek().is_some_and(|c| !c.is_whitespace() && !",\"|()".contains(c)) {
             self.bump();
         }
         if at == self.at {

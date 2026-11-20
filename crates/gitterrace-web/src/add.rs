@@ -31,10 +31,7 @@ enum RootError {
     #[error("path must be absolute")]
     NotAbsolute,
     #[error("cannot read {}: {source}", path.display())]
-    Unreadable {
-        path: PathBuf,
-        source: std::io::Error,
-    },
+    Unreadable { path: PathBuf, source: std::io::Error },
     #[error("path must be canonical: no symlinks, `.` or `..`")]
     NotCanonical,
     #[error("not a folder")]
@@ -64,18 +61,10 @@ struct AddReply<'a> {
 }
 
 impl<'a> AddReply<'a> {
-    const NONE: Self = Self {
-        base: None,
-        error: None,
-        name: None,
-        proof: None,
-    };
+    const NONE: Self = Self { base: None, error: None, name: None, proof: None };
 
     const fn error(why: &'a str) -> Self {
-        Self {
-            error: Some(why),
-            ..Self::NONE
-        }
+        Self { error: Some(why), ..Self::NONE }
     }
 }
 
@@ -101,9 +90,7 @@ struct AddRequest {
 
 /// Mounted only on a loopback bind with a token; elsewhere the route does not exist.
 pub(crate) fn router(adder: Arc<Adder>) -> Router {
-    Router::new()
-        .route("/_repos", get(prove).post(add).delete(remove))
-        .with_state(adder)
+    Router::new().route("/_repos", get(prove).post(add).delete(remove)).with_state(adder)
 }
 
 #[derive(serde::Deserialize)]
@@ -120,22 +107,13 @@ async fn prove(
     axum::extract::Query(c): axum::extract::Query<Challenge>,
 ) -> Response {
     if headers.contains_key(header::ORIGIN) || headers.contains_key("sec-fetch-site") {
-        return (
-            StatusCode::FORBIDDEN,
-            "forbidden: browsers cannot add repositories\n",
-        )
+        return (StatusCode::FORBIDDEN, "forbidden: browsers cannot add repositories\n")
             .into_response();
     }
     if c.nonce.is_empty() || c.nonce.len() > 128 {
         return bad("nonce must be 1 to 128 bytes");
     }
-    reply(
-        StatusCode::OK,
-        &AddReply {
-            proof: Some(&adder.token.prove(&c.nonce)),
-            ..AddReply::NONE
-        },
-    )
+    reply(StatusCode::OK, &AddReply { proof: Some(&adder.token.prove(&c.nonce)), ..AddReply::NONE })
 }
 
 /// Why a request is refused before its body is read. Any browser marker refuses: a fetch from
@@ -153,12 +131,7 @@ fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
 }
 
 fn reply(status: StatusCode, body: &AddReply<'_>) -> Response {
-    (
-        status,
-        [(header::CACHE_CONTROL, "no-store")],
-        axum::Json(body),
-    )
-        .into_response()
+    (status, [(header::CACHE_CONTROL, "no-store")], axum::Json(body)).into_response()
 }
 
 fn bad(why: &str) -> Response {
@@ -183,10 +156,7 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     let (root, stem) = match checked {
         Ok(Ok(found)) => found,
         Ok(Err(why @ RootError::Unopenable(_))) => {
-            return reply(
-                StatusCode::UNPROCESSABLE_ENTITY,
-                &AddReply::error(&why.to_string()),
-            );
+            return reply(StatusCode::UNPROCESSABLE_ENTITY, &AddReply::error(&why.to_string()));
         }
         Ok(Err(why)) => return bad(&why.to_string()),
         Err(_) => return StatusCode::INTERNAL_SERVER_ERROR.into_response(),
@@ -225,11 +195,7 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     tokio::spawn(open_added(adder, served, root));
     reply(
         StatusCode::ACCEPTED,
-        &AddReply {
-            base: Some(&base),
-            name: Some(&name),
-            ..AddReply::NONE
-        },
+        &AddReply { base: Some(&base), name: Some(&name), ..AddReply::NONE },
     )
 }
 
@@ -246,11 +212,7 @@ async fn open_added(adder: Arc<Adder>, served: Arc<crate::multi::Served>, root: 
         }
         return;
     }
-    if !adder
-        .table
-        .get(&served.name)
-        .is_some_and(|s| Arc::ptr_eq(&s, &served))
-    {
+    if !adder.table.get(&served.name).is_some_and(|s| Arc::ptr_eq(&s, &served)) {
         return;
     }
     let state = adder.state.clone();
@@ -291,13 +253,7 @@ async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
             adder.site.drop_target(&name);
             tracing::info!("removed {name}");
             adder.table.announce();
-            reply(
-                StatusCode::OK,
-                &AddReply {
-                    name: Some(&name),
-                    ..AddReply::NONE
-                },
-            )
+            reply(StatusCode::OK, &AddReply { name: Some(&name), ..AddReply::NONE })
         }
         Err(Kept::NotServed) => reply(StatusCode::NOT_FOUND, &AddReply::error("not served")),
         Err(Kept::Last) => reply(
@@ -324,10 +280,7 @@ fn checked_root(path: &Path, actions_file: Option<&Path>) -> Result<(PathBuf, St
     }
     let canon = path
         .canonicalize()
-        .map_err(|source| RootError::Unreadable {
-            path: path.to_owned(),
-            source,
-        })?;
+        .map_err(|source| RootError::Unreadable { path: path.to_owned(), source })?;
     if canon != path {
         return Err(RootError::NotCanonical);
     }
@@ -365,10 +318,7 @@ mod error_tests {
             RootError::NotTop { top: "/r".into() }.to_string(),
             "not the top folder of a git repository (that is /r)"
         );
-        assert_eq!(
-            RootError::HoldsActions.to_string(),
-            "this repository holds actions.toml"
-        );
+        assert_eq!(RootError::HoldsActions.to_string(), "this repository holds actions.toml");
     }
 
     #[test]

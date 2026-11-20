@@ -12,11 +12,8 @@ fn the_owned_index_blame_is_gix_blame() -> crate::Result<()> {
     let at = |args: &[&str]| gitterrace_testkit::git_at(p, "2024-01-02T12:00:00Z", args);
     let body = |tag: &str| (0..30).fold(String::new(), |b, l| b + &format!("{tag} {l}\n"));
     at(&["init", "-q", "-b", "main"]);
-    std::fs::write(
-        p.join(".gitattributes"),
-        "*.txt text eol=crlf\n*.md diff=markdown\n",
-    )
-    .map_err(crate::error::git)?;
+    std::fs::write(p.join(".gitattributes"), "*.txt text eol=crlf\n*.md diff=markdown\n")
+        .map_err(crate::error::git)?;
     std::fs::write(p.join("a.txt"), body("a")).map_err(crate::error::git)?;
     std::fs::write(p.join("b.md"), body("b")).map_err(crate::error::git)?;
     at(&["add", "-A"]);
@@ -35,17 +32,9 @@ fn the_owned_index_blame_is_gix_blame() -> crate::Result<()> {
     for path in ["moved.txt", "b.md", ".gitattributes"] {
         let ours = super::blame_outcome(&gix, tip, path, u64::MAX)?;
         let theirs = gix
-            .blame_file(
-                path.into(),
-                tip,
-                gix::repository::blame_file::Options::default(),
-            )
+            .blame_file(path.into(), tip, gix::repository::blame_file::Options::default())
             .map_err(crate::error::git)?;
-        assert_eq!(
-            format!("{:?}", ours.entries),
-            format!("{:?}", theirs.entries),
-            "{path}"
-        );
+        assert_eq!(format!("{:?}", ours.entries), format!("{:?}", theirs.entries), "{path}");
     }
     Ok(())
 }
@@ -122,10 +111,7 @@ fn the_horizon_walk_visits_only_the_files_own_history() -> crate::Result<()> {
             at(t + k, &["commit", "-qm", "side"]);
         }
         at(t + 3, &["checkout", "-q", "main"]);
-        at(
-            t + 3,
-            &["merge", "-q", "--no-ff", "--no-edit", &format!("s{n}")],
-        );
+        at(t + 3, &["merge", "-q", "--no-ff", "--no-edit", &format!("s{n}")]);
     }
     let repo = crate::Repo::discover(p)?;
     let gix = repo.repo();
@@ -175,11 +161,8 @@ fn a_blame_that_fits_its_budget_skips_the_horizon_walk() -> crate::Result<()> {
 fn blame_holds_only_the_versions_that_fit_its_budget() -> crate::Result<()> {
     let dir = tempfile::tempdir().map_err(crate::error::git)?;
     let p = dir.path();
-    let version = |n: usize| {
-        (0..4000).fold(format!("v{n}\n"), |b, l| {
-            b + &format!("line {l} xxxxxxxxxx\n")
-        })
-    };
+    let version =
+        |n: usize| (0..4000).fold(format!("v{n}\n"), |b, l| b + &format!("line {l} xxxxxxxxxx\n"));
     gitterrace_testkit::git_at(p, "2024-01-01T00:00:00Z", &["init", "-q", "-b", "main"]);
     for n in 0..40 {
         std::fs::write(p.join("big.txt"), version(n)).map_err(crate::error::git)?;

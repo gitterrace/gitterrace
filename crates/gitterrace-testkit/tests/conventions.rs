@@ -18,11 +18,7 @@ fn hits(dirs: &[&str], exts: &[&str], allowed: &[&str], bad: impl Fn(&str) -> bo
     assert!(!files.is_empty(), "no sources found");
     let mut out = Vec::new();
     for f in files {
-        let rel = f
-            .strip_prefix(root())
-            .unwrap_or(&f)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = f.strip_prefix(root()).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         if allowed.iter().any(|a| rel.contains(a)) {
             continue;
         }
@@ -49,18 +45,10 @@ fn no_git_test_helper_outside_the_testkit() {
     let found = hits(
         &["crates", "xtask"],
         &["rs"],
-        &[
-            "gitterrace-testkit/",
-            "crates/gitterrace/build.rs",
-            "crates/gitterrace/stamp.rs",
-        ],
+        &["gitterrace-testkit/", "crates/gitterrace/build.rs", "crates/gitterrace/stamp.rs"],
         |l| defs.iter().any(|d| l.contains(d)) || l.contains(raw),
     );
-    assert!(
-        found.is_empty(),
-        "use gitterrace_testkit::git instead:\n{}",
-        found.join("\n")
-    );
+    assert!(found.is_empty(), "use gitterrace_testkit::git instead:\n{}", found.join("\n"));
 }
 
 /// Limits that became settings. Each must stay out of the code as a raw constant: its value
@@ -92,9 +80,7 @@ fn const_name(line: &str) -> Option<&str> {
         .iter()
         .find_map(|p| rest.strip_prefix(p))
         .unwrap_or(rest);
-    let rest = rest
-        .strip_prefix("const ")
-        .or_else(|| rest.strip_prefix("static "))?;
+    let rest = rest.strip_prefix("const ").or_else(|| rest.strip_prefix("static "))?;
     rest.split([':', ' ']).next()
 }
 
@@ -126,11 +112,7 @@ fn every_limit_constant_is_classified() {
     let files = scan::files_in(&root(), &["crates"], &["rs"]);
     let mut bad = Vec::new();
     for f in files {
-        let rel = f
-            .strip_prefix(root())
-            .unwrap_or(&f)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = f.strip_prefix(root()).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         if rel.contains("/tests/") || rel.ends_with("tests.rs") || !rel.contains("/src/") {
             continue;
         }
@@ -139,10 +121,7 @@ fn every_limit_constant_is_classified() {
         };
         let lines: Vec<&str> = text.lines().collect();
         // Test modules sit at the end of a file; their constants are fixtures, not limits.
-        let end = lines
-            .iter()
-            .position(|l| l.trim() == "mod tests {")
-            .unwrap_or(lines.len());
+        let end = lines.iter().position(|l| l.trim() == "mod tests {").unwrap_or(lines.len());
         for (i, l) in lines[..end].iter().enumerate() {
             let Some(name) = const_name(l).filter(|n| shaped(n)) else {
                 continue;
@@ -169,11 +148,7 @@ fn every_limit_constant_is_classified() {
             }
         }
     }
-    assert!(
-        bad.is_empty(),
-        "limit constants without a classification:\n{}",
-        bad.join("\n")
-    );
+    assert!(bad.is_empty(), "limit constants without a classification:\n{}", bad.join("\n"));
 }
 
 /// Escaping text for markup is written once, in `gitterrace-types`: a second definition
@@ -181,17 +156,9 @@ fn every_limit_constant_is_classified() {
 #[test]
 fn one_markup_escape_definition() {
     let def = concat!("fn ", "esc(");
-    let found = hits(
-        &["crates"],
-        &["rs"],
-        &["gitterrace-types/src/markup.rs"],
-        |l| l.contains(def),
-    );
-    assert!(
-        found.is_empty(),
-        "use gitterrace_types::esc instead:\n{}",
-        found.join("\n")
-    );
+    let found =
+        hits(&["crates"], &["rs"], &["gitterrace-types/src/markup.rs"], |l| l.contains(def));
+    assert!(found.is_empty(), "use gitterrace_types::esc instead:\n{}", found.join("\n"));
 }
 
 /// The lines of a Rust file that are test code: all of a test file, else everything after a
@@ -214,9 +181,7 @@ fn test_lines(rel: &str, text: &str) -> Vec<(usize, String)> {
 /// A raw sleep in test code, said either way.
 fn raw_sleep(line: &str) -> bool {
     let code = line.split("//").next().unwrap_or_default();
-    [concat!("time::", "sleep("), concat!("thread::", "sleep(")]
-        .iter()
-        .any(|s| code.contains(s))
+    [concat!("time::", "sleep("), concat!("thread::", "sleep(")].iter().any(|s| code.contains(s))
 }
 
 /// Guard class: a test that sleeps and then asserts bets on machine speed, and a loaded
@@ -228,11 +193,7 @@ fn test_code_waits_through_the_shared_helper() {
     let files = scan::files_in(&root(), &["crates"], &["rs"]);
     let mut found = Vec::new();
     for f in files {
-        let rel = f
-            .strip_prefix(root())
-            .unwrap_or(&f)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = f.strip_prefix(root()).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         if rel.ends_with("gitterrace-testkit/src/wait.rs") {
             continue;
         }
@@ -258,17 +219,10 @@ fn test_code_waits_through_the_shared_helper() {
 fn the_sleep_guard_sees_both_kinds_of_test_code() {
     let sleep = concat!("    tokio::time::", "sleep(d).await;");
     let blocking = concat!("    std::thread::", "sleep(d);");
-    let caught = |rel: &str, text: &str| {
-        test_lines(rel, text)
-            .iter()
-            .filter(|(_, l)| raw_sleep(l))
-            .count()
-    };
+    let caught =
+        |rel: &str, text: &str| test_lines(rel, text).iter().filter(|(_, l)| raw_sleep(l)).count();
     assert_eq!(caught("crates/a/tests/x.rs", sleep), 1, "a test file");
-    assert_eq!(
-        caught("crates/a/src/x.rs", &format!("mod tests {{\n{blocking}")),
-        1
-    );
+    assert_eq!(caught("crates/a/src/x.rs", &format!("mod tests {{\n{blocking}")), 1);
     assert_eq!(caught("crates/a/src/x.rs", sleep), 0, "product code");
     assert_eq!(caught("crates/a/tests/x.rs", "    // a sleep( in prose"), 0);
 }
@@ -279,23 +233,18 @@ fn the_sleep_guard_sees_both_kinds_of_test_code() {
 fn bare_process_match(line: &str) -> bool {
     let code = line.split("//").next().unwrap_or_default();
     let code = code.split(" #").next().unwrap_or_default();
-    if [concat!("pid", "of "), concat!("kill", "all ")]
-        .iter()
-        .any(|s| code.contains(s))
-    {
+    if [concat!("pid", "of "), concat!("kill", "all ")].iter().any(|s| code.contains(s)) {
         return true;
     }
     // Without `-f` both match the process name only, never the arguments that make it ours.
-    [concat!("pg", "rep "), concat!("pk", "ill ")]
-        .iter()
-        .any(|tool| {
-            code.find(tool).is_some_and(|at| {
-                !code[at + tool.len()..]
-                    .split_whitespace()
-                    .take_while(|a| a.starts_with('-'))
-                    .any(|a| a.contains('f'))
-            })
+    [concat!("pg", "rep "), concat!("pk", "ill ")].iter().any(|tool| {
+        code.find(tool).is_some_and(|at| {
+            !code[at + tool.len()..]
+                .split_whitespace()
+                .take_while(|a| a.starts_with('-'))
+                .any(|a| a.contains('f'))
         })
+    })
 }
 
 /// Guard class: a check that finds a process by its name alone also finds a foreign one,
@@ -304,18 +253,10 @@ fn bare_process_match(line: &str) -> bool {
 /// `pidof`, `killall`, `pgrep -x name` and a one-word `pgrep name` alike.
 #[test]
 fn checks_find_their_own_process_not_one_of_the_same_name() {
-    let mut found = hits(
-        &["scripts/verify", "crates"],
-        &["sh", "mjs", "js", "py"],
-        &[],
-        bare_process_match,
-    );
+    let mut found =
+        hits(&["scripts/verify", "crates"], &["sh", "mjs", "js", "py"], &[], bare_process_match);
     for f in scan::files_in(&root(), &["crates"], &["rs"]) {
-        let rel = f
-            .strip_prefix(root())
-            .unwrap_or(&f)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = f.strip_prefix(root()).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         let Ok(text) = fs::read_to_string(&f) else {
             continue;
         };
@@ -389,11 +330,7 @@ fn every_streamed_body_is_fused() {
         let Ok(text) = fs::read_to_string(&f) else {
             continue;
         };
-        let rel = f
-            .strip_prefix(root())
-            .unwrap_or(&f)
-            .to_string_lossy()
-            .replace('\\', "/");
+        let rel = f.strip_prefix(root()).unwrap_or(&f).to_string_lossy().replace('\\', "/");
         // Shipped code only: this file names the pattern it looks for.
         if !rel.contains("/src/") {
             continue;
@@ -404,11 +341,7 @@ fn every_streamed_body_is_fused() {
             }
         }
     }
-    assert!(
-        bad.is_empty(),
-        "fuse the stream these bodies read:\n{}",
-        bad.join("\n")
-    );
+    assert!(bad.is_empty(), "fuse the stream these bodies read:\n{}", bad.join("\n"));
 }
 
 #[test]

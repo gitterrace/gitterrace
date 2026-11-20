@@ -48,11 +48,9 @@ impl Field {
             .and_then(|mut t| t.remove("v"));
         match v {
             Some(toml::Value::String(s)) => s,
-            Some(toml::Value::Array(a)) => a
-                .iter()
-                .filter_map(toml::Value::as_str)
-                .collect::<Vec<_>>()
-                .join("\n"),
+            Some(toml::Value::Array(a)) => {
+                a.iter().filter_map(toml::Value::as_str).collect::<Vec<_>>().join("\n")
+            }
             Some(_) => self.value.clone(),
             None => String::new(),
         }
@@ -61,10 +59,7 @@ impl Field {
 
 /// The form's fields for `loaded`, in declaration order.
 pub fn fields(loaded: &Loaded) -> Vec<Field> {
-    keys()
-        .into_iter()
-        .map(|k| field(&loaded.config, loaded, k))
-        .collect()
+    keys().into_iter().map(|k| field(&loaded.config, loaded, k)).collect()
 }
 
 fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
@@ -74,10 +69,7 @@ fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
         Control::Tri => Input::Tri,
         Control::Number => {
             let b = BOUNDS.iter().find(|(id, _, _)| *id == k.id);
-            Input::Number {
-                min: b.map(|b| b.1),
-                max: b.map(|b| b.2),
-            }
+            Input::Number { min: b.map(|b| b.1), max: b.map(|b| b.2) }
         }
         Control::Text => Input::Text,
         Control::List => Input::List,
@@ -120,27 +112,11 @@ mod tests {
     fn number_bounds_come_from_bounds() {
         let f = fields(&parse("").expect("empty"));
         for (id, lo, hi) in BOUNDS {
-            let x = f
-                .iter()
-                .find(|x| x.id == *id)
-                .expect("bounded key has a field");
-            assert_eq!(
-                x.input,
-                Input::Number {
-                    min: Some(*lo),
-                    max: Some(*hi)
-                },
-                "{id}"
-            );
+            let x = f.iter().find(|x| x.id == *id).expect("bounded key has a field");
+            assert_eq!(x.input, Input::Number { min: Some(*lo), max: Some(*hi) }, "{id}");
         }
         let free = f.iter().find(|x| x.id == "watch.rescan_secs").expect("key");
-        assert_eq!(
-            free.input,
-            Input::Number {
-                min: None,
-                max: None
-            }
-        );
+        assert_eq!(free.input, Input::Number { min: None, max: None });
     }
 
     #[test]

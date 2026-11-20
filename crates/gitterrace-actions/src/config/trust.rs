@@ -7,10 +7,7 @@ use std::path::{Path, PathBuf};
 use crate::config::{ConfigError, MAX_CONFIG_BYTES};
 
 fn unsafe_path(path: &Path, why: impl Into<String>) -> ConfigError {
-    ConfigError::Unsafe {
-        path: path.to_path_buf(),
-        why: why.into(),
-    }
+    ConfigError::Unsafe { path: path.to_path_buf(), why: why.into() }
 }
 
 /// Regular file (not a symlink), owned by us, not group or world writable; the same for
@@ -28,12 +25,8 @@ pub(super) fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigErr
         return Err(unsafe_path(path, "too large"));
     }
     owned_private(path, &meta, uid)?;
-    let real = path
-        .canonicalize()
-        .map_err(|e| ConfigError::Io(path.into(), e))?;
-    let dir = real
-        .parent()
-        .ok_or_else(|| unsafe_path(path, "no parent dir"))?;
+    let real = path.canonicalize().map_err(|e| ConfigError::Io(path.into(), e))?;
+    let dir = real.parent().ok_or_else(|| unsafe_path(path, "no parent dir"))?;
     let dmeta = std::fs::metadata(dir).map_err(|e| ConfigError::Io(dir.into(), e))?;
     owned_private(dir, &dmeta, uid)?;
     for root in repos {
@@ -48,10 +41,7 @@ pub(super) fn check_file(path: &Path, repos: &[PathBuf]) -> Result<(), ConfigErr
 /// Windows has no mode bits and this does not read ACLs: the file lives under the user's
 /// profile (`%APPDATA%`), which is private by default, so the owner check is skipped.
 #[cfg(windows)]
-#[expect(
-    clippy::unnecessary_wraps,
-    reason = "the signature must match the unix variant"
-)]
+#[expect(clippy::unnecessary_wraps, reason = "the signature must match the unix variant")]
 const fn owned_private(_: &Path, _: &std::fs::Metadata, _: u32) -> Result<(), ConfigError> {
     Ok(())
 }

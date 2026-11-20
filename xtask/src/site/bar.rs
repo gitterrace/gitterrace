@@ -83,17 +83,8 @@ mod tests {
     fn the_demo_link_is_there_only_with_a_demo() {
         let none = bar("r", "https://github.com/o/r", "", "", false);
         assert!(!none.contains("class=\"live\""), "{none}");
-        let one = bar(
-            "r",
-            "https://github.com/o/r",
-            "https://demo.example",
-            "",
-            false,
-        );
-        assert!(
-            one.contains("<a class=\"live\" href=\"https://demo.example\""),
-            "{one}"
-        );
+        let one = bar("r", "https://github.com/o/r", "https://demo.example", "", false);
+        assert!(one.contains("<a class=\"live\" href=\"https://demo.example\""), "{one}");
         // The demo is a link among the links, between Docs and the source, not a button.
         assert!(
             one.find("class=\"docs\"") < one.find("class=\"live\"")

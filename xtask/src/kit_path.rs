@@ -66,18 +66,9 @@ mod tests {
     fn a_planted_old_kit_path_is_reported() {
         let files = [
             ("Makefile", "\tbash schwarzwald/kit/lint/run.sh\n"),
-            (
-                "a.py",
-                "LINT = ROOT / \"schwarzwald\" / \"kit\" / \"lint\"\n",
-            ),
-            (
-                "b.py",
-                "LINT = ROOT / \"vendor\" / \"schwarzwald\" / \"kit\"\n",
-            ),
-            (
-                "ruff.toml",
-                "extend = \"vendor/schwarzwald/kit/configs/ruff-base.toml\"\n",
-            ),
+            ("a.py", "LINT = ROOT / \"schwarzwald\" / \"kit\" / \"lint\"\n"),
+            ("b.py", "LINT = ROOT / \"vendor\" / \"schwarzwald\" / \"kit\"\n"),
+            ("ruff.toml", "extend = \"vendor/schwarzwald/kit/configs/ruff-base.toml\"\n"),
             ("vendor/schwarzwald/kit/hooks/x", "schwarzwald/kit\n"),
             ("CHANGELOG.md", "moved schwarzwald/kit\n"),
         ];
@@ -97,10 +88,7 @@ mod tests {
         assert!(
             bad.is_empty(),
             "name the kit at {KIT}: {}",
-            bad.iter()
-                .map(|(p, l)| format!("{p}:{l}"))
-                .collect::<Vec<_>>()
-                .join(", ")
+            bad.iter().map(|(p, l)| format!("{p}:{l}")).collect::<Vec<_>>().join(", ")
         );
     }
 }

@@ -28,12 +28,7 @@ fn public_full_id_set_goes_with_the_idle_release() {
     // Not a root itself, so its full id walks the history.
     let child = gitterrace_testkit::git(
         dir.path(),
-        &[
-            "rev-list",
-            "--reverse",
-            "--ancestry-path",
-            &format!("{}..HEAD", root.trim()),
-        ],
+        &["rev-list", "--reverse", "--ancestry-path", &format!("{}..HEAD", root.trim())],
     );
     let child = child.lines().next().expect("a second commit").to_owned();
     let s = Server::start_with(

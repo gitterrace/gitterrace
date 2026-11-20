@@ -15,11 +15,7 @@ fn names(items: &[Item]) -> BTreeSet<String> {
 /// Names a serde or toml "expected one of `a`, `b`" message lists.
 fn expected(message: &str) -> BTreeSet<String> {
     let tail = message.split("expected one of").nth(1).unwrap_or("");
-    tail.split('`')
-        .enumerate()
-        .filter(|(i, _)| i % 2 == 1)
-        .map(|(_, s)| s.to_owned())
-        .collect()
+    tail.split('`').enumerate().filter(|(i, _)| i % 2 == 1).map(|(_, s)| s.to_owned()).collect()
 }
 
 fn payload(full: bool) -> Payload {
@@ -27,11 +23,7 @@ fn payload(full: bool) -> Payload {
         v: 1,
         action: "a".into(),
         kind: Kind::Line,
-        repo: RepoInfo {
-            name: "r".into(),
-            root: "/r".into(),
-            id: Some("abc".into()),
-        },
+        repo: RepoInfo { name: "r".into(), root: "/r".into(), id: Some("abc".into()) },
         rev: "HEAD".into(),
         sha: "0".repeat(40),
         path: full.then(|| "p".into()),
@@ -59,25 +51,16 @@ fn keys_of(p: &Payload) -> BTreeSet<String> {
 #[test]
 fn payload_table_is_the_payload() {
     assert_eq!(keys_of(&payload(true)), names(&PAYLOAD_FIELDS));
-    let absent_when_unset: BTreeSet<String> = names(&PAYLOAD_FIELDS)
-        .difference(&keys_of(&payload(false)))
-        .cloned()
-        .collect();
-    let optional: BTreeSet<String> = PAYLOAD_FIELDS
-        .iter()
-        .filter(|f| !f.required)
-        .map(|f| f.name.to_owned())
-        .collect();
+    let absent_when_unset: BTreeSet<String> =
+        names(&PAYLOAD_FIELDS).difference(&keys_of(&payload(false))).cloned().collect();
+    let optional: BTreeSet<String> =
+        PAYLOAD_FIELDS.iter().filter(|f| !f.required).map(|f| f.name.to_owned()).collect();
     assert_eq!(absent_when_unset, optional);
 }
 
 #[test]
 fn env_table_is_the_environment() {
-    let env: BTreeSet<String> = payload(true)
-        .env()
-        .keys()
-        .map(|k| (*k).to_owned())
-        .collect();
+    let env: BTreeSet<String> = payload(true).env().keys().map(|k| (*k).to_owned()).collect();
     let doc: BTreeSet<String> = ENV_VARS.iter().map(|(k, _)| (*k).to_owned()).collect();
     assert_eq!(env, doc);
 }

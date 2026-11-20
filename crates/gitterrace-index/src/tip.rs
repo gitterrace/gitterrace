@@ -64,9 +64,8 @@ pub(crate) fn sync(dir: &Path) -> io::Result<()> {
 /// of the new order, its items are reused (see the module docs), else every row is read.
 pub(crate) fn stage(dir: &Path, m: &mut Manifest) -> SegResult<()> {
     let kind = Kind::Tip as u8;
-    let (gone, kept): (Vec<_>, Vec<_>) = std::mem::take(&mut m.live)
-        .into_iter()
-        .partition(|f| f.kind == kind);
+    let (gone, kept): (Vec<_>, Vec<_>) =
+        std::mem::take(&mut m.live).into_iter().partition(|f| f.kind == kind);
     m.live = kept;
     m.retired.extend(gone.into_iter().map(|f| f.name));
     if m.commits == 0 {
@@ -86,11 +85,7 @@ pub(crate) fn stage(dir: &Path, m: &mut Manifest) -> SegResult<()> {
         return Err(SegError::unreadable(&name, 0, leak(e.0)));
     }
     let msg = Kind::Messages as u8;
-    let at = m
-        .live
-        .iter()
-        .position(|f| f.kind == msg)
-        .unwrap_or(m.live.len());
+    let at = m.live.iter().position(|f| f.kind == msg).unwrap_or(m.live.len());
     m.live.insert(at, entry);
     Ok(())
 }
@@ -109,11 +104,7 @@ fn previous(dir: &Path, m: &Manifest, oids: &[crate::seg::Oid]) -> Option<(Conta
             .and_then(|r| r.strip_suffix(".gts"))
             .and_then(|g| g.parse::<u64>().ok())
     };
-    let mut names: Vec<&String> = m
-        .retired
-        .iter()
-        .filter(|n| generation(n).is_some())
-        .collect();
+    let mut names: Vec<&String> = m.retired.iter().filter(|n| generation(n).is_some()).collect();
     names.sort_by_key(|n| generation(n));
     let name = names.pop()?;
     let c = Container::open(dir, name, Kind::Tip).ok()?;
@@ -145,10 +136,10 @@ fn write(
             let mut each = |_: Rank, rows: &[TipTouch]| -> SegResult<()> {
                 row.clear();
                 // Every new edge is newer than this row, so it sees them all.
-                row.extend(rows.iter().map(|t| TipTouch {
-                    path: moved.canonical(t.path, Rank(0), 0),
-                    ..*t
-                }));
+                row.extend(
+                    rows.iter()
+                        .map(|t| TipTouch { path: moved.canonical(t.path, Rank(0), 0), ..*t }),
+                );
                 out.push(&row, &mut w)
             };
             read(c, *n, paths, &mut each)?;
@@ -157,18 +148,12 @@ fn write(
         None => 0,
     };
     let ranks: Vec<Rank> = (from..m.commits).map(Rank).collect();
-    let merges: Vec<bool> = src
-        .commits_in(crate::feed::CommitRange::Ranks(from..m.commits))
-        .map(|c| c.merge)
-        .collect();
+    let merges: Vec<bool> =
+        src.commits_in(crate::feed::CommitRange::Ranks(from..m.commits)).map(|c| c.merge).collect();
     let mut row = Vec::new();
     for (rank, files) in src.rows_for(ranks) {
         row.clear();
-        if !merges
-            .get((rank.0 - from) as usize)
-            .copied()
-            .unwrap_or(true)
-        {
+        if !merges.get((rank.0 - from) as usize).copied().unwrap_or(true) {
             for (i, f) in files.iter().enumerate() {
                 let (ca, cd, _) = f.code();
                 row.push(TipTouch {
@@ -182,11 +167,7 @@ fn write(
     }
     out.flush(&mut w)?;
     if out.total != m.commits {
-        return Err(SegError::unreadable(
-            name,
-            0,
-            "tip items do not cover the commits",
-        ));
+        return Err(SegError::unreadable(name, 0, "tip items do not cover the commits"));
     }
     let mut meta = Vec::with_capacity(META_LEN);
     meta.extend_from_slice(&m.fingerprint.to_le_bytes());
@@ -257,11 +238,7 @@ fn meta(c: &Container) -> SegResult<(u64, u32)> {
     }
     let mut cur = Cursor::new(b, c.name(), e.offset);
     let (fp, commits) = (cur.u64()?, cur.u32()?);
-    let items: u64 = c
-        .blocks(section::TIP_TOUCHES)
-        .iter()
-        .map(|e| u64::from(e.items))
-        .sum();
+    let items: u64 = c.blocks(section::TIP_TOUCHES).iter().map(|e| u64::from(e.items)).sum();
     if items != u64::from(commits) {
         return Err(bad("tip item count"));
     }
@@ -302,11 +279,7 @@ pub(crate) fn read(
         }
     }
     if rank != commits {
-        return Err(SegError::unreadable(
-            c.name(),
-            0,
-            "tip items short of the commits",
-        ));
+        return Err(SegError::unreadable(c.name(), 0, "tip items short of the commits"));
     }
     Ok(())
 }
@@ -323,11 +296,7 @@ pub(crate) fn item(cur: &mut Cursor<'_>, paths: usize, rows: &mut Vec<TipTouch>)
         let raw = u32::try_from(cur.varint()?).map_err(|_| cur.err("tip churn"))?;
         let code = i64::from(raw) - unzigzag(cur.varint()?);
         let code = u32::try_from(code).map_err(|_| cur.err("tip code churn"))?;
-        rows.push(TipTouch {
-            path: PathId(path as u32),
-            raw,
-            code,
-        });
+        rows.push(TipTouch { path: PathId(path as u32), raw, code });
     }
     Ok(())
 }

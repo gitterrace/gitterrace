@@ -54,8 +54,7 @@ fn unique_slug(seen: &mut HashMap<String, usize>, base: String) -> String {
 }
 
 fn has_scheme(url: &str) -> bool {
-    url.find([':', '/', '?', '#'])
-        .is_some_and(|i| url.as_bytes()[i] == b':')
+    url.find([':', '/', '?', '#']).is_some_and(|i| url.as_bytes()[i] == b':')
 }
 
 /// Resolves `target` against `dir`, collapsing `.` and `..`. Escaping the root clamps to it.
@@ -112,11 +111,8 @@ fn image_url<'a>(base: &Base, value: &str) -> Option<Cow<'a, str>> {
 fn code_block(code: &str, lang: &str, span: &str, most: usize) -> String {
     let lang = lang.split([' ', ',', '{']).next().unwrap_or("");
     let body = crate::highlight::block(code, lang, most).unwrap_or_else(|| esc(code));
-    let class = if lang.is_empty() {
-        String::new()
-    } else {
-        format!(" class=\"language-{}\"", esc(lang))
-    };
+    let class =
+        if lang.is_empty() { String::new() } else { format!(" class=\"language-{}\"", esc(lang)) };
     format!("{span}<pre><code{class}>{body}</code></pre>\n")
 }
 
@@ -237,14 +233,7 @@ fn transform<'a>(
 }
 
 /// Class prefixes the renderer itself emits; anything else could restyle the page chrome.
-const SAFE_CLASS: [&str; 6] = [
-    "language-",
-    "s-",
-    "markdown-",
-    "anchor",
-    "mermaid",
-    "footnote",
-];
+const SAFE_CLASS: [&str; 6] = ["language-", "s-", "markdown-", "anchor", "mermaid", "footnote"];
 
 fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     let mut b = ammonia::Builder::default();
@@ -278,9 +267,9 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
             ("img", "src") => image_url(&base, value),
             // One candidate, as the README idiom writes it. A list with widths or densities
             // would need each URL rewritten, so it is dropped and the `<img>` shows instead.
-            ("source", "srcset") => (!value.contains([',', ' ']))
-                .then(|| image_url(&base, value.trim()))
-                .flatten(),
+            ("source", "srcset") => {
+                (!value.contains([',', ' '])).then(|| image_url(&base, value.trim())).flatten()
+            }
             // Only colour-scheme queries: they are what the page's theme switch can honour.
             ("source", "media") => matches!(
                 value.replace(' ', "").as_str(),
@@ -288,11 +277,10 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
             )
             .then(|| Cow::Borrowed(value)),
             // Only the alignment the parser itself emits survives.
-            (_, "style") => matches!(
-                value,
-                "text-align: left" | "text-align: right" | "text-align: center"
-            )
-            .then(|| Cow::Borrowed(value)),
+            (_, "style") => {
+                matches!(value, "text-align: left" | "text-align: right" | "text-align: center")
+                    .then(|| Cow::Borrowed(value))
+            }
             // ammonia 4.2 drops a refused URL scheme before this callback: recheck on upgrade.
             _ => Some(Cow::Borrowed(value)),
         });
@@ -336,10 +324,7 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     html::push_html(&mut raw, events.into_iter());
     // Spans are added after sanitizing, which drops every data-line the file wrote.
     let clean = levels::demote(&sanitizer(base).clean(&raw).to_string());
-    Doc {
-        html: head + &lines::place(&clean),
-        outline,
-    }
+    Doc { html: head + &lines::place(&clean), outline }
 }
 
 #[cfg(test)]
@@ -466,10 +451,7 @@ mod tests {
         assert_eq!(resolve_path("docs/guide", "../a.md"), "docs/a.md");
         assert_eq!(resolve_path("docs", "/top.md"), "top.md");
         assert_eq!(resolve_path("", "../../x"), "x");
-        let out = at(
-            "[a](../a.md#frag) [d](sub/) [x](https://e.com/a) [h](#intro)",
-            "docs/guide",
-        );
+        let out = at("[a](../a.md#frag) [d](sub/) [x](https://e.com/a) [h](#intro)", "docs/guide");
         assert!(out.contains("href=\"/blob/abc123/docs/a.md#frag\""));
         assert!(out.contains("href=\"/tree/abc123/docs/guide/sub\""));
         assert!(out.contains("href=\"https://e.com/a\""));
@@ -484,10 +466,7 @@ mod tests {
             "docs",
         );
         assert!(out.contains("<picture>"), "{out}");
-        assert!(
-            out.contains("media=\"(prefers-color-scheme: dark)\""),
-            "{out}"
-        );
+        assert!(out.contains("media=\"(prefers-color-scheme: dark)\""), "{out}");
         assert!(out.contains("srcset=\"/raw/abc123/docs/b/d.svg\""), "{out}");
         assert!(out.contains("src=\"/raw/abc123/docs/b/l.svg\""), "{out}");
         // Other queries and candidate lists are not passed through.
@@ -554,10 +533,7 @@ mod tests {
             Base::new("HEAD", ""),
         );
         let rail = crate::markdown::outline_rail(&doc.outline);
-        let at = |needle: &str| {
-            rail.find(needle)
-                .unwrap_or_else(|| panic!("{needle} in {rail}"))
-        };
+        let at = |needle: &str| rail.find(needle).unwrap_or_else(|| panic!("{needle} in {rail}"));
         assert!(at("#install") < at("#from-source"));
         assert!(at("#from-source") < at("#usage\""));
         assert!(rail.contains("<li class=\"d1\"><a href=\"#from-source\""));

@@ -10,24 +10,9 @@ fn repo(dir: &std::path::Path) -> std::path::PathBuf {
     let p = dir.join("repo");
     let mut f = Fixture::init(&p);
     for (who, date, path, msg) in [
-        (
-            "Bob <bob@y.io>",
-            "2024-01-10T12:00:00Z",
-            "src/a.rs",
-            "feat: a",
-        ),
-        (
-            "Bob <bob@y.io>",
-            "2024-03-10T12:00:00Z",
-            "src/a.rs",
-            "fix: a",
-        ),
-        (
-            "Ann <ann@x.io>",
-            "2024-03-20T12:00:00Z",
-            "docs/guide.md",
-            "docs: guide",
-        ),
+        ("Bob <bob@y.io>", "2024-01-10T12:00:00Z", "src/a.rs", "feat: a"),
+        ("Bob <bob@y.io>", "2024-03-10T12:00:00Z", "src/a.rs", "fix: a"),
+        ("Ann <ann@x.io>", "2024-03-20T12:00:00Z", "docs/guide.md", "docs: guide"),
     ] {
         f = f.at(date).write(path, &format!("{msg}\nmore\n"));
         f.git(&["add", "-A"]);
@@ -43,11 +28,7 @@ async fn json(router: &axum::Router, uri: &str) -> serde_json::Value {
 }
 
 fn keys(v: &serde_json::Value) -> Vec<serde_json::Value> {
-    v.as_array()
-        .expect("buckets")
-        .iter()
-        .map(|b| b["key"].clone())
-        .collect()
+    v.as_array().expect("buckets").iter().map(|b| b["key"].clone()).collect()
 }
 
 /// "Last month" ends on the repository's newest day, with or without a chip.
@@ -58,16 +39,8 @@ async fn a_chip_keeps_the_period_anchor() {
     oracle::ready(&router).await;
     let api = "/api/v1/insights";
     let all = json(&router, &format!("{api}/summary?period=1m")).await;
-    let bob = json(
-        &router,
-        &format!("{api}/summary?q=author:bob%40y.io&period=1m"),
-    )
-    .await;
-    assert_eq!(
-        (&bob["from"], &bob["to"]),
-        (&all["from"], &all["to"]),
-        "{bob}"
-    );
+    let bob = json(&router, &format!("{api}/summary?q=author:bob%40y.io&period=1m")).await;
+    assert_eq!((&bob["from"], &bob["to"]), (&all["from"], &all["to"]), "{bob}");
     let fa = json(&router, &format!("{api}/frequency?period=1m")).await;
     let fb = json(&router, &format!("{api}/frequency?q=type:fix&period=1m")).await;
     assert_eq!(keys(&fb), keys(&fa), "frequency buckets with a chip");
@@ -80,11 +53,7 @@ async fn new_is_judged_on_the_whole_history() {
     let dir = tempfile::tempdir().expect("tmp");
     let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
     oracle::ready(&router).await;
-    let c = json(
-        &router,
-        "/api/v1/insights/contributors?q=type:fix&period=1m",
-    )
-    .await;
+    let c = json(&router, "/api/v1/insights/contributors?q=type:fix&period=1m").await;
     let bob = c["contributors"]
         .as_array()
         .expect("people")

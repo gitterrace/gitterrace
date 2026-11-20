@@ -41,10 +41,8 @@ pub(super) struct Facts<'a> {
 pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String> {
     // A page is fitted to the line width, so a tag may break before an attribute. The guards
     // read each tag as if on one line.
-    let joined: BTreeMap<String, String> = pages
-        .iter()
-        .map(|(p, h)| (p.clone(), h.replace("\n ", " ")))
-        .collect();
+    let joined: BTreeMap<String, String> =
+        pages.iter().map(|(p, h)| (p.clone(), h.replace("\n ", " "))).collect();
     let pages = &joined;
     let mut bad = Vec::new();
     bad.extend(markdown_links(pages, facts));
@@ -60,9 +58,7 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
 
 /// The text between the first `<open` and the matching close of `tag`, or "".
 fn inside<'a>(html: &'a str, open: &str, close: &str) -> &'a str {
-    html.split_once(open)
-        .and_then(|(_, r)| r.split_once(close))
-        .map_or("", |(m, _)| m)
+    html.split_once(open).and_then(|(_, r)| r.split_once(close)).map_or("", |(m, _)| m)
 }
 
 /// `html` without its tags, entities left as they are, whitespace collapsed.
@@ -95,21 +91,15 @@ fn own_main(html: &str) -> String {
         main.replace_range(at..end, "");
     }
     if let Some(at) = main.find("<nav class=\"pager\"") {
-        let end = main[at..]
-            .find("</nav>")
-            .map_or(main.len(), |e| at + e + "</nav>".len());
+        let end = main[at..].find("</nav>").map_or(main.len(), |e| at + e + "</nav>".len());
         main.replace_range(at..end, "");
     }
     while let Some(at) = main.find(" data-from=\"") {
         let start = main[..at].rfind('<').unwrap_or(at);
-        let name: String = main[start + 1..]
-            .chars()
-            .take_while(char::is_ascii_alphanumeric)
-            .collect();
+        let name: String =
+            main[start + 1..].chars().take_while(char::is_ascii_alphanumeric).collect();
         let close = format!("</{name}>");
-        let end = main[at..]
-            .find(&close)
-            .map_or(main.len(), |e| at + e + close.len());
+        let end = main[at..].find(&close).map_or(main.len(), |e| at + e + close.len());
         main.replace_range(start..end, "");
     }
     main
@@ -128,9 +118,7 @@ fn markdown_links(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String
             let rel = file.strip_prefix(&blob).unwrap_or(file);
             let local = !rel.contains("://");
             if local
-                && Path::new(rel)
-                    .extension()
-                    .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+                && Path::new(rel).extension().is_some_and(|e| e.eq_ignore_ascii_case("md"))
                 && facts.published.contains(rel)
             {
                 bad.push(format!(
@@ -264,9 +252,7 @@ fn raw_drawings(pages: &BTreeMap<String, String>) -> Vec<String> {
     for (path, html) in pages {
         for lang in DRAWN {
             if html.contains(&format!("class=\"language-{lang}\"")) {
-                bad.push(format!(
-                    "{path}: a {lang} block shows as source; draw it at build"
-                ));
+                bad.push(format!("{path}: a {lang} block shows as source; draw it at build"));
             }
         }
     }
@@ -317,9 +303,7 @@ fn orphan_docs(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String> {
         if !index.contains(&href) {
             bad.push(format!("docs/index.html: does not link /{doc}"));
         }
-        let html = pages
-            .get(&format!("{doc}index.html"))
-            .map_or("", String::as_str);
+        let html = pages.get(&format!("{doc}index.html")).map_or("", String::as_str);
         let list = inside(html, "<nav class=\"docnav\"", "</nav>");
         for other in &facts.docs {
             if !list.contains(&format!("href=\"/{other}\"")) {
@@ -334,9 +318,7 @@ fn orphan_docs(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String> {
         if walked.contains(&doc) || walked.len() > facts.docs.len() {
             break;
         }
-        let html = pages
-            .get(&format!("{doc}index.html"))
-            .map_or("", String::as_str);
+        let html = pages.get(&format!("{doc}index.html")).map_or("", String::as_str);
         walked.push(doc);
         let nav = inside(html, "<nav class=\"pager\"", "</nav>");
         at = nav

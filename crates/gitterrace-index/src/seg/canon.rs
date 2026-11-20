@@ -46,11 +46,7 @@ impl Lives {
         if r.merge {
             return Vec::new();
         }
-        let need = paths
-            .iter()
-            .chain(olds.iter().flatten())
-            .max()
-            .map_or(0, |&m| m as usize + 1);
+        let need = paths.iter().chain(olds.iter().flatten()).max().map_or(0, |&m| m as usize + 1);
         if self.by_name.len() < need {
             self.by_name.resize(need, NONE);
         }
@@ -88,9 +84,7 @@ impl Lives {
     }
 
     fn start(&mut self, p: u32) -> u32 {
-        let life = u32::try_from(self.name.len())
-            .unwrap_or(HOLDS - 1)
-            .min(HOLDS - 1);
+        let life = u32::try_from(self.name.len()).unwrap_or(HOLDS - 1).min(HOLDS - 1);
         self.name.push(p);
         life
     }
@@ -120,12 +114,7 @@ impl Lives {
         if items.is_empty() {
             return Ok(());
         }
-        pack(
-            section::CANON,
-            items,
-            |_, v, out| out.extend_from_slice(&v.to_le_bytes()),
-            sink,
-        )
+        pack(section::CANON, items, |_, v, out| out.extend_from_slice(&v.to_le_bytes()), sink)
     }
 
     /// The state section 7 holds, for an append to continue. `paths` is the set's path count
@@ -142,11 +131,7 @@ impl Lives {
             }
         }
         if all.len() < paths {
-            return Err(SegError::unreadable(
-                file,
-                0,
-                "canon shorter than the paths",
-            ));
+            return Err(SegError::unreadable(file, 0, "canon shorter than the paths"));
         }
         let name: Vec<u32> = all[paths..].iter().map(|v| v & !HOLDS).collect();
         all.truncate(paths);
@@ -189,10 +174,7 @@ pub fn canon_of(records: &[CommitRecord]) -> (Vec<u32>, Vec<u64>) {
 
 /// Old-name ids of the rows of `r`, already interned.
 pub(crate) fn olds(s: &crate::seg::agg::Strings, r: &CommitRecord) -> Vec<Option<u32>> {
-    r.files
-        .iter()
-        .map(|f| f.old.as_deref().and_then(|o| s.paths.get(o)))
-        .collect()
+    r.files.iter().map(|f| f.old.as_deref().and_then(|o| s.paths.get(o))).collect()
 }
 
 /// What a store's lives hold, for guards: the newest section 7 and, per life, the touches
@@ -244,14 +226,7 @@ pub struct LifeTables {
 
 #[cfg(any(test, feature = "oracle"))]
 const fn tuple(s: &crate::seg::agg::Sums) -> SumsTuple {
-    [
-        s.add,
-        s.del,
-        s.rewritten,
-        s.code_add,
-        s.code_del,
-        s.code_rewritten,
-    ]
+    [s.add, s.del, s.rewritten, s.code_add, s.code_del, s.code_rewritten]
 }
 
 /// `a += b` per field, `None` past u64 (`a` may be part added then: the caller drops it).
@@ -268,10 +243,7 @@ fn add_tuple(a: &mut SumsTuple, b: &SumsTuple) -> Option<()> {
 impl LifeTables {
     /// The row summed in, `None` when a sum passes u64.
     fn month(&mut self, life: u32, month: i64, v: &crate::seg::agg::LifeMonth) -> Option<()> {
-        let e = self
-            .months
-            .entry((life, month))
-            .or_insert((0, [0; 6], i64::MIN));
+        let e = self.months.entry((life, month)).or_insert((0, [0; 6], i64::MIN));
         add_count(&mut e.0, v.touches)?;
         add_tuple(&mut e.1, &tuple(&v.lines))?;
         e.2 = e.2.max(v.last);

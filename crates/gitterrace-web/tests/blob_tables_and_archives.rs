@@ -23,15 +23,12 @@ async fn a_csv_blob_renders_as_a_table() {
 async fn a_tar_gz_blob_lists_its_entries() {
     let dir = tempfile::tempdir().expect("tmp");
     let f = Fixture::init(dir.path());
-    let mut b = tar::Builder::new(flate2::write::GzEncoder::new(
-        Vec::new(),
-        flate2::Compression::fast(),
-    ));
+    let mut b =
+        tar::Builder::new(flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast()));
     let mut h = tar::Header::new_gnu();
     h.set_size(2);
     h.set_cksum();
-    b.append_data(&mut h, "pkg/inner.txt", &b"hi"[..])
-        .expect("append");
+    b.append_data(&mut h, "pkg/inner.txt", &b"hi"[..]).expect("append");
     let gz = b.into_inner().expect("tar").finish().expect("gz");
     std::fs::write(dir.path().join("bundle.tar.gz"), gz).expect("write");
     let f = f.commit("feat: bundle");

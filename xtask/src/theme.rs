@@ -20,9 +20,7 @@ const SCRIM: &str = "#0000004d";
 /// Steps of the schwarzwald space grid that `app.css` uses; the rest stays out of the stylesheet.
 const SPACE_USED: [usize; 8] = [1, 2, 3, 4, 5, 6, 8, 16];
 const SHADOW: (&str, &str) = ("0 8px 28px rgba(16,20,28,.12)", "0 8px 28px rgba(0,0,0,.5)");
-const SYNTAX: [&str; 7] = [
-    "comment", "keyword", "string", "constant", "entity", "tag", "param",
-];
+const SYNTAX: [&str; 7] = ["comment", "keyword", "string", "constant", "entity", "tag", "param"];
 
 /// Every color of one mode as (role, value), in the stylesheet's order.
 type Colours = Vec<(String, String)>;
@@ -31,13 +29,8 @@ type Colours = Vec<(String, String)>;
 type Pair = (String, String, f64);
 
 fn hexv(t: &Value, name: &str) -> Result<String> {
-    let hex = t
-        .get(name)
-        .and_then(|v| v.get("hex"))
-        .and_then(Value::as_str);
-    Ok(hex
-        .with_context(|| format!("token {name} has no hex"))?
-        .to_lowercase())
+    let hex = t.get(name).and_then(|v| v.get("hex")).and_then(Value::as_str);
+    Ok(hex.with_context(|| format!("token {name} has no hex"))?.to_lowercase())
 }
 
 fn channels(c: &str) -> Result<[u8; 3]> {
@@ -61,11 +54,7 @@ fn mix(fg: &str, bg: &str, share: f64) -> Result<String> {
 fn luminance(c: &str) -> Result<f64> {
     let ch = |x: u8| {
         let x = f64::from(x) / 255.0;
-        if x <= 0.04045 {
-            x / 12.92
-        } else {
-            ((x + 0.055) / 1.055).powf(2.4)
-        }
+        if x <= 0.04045 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) }
     };
     let [r, g, b] = channels(c)?;
     Ok(0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b))
@@ -94,10 +83,8 @@ fn pairs() -> Vec<Pair> {
         }
     };
     add(&text, &page, 4.5);
-    let syn_bg: Vec<String> = own(&["n-1", "n-2", "raised"])
-        .into_iter()
-        .chain(rows.clone())
-        .collect();
+    let syn_bg: Vec<String> =
+        own(&["n-1", "n-2", "raised"]).into_iter().chain(rows.clone()).collect();
     add(&syntax, &syn_bg, 4.5);
     add(&own(&["n-9", "n-7", "accent"]), &rows, 4.5);
     add(&own(&["add"]), &own(&["add-hl"]), 4.5);
@@ -105,11 +92,7 @@ fn pairs() -> Vec<Pair> {
     add(&own(&["on-accent"]), &own(&["accent"]), 4.5);
     add(&own(&["accent"]), &own(&["n-1", "raised", "header"]), 3.0);
     add(&own(&["n-5"]), &page, 3.0);
-    add(
-        &own(&["n-4"]),
-        &own(&["n-1", "n-2", "header", "raised"]),
-        1.15,
-    );
+    add(&own(&["n-4"]), &own(&["n-1", "n-2", "header", "raised"]), 1.15);
     out
 }
 
@@ -121,9 +104,7 @@ fn contrast_problems(light: &Colours, dark: &Colours) -> Result<Vec<String>> {
             let (f, b) = (get(&fg).context(fg.clone())?, get(&bg).context(bg.clone())?);
             let got = contrast(f, b)?;
             if got < need {
-                bad.push(format!(
-                    "{mode}: --{fg} on --{bg} is {got:.2}:1, needs {need}:1"
-                ));
+                bad.push(format!("{mode}: --{fg} on --{bg} is {got:.2}:1, needs {need}:1"));
             }
         }
     }
@@ -133,9 +114,7 @@ fn contrast_problems(light: &Colours, dark: &Colours) -> Result<Vec<String>> {
 fn colours(tokens: &Value, mode: &str) -> Result<Colours> {
     let t = &tokens["themes"][THEME][mode];
     let h = |n: &str| hexv(t, n);
-    let share = tokens["shares"]["selected-row"]
-        .as_f64()
-        .context("shares.selected-row")?;
+    let share = tokens["shares"]["selected-row"].as_f64().context("shares.selected-row")?;
     let ring = if mode == "light" { "66" } else { "80" };
     let accent = h("accent-ink")?;
     let bg = h("surfaces.bg")?;
@@ -198,21 +177,15 @@ fn pair(light: &str, dark: &str) -> String {
 
 /// Every color once, as `light-dark()`; `color-scheme` on `:root` picks the side.
 fn palette(light: Colours, dark: Colours) -> String {
-    let both = light
-        .into_iter()
-        .chain([("shadow-2".to_owned(), SHADOW.0.to_owned())]);
-    let other = dark
-        .into_iter()
-        .chain([("shadow-2".to_owned(), SHADOW.1.to_owned())]);
+    let both = light.into_iter().chain([("shadow-2".to_owned(), SHADOW.0.to_owned())]);
+    let other = dark.into_iter().chain([("shadow-2".to_owned(), SHADOW.1.to_owned())]);
     let items: Vec<String> = both
         .zip(other)
-        .map(|((k, v), (_, o))| {
-            if v == o {
-                format!("--{k}:{v};")
-            } else {
-                format!("--{k}:{};", pair(&v, &o))
-            }
-        })
+        .map(
+            |((k, v), (_, o))| {
+                if v == o { format!("--{k}:{v};") } else { format!("--{k}:{};", pair(&v, &o)) }
+            },
+        )
         .collect();
     let rows: Vec<String> = items.chunks(6).map(|c| c.join(" ")).collect();
     format!(":root{{\n{}\n}}", rows.join("\n"))
@@ -220,11 +193,7 @@ fn palette(light: Colours, dark: Colours) -> String {
 
 fn fonts(design: &Value) -> Result<Vec<String>> {
     let f = &design["font"];
-    let web = |k: &str| {
-        f[k]["web"]
-            .as_str()
-            .with_context(|| format!("font.{k}.web"))
-    };
+    let web = |k: &str| f[k]["web"].as_str().with_context(|| format!("font.{k}.web"));
     ensure!(
         web("title")? == "Fraunces"
             && web("body")?.starts_with("Bricolage")
@@ -252,13 +221,7 @@ fn fonts(design: &Value) -> Result<Vec<String>> {
         }
         Ok(names
             .iter()
-            .map(|x| {
-                if x.contains(' ') {
-                    format!("\"{x}\"")
-                } else {
-                    x.clone()
-                }
-            })
+            .map(|x| if x.contains(' ') { format!("\"{x}\"") } else { x.clone() })
             .collect::<Vec<_>>()
             .join(","))
     };
@@ -272,55 +235,25 @@ fn fonts(design: &Value) -> Result<Vec<String>> {
 }
 
 fn scales(d: &Value) -> Result<String> {
-    let names = [
-        (11, "2xs"),
-        (12, "xs"),
-        (13, "sm"),
-        (15, "base"),
-        (16, "md"),
-        (20, "lg"),
-        (26, "xl"),
-    ];
+    let names =
+        [(11, "2xs"), (12, "xs"), (13, "sm"), (15, "base"), (16, "md"), (20, "lg"), (26, "xl")];
     let mut text: Vec<String> = Vec::new();
     for p in d["type"]["scalePx"].as_array().context("type.scalePx")? {
         let p = p.as_u64().context("type step")?;
-        let name = names
-            .iter()
-            .find(|(n, _)| *n == p)
-            .context("an unnamed type step")?
-            .1;
+        let name = names.iter().find(|(n, _)| *n == p).context("an unnamed type step")?.1;
         text.push(format!("--text-{name}:{p}px;"));
     }
     let mut space: Vec<String> = Vec::new();
-    for (i, p) in d["space"]["stepsPx"]
-        .as_array()
-        .context("space.stepsPx")?
-        .iter()
-        .enumerate()
-    {
+    for (i, p) in d["space"]["stepsPx"].as_array().context("space.stepsPx")?.iter().enumerate() {
         if SPACE_USED.contains(&(i + 1)) {
-            space.push(format!(
-                "--space-{}:{}px;",
-                i + 1,
-                p.as_u64().context("space step")?
-            ));
+            space.push(format!("--space-{}:{}px;", i + 1, p.as_u64().context("space step")?));
         }
     }
     let m = &d["motion"];
-    let easing = m["easing"]
-        .as_str()
-        .context("motion.easing")?
-        .replace(", ", ",");
-    let ms = |k: &str| {
-        m["durationMs"][k]
-            .as_u64()
-            .with_context(|| format!("motion {k}"))
-    };
-    let motion = format!(
-        "--ease:{easing};--dur-fast:{}ms;--dur-slow:{}ms;",
-        ms("hover")?,
-        ms("progress")?
-    );
+    let easing = m["easing"].as_str().context("motion.easing")?.replace(", ", ",");
+    let ms = |k: &str| m["durationMs"][k].as_u64().with_context(|| format!("motion {k}"));
+    let motion =
+        format!("--ease:{easing};--dur-fast:{}ms;--dur-slow:{}ms;", ms("hover")?, ms("progress")?);
     Ok(format!(
         ":root{{{}\n{}\n--radius:{}px;\n{motion}}}",
         text.concat(),
@@ -339,11 +272,7 @@ pub fn render(root: &std::path::Path) -> Result<Out> {
     let (tokens, design) = (load("theme-tokens.json")?, load("design-tokens.json")?);
     let (light, dark) = (colours(&tokens, "light")?, colours(&tokens, "dark")?);
     let low = contrast_problems(&light, &dark)?;
-    ensure!(
-        low.is_empty(),
-        "contrast under its minimum:\n  {}",
-        low.join("\n  ")
-    );
+    ensure!(low.is_empty(), "contrast under its minimum:\n  {}", low.join("\n  "));
     let mut parts = fonts(&design)?;
     parts.extend([
         scales(&design)?,

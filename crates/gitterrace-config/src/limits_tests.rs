@@ -30,10 +30,7 @@ fn every_limit_refuses_zero_and_absurd_values() {
         for v in [0, hi + 1, i64::MAX.unsigned_abs()] {
             let err = parse(&toml_for(id, v)).err();
             let err = err.unwrap_or_else(|| panic!("{id} = {v} was accepted"));
-            assert!(
-                err.to_string().contains(id),
-                "{id} = {v}: error {err} names no key"
-            );
+            assert!(err.to_string().contains(id), "{id} = {v}: error {err} names no key");
         }
     }
 }
@@ -49,10 +46,7 @@ fn every_limit_is_bounded_and_its_default_fits() {
             continue;
         }
         let v = value(&d, id);
-        assert!(
-            (*lo..=*hi).contains(&v),
-            "{id}: default {v} outside {lo}..={hi}"
-        );
+        assert!((*lo..=*hi).contains(&v), "{id}: default {v} outside {lo}..={hi}");
     }
     for k in keys() {
         if ["limits", "api"].contains(&k.section)
@@ -111,8 +105,5 @@ fn costs_above_default_name_only_raised_keys() {
     c.limits.search_matches += 1;
     c.limits.blob_lines -= 1;
     c.limits.registry_entries += 1;
-    assert_eq!(
-        c.costs_above_default(),
-        ["limits.search_matches", "api.diff_lines"]
-    );
+    assert_eq!(c.costs_above_default(), ["limits.search_matches", "api.diff_lines"]);
 }

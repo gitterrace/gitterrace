@@ -76,9 +76,7 @@ impl fmt::Display for DocHead {
             ],
             ..Seg::default()
         });
-        DocHeadMarkup { h: self, views }
-            .render_into(f)
-            .map_err(|_| fmt::Error)
+        DocHeadMarkup { h: self, views }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 
@@ -92,16 +90,8 @@ mod tests {
     fn escapes_and_marks_the_active_tab() {
         let h = DocHead {
             tabs: vec![
-                DocTab {
-                    href: "/?doc=a&b".into(),
-                    label: "README",
-                    on: true,
-                },
-                DocTab {
-                    href: "/x".into(),
-                    label: "LICENSE",
-                    on: false,
-                },
+                DocTab { href: "/?doc=a&b".into(), label: "README", on: true },
+                DocTab { href: "/x".into(), label: "LICENSE", on: false },
             ],
             ..DocHead::default()
         }
@@ -113,12 +103,7 @@ mod tests {
 
     #[test]
     fn a_title_alone_when_there_are_no_tabs() {
-        let h = DocHead {
-            title: "<x>".into(),
-            views: true,
-            ..DocHead::default()
-        }
-        .to_string();
+        let h = DocHead { title: "<x>".into(), views: true, ..DocHead::default() }.to_string();
         assert!(h.contains("<span class=\"doc-title\">&lt;x&gt;</span>"));
         assert!(h.contains("data-show=\"source\""));
     }

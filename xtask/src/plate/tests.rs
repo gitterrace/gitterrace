@@ -29,9 +29,7 @@ fn favicon_swaps_plate_for_bare_mark_in_dark_mode() {
 #[test]
 fn favicon_link_is_one_safe_attribute() {
     let l = favicon_link(&favicon(DARK, PLATE_COLOR).expect("favicon"));
-    let uri = l
-        .trim_end()
-        .trim_start_matches("<link rel=\"icon\" href=\"");
+    let uri = l.trim_end().trim_start_matches("<link rel=\"icon\" href=\"");
     let uri = uri.strip_suffix("\">").expect("closing");
     assert!(!uri.contains(['"', '<', '>', '#']));
 }
@@ -72,8 +70,5 @@ fn no_file_has_two_writers() {
         })
         .collect();
     let both: Vec<&String> = theirs.iter().filter(|p| ours.contains(p)).collect();
-    assert!(
-        both.is_empty(),
-        "written by the plate and by the logos: {both:?}"
-    );
+    assert!(both.is_empty(), "written by the plate and by the logos: {both:?}");
 }

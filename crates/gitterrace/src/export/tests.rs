@@ -11,10 +11,7 @@ const DEFAULT_PAGES: Option<usize> = None;
 fn encoded_names_round_trip_to_real_file_names() {
     let html =
         r#"<a href="/blob/HEAD/docs/a%20b%23c.md">x</a><a href="/blob/HEAD/%C3%BCber.md">y</a>"#;
-    assert_eq!(
-        links(html),
-        vec!["/blob/HEAD/docs/a b#c.md", "/blob/HEAD/über.md"]
-    );
+    assert_eq!(links(html), vec!["/blob/HEAD/docs/a b#c.md", "/blob/HEAD/über.md"]);
 }
 
 #[test]
@@ -24,12 +21,7 @@ fn links_keeps_same_origin_paths_only() {
             <a href="/tree/HEAD/a&amp;b">t</a>"#;
     assert_eq!(
         links(html),
-        vec![
-            "/commit/abc",
-            "/tree/HEAD/a&b",
-            "/raw/HEAD/a.png",
-            "/static/f.woff2"
-        ]
+        vec!["/commit/abc", "/tree/HEAD/a&b", "/raw/HEAD/a.png", "/static/f.woff2"]
     );
 }
 
@@ -37,18 +29,9 @@ fn links_keeps_same_origin_paths_only() {
 fn html_pages_become_index_files() {
     let out = Path::new("/o");
     let t = |p, ct| target(out, p, ct).expect("plain path");
-    assert_eq!(
-        t("/", "text/html; charset=utf-8"),
-        Path::new("/o/index.html")
-    );
-    assert_eq!(
-        t("/stats/hotspots", "text/html"),
-        Path::new("/o/stats/hotspots/index.html")
-    );
-    assert_eq!(
-        t("/static/app.css", "text/css"),
-        Path::new("/o/static/app.css")
-    );
+    assert_eq!(t("/", "text/html; charset=utf-8"), Path::new("/o/index.html"));
+    assert_eq!(t("/stats/hotspots", "text/html"), Path::new("/o/stats/hotspots/index.html"));
+    assert_eq!(t("/static/app.css", "text/css"), Path::new("/o/static/app.css"));
 }
 
 /// Class: any segment that is not a plain name. Whatever a path holds, a target is either
@@ -79,24 +62,14 @@ fn target_refuses_every_hostile_segment() {
         "/tree/HEAD/dir./x",
     ];
     for path in hostile {
-        assert_eq!(
-            target(out, path, "text/plain"),
-            None,
-            "{path:?} was accepted"
-        );
+        assert_eq!(target(out, path, "text/plain"), None, "{path:?} was accepted");
     }
-    for path in hostile
-        .iter()
-        .copied()
-        .chain(["/a b/c", "//x//y/", "/über"])
-    {
+    for path in hostile.iter().copied().chain(["/a b/c", "//x//y/", "/über"]) {
         for ct in ["text/html", "text/plain"] {
             if let Some(t) = target(out, path, ct) {
                 let below = t.strip_prefix(out).expect("under out");
                 assert!(
-                    below
-                        .components()
-                        .all(|c| matches!(c, std::path::Component::Normal(_))),
+                    below.components().all(|c| matches!(c, std::path::Component::Normal(_))),
                     "{path:?} -> {}",
                     t.display()
                 );
@@ -109,9 +82,7 @@ fn target_refuses_every_hostile_segment() {
 #[test]
 fn target_accepts_names_that_share_a_device_prefix() {
     let out = Path::new("/o");
-    for name in [
-        "CONMAN", "NULLIFY", "AUX_data", "com10", "lpt0.txt", ".con", "a.b",
-    ] {
+    for name in ["CONMAN", "NULLIFY", "AUX_data", "com10", "lpt0.txt", ".con", "a.b"] {
         let path = format!("/blob/HEAD/{name}");
         assert_eq!(
             target(out, &path, "text/plain"),
@@ -133,14 +104,9 @@ fn snapshot_names_the_gitterrace_version() {
         "{out}"
     );
     // One line of facts, no pitch: the banner ends on its own period.
+    assert!(!out.contains("Install") && !out.contains("real thing"), "{out}");
     assert!(
-        !out.contains("Install") && !out.contains("real thing"),
-        "{out}"
-    );
-    assert!(
-        out.contains(&format!(
-            "<meta name=\"generator\" content=\"gitterrace {v}\"></head>"
-        )),
+        out.contains(&format!("<meta name=\"generator\" content=\"gitterrace {v}\"></head>")),
         "{out}"
     );
 }
@@ -152,10 +118,7 @@ fn snapshot_escapes_the_version() {
     let out = String::from_utf8(mark_snapshot_as(html, "v1", None, "1<b>&\"x")).expect("utf8");
     assert!(!out.contains("1<b>"), "{out}");
     assert!(out.contains("</a> 1&lt;b&gt;&amp;&quot;x."), "{out}");
-    assert!(
-        out.contains("content=\"gitterrace 1&lt;b&gt;&amp;&quot;x\""),
-        "{out}"
-    );
+    assert!(out.contains("content=\"gitterrace 1&lt;b&gt;&amp;&quot;x\""), "{out}");
 }
 
 #[test]
@@ -215,18 +178,11 @@ async fn export_never_writes_into_or_clears_a_folder_it_did_not_create_unless_fo
     let out = dir.path().join("foreign");
     std::fs::create_dir(&out).expect("mkdir");
     std::fs::write(out.join("mine.txt"), "keep").expect("write");
-    let err = crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
-        .await
-        .unwrap_err();
+    let err = crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES).await.unwrap_err();
     assert!(err.to_string().contains("not empty"), "{err}");
     assert_eq!(std::fs::read_dir(&out).expect("read").count(), 1);
-    crate::export::export(&repos, &out, &scope(true), DEFAULT_PAGES)
-        .await
-        .expect("forced");
-    assert!(
-        out.join("mine.txt").is_file(),
-        "force writes over, not clears"
-    );
+    crate::export::export(&repos, &out, &scope(true), DEFAULT_PAGES).await.expect("forced");
+    assert!(out.join("mine.txt").is_file(), "force writes over, not clears");
     assert!(out.join(".gitterrace-export").is_file());
     assert!(out.join("index.html").is_file());
 }
@@ -237,9 +193,7 @@ async fn re_export_removes_stale_pages_and_ignores_symlink_targets() {
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let repos = [repo.path().to_path_buf()];
     let out = dir.path().join("out");
-    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
-        .await
-        .expect("first");
+    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES).await.expect("first");
     std::fs::create_dir_all(out.join("old/page")).expect("mkdir");
     std::fs::write(out.join("old/page/index.html"), "stale").expect("write");
     let outside = dir.path().join("outside");
@@ -247,9 +201,7 @@ async fn re_export_removes_stale_pages_and_ignores_symlink_targets() {
     std::fs::write(outside.join("precious"), "keep").expect("write");
     #[cfg(unix)]
     std::os::unix::fs::symlink(&outside, out.join("link")).expect("symlink");
-    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES)
-        .await
-        .expect("second");
+    crate::export::export(&repos, &out, &scope(false), DEFAULT_PAGES).await.expect("second");
     assert!(!out.join("old").exists(), "stale page survived");
     assert!(!out.join("link").exists());
     assert!(outside.join("precious").is_file(), "symlink was followed");
@@ -261,14 +213,9 @@ async fn default_folder_is_used_when_none_is_named() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let out = dir.path().join(crate::export::DEFAULT_OUT);
-    crate::export::export(
-        &[repo.path().to_path_buf()],
-        &out,
-        &scope(false),
-        DEFAULT_PAGES,
-    )
-    .await
-    .expect("export");
+    crate::export::export(&[repo.path().to_path_buf()], &out, &scope(false), DEFAULT_PAGES)
+        .await
+        .expect("export");
     assert!(out.join("index.html").is_file());
     assert_eq!(crate::export::DEFAULT_OUT, "gitterrace-export");
 }
@@ -284,18 +231,11 @@ async fn export_refuses_a_repository_root_as_output() {
         force: false,
         config: gitterrace_config::Config::default(),
     };
-    let err = crate::export::export(
-        &[repo.path().to_path_buf()],
-        repo.path(),
-        &scope,
-        DEFAULT_PAGES,
-    )
-    .await
-    .unwrap_err();
-    assert!(
-        err.to_string().contains("root of a git repository"),
-        "{err}"
-    );
+    let err =
+        crate::export::export(&[repo.path().to_path_buf()], repo.path(), &scope, DEFAULT_PAGES)
+            .await
+            .unwrap_err();
+    assert!(err.to_string().contains("root of a git repository"), "{err}");
     let left: Vec<_> = std::fs::read_dir(repo.path()).expect("read").collect();
     assert_eq!(left.len(), 1, "nothing but .git may be written");
 }
@@ -319,35 +259,22 @@ async fn export_writes_every_prewarmed_page() {
         .expect("export");
     let root =
         std::fs::read_to_string(target(&out, "/", "text/html").expect("root")).expect("root page");
-    assert!(
-        root.contains("url=r/r/index.html"),
-        "/ forwards to the one repository: {root}"
-    );
+    assert!(root.contains("url=r/r/index.html"), "/ forwards to the one repository: {root}");
     for page in gitterrace_web::WARM_PAGES {
         let page = format!("/r/r{page}");
         let file = target(&out, &page, "text/html").expect("plain path");
-        assert!(
-            file.is_file(),
-            "{page} was not exported (looked for {})",
-            file.display()
-        );
+        assert!(file.is_file(), "{page} was not exported (looked for {})", file.display());
         let html = std::fs::read_to_string(&file).expect("read page");
         assert!(
             html.contains("class=\"snapshot\"") && html.contains("Snapshot at"),
             "{page} does not say it is a snapshot"
         );
     }
-    assert!(
-        out.join("snapshot.css").is_file(),
-        "the banner style is missing"
-    );
+    assert!(out.join("snapshot.css").is_file(), "the banner style is missing");
     // A static host answers a missing file with `404.html`: the app's not-found page, whose
     // stylesheets and way back resolve from the root it sits in.
     let lost = std::fs::read_to_string(out.join("404.html")).expect("404.html is written");
-    assert!(
-        lost.contains("404") && lost.contains("static/app.css"),
-        "{lost}"
-    );
+    assert!(lost.contains("404") && lost.contains("static/app.css"), "{lost}");
     assert!(!lost.contains("type=\"font/woff2\""), "{lost}");
     // The credit is a footer of its own, not a second snapshot banner.
     let page = std::fs::read_to_string(target(&out, "/r/r/", "text/html").expect("home"))
@@ -383,10 +310,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
     .expect("export");
     let index = std::fs::read_to_string(out.join("index.html")).expect("index page");
     for name in ["alpha", "beta"] {
-        assert!(
-            index.contains(&format!("/r/{name}/")),
-            "index does not link {name}"
-        );
+        assert!(index.contains(&format!("/r/{name}/")), "index does not link {name}");
         for page in gitterrace_web::WARM_PAGES {
             let file = target(&out, &format!("/r/{name}{page}"), "text/html").expect("plain path");
             assert!(file.is_file(), "/r/{name}{page} was not exported");
@@ -397,11 +321,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
         std::fs::read_to_string(target(&out, "/r/alpha/", "text/html").expect("plain path"))
             .expect("alpha");
     // Written for disk, a page holds no root-absolute link at all.
-    assert!(
-        links(&alpha).is_empty(),
-        "absolute links: {:?}",
-        links(&alpha)
-    );
+    assert!(links(&alpha).is_empty(), "absolute links: {:?}", links(&alpha));
 }
 
 /// Class: a repository file a browser would run scripts in. A static host serves exported
@@ -412,9 +332,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
 async fn export_ships_no_scriptable_raw_file() {
     let dir = tempfile::tempdir().expect("tempdir");
     let names = ["evil.svg", "x.html", "x.xhtml", "page.pdf", "a.png"];
-    let readme = names
-        .map(|n| format!("[{n}](/raw/HEAD/{n}) ![{n}](/raw/HEAD/{n})\n"))
-        .concat();
+    let readme = names.map(|n| format!("[{n}](/raw/HEAD/{n}) ![{n}](/raw/HEAD/{n})\n")).concat();
     let mut fx = gitterrace_testkit::Fixture::init(&dir.path().join("r"))
         .write("README.md", &readme)
         .write(
@@ -532,16 +450,8 @@ async fn export_skips_what_features_turn_off() {
                 todo.push(p);
             } else if p.extension().is_some_and(|x| x == "html") {
                 let html = std::fs::read_to_string(&p).expect("read");
-                assert!(
-                    !html.contains("/r/r/stats"),
-                    "{} links insights",
-                    p.display()
-                );
-                assert!(
-                    !html.contains("role=\"contentinfo\""),
-                    "{} has a credit",
-                    p.display()
-                );
+                assert!(!html.contains("/r/r/stats"), "{} links insights", p.display());
+                assert!(!html.contains("role=\"contentinfo\""), "{} has a credit", p.display());
                 seen += 1;
             }
         }
@@ -568,10 +478,7 @@ fn snapshot_banner_is_plain_sentences_without_a_pitch() {
             assert!(!text.to_lowercase().contains(pitch), "{text}");
         }
         for sentence in text.split(". ") {
-            assert!(
-                sentence.chars().next().is_some_and(char::is_uppercase),
-                "{text}"
-            );
+            assert!(sentence.chars().next().is_some_and(char::is_uppercase), "{text}");
         }
     }
 }

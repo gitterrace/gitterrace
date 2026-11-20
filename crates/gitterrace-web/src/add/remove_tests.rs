@@ -68,24 +68,12 @@ async fn remove_is_gated_and_takes_the_repository_off() {
     let tok = Some(secret.as_str());
     assert_eq!(get(&r, "/r/b/").await.0, 200);
 
-    assert_eq!(
-        send(&r, req("DELETE", None), named("b")).await.0,
-        403,
-        "no proof"
-    );
-    assert_eq!(
-        send(&r, req("DELETE", Some("x")), named("b")).await.0,
-        403,
-        "bad"
-    );
+    assert_eq!(send(&r, req("DELETE", None), named("b")).await.0, 403, "no proof");
+    assert_eq!(send(&r, req("DELETE", Some("x")), named("b")).await.0, 403, "bad");
     let browser = req("DELETE", tok).header("sec-fetch-site", "same-origin");
     assert_eq!(send(&r, browser, named("b")).await.0, 403, "browser");
     assert_eq!(get(&r, "/r/b/").await.0, 200, "still served");
-    assert_eq!(
-        send(&r, req("DELETE", tok), named("zz")).await.0,
-        404,
-        "unknown"
-    );
+    assert_eq!(send(&r, req("DELETE", tok), named("zz")).await.0, 404, "unknown");
     assert_eq!(send(&r, req("DELETE", tok), "{}".into()).await.0, 400);
 
     let by_path = serde_json::json!({ "path": b }).to_string();
@@ -124,11 +112,7 @@ async fn a_public_server_refuses_remove() {
     let (s, _) = send(&r, req("DELETE", Some(&secret)), named("b")).await;
     assert!(s == 404 || s == 405, "public: {s}");
     // The secret routes are not mounted at all: the GET challenge reaches the guard.
-    assert_eq!(
-        get(&r, "/_repos?nonce=n1").await.0,
-        404,
-        "no challenge in public"
-    );
+    assert_eq!(get(&r, "/_repos?nonce=n1").await.0, 404, "no challenge in public");
     assert_eq!(get(&r, "/r/b/").await.0, 200, "still served");
 }
 
@@ -148,10 +132,7 @@ async fn a_removed_repository_stops_indexing() {
     let landed = gitterrace_testkit::wait::within(w, || async { !snapshot(&cache).is_empty() });
     assert!(landed.await, "indexed while served");
     gitterrace_testkit::wait::pause(Duration::from_millis(500)).await;
-    assert_eq!(
-        send(&r, req("DELETE", Some(&secret)), named("b")).await.0,
-        200
-    );
+    assert_eq!(send(&r, req("DELETE", Some(&secret)), named("b")).await.0, 200);
     // Aborting stops the refresher, but a blocking index job it already started (the first
     // build, the warm-up walk) runs to its end; on a loaded machine that is seconds. Wait for
     // the folder to hold still, so the check below is about the commits made after removal.
@@ -163,10 +144,7 @@ async fn a_removed_repository_stops_indexing() {
         if now == before {
             break;
         }
-        assert!(
-            std::time::Instant::now() < end,
-            "the cache never holds still"
-        );
+        assert!(std::time::Instant::now() < end, "the cache never holds still");
         before = now;
     }
     for i in 0..3 {

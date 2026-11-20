@@ -66,11 +66,7 @@ impl ApiState {
             }
             state.rebuilding.store(false, Ordering::Release);
         };
-        if std::thread::Builder::new()
-            .name("gitterrace-rebuild".into())
-            .spawn(run)
-            .is_err()
-        {
+        if std::thread::Builder::new().name("gitterrace-rebuild".into()).spawn(run).is_err() {
             self.rebuilding.store(false, Ordering::Release);
         }
     }

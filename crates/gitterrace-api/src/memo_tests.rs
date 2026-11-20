@@ -20,10 +20,7 @@ fn state(dir: &std::path::Path) -> ApiState {
 fn insights_after_the_first_walk_no_tree() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    let params = Params {
-        period: Some("all".to_owned()),
-        ..Params::default()
-    };
+    let params = Params { period: Some("all".to_owned()), ..Params::default() };
     let first = s.insight("hotspots", None, &params).expect("first");
     let walked = s.repo.tree_walks();
     assert!(walked > 0, "the first request reads the tree");
@@ -39,10 +36,7 @@ fn insights_after_the_first_walk_no_tree() {
 fn release_records_empties_the_head_memo() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    let params = Params {
-        period: Some("all".to_owned()),
-        ..Params::default()
-    };
+    let params = Params { period: Some("all".to_owned()), ..Params::default() };
     // Hotspots read both the ignore files and the head line counts.
     s.insight("hotspots", None, &params).expect("hotspots");
     assert!(s.head_memo_held(), "a request fills the head memo");
@@ -54,25 +48,14 @@ fn release_records_empties_the_head_memo() {
 fn insight_requests_over_one_tip_build_the_derived_tables_once() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    let params = Params {
-        period: Some("all".to_owned()),
-        ..Params::default()
-    };
+    let params = Params { period: Some("all".to_owned()), ..Params::default() };
     s.insight("summary", None, &params).expect("first");
     let src = s.records("HEAD").expect("records");
-    let built = src
-        .share()
-        .run(|a| gitterrace_index::table_builds(&**a))
-        .expect("run");
+    let built = src.share().run(|a| gitterrace_index::table_builds(&**a)).expect("run");
     assert_eq!(built, 1, "the first request builds the tables");
     for name in ["summary", "contributors", "hotspots"] {
         s.insight(name, None, &params).expect(name);
     }
-    let after = src
-        .run(|a| gitterrace_index::table_builds(&**a))
-        .expect("run");
-    assert_eq!(
-        after, 1,
-        "later requests over the same tip slice the same tables"
-    );
+    let after = src.run(|a| gitterrace_index::table_builds(&**a)).expect("run");
+    assert_eq!(after, 1, "later requests over the same tip slice the same tables");
 }

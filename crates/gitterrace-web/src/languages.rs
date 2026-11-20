@@ -199,11 +199,7 @@ pub(crate) async fn page(
         let at = shown(ch.len(), view);
         let ids: Vec<String> = at.iter().map(|i| ch.id(*i).to_owned()).collect();
         let subj = match a.repo.summaries(&ids) {
-            Ok(sums) => Subjects(
-                at.into_iter()
-                    .zip(sums.into_iter().map(|s| s.subject))
-                    .collect(),
-            ),
+            Ok(sums) => Subjects(at.into_iter().zip(sums.into_iter().map(|s| s.subject)).collect()),
             Err(e) => {
                 tracing::warn!("subjects unavailable: {e}");
                 Subjects(HashMap::new())

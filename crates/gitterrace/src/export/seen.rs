@@ -38,19 +38,11 @@ mod tests {
         let mut s = Seen::default();
         assert!(s.insert("/commit/abc"));
         assert!(!s.insert("/commit/abc"));
-        for p in [
-            "/commit/abd",
-            "/commit/ab",
-            "/commit/abc/",
-            "commit/abc",
-            "",
-        ] {
+        for p in ["/commit/abd", "/commit/ab", "/commit/abc/", "commit/abc", ""] {
             assert!(s.insert(p), "{p:?} collided");
         }
         let n = 200_000;
-        let fresh = (0..n)
-            .filter(|i| s.insert(&format!("/blob/HEAD/d/{i}.rs")))
-            .count();
+        let fresh = (0..n).filter(|i| s.insert(&format!("/blob/HEAD/d/{i}.rs"))).count();
         assert_eq!(fresh, n);
     }
 }

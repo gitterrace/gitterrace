@@ -32,21 +32,12 @@ fn build(repo: &Path, threads: usize) -> BTreeMap<String, Vec<u8>> {
 
 fn assert_same_on_any_thread_count(repo: &Path) {
     let one = build(repo, 1);
-    assert!(
-        one.get("MANIFEST").is_some_and(|c| !c.is_empty()),
-        "nothing was indexed"
-    );
+    assert!(one.get("MANIFEST").is_some_and(|c| !c.is_empty()), "nothing was indexed");
     for threads in [4, 10, 10] {
         let got = build(repo, threads);
-        assert_eq!(
-            got.keys().collect::<Vec<_>>(),
-            one.keys().collect::<Vec<_>>()
-        );
+        assert_eq!(got.keys().collect::<Vec<_>>(), one.keys().collect::<Vec<_>>());
         for (name, body) in &one {
-            assert!(
-                got[name] == *body,
-                "{name} differs between 1 and {threads} threads"
-            );
+            assert!(got[name] == *body, "{name} differs between 1 and {threads} threads");
         }
     }
 }
@@ -96,20 +87,13 @@ fn a_real_repository_indexes_the_same_on_any_thread_count() {
 /// Every live file of the cache in `dir`, in manifest order, with its kind. Names carry the
 /// generation that wrote them, so only kind and bytes are compared.
 fn live_files(dir: &Path) -> Vec<(u8, Vec<u8>)> {
-    let m = Manifest::load(dir)
-        .expect("manifest")
-        .expect("a segment set");
-    m.live
-        .iter()
-        .map(|f| (f.kind, std::fs::read(dir.join(&f.name)).expect("read live")))
-        .collect()
+    let m = Manifest::load(dir).expect("manifest").expect("a segment set");
+    m.live.iter().map(|f| (f.kind, std::fs::read(dir.join(&f.name)).expect("read live"))).collect()
 }
 
 /// The kinds the manifest names, in order, after checking each named file exists.
 fn kinds(dir: &Path) -> Vec<u8> {
-    let m = Manifest::load(dir)
-        .expect("manifest")
-        .expect("a segment set");
+    let m = Manifest::load(dir).expect("manifest").expect("a segment set");
     for f in &m.live {
         assert!(dir.join(&f.name).is_file(), "{} is named but gone", f.name);
     }
@@ -117,12 +101,10 @@ fn kinds(dir: &Path) -> Vec<u8> {
 }
 
 fn segments(dir: &Path) -> usize {
-    Manifest::load(dir).ok().flatten().map_or(0, |m| {
-        m.live
-            .iter()
-            .filter(|f| f.kind == Kind::Segment as u8)
-            .count()
-    })
+    Manifest::load(dir)
+        .ok()
+        .flatten()
+        .map_or(0, |m| m.live.iter().filter(|f| f.kind == Kind::Segment as u8).count())
 }
 
 /// Built at HEAD~k, updated to HEAD, then merged: every cache file byte for byte the one-step
@@ -140,14 +122,7 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
             .write(&format!("docs/d{i}.md"), "x\n");
         let who = format!("Dev{} <d{}@x.io>", i % 3, i % 3);
         f.git(&["add", "-A"]);
-        f.git(&[
-            "commit",
-            "-q",
-            "--author",
-            &who,
-            "-m",
-            &format!("fix(core): step {i}"),
-        ]);
+        f.git(&["commit", "-q", "--author", &who, "-m", &format!("fix(core): step {i}")]);
         tips.push(f.git(&["rev-parse", "HEAD"]));
     }
     let head = tips.last().expect("tip").clone();
@@ -174,28 +149,16 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
     }
     // The merge runs on a background thread: wait until the set is one segment again.
     gitterrace_testkit::wait::until_blocking("the merge ran", || segments(&two_dir) == 1);
-    assert_eq!(
-        kinds(&two_dir),
-        kinds(&one_dir),
-        "live kinds after the merge"
-    );
+    assert_eq!(kinds(&two_dir), kinds(&one_dir), "live kinds after the merge");
     let got = live_files(&two_dir);
     assert_eq!(got.len(), want.len(), "live file count");
     for (i, (g, w)) in got.iter().zip(&want).enumerate() {
         assert_eq!(g.0, w.0, "kind of live file {i}");
-        assert!(
-            g.1 == w.1,
-            "live file {i} (kind {}) differs from the one-step build",
-            w.0
-        );
+        assert!(g.1 == w.1, "live file {i} (kind {}) differs from the one-step build", w.0);
     }
     // The commit section is part of what was compared, not an empty one.
     let store = Store::open(&two_dir).expect("open").expect("set");
-    let commits: u32 = store.segments[0]
-        .blocks(section::COMMITS)
-        .iter()
-        .map(|e| e.items)
-        .sum();
+    let commits: u32 = store.segments[0].blocks(section::COMMITS).iter().map(|e| e.items).sum();
     assert_eq!(commits as usize, tips.len(), "commit section items");
 }
 
@@ -205,10 +168,8 @@ fn two_steps_then_merge_equal_one_step_byte_for_byte() {
 fn an_append_sequence_with_a_fork_indexes_the_same_on_any_thread_count() {
     let dir = tempfile::tempdir().expect("tempdir");
     let r = gitterrace_testkit::RenameChain::build(dir.path());
-    let stops = gitterrace_testkit::git(
-        &r.repo,
-        &["rev-list", "--first-parent", "--reverse", "HEAD"],
-    );
+    let stops =
+        gitterrace_testkit::git(&r.repo, &["rev-list", "--first-parent", "--reverse", "HEAD"]);
     let stops: Vec<&str> = stops.lines().step_by(4).chain(["HEAD"]).collect();
     let build = |threads: usize, n: usize| {
         let source = Repo::discover(&r.repo).expect("open").with_workers(threads);
@@ -219,12 +180,8 @@ fn an_append_sequence_with_a_fork_indexes_the_same_on_any_thread_count() {
         }
         assert!(segments(&cache) > 1, "built by appends");
         let store = Store::open(&cache).expect("open").expect("set");
-        let canon: u32 = store
-            .segments
-            .iter()
-            .flat_map(|s| s.blocks(section::CANON))
-            .map(|e| e.items)
-            .sum();
+        let canon: u32 =
+            store.segments.iter().flat_map(|s| s.blocks(section::CANON)).map(|e| e.items).sum();
         assert!(canon > 0, "section 7 is written");
         live_files(&cache)
     };
@@ -242,28 +199,17 @@ fn a_real_build_reports_cpu_and_worker_busy_for_the_stream() {
     let dir = tempfile::tempdir().expect("tempdir");
     let mut f = Fixture::init(&dir.path().join("repo")).at("2024-01-01T00:00:00Z");
     for i in 0..20 {
-        f = f
-            .write(&format!("f{i}.rs"), &format!("line {i}\n"))
-            .commit(&format!("fix: edit {i}"));
+        f = f.write(&format!("f{i}.rs"), &format!("line {i}\n")).commit(&format!("fix: edit {i}"));
     }
     let source = Repo::discover(f.path()).expect("open").with_workers(4);
     let index = Index::open_dir(dir.path().join("gitterrace")).expect("index");
     index.update(&source, "HEAD", &|_| {}).expect("update");
     let (steps, _) = index.phases();
-    let stream = steps
-        .iter()
-        .find(|p| p.name == "stream")
-        .expect("stream step");
-    assert!(
-        stream.busy.is_some_and(|b| b > 0.0 && b <= 1.0),
-        "{stream:?}"
-    );
+    let stream = steps.iter().find(|p| p.name == "stream").expect("stream step");
+    assert!(stream.busy.is_some_and(|b| b > 0.0 && b <= 1.0), "{stream:?}");
     if cfg!(unix) {
         assert!(stream.cpu_secs.is_some_and(|c| c >= 0.0), "{stream:?}");
     }
-    let rev_list = steps
-        .iter()
-        .find(|p| p.name == "rev_list")
-        .expect("rev_list");
+    let rev_list = steps.iter().find(|p| p.name == "rev_list").expect("rev_list");
     assert!(rev_list.cpu_secs.is_some() || !cfg!(unix), "{rev_list:?}");
 }

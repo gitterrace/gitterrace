@@ -143,11 +143,7 @@ impl Lexer<'_> {
             if self.src[self.at] == b'\n' {
                 self.line += 1;
             } else if self.src[self.at] == b'"'
-                && self.src[self.at + 1..]
-                    .iter()
-                    .take(hashes)
-                    .filter(|b| **b == b'#')
-                    .count()
+                && self.src[self.at + 1..].iter().take(hashes).filter(|b| **b == b'#').count()
                     == hashes
             {
                 self.at += 1 + hashes;

@@ -86,18 +86,16 @@ fn gen_commit() -> impl Strategy<Value = Gen> {
         prop::bool::weighted(0.1),
         any::<bool>(),
     )
-        .prop_map(
-            |(back, edge, offset, author, files, kind, merge, dst)| Gen {
-                back,
-                edge,
-                offset,
-                author,
-                files,
-                kind,
-                merge,
-                dst,
-            },
-        )
+        .prop_map(|(back, edge, offset, author, files, kind, merge, dst)| Gen {
+            back,
+            edge,
+            offset,
+            author,
+            files,
+            kind,
+            merge,
+            dst,
+        })
 }
 
 fn record(i: usize, g: &Gen) -> CommitRecord {
@@ -203,26 +201,17 @@ fn query() -> impl Strategy<Value = Q> {
 }
 
 fn no_chips() -> impl Strategy<Value = Q> {
-    query().prop_map(|q| Q {
-        author: None,
-        path: None,
-        kind: None,
-        ..q
-    })
+    query().prop_map(|q| Q { author: None, path: None, kind: None, ..q })
 }
 
 fn scope(q: &Q) -> Scope {
     let flag = |b: bool| Some(if b { "1" } else { "0" }.to_owned());
-    let mut p = ScopeParams {
-        period: Some(PERIODS[q.period].to_owned()),
-        ..ScopeParams::default()
-    };
+    let mut p =
+        ScopeParams { period: Some(PERIODS[q.period].to_owned()), ..ScopeParams::default() };
     let terms = [
-        q.kind
-            .map(|k| format!("type:{}", KINDS[k].unwrap_or("other"))),
+        q.kind.map(|k| format!("type:{}", KINDS[k].unwrap_or("other"))),
         q.author.map(|a| format!("author:{}", AUTHORS[a].1)),
-        q.path
-            .map(|i| format!("path:{}", ["src", "docs", "src/a.rs"][i])),
+        q.path.map(|i| format!("path:{}", ["src", "docs", "src/a.rs"][i])),
     ];
     p.select.q = Some(terms.into_iter().flatten().collect::<Vec<_>>().join(" "));
     p.options.bots = flag(q.bots);

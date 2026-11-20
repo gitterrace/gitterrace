@@ -79,11 +79,7 @@ pub fn reference_time(src: &dyn InsightsSource) -> i64 {
 /// [`reference_time`] with the clock given.
 pub fn reference_time_at(src: &dyn InsightsSource, clock: &dyn Clock) -> i64 {
     let wall = clock.now();
-    src.commits_in(CommitRange::All)
-        .map(|c| c.time)
-        .filter(|t| *t <= wall)
-        .max()
-        .unwrap_or(0)
+    src.commits_in(CommitRange::All).map(|c| c.time).filter(|t| *t <= wall).max().unwrap_or(0)
 }
 
 /// [`crate::local_time`] from the columns.
@@ -93,8 +89,7 @@ pub const fn local_time_of(time: i64, offset: i32) -> i64 {
 
 /// [`crate::local_day`] from the columns.
 pub const fn local_day_of(time: i64, offset: i32) -> i64 {
-    time.saturating_add(offset as i64)
-        .div_euclid(crate::insights::DAY)
+    time.saturating_add(offset as i64).div_euclid(crate::insights::DAY)
 }
 
 /// Author x day rows over `commits` (merges skipped), for views that fold their own rows.
@@ -112,15 +107,12 @@ pub(crate) fn fold_author_day(
             over.note(e.1.merge(&c.sums));
         }
     }
-    Box::new(
-        m.into_iter()
-            .map(|((day, ident), (commits, sums))| AuthorDayRow {
-                day,
-                ident,
-                commits,
-                sums,
-            }),
-    )
+    Box::new(m.into_iter().map(|((day, ident), (commits, sums))| AuthorDayRow {
+        day,
+        ident,
+        commits,
+        sums,
+    }))
 }
 
 /// Path x author rows over the rows `each` hands out (merges skipped by the caller), keeping
@@ -141,15 +133,12 @@ pub(crate) fn fold_path_author(
             over.note(e.1.add_row(f));
         }
     });
-    Box::new(
-        m.into_iter()
-            .map(|((path, ident), (touches, sums))| PathAuthorRow {
-                path,
-                ident,
-                touches,
-                sums,
-            }),
-    )
+    Box::new(m.into_iter().map(|((path, ident), (touches, sums))| PathAuthorRow {
+        path,
+        ident,
+        touches,
+        sums,
+    }))
 }
 
 /// Boxed streaming iterator borrowed from the source.
@@ -201,14 +190,7 @@ impl Sums {
         ) else {
             return None;
         };
-        *self = Self {
-            add,
-            del,
-            rewritten,
-            code_add,
-            code_del,
-            code_rewritten,
-        };
+        *self = Self { add, del, rewritten, code_add, code_del, code_rewritten };
         Some(())
     }
 }
@@ -507,9 +489,7 @@ impl<S: InsightsSource + ?Sized> Checked<S> {
 
     /// The same source, checked again on its own.
     pub fn share(&self) -> Self {
-        Self {
-            src: Arc::clone(&self.src),
-        }
+        Self { src: Arc::clone(&self.src) }
     }
 
     /// The same handle over the trait object, so sources of different kinds share one slot.

@@ -19,20 +19,14 @@ fn hostile(root: &Path) -> (PathBuf, String) {
     git(&p, &["init", "-q", "-b", "main"]);
     git(&p, &["config", "user.name", &format!("Eve {XSS}")]);
     git(&p, &["config", "user.email", "e@x.y"]);
-    std::fs::write(
-        p.join("src/a.rs"),
-        format!("fn a() {{}}\n// {XSS}\n// $(touch pwned)\n"),
-    )
-    .expect("w");
+    std::fs::write(p.join("src/a.rs"), format!("fn a() {{}}\n// {XSS}\n// $(touch pwned)\n"))
+        .expect("w");
     std::fs::write(p.join(format!("src/{}.txt", "q\"><img onerror=x>")), "x\n").expect("w");
     std::fs::write(p.join("actions.toml"), "version = 1\n").expect("w");
     std::fs::create_dir_all(p.join(".gitterrace")).expect("dir");
     std::fs::write(p.join(".gitterrace/actions.toml"), "version = 1\n").expect("w");
     git(&p, &["add", "."]);
-    git(
-        &p,
-        &["commit", "-q", "-m", &format!("fix: $(touch pwned) {XSS}")],
-    );
+    git(&p, &["commit", "-q", "-m", &format!("fix: $(touch pwned) {XSS}")]);
     git(&p, &["branch", "x\"><svg-onload=alert(3)>"]);
     let sha = git(&p, &["rev-parse", "HEAD"]);
     (p, sha)
@@ -53,11 +47,7 @@ fn router(repo: &Path, cfg: Option<&Path>, bound: Option<std::net::IpAddr>) -> a
 /// server's own routes (`/go`, `/_send`, `/_actions`) as they are.
 async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
     let server = ["/go/", "/_"].iter().any(|p| uri.starts_with(p));
-    let uri = if server {
-        uri.to_owned()
-    } else {
-        format!("/r/evil{uri}")
-    };
+    let uri = if server { uri.to_owned() } else { format!("/r/evil{uri}") };
     let res = r
         .clone()
         .oneshot(
@@ -74,9 +64,7 @@ async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
 }
 
 fn token(html: &str) -> String {
-    let i = html
-        .find("name=\"gitterrace-actions\" content=\"")
-        .expect("token meta");
+    let i = html.find("name=\"gitterrace-actions\" content=\"").expect("token meta");
     let rest = &html[i + 35..];
     rest[..rest.find('"').expect("end")].to_owned()
 }
@@ -96,10 +84,7 @@ impl<'a> Req<'a> {
             token: Some(token),
             site: Some("same-origin"),
             host: gitterrace_testkit::on_port("localhost"),
-            origin: Some(format!(
-                "http://{}",
-                gitterrace_testkit::on_port("localhost")
-            )),
+            origin: Some(format!("http://{}", gitterrace_testkit::on_port("localhost"))),
             ctype: "application/json",
             body,
         }
@@ -107,9 +92,7 @@ impl<'a> Req<'a> {
 }
 
 async fn send(r: &axum::Router, q: Req<'_>) -> (u16, serde_json::Value) {
-    let mut b = Request::post(RUN_PATH)
-        .header("host", q.host)
-        .header("content-type", q.ctype);
+    let mut b = Request::post(RUN_PATH).header("host", q.host).header("content-type", q.ctype);
     if let Some(t) = q.token {
         b = b.header("x-gitterrace-token", t);
     }
@@ -119,17 +102,10 @@ async fn send(r: &axum::Router, q: Req<'_>) -> (u16, serde_json::Value) {
     if let Some(o) = q.origin {
         b = b.header("origin", o);
     }
-    let res = r
-        .clone()
-        .oneshot(b.body(Body::from(q.body)).expect("req"))
-        .await
-        .expect("res");
+    let res = r.clone().oneshot(b.body(Body::from(q.body)).expect("req")).await.expect("res");
     let s = res.status().as_u16();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
-    (
-        s,
-        serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null),
-    )
+    (s, serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null))
 }
 
 fn body(action: &str, kind: &str, extra: &str) -> String {
@@ -149,18 +125,11 @@ async fn run_route_security_table() {
     let none = tempfile::tempdir().expect("tmp");
     let off = router(&repo, Some(none.path()), None);
     let (_, html) = page(&off, "/").await;
-    assert!(
-        !html.contains("gitterrace-actions"),
-        "token without actions"
-    );
+    assert!(!html.contains("gitterrace-actions"), "token without actions");
     let (s, _) = send(&off, Req::ok("x", body("echo", "page", ""))).await;
     assert_eq!(s, 404, "not configured");
     // 2. --no-actions: the CLI passes no file.
-    let (s, _) = send(
-        &router(&repo, None, None),
-        Req::ok("x", body("echo", "page", "")),
-    )
-    .await;
+    let (s, _) = send(&router(&repo, None, None), Req::ok("x", body("echo", "page", ""))).await;
     assert_eq!(s, 404, "--no-actions");
     // 3. bound to the LAN or to every interface.
     for ip in ["0.0.0.0", "192.168.1.5"] {
@@ -227,23 +196,15 @@ async fn run_route_security_table() {
         assert_eq!(send(&on, Req::ok(&tok, b.clone())).await.0, 400, "{b}");
     }
     // 13. path traversal.
-    let (s, _) = send(
-        &on,
-        Req::ok(&tok, body("echo", "file", r#","path":"../../etc/passwd""#)),
-    )
-    .await;
+    let (s, _) =
+        send(&on, Req::ok(&tok, body("echo", "file", r#","path":"../../etc/passwd""#))).await;
     assert_eq!(s, 400, "traversal");
 
     // 14. valid: exact JSON on stdin, only allowed env. 15. $(touch pwned) not run.
     let (s, res) = send(&on, Req::ok(&tok, body("echo", "commit", ""))).await;
     assert_eq!(s, 200, "{res}");
     assert_eq!(res["ok"], true);
-    assert!(
-        res["first_line"]
-            .as_str()
-            .expect("line")
-            .contains("$(touch pwned)")
-    );
+    assert!(res["first_line"].as_str().expect("line").contains("$(touch pwned)"));
     assert!(!repo.join("pwned").exists() && !cfg.path().join("pwned").exists());
     let stdin: serde_json::Value =
         serde_json::from_slice(&std::fs::read(cfg.path().join("stdin.json")).expect("stdin"))
@@ -252,20 +213,13 @@ async fn run_route_security_table() {
     assert_eq!(stdin["kind"], "commit");
     assert_eq!(stdin["sha"], sha);
     assert_eq!(stdin["repo"]["name"], "evil");
-    assert!(
-        stdin["permalink"]
-            .as_str()
-            .expect("link")
-            .starts_with("gitterrace://")
-    );
+    assert!(stdin["permalink"].as_str().expect("link").starts_with("gitterrace://"));
     let env = std::fs::read_to_string(cfg.path().join("env.txt")).expect("env");
     for line in env.lines() {
         let name = line.split('=').next().unwrap_or_default();
         assert!(
-            [
-                "PATH", "HOME", "USER", "LANG", "TMPDIR", "PWD", "SHLVL", "OLDPWD", "_"
-            ]
-            .contains(&name)
+            ["PATH", "HOME", "USER", "LANG", "TMPDIR", "PWD", "SHLVL", "OLDPWD", "_"]
+                .contains(&name)
                 || name.starts_with("LC_")
                 || name.starts_with("GITTERRACE_"),
             "leaked {name}"
@@ -273,32 +227,16 @@ async fn run_route_security_table() {
     }
     let (s, res) = send(
         &on,
-        Req::ok(
-            &tok,
-            body(
-                "echo",
-                "line",
-                r#","path":"src/a.rs","lines":{"start":2,"end":3}"#,
-            ),
-        ),
+        Req::ok(&tok, body("echo", "line", r#","path":"src/a.rs","lines":{"start":2,"end":3}"#)),
     )
     .await;
-    assert_eq!(
-        (s, &res["ok"]),
-        (200, &serde_json::Value::Bool(true)),
-        "{res}"
-    );
+    assert_eq!((s, &res["ok"]), (200, &serde_json::Value::Bool(true)), "{res}");
 
     // 16. timeout: killed, its grandchild too.
     let (s, res) = send(&on, Req::ok(&tok, body("slow", "page", ""))).await;
     assert_eq!(s, 200);
     assert_eq!(res["ok"], false);
-    assert!(
-        res["first_line"]
-            .as_str()
-            .expect("line")
-            .contains("timed out")
-    );
+    assert!(res["first_line"].as_str().expect("line").contains("timed out"));
     let pid = std::fs::read_to_string(cfg.path().join("grandchild.pid")).expect("pid");
     // The group was signalled; the kernel reaps the grandchild soon after, well before its
     // own 30 s sleep would end it.
@@ -308,9 +246,7 @@ async fn run_route_security_table() {
     let mut runs = Vec::new();
     for id in ["nap1", "nap2", "nap3", "nap4"] {
         let (r, t) = (on.clone(), tok.clone());
-        runs.push(tokio::spawn(async move {
-            send(&r, Req::ok(&t, body(id, "page", ""))).await.0
-        }));
+        runs.push(tokio::spawn(async move { send(&r, Req::ok(&t, body(id, "page", ""))).await.0 }));
     }
     // Each nap marks itself started and runs until released, so all four hold a slot now. A
     // nap that answers before the release did not run (refused, or its spawn failed under load):
@@ -326,10 +262,7 @@ async fn run_route_security_table() {
         std::fs::write(cfg.path().join("release"), "").expect("release");
         panic!("nap run {} answered {s} before the release", i + 1);
     }
-    assert!(
-        ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)),
-        "four runs started"
-    );
+    assert!(["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)), "four runs started");
     let (s, res) = send(&on, Req::ok(&tok, body("echo", "page", ""))).await;
     std::fs::write(cfg.path().join("release"), "").expect("release");
     assert_eq!(s, 429, "5th concurrent: {res}");
@@ -358,11 +291,7 @@ async fn run_route_security_table() {
     let gw = tempfile::tempdir().expect("tmp");
     write_config(gw.path(), ECHO, 0o620);
     let r = router(&repo, Some(gw.path()), None);
-    assert_eq!(
-        send(&r, Req::ok("x", body("echo", "page", ""))).await.0,
-        404,
-        "group writable"
-    );
+    assert_eq!(send(&r, Req::ok("x", body("echo", "page", ""))).await.0, 404, "group writable");
 }
 
 /// Repo content shows up escaped on every page that carries the action menu.
@@ -387,19 +316,11 @@ async fn hostile_repo_content_is_escaped_where_the_menu_lives() {
     ] {
         let (s, html) = page(&r, &uri).await;
         assert!(s == 200 || s == 404, "{uri}: {s}");
-        for raw in [
-            "<script>alert(1)",
-            "<img src=x onerror",
-            "\"><img onerror",
-            "\"><svg-onload",
-        ] {
+        for raw in ["<script>alert(1)", "<img src=x onerror", "\"><img onerror", "\"><svg-onload"] {
             assert!(!html.contains(raw), "{uri} renders {raw:?} unescaped");
         }
         if s == 200 {
-            assert!(
-                html.contains("name=\"gitterrace-actions\""),
-                "{uri} lacks the menu token"
-            );
+            assert!(html.contains("name=\"gitterrace-actions\""), "{uri} lacks the menu token");
         }
     }
 }
@@ -408,29 +329,15 @@ async fn hostile_repo_content_is_escaped_where_the_menu_lives() {
 async fn go_redirects_to_the_repo_holding_the_commit() {
     let tmp = tempfile::tempdir().expect("tmp");
     let (repo, sha) = hostile(tmp.path());
-    let id = gitterrace_git::Repo::discover(&repo)
-        .expect("repo")
-        .id()
-        .expect("id");
+    let id = gitterrace_git::Repo::discover(&repo).expect("repo").id().expect("id");
     let r = router(&repo, None, None);
     let loc = |res: &axum::response::Response| {
-        res.headers()
-            .get("location")
-            .map(|v| v.to_str().expect("ascii").to_owned())
+        res.headers().get("location").map(|v| v.to_str().expect("ascii").to_owned())
     };
     for (uri, want) in [
-        (
-            format!("/go/{id}/{sha}"),
-            Some(format!("/r/evil/commit/{sha}")),
-        ),
-        (
-            format!("/go/{id}/{sha}/src/a.rs"),
-            Some(format!("/r/evil/blob/{sha}/src/a.rs")),
-        ),
-        (
-            format!("/go/{id}/{sha}/src"),
-            Some(format!("/r/evil/tree/{sha}/src")),
-        ),
+        (format!("/go/{id}/{sha}"), Some(format!("/r/evil/commit/{sha}"))),
+        (format!("/go/{id}/{sha}/src/a.rs"), Some(format!("/r/evil/blob/{sha}/src/a.rs"))),
+        (format!("/go/{id}/{sha}/src"), Some(format!("/r/evil/tree/{sha}/src"))),
         (format!("/go/{id}/{sha}/../../etc/passwd"), None),
         (format!("/go/000000000000/{sha}"), None),
         (format!("/go/{id}/{}", &sha[..12]), None),
@@ -438,10 +345,7 @@ async fn go_redirects_to_the_repo_holding_the_commit() {
         let res = r
             .clone()
             .oneshot(
-                Request::get(&uri)
-                    .header("host", "localhost")
-                    .body(Body::empty())
-                    .expect("req"),
+                Request::get(&uri).header("host", "localhost").body(Body::empty()).expect("req"),
             )
             .await
             .expect("res");
@@ -460,10 +364,7 @@ async fn go_redirects_to_the_repo_holding_the_commit() {
     })
     .await;
     let (_, html) = page(&r, "/").await;
-    assert!(
-        html.contains(&format!("data-id=\"{id}\"")),
-        "permalink id not in the page"
-    );
+    assert!(html.contains(&format!("data-id=\"{id}\"")), "permalink id not in the page");
 }
 
 /// Targets come back as parts with `var` already resolved; no file or a file with no
@@ -490,8 +391,5 @@ async fn send_targets_are_template_parts() {
             {"ph": "notes"},
         ],
     }]);
-    assert_eq!(
-        serde_json::from_str::<serde_json::Value>(&body).expect("json"),
-        want
-    );
+    assert_eq!(serde_json::from_str::<serde_json::Value>(&body).expect("json"), want);
 }

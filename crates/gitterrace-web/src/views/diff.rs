@@ -18,12 +18,7 @@ pub(crate) fn diff_html(r: &Render, rev: &str, parent: Option<&str>, files: &[Fi
     let generated = std::collections::HashSet::new();
     diff_html_with(
         r,
-        DiffSource::Commit {
-            rev,
-            parent,
-            media: &none,
-            generated: &generated,
-        },
+        DiffSource::Commit { rev, parent, media: &none, generated: &generated },
         files,
     )
 }
@@ -55,27 +50,16 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
     let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
     let mut chunk = String::new();
     let mut in_chunk = 0usize;
-    let total: usize = f
-        .hunks
-        .iter()
-        .flat_map(|h| &h.lines)
-        .map(|l| l.text.len())
-        .sum();
+    let total: usize = f.hunks.iter().flat_map(|h| &h.lines).map(|l| l.text.len()).sum();
     let plain = total > r.highlight_bytes;
     let first = |k: LineKind| {
-        f.hunks
-            .iter()
-            .flat_map(|h| &h.lines)
-            .find(|l| l.kind == k)
-            .map_or("", |l| l.text.as_str())
+        f.hunks.iter().flat_map(|h| &h.lines).find(|l| l.kind == k).map_or("", |l| l.text.as_str())
     };
     let old_path = f.old_path.as_deref().unwrap_or(&f.path);
-    let mut new_hl = (!plain)
-        .then(|| crate::highlight::for_file(&f.path, first(LineKind::Added)))
-        .flatten();
-    let mut old_hl = (!plain)
-        .then(|| crate::highlight::for_file(old_path, first(LineKind::Removed)))
-        .flatten();
+    let mut new_hl =
+        (!plain).then(|| crate::highlight::for_file(&f.path, first(LineKind::Added))).flatten();
+    let mut old_hl =
+        (!plain).then(|| crate::highlight::for_file(old_path, first(LineKind::Removed))).flatten();
     for h in &f.hunks {
         let _ = write!(chunk, "<div class=\"hh\">{}</div>", esc(&h.header));
         in_chunk += 1;
@@ -85,11 +69,7 @@ fn diff_body_html(r: &Render, f: &FileDiff) -> String {
                 LineKind::Removed => ("del", SIGN_REMOVED),
                 LineKind::Context => ("ctx", ""),
             };
-            let hl = if l.kind == LineKind::Removed {
-                old_hl.as_mut()
-            } else {
-                new_hl.as_mut()
-            };
+            let hl = if l.kind == LineKind::Removed { old_hl.as_mut() } else { new_hl.as_mut() };
             let body = hl.map_or_else(|| esc_text(&l.text), |h| h.line(&l.text));
             let _ = write!(
                 chunk,
@@ -205,11 +185,7 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         );
     }
     for (i, f) in files.iter().enumerate() {
-        let gen_attr = if is_generated(src, f) {
-            " data-generated"
-        } else {
-            ""
-        };
+        let gen_attr = if is_generated(src, f) { " data-generated" } else { "" };
         let _ = write!(
             out,
             "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{gen_attr}>\
@@ -276,10 +252,7 @@ pub(crate) fn worktree_generated(
 ) -> std::collections::HashSet<String> {
     let paths = files.iter().map(|f| f.path.as_str());
     gitterrace_git::generated_paths(repo, "HEAD", paths.clone()).unwrap_or_else(|_| {
-        paths
-            .filter(|p| gitterrace_git::is_lockfile(p))
-            .map(str::to_owned)
-            .collect()
+        paths.filter(|p| gitterrace_git::is_lockfile(p)).map(str::to_owned).collect()
     })
 }
 
@@ -315,10 +288,9 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
             crate::media::is_image(&f.path) && crate::features::on(gitterrace_config::Feature::Raw);
         let old_path = f.old_path.as_deref().unwrap_or(&f.path);
         let sides = match src {
-            DiffSource::Commit { rev, parent, .. } => Some((
-                parent.map(|p| Side::At(p, old_path)),
-                Side::At(rev, f.path.as_str()),
-            )),
+            DiffSource::Commit { rev, parent, .. } => {
+                Some((parent.map(|p| Side::At(p, old_path)), Side::At(rev, f.path.as_str())))
+            }
             // HEAD through `/raw`, the copy on disk through `/worktree/raw`.
             DiffSource::Worktree { .. } => {
                 Some((Some(Side::At("HEAD", old_path)), Side::Worktree(&f.path)))
@@ -330,9 +302,7 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
                 DiffSource::Worktree { .. } => (None, None),
             };
             let px = |x: Option<crate::media::Facts>| x.and_then(|x| x.dims);
-            let old = old
-                .filter(|_| f.kind != ChangeKind::Added)
-                .map(|s| (s, px(was)));
+            let old = old.filter(|_| f.kind != ChangeKind::Added).map(|s| (s, px(was)));
             let new = (f.kind != ChangeKind::Deleted).then_some((new, px(now)));
             return crate::media::diff_html(old, new);
         }
@@ -342,12 +312,7 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
         return no_hunks_line(f);
     }
     let changed = (f.additions + f.deletions) as usize;
-    let bytes: usize = f
-        .hunks
-        .iter()
-        .flat_map(|h| &h.lines)
-        .map(|l| l.text.len() + 48)
-        .sum();
+    let bytes: usize = f.hunks.iter().flat_map(|h| &h.lines).map(|l| l.text.len() + 48).sum();
     // Generated files fold whatever their size and spend no budget, so a lockfile never
     // pushes the hand-written files below it into folds.
     if is_generated(src, f) {
@@ -376,10 +341,7 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
             src,
             i,
             f,
-            &format!(
-                "Load diff ({} changed)",
-                crate::fmt::count(changed, "line", "lines")
-            ),
+            &format!("Load diff ({} changed)", crate::fmt::count(changed, "line", "lines")),
             !alone,
         )
     } else {
@@ -395,10 +357,7 @@ pub(crate) async fn diff_fragment(
     let html = crate::app::blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let r = Render::of(a);
-        Ok(a.repo
-            .commit_file(&id, index)?
-            .as_ref()
-            .map(|f| diff_body_html(&r, f)))
+        Ok(a.repo.commit_file(&id, index)?.as_ref().map(|f| diff_body_html(&r, f)))
     })
     .await?;
     html.map(axum::response::Html)
@@ -414,21 +373,14 @@ pub(crate) async fn worktree_fragment(
     let scope = q.scope();
     let html = crate::app::blocking(&app, move |a| {
         let r = Render::of(a);
-        Ok(
-            gitterrace_git::worktree_file_diff_scoped(&a.repo, &path, scope)?.map(|f| {
-                if f.hunks.is_empty() {
-                    no_hunks_line(&f)
-                } else {
-                    diff_body_html(&r, &f)
-                }
-            }),
-        )
+        Ok(gitterrace_git::worktree_file_diff_scoped(&a.repo, &path, scope)?
+            .map(|f| if f.hunks.is_empty() { no_hunks_line(&f) } else { diff_body_html(&r, &f) }))
     })
     .await?;
     // A file committed or reverted since the page loaded has nothing left to show.
-    Ok(axum::response::Html(html.unwrap_or_else(|| {
-        crate::empty::Empty::new("No longer changed.").to_string()
-    })))
+    Ok(axum::response::Html(
+        html.unwrap_or_else(|| crate::empty::Empty::new("No longer changed.").to_string()),
+    ))
 }
 
 #[cfg(test)]

@@ -36,12 +36,7 @@ fn only_dead_staging_folders_of_this_target_are_removed() {
         mk(n);
         std::fs::write(p.join(n).join("page"), "x").expect("write");
     }
-    for n in [
-        ".other.partial-111",
-        ".site.partial-11x",
-        ".site.partial-0111",
-        "site",
-    ] {
+    for n in [".other.partial-111", ".site.partial-11x", ".site.partial-0111", "site"] {
         mk(n);
     }
     std::fs::write(p.join(".site.partial-333"), "a file").expect("write");
@@ -94,26 +89,17 @@ fn a_site_set_aside_is_removed_only_when_a_new_site_is_in_place() {
     site(&p.join("site"), "new");
     recover_with(&target(p, "site"), |_| false).expect("recover");
     assert!(!old.exists(), "the replaced site stayed");
-    assert_eq!(
-        std::fs::read(p.join("site/index.html")).expect("new"),
-        b"new"
-    );
+    assert_eq!(std::fs::read(p.join("site/index.html")).expect("new"), b"new");
     site(&old, "old");
     std::fs::remove_file(p.join("site").join(MARKER)).expect("unmark");
     recover_with(&target(p, "site"), |_| false).expect("recover");
-    assert!(
-        old.is_dir(),
-        "an old site was dropped for a folder that is not one"
-    );
+    assert!(old.is_dir(), "an old site was dropped for a folder that is not one");
     let bare = p.join(".site.partial-222.old");
     std::fs::create_dir(&bare).expect("mkdir");
     std::fs::write(bare.join("mine"), "x").expect("write");
     recover_with(&target(p, "other"), |_| false).expect("recover");
     recover_with(&target(p, "site"), |_| false).expect("recover");
-    assert!(
-        bare.join("mine").is_file(),
-        "an unmarked folder was touched"
-    );
+    assert!(bare.join("mine").is_file(), "an unmarked folder was touched");
 }
 
 /// Guard class: a failed publication that loses the old site. When the second rename fails,
@@ -131,10 +117,7 @@ fn a_failed_second_rename_puts_the_old_site_back() {
     let parent = Dir::open(p).expect("parent");
     let err = staging.replace(&parent).expect_err("replace");
     assert!(format!("{err:#}").contains("moving"), "{err:#}");
-    assert_eq!(
-        std::fs::read(p.join("site/index.html")).expect("old"),
-        b"old"
-    );
+    assert_eq!(std::fs::read(p.join("site/index.html")).expect("old"), b"old");
     assert!(!p.join(aside_name("site")).exists());
     assert_eq!(names(p), vec!["site"]);
 }

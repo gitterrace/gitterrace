@@ -116,11 +116,7 @@ fn commit_matches_the_map_it_replaced() {
 fn tree_refs_and_repo_match_the_maps_they_replaced() {
     let tree = TreeResponse {
         commit: "c".into(),
-        entries: vec![TreeItem {
-            kind: TreeEntryKind::Dir,
-            name: "src".into(),
-            size: None,
-        }],
+        entries: vec![TreeItem { kind: TreeEntryKind::Dir, name: "src".into(), size: None }],
         path: String::new(),
         rev: "HEAD".into(),
     };
@@ -130,17 +126,9 @@ fn tree_refs_and_repo_match_the_maps_they_replaced() {
             "entries": [{ "name": "src", "kind": "dir", "size": null }] }),
     );
     let refs = RefsResponse {
-        refs: vec![RefItem {
-            kind: RefKind::Tag,
-            name: "v1".into(),
-            target: "t".into(),
-            time: 5,
-        }],
+        refs: vec![RefItem { kind: RefKind::Tag, name: "v1".into(), target: "t".into(), time: 5 }],
     };
-    same(
-        &refs,
-        &json!({ "refs": [{ "name": "v1", "kind": "tag", "target": "t", "time": 5 }] }),
-    );
+    same(&refs, &json!({ "refs": [{ "name": "v1", "kind": "tag", "target": "t", "time": 5 }] }));
     let repo = RepoResponse {
         head: Some("h".into()),
         head_branch: None,
@@ -240,14 +228,9 @@ fn blob_blame_and_contributors_match_the_maps_they_replaced() {
 
 #[test]
 fn index_and_insight_list_match_the_maps_they_replaced() {
-    let row = InsightRow {
-        name: "n".into(),
-        summary: "s".into(),
-    };
+    let row = InsightRow { name: "n".into(), summary: "s".into() };
     same(
-        &InsightList {
-            insights: vec![row.clone()],
-        },
+        &InsightList { insights: vec![row.clone()] },
         &json!({ "insights": [{ "name": "n", "summary": "s" }] }),
     );
     let index = IndexResponse {

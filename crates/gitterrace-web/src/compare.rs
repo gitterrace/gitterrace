@@ -100,21 +100,14 @@ enum Range {
 /// The link to compare `base` with `head`, or `""` when the compare page is turned off. With
 /// no `base` the page starts from the latest tag.
 pub(crate) fn compare_href(base: Option<&str>, head: &str) -> String {
-    crate::features::href_if(
-        gitterrace_config::Feature::Compare,
-        &compare_path(base, head, false),
-    )
+    crate::features::href_if(gitterrace_config::Feature::Compare, &compare_path(base, head, false))
 }
 
 /// The compare page's path and query, with no feature switch and no repo prefix. `merge_base`
 /// asks for `base...head`, the commits `head` has since it left `base`.
 pub fn compare_path(base: Option<&str>, head: &str, merge_base: bool) -> String {
     let base = base.map_or_else(String::new, |b| format!("base={}&", enc_seg(b)));
-    let mode = if merge_base {
-        format!("&mode={MERGE_BASE}")
-    } else {
-        String::new()
-    };
+    let mode = if merge_base { format!("&mode={MERGE_BASE}") } else { String::new() };
     format!("/compare?{base}head={}{mode}", enc_seg(head))
 }
 
@@ -131,10 +124,7 @@ pub(crate) async fn page(
     RawQuery(raw): RawQuery,
     Query(q): Query<CompareQuery>,
 ) -> Result<Html<String>> {
-    let (base, head) = (
-        q.base.unwrap_or_default(),
-        q.head.unwrap_or_else(|| "HEAD".to_owned()),
-    );
+    let (base, head) = (q.base.unwrap_or_default(), q.head.unwrap_or_else(|| "HEAD".to_owned()));
     let h2 = head.clone();
     let merge = q.mode.as_deref() == Some(MERGE_BASE);
     cached(&app, "cm", raw, move |a, r, c| {
@@ -143,11 +133,7 @@ pub(crate) async fn page(
             tracing::warn!("compare: refs unreadable, no default base: {e}");
             Vec::new()
         });
-        let b2 = if base.is_empty() {
-            latest_tag(&refs).unwrap_or_default()
-        } else {
-            base
-        };
+        let b2 = if base.is_empty() { latest_tag(&refs).unwrap_or_default() } else { base };
         let tags: Vec<(String, String)> = refs
             .iter()
             .filter(|x| x.kind == gitterrace_git::RefKind::Tag)
@@ -161,9 +147,7 @@ pub(crate) async fn page(
             .map(|x| (x.name.clone(), compare_href(Some(&x.name), &h2)))
             .collect();
         let pick = b2.is_empty().then(|| {
-            Empty::new(format!(
-                "Choose a base to compare {h2} with: a branch, tag or commit."
-            ))
+            Empty::new(format!("Choose a base to compare {h2} with: a branch, tag or commit."))
         });
         let mut error = None;
         let mut state = None;
@@ -206,23 +190,12 @@ pub(crate) async fn page(
                 label: "Commits",
                 href: href(&format!("/log/{}", enc_seg(&h2))),
             }],
-            toolbar: CmpForm {
-                action: href("/compare"),
-                base: b2,
-                head: h2,
-                merge,
-            }
-            .render()
-            .unwrap_or_default(),
+            toolbar: CmpForm { action: href("/compare"), base: b2, head: h2, merge }
+                .render()
+                .unwrap_or_default(),
             ..PageHead::new("Compare", tagline)
         };
-        ComparePage {
-            c,
-            page_head,
-            pick: pick.or(state),
-            error,
-            result,
-        }
+        ComparePage { c, page_head, pick: pick.or(state), error, result }
     })
     .await
 }
@@ -284,11 +257,7 @@ fn outcome(
         Kpi("Lines removed", fmt::thousands(cmp.removed)),
         Kpi(
             "Net",
-            format!(
-                "{}{}",
-                if cmp.added >= cmp.removed { "+" } else { "-" },
-                fmt::thousands(net)
-            ),
+            format!("{}{}", if cmp.added >= cmp.removed { "+" } else { "-" }, fmt::thousands(net)),
         ),
     ];
     let langs = cmp
@@ -328,10 +297,7 @@ fn outcome(
             if bi == hi {
                 return e;
             }
-            e.step(
-                format!("Compare the other way, {h2} to {b2}"),
-                compare_href(Some(h2), b2),
-            )
+            e.step(format!("Compare the other way, {h2} to {b2}"), compare_href(Some(h2), b2))
         }),
         kpis,
         langs,
@@ -374,8 +340,7 @@ fn lookup(a: &App, r: &Src, base: &str, head: &str) -> std::result::Result<Range
 /// [`comparison`] for a head the index lacks: at most [`GIT_RANGE_CAP`] commits, each
 /// diffed once, matched to its summary by id.
 fn from_git(a: &App, base: &str, head: &str) -> gitterrace_git::Result<Range> {
-    a.git_ranges
-        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    a.git_ranges.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let ids = a.repo.range(base, head, GIT_RANGE_CAP + 1)?;
     if ids.len() > GIT_RANGE_CAP {
         return Ok(Range::TooLarge);
@@ -413,13 +378,7 @@ mod tests {
     use super::*;
 
     fn r(name: &str, kind: RefKind, time: i64) -> RefInfo {
-        RefInfo {
-            name: name.to_owned(),
-            kind,
-            target: String::new(),
-            time,
-            annotation: None,
-        }
+        RefInfo { name: name.to_owned(), kind, target: String::new(), time, annotation: None }
     }
 
     #[test]
@@ -438,10 +397,8 @@ mod tests {
         run(&["commit", "-q", "-m", "feat: two"]);
         let repo = gitterrace_git::Repo::discover(root).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
-        let (base, head) = (
-            repo.resolve("main").expect("main"),
-            repo.resolve("side").expect("side"),
-        );
+        let (base, head) =
+            (repo.resolve("main").expect("main"), repo.resolve("side").expect("side"));
         let app = App::new(repo, index);
         let src: Src = Arc::new(gitterrace_index::feed::MemorySource::new(&[]));
         let first = lookup(&app, &src, &base, &head).expect("first");
@@ -459,11 +416,8 @@ mod tests {
 
     #[test]
     fn the_latest_tag_is_the_newest_tag_not_the_newest_ref() {
-        let refs = [
-            r("main", RefKind::Branch, 30),
-            r("v1", RefKind::Tag, 10),
-            r("v2", RefKind::Tag, 20),
-        ];
+        let refs =
+            [r("main", RefKind::Branch, 30), r("v1", RefKind::Tag, 10), r("v2", RefKind::Tag, 20)];
         assert_eq!(latest_tag(&refs).as_deref(), Some("v2"));
         assert_eq!(latest_tag(&refs[..1]), None);
     }
@@ -472,10 +426,7 @@ mod tests {
     fn a_link_without_a_base_leaves_the_prefill_to_the_page() {
         let on = crate::features::Effective::of(&gitterrace_config::Config::default(), None);
         let (with, without) = crate::features::with(on, || {
-            (
-                compare_href(Some("v 1"), "main"),
-                compare_href(None, "main"),
-            )
+            (compare_href(Some("v 1"), "main"), compare_href(None, "main"))
         });
         assert!(with.ends_with("/compare?base=v%201&head=main"), "{with}");
         assert!(without.ends_with("/compare?head=main"), "{without}");

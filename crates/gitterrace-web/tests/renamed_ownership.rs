@@ -43,11 +43,7 @@ async fn a_reused_path_does_not_inherit_the_moved_file_history() {
     oracle::ready(&router).await;
 
     let new_lib = src_owners(&router, "src/core.rs").await;
-    assert_eq!(
-        new_lib,
-        ["Jane Doe"],
-        "the new src/lib.rs has its own author only"
-    );
+    assert_eq!(new_lib, ["Jane Doe"], "the new src/lib.rs has its own author only");
     let core = src_owners(&router, "src/lib.rs").await;
     assert!(
         core.contains(&"Bob".to_owned()) && core.contains(&"Jane Doe".to_owned()),
@@ -70,9 +66,7 @@ async fn src_dir(router: &axum::Router, query: &str) -> serde_json::Value {
     assert_eq!(status, 200, "{body}");
     let json: serde_json::Value = serde_json::from_str(&body).expect("json");
     let dirs = json["data"]["dirs"].as_array().expect("dirs").clone();
-    dirs.into_iter()
-        .find(|d| d["path"] == "src")
-        .unwrap_or(serde_json::Value::Null)
+    dirs.into_iter().find(|d| d["path"] == "src").unwrap_or(serde_json::Value::Null)
 }
 
 /// An author selection must not change how a file's history is followed. Bob wrote
@@ -82,28 +76,12 @@ async fn src_dir(router: &axum::Router, query: &str) -> serde_json::Value {
 async fn an_author_selection_follows_renames_made_by_others() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = dir.path().join("repo");
-    let f = Fixture::init(&p)
-        .at("2024-03-01T12:00:00Z")
-        .write("src/old.rs", "a\nb\nc\nd\n");
+    let f = Fixture::init(&p).at("2024-03-01T12:00:00Z").write("src/old.rs", "a\nb\nc\nd\n");
     f.git(&["add", "-A"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Bob <bob@y.io>",
-        "-m",
-        "feat: old",
-    ]);
+    f.git(&["commit", "-q", "--author", "Bob <bob@y.io>", "-m", "feat: old"]);
     let f = f.at("2024-03-02T12:00:00Z");
     f.git(&["mv", "src/old.rs", "src/new.rs"]);
-    f.git(&[
-        "commit",
-        "-q",
-        "--author",
-        "Jane <jane@x.io>",
-        "-m",
-        "refactor: rename",
-    ]);
+    f.git(&["commit", "-q", "--author", "Jane <jane@x.io>", "-m", "refactor: rename"]);
     let router = gitterrace_web::app_router(f.path()).expect("router");
     oracle::ready(&router).await;
 

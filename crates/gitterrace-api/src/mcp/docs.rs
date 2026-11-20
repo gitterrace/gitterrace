@@ -51,10 +51,9 @@ impl PropSchema {
     fn type_name(&self) -> String {
         match &self.ty {
             Some(SchemaType::One(t)) => t.clone(),
-            Some(SchemaType::Many(ts)) => ts
-                .iter()
-                .find(|t| *t != "null")
-                .map_or_else(|| "any".to_owned(), Clone::clone),
+            Some(SchemaType::Many(ts)) => {
+                ts.iter().find(|t| *t != "null").map_or_else(|| "any".to_owned(), Clone::clone)
+            }
             None => "any".to_owned(),
         }
     }

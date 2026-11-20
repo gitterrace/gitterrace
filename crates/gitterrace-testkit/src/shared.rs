@@ -64,32 +64,15 @@ fn docs(dir: &Path) {
         .write("src/a.rs", "fn main() {}\n")
         .commit("feat(core): first")
         .tag("v1", "first release");
-    let _second = f
-        .write("src/a.rs", "fn main() {\n}\n")
-        .commit("fix: second");
+    let _second = f.write("src/a.rs", "fn main() {\n}\n").commit("fix: second");
 }
 
 fn dated(dir: &Path) {
     let mut f = Fixture::init(dir);
     for (who, date, path, msg) in [
-        (
-            "Bob <bob@y.io>",
-            "2024-01-10T12:00:00Z",
-            "src/a.rs",
-            "feat: a",
-        ),
-        (
-            "Bob <bob@y.io>",
-            "2024-03-10T12:00:00Z",
-            "src/a.rs",
-            "fix: a",
-        ),
-        (
-            "Ann <ann@x.io>",
-            "2024-03-20T12:00:00Z",
-            "docs/guide.md",
-            "docs: guide",
-        ),
+        ("Bob <bob@y.io>", "2024-01-10T12:00:00Z", "src/a.rs", "feat: a"),
+        ("Bob <bob@y.io>", "2024-03-10T12:00:00Z", "src/a.rs", "fix: a"),
+        ("Ann <ann@x.io>", "2024-03-20T12:00:00Z", "docs/guide.md", "docs: guide"),
     ] {
         f = f.at(date).write(path, &format!("{msg}\nmore\n"));
         f.git(&["add", "-A"]);

@@ -85,18 +85,12 @@ fn refuses_bad_actions() {
         assert!(Config::parse(&base(bad), Path::new("/")).is_err(), "{bad}");
     }
     let typo = GOOD.replace("\"commit\"", "\"comit\"");
-    assert!(
-        Config::parse(&typo, Path::new("/")).is_err(),
-        "unknown kind"
-    );
+    assert!(Config::parse(&typo, Path::new("/")).is_err(), "unknown kind");
     let dup = format!(
         "{GOOD}\n[[action]]\nid = \"echo\"\nlabel = \"x\"\nkinds = [\"page\"]\ncommand = \
         [\"/bin/echo\"]\n"
     );
-    assert!(matches!(
-        Config::parse(&dup, Path::new("/")),
-        Err(ConfigError::Invalid { .. })
-    ));
+    assert!(matches!(Config::parse(&dup, Path::new("/")), Err(ConfigError::Invalid { .. })));
     assert!(Config::parse(&GOOD.replace("version = 1", "version = 2"), Path::new("/")).is_err());
     let upper = GOOD.replace("id = \"echo\"", "id = \"Echo\"");
     assert!(Config::parse(&upper, Path::new("/")).is_err());
@@ -106,18 +100,13 @@ fn refuses_bad_actions() {
 fn page_and_menu_keys_are_refused_as_action_keys() {
     for (k, who) in crate::config::RESERVED_KEYS {
         let e = err(&format!("{HEAD}key = \"{k}\"\n"));
-        assert!(
-            e.contains(&format!("key '{k}' is already used by {who}")),
-            "{e}"
-        );
+        assert!(e.contains(&format!("key '{k}' is already used by {who}")), "{e}");
     }
     assert!(Config::parse(&format!("{HEAD}key = \"n\"\n"), Path::new("/")).is_ok());
 }
 
 fn err(text: &str) -> String {
-    Config::parse(text, Path::new("/"))
-        .expect_err("must refuse")
-        .to_string()
+    Config::parse(text, Path::new("/")).expect_err("must refuse").to_string()
 }
 
 const HEAD: &str = "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = \
@@ -143,16 +132,11 @@ fn vars_are_validated_naming_the_key() {
         ("num = 3", "parse"),
     ] {
         let e = err(&format!("{HEAD}[action.vars]\n{bad}\n"));
-        assert!(
-            e.contains(needle) && e.contains("action a") || needle == "parse",
-            "{bad}: {e}"
-        );
+        assert!(e.contains(needle) && e.contains("action a") || needle == "parse", "{bad}: {e}");
     }
     let at_limit = format!("{HEAD}[action.vars]\nbig = \"{}\"\n", "x".repeat(4096));
     assert!(Config::parse(&at_limit, Path::new("/")).is_ok());
-    let many: String = (0..33)
-        .map(|i| ["v", &i.to_string(), " = \"x\"\n"].concat())
-        .collect();
+    let many: String = (0..33).map(|i| ["v", &i.to_string(), " = \"x\"\n"].concat()).collect();
     assert!(err(&format!("{HEAD}[action.vars]\n{many}")).contains("at most 32 vars"));
 }
 
@@ -194,21 +178,15 @@ cwd = "home"
     assert!(e.contains("action inbox") && e.contains("\"nope\""), "{e}");
     let both = err(&format!("{HEAD}script = \"x\"\n"));
     assert!(both.contains("not both"), "{both}");
-    let dup = err(&format!(
-        "{text}\n[[script]]\nid = \"obsidian\"\ncommand = [\"/bin/echo\"]\n"
-    ));
-    assert!(
-        dup.contains("script obsidian") && dup.contains("duplicate"),
-        "{dup}"
-    );
+    let dup = err(&format!("{text}\n[[script]]\nid = \"obsidian\"\ncommand = [\"/bin/echo\"]\n"));
+    assert!(dup.contains("script obsidian") && dup.contains("duplicate"), "{dup}");
     // A script cannot reference another script, so a cycle cannot be written.
     let nested =
         err("version = 1\n[[script]]\nid = \"s\"\nscript = \"s\"\ncommand = [\"/bin/echo\"]\n");
     assert!(nested.contains("script"), "{nested}");
-    let bad_cmd = err(
-        "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/nonexistent\"]\n[[action]]\nid = \
-        \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n",
-    );
+    let bad_cmd =
+        err("version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/nonexistent\"]\n[[action]]\nid = \
+        \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n");
     assert!(bad_cmd.contains("action a"), "{bad_cmd}");
 }
 
@@ -219,22 +197,13 @@ fn permission_checks() {
     assert_eq!(Config::load(&ok, &[]).expect("load").actions.len(), 2);
 
     let gw = write(d.path(), "gw.toml", GOOD, 0o620);
-    assert!(
-        matches!(Config::load(&gw, &[]), Err(ConfigError::Unsafe { .. })),
-        "group writable"
-    );
+    assert!(matches!(Config::load(&gw, &[]), Err(ConfigError::Unsafe { .. })), "group writable");
     let ww = write(d.path(), "ww.toml", GOOD, 0o602);
-    assert!(
-        matches!(Config::load(&ww, &[]), Err(ConfigError::Unsafe { .. })),
-        "world writable"
-    );
+    assert!(matches!(Config::load(&ww, &[]), Err(ConfigError::Unsafe { .. })), "world writable");
 
     let link = d.path().join("link.toml");
     std::os::unix::fs::symlink(&ok, &link).expect("symlink");
-    assert!(
-        matches!(Config::load(&link, &[]), Err(ConfigError::Unsafe { .. })),
-        "symlink"
-    );
+    assert!(matches!(Config::load(&link, &[]), Err(ConfigError::Unsafe { .. })), "symlink");
 
     let open = tempfile::tempdir().expect("tempdir");
     std::fs::set_permissions(open.path(), std::fs::Permissions::from_mode(0o777)).expect("chmod");
@@ -250,24 +219,14 @@ fn repo_local_config_is_never_loaded() {
     let repo = private_dir();
     write(repo.path(), "actions.toml", GOOD, 0o600);
     std::fs::create_dir_all(repo.path().join(".gitterrace")).expect("mkdir");
-    write(
-        &repo.path().join(".gitterrace"),
-        "actions.toml",
-        GOOD,
-        0o600,
-    );
+    write(&repo.path().join(".gitterrace"), "actions.toml", GOOD, 0o600);
     let roots = vec![repo.path().to_path_buf()];
     // The default path is the user's config dir, never relative to a repo or the cwd.
-    let default = gitterrace_config::config_dir(None)
-        .expect("home")
-        .join("actions.toml");
+    let default = gitterrace_config::config_dir(None).expect("home").join("actions.toml");
     assert!(default.is_absolute());
     assert!(!default.starts_with(repo.path()));
     // Even named explicitly, a file inside a served repo is refused.
-    for p in [
-        repo.path().join("actions.toml"),
-        repo.path().join(".gitterrace/actions.toml"),
-    ] {
+    for p in [repo.path().join("actions.toml"), repo.path().join(".gitterrace/actions.toml")] {
         assert!(
             matches!(Config::load(&p, &roots), Err(ConfigError::Unsafe { .. })),
             "{}",
@@ -284,22 +243,12 @@ fn reload_swaps_valid_and_keeps_old_on_invalid() {
     let h = r.handle();
     assert!(r.poll().is_empty(), "unchanged file is not reloaded");
 
-    let fewer = GOOD
-        .split("[[action]]")
-        .take(2)
-        .collect::<Vec<_>>()
-        .join("[[action]]")
-        + "\n# x";
+    let fewer = GOOD.split("[[action]]").take(2).collect::<Vec<_>>().join("[[action]]") + "\n# x";
     write(d.path(), "actions.toml", &fewer, 0o600);
     assert_eq!(r.poll(), ["action removed: sh"]);
     assert_eq!(h.read().expect("lock").actions.len(), 1);
 
-    write(
-        d.path(),
-        "actions.toml",
-        "version = 1\n[[action]]\nbroken",
-        0o600,
-    );
+    write(d.path(), "actions.toml", "version = 1\n[[action]]\nbroken", 0o600);
     assert!(r.poll()[0].contains("keeping the old set"));
     assert_eq!(h.read().expect("lock").actions.len(), 1);
 
@@ -310,32 +259,20 @@ fn reload_swaps_valid_and_keeps_old_on_invalid() {
     write(d.path(), "actions.toml", &bad_var, 0o600);
     assert!(r.poll()[0].contains("keeping the old set"));
     let cur = h.read().expect("lock").clone();
-    assert_eq!(
-        cur.get("echo")
-            .expect("echo")
-            .vars
-            .get("mode")
-            .map(String::as_str),
-        Some("daily")
-    );
+    assert_eq!(cur.get("echo").expect("echo").vars.get("mode").map(String::as_str), Some("daily"));
 }
 
 #[test]
 fn placeholders_load_and_every_refusal_names_its_key() {
     let cmd = |c: &str| HEAD.replace("command = [\"/bin/echo\"]", c);
     let ok = Config::parse(
-        &cmd(
-            "command = [\"/bin/echo\", \"--notes\", \"{markdown}\", \"--\", \"{title}\", \
-                \"{{x}}\"]\nstdin = \"markdown\"",
-        ),
+        &cmd("command = [\"/bin/echo\", \"--notes\", \"{markdown}\", \"--\", \"{title}\", \
+                \"{{x}}\"]\nstdin = \"markdown\""),
         Path::new("/"),
     )
     .expect("parse");
     let a = ok.get("a").expect("a");
-    assert_eq!(
-        a.argv[1..],
-        ["--notes", "{markdown}", "--", "{title}", "{{x}}"]
-    );
+    assert_eq!(a.argv[1..], ["--notes", "{markdown}", "--", "{title}", "{{x}}"]);
     assert_eq!(a.stdin, crate::config::Stdin::Markdown);
     // A literal prefix or a trusted first value needs no `--`.
     let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"{root}/{path}\"]");
@@ -348,22 +285,10 @@ fn placeholders_load_and_every_refusal_names_its_key() {
     }
     assert!(Config::parse(&prefixed, Path::new("/")).is_ok());
     for (bad, needle) in [
-        (
-            "command = [\"/bin/echo\", \"{titel}\"]",
-            "command[1]: unknown placeholder {titel}",
-        ),
-        (
-            "command = [\"{sha}\"]",
-            "command[0]: the program is literal",
-        ),
-        (
-            "command = [\"/bin/echo\", \"{title}\"]",
-            "command[1]: {title} comes from the repository",
-        ),
-        (
-            "command = [\"/bin/echo\", \"{path}\", \"--\"]",
-            "Put a literal \"--\"",
-        ),
+        ("command = [\"/bin/echo\", \"{titel}\"]", "command[1]: unknown placeholder {titel}"),
+        ("command = [\"{sha}\"]", "command[0]: the program is literal"),
+        ("command = [\"/bin/echo\", \"{title}\"]", "command[1]: {title} comes from the repository"),
+        ("command = [\"/bin/echo\", \"{path}\", \"--\"]", "Put a literal \"--\""),
         (
             "command = [\"/bin/echo\", \"--\", \"{title:bogus}\"]",
             "command[2]: {title:bogus}: unknown modifier :bogus, known: :url",
@@ -376,20 +301,14 @@ fn placeholders_load_and_every_refusal_names_its_key() {
             "command = [\"/bin/echo\", \"--\", \"{titel:url}\"]",
             "command[2]: unknown placeholder {titel}",
         ),
-        (
-            "command = [\"/bin/echo\", \"{var.nope}\"]",
-            "command[1]: {var.nope}: no var",
-        ),
+        ("command = [\"/bin/echo\", \"{var.nope}\"]", "command[1]: {var.nope}: no var"),
         ("command = [\"/bin/echo\", \"a}\"]", "command[1]"),
         ("command = [\"/bin/echo\", \"{x\"]", "command[1]"),
         (
             "shell = true\ncommand = 'echo {title}'",
             "command: shell = true cannot take placeholders",
         ),
-        (
-            "command = [\"/bin/echo\"]\nstdin = \"xml\"",
-            "stdin = \"xml\"",
-        ),
+        ("command = [\"/bin/echo\"]\nstdin = \"xml\"", "stdin = \"xml\""),
     ] {
         let e = err(&cmd(bad));
         assert!(e.contains("action a") && e.contains(needle), "{bad}: {e}");
@@ -398,19 +317,11 @@ fn placeholders_load_and_every_refusal_names_its_key() {
     let e = err(script);
     assert!(e.contains("script s") && e.contains("command[1]"), "{e}");
     let shell = "version = 1\n[[script]]\nid = \"s\"\nshell = true\ncommand = 'echo {url}'\n";
-    assert!(
-        err(shell).contains("script s: command: shell"),
-        "{}",
-        err(shell)
-    );
+    assert!(err(shell).contains("script s: command: shell"), "{}", err(shell));
     // A script's {var.NAME} is checked against each action that uses it.
     let uses = "version = 1\n[[script]]\nid = \"s\"\ncommand = [\"/bin/echo\", \"{var.url}\"]\n\
                     [[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\nscript = \"s\"\n";
-    assert!(
-        err(uses).contains("action a: command[1]: {var.url}"),
-        "{}",
-        err(uses)
-    );
+    assert!(err(uses).contains("action a: command[1]: {var.url}"), "{}", err(uses));
     let with = format!("{uses}[action.vars]\nurl = \"https://x\"\n");
     assert!(Config::parse(&with, Path::new("/")).is_ok());
     // Shell text that only looks like braces keeps working.
@@ -431,11 +342,8 @@ fn every_documented_example_loads() {
         std::fs::write(p, "#!/bin/sh\n").expect("write");
         std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o700)).expect("chmod");
     };
-    let blocks: Vec<&str> = doc
-        .split("```toml\n")
-        .skip(1)
-        .filter_map(|b| b.split("```").next())
-        .collect();
+    let blocks: Vec<&str> =
+        doc.split("```toml\n").skip(1).filter_map(|b| b.split("```").next()).collect();
     assert!(blocks.len() >= 3, "found {} toml blocks", blocks.len());
     for (i, block) in blocks.iter().enumerate() {
         let mut text = if block.contains("version") {

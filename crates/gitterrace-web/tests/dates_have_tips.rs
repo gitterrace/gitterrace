@@ -47,11 +47,7 @@ fn bare_dates(body: &str) -> Vec<String> {
                         && body[at + pat.len()..].starts_with("</time>")
                 });
             if !inside {
-                let from = body[..at]
-                    .char_indices()
-                    .rev()
-                    .nth(60)
-                    .map_or(0, |(i, _)| i);
+                let from = body[..at].char_indices().rev().nth(60).map_or(0, |(i, _)| i);
                 bad.push(body[from..at + pat.len()].to_owned());
             }
         }
@@ -62,10 +58,7 @@ fn bare_dates(body: &str) -> Vec<String> {
 #[test]
 fn the_checker_sees_a_bare_date() {
     assert_eq!(bare_dates("<span>3 days ago</span>").len(), 1);
-    assert_eq!(
-        bare_dates("<time tabindex=\"0\">3 days ago</time>").len(),
-        1
-    );
+    assert_eq!(bare_dates("<time tabindex=\"0\">3 days ago</time>").len(), 1);
     let ok = "<time data-tip=\"x\" datetime=\"y\" tabindex=\"0\">3 days ago</time> \
               <time data-tip=\"x\" datetime=\"y\" tabindex=\"0\">just now</time>";
     assert_eq!(bare_dates(ok), [] as [std::string::String; 0]);
@@ -82,10 +75,8 @@ fn every_relative_date_has_its_tip() {
         let (repo, values) = oracle::matrix_repo(dir.path(), Mailmap::AsIs);
         let router = gitterrace_web::app_router(&repo).expect("router");
         oracle::ready(&router).await;
-        let mut pages: Vec<String> = gitterrace_web::WARM_PAGES
-            .iter()
-            .map(|p| (*p).to_owned())
-            .collect();
+        let mut pages: Vec<String> =
+            gitterrace_web::WARM_PAGES.iter().map(|p| (*p).to_owned()).collect();
         pages.extend(
             [
                 "/log/HEAD",
@@ -100,10 +91,7 @@ fn every_relative_date_has_its_tip() {
         );
         let mut seen = 0;
         let mut failures = Vec::new();
-        for cell in matrix::pairwise()
-            .iter()
-            .filter(|c| c.mailmap == Mailmap::AsIs)
-        {
+        for cell in matrix::pairwise().iter().filter(|c| c.mailmap == Mailmap::AsIs) {
             let q = cell.query(&values);
             for p in &pages {
                 let (status, body) = page(&router, &format!("{p}?{q}")).await;
@@ -124,11 +112,7 @@ fn every_relative_date_has_its_tip() {
             assert!(!w["datetime"].as_str().unwrap_or("").is_empty(), "{c}");
             assert!(!w["tip"].as_str().unwrap_or("").is_empty(), "{c}");
         }
-        assert!(
-            failures.is_empty(),
-            "dates without a tip:\n{}",
-            failures.join("\n")
-        );
+        assert!(failures.is_empty(), "dates without a tip:\n{}", failures.join("\n"));
     });
 }
 
@@ -137,11 +121,7 @@ fn every_relative_date_has_its_tip() {
 fn only_the_shared_helpers_write_time_elements() {
     let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut bad = Vec::new();
-    let mut stack = vec![
-        root.join("src"),
-        root.join("templates"),
-        root.join("static"),
-    ];
+    let mut stack = vec![root.join("src"), root.join("templates"), root.join("static")];
     while let Some(d) = stack.pop() {
         for e in std::fs::read_dir(&d).expect("dir").flatten() {
             let p = e.path();

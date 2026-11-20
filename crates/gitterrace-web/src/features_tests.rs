@@ -54,14 +54,8 @@ fn every_route() -> BTreeSet<String> {
         .iter()
         .chain(crate::public::LOCAL)
         .map(|r| (*r).to_owned())
-        .chain(
-            gitterrace_api::ENDPOINTS
-                .iter()
-                .map(|e| format!("/api/v1{}", e.path)),
-        )
-        .chain(std::iter::once(
-            "/static/vendor/mermaid-12.3.0.min.js".to_owned(),
-        ))
+        .chain(gitterrace_api::ENDPOINTS.iter().map(|e| format!("/api/v1{}", e.path)))
+        .chain(std::iter::once("/static/vendor/mermaid-12.3.0.min.js".to_owned()))
         .collect()
 }
 
@@ -70,10 +64,8 @@ fn every_route() -> BTreeSet<String> {
 /// served with every switch off.
 #[test]
 fn every_route_is_a_feature_or_core() {
-    let owned: BTreeSet<String> = FEATURE_ROUTES
-        .iter()
-        .flat_map(|(_, rs)| rs.iter().map(|r| (*r).to_owned()))
-        .collect();
+    let owned: BTreeSet<String> =
+        FEATURE_ROUTES.iter().flat_map(|(_, rs)| rs.iter().map(|r| (*r).to_owned())).collect();
     let core: BTreeSet<String> = CORE_ROUTES.iter().map(|r| (*r).to_owned()).collect();
     assert!(owned.is_disjoint(&core), "{:?}", owned.intersection(&core));
     let classified: BTreeSet<String> = owned.union(&core).cloned().collect();
@@ -110,19 +102,15 @@ impl Off {
             .into_iter()
             .filter(|k| k.section == "features")
             .map(|k| Self::Key(Feature::from_key(k.name).expect("a feature")));
-        ks.chain(INSIGHT_PAGES.into_iter().map(Self::Page))
-            .collect()
+        ks.chain(INSIGHT_PAGES.into_iter().map(Self::Page)).collect()
     }
 
     fn config(&self) -> Config {
         let text = match self {
             Self::Key(f) => format!("[features]\n{} = false\n", f.key()),
             Self::Page(p) => {
-                let rest: Vec<String> = INSIGHT_PAGES
-                    .iter()
-                    .filter(|q| *q != p)
-                    .map(|q| format!("\"{q}\""))
-                    .collect();
+                let rest: Vec<String> =
+                    INSIGHT_PAGES.iter().filter(|q| *q != p).map(|q| format!("\"{q}\"")).collect();
                 format!("[insights]\npages = [{}]\n", rest.join(", "))
             }
         };
@@ -142,11 +130,9 @@ impl Off {
                 .filter(|(g, _)| g == f)
                 .flat_map(|(_, rs)| rs.iter().copied())
                 .collect(),
-            Self::Page(p) => INSIGHT_ROUTES
-                .iter()
-                .filter(|(q, _)| q == p)
-                .map(|(_, r)| *r)
-                .collect(),
+            Self::Page(p) => {
+                INSIGHT_ROUTES.iter().filter(|(q, _)| q == p).map(|(_, r)| *r).collect()
+            }
         }
     }
 }
@@ -163,11 +149,7 @@ fn sample(route: &str, head: &str) -> (bool, String) {
         || route.starts_with("/r/")
         || route.starts_with("/static/")
         || route == "/api/repos";
-    let url = if route.starts_with("/r/{name}") {
-        route.replace("{name}", "repo")
-    } else {
-        url
-    };
+    let url = if route.starts_with("/r/{name}") { route.replace("{name}", "repo") } else { url };
     (!server_wide, url)
 }
 
@@ -246,21 +228,14 @@ async fn features_off_leave_no_trace() {
         let routes = off.routes();
         for route in &routes {
             let (in_repo, url) = sample(route, &head);
-            let url = if in_repo {
-                format!("{prefix}{url}")
-            } else {
-                url
-            };
+            let url = if in_repo { format!("{prefix}{url}") } else { url };
             let (s, body) = get(&r, &url).await;
             assert_eq!(s, 404, "{off:?}: {url}");
             assert!(
                 body == unknown || body == unknown_outer,
                 "{off:?}: {url} answers unlike an unknown page"
             );
-            assert!(
-                !warm(&cfg, Some("repo")).contains(route),
-                "{off:?} warms {route}"
-            );
+            assert!(!warm(&cfg, Some("repo")).contains(route), "{off:?} warms {route}");
         }
         let mut pages: Vec<String> = CORE_PAGES.iter().map(|p| (*p).to_owned()).collect();
         pages.push(format!("/commit/{head}"));
@@ -295,15 +270,9 @@ fn check_inline(off: &Off, page: &str, html: &str) {
     // The README shows on the overview card and on its own page.
     if matches!(off, Off::Key(Feature::MarkdownPreview)) && page == "/" {
         for trace in ["markdown-body", "data-outline"] {
-            assert!(
-                !html.contains(trace),
-                "preview off: the overview shows {trace}"
-            );
+            assert!(!html.contains(trace), "preview off: the overview shows {trace}");
         }
-        assert!(
-            html.contains("<pre>"),
-            "preview off: no plain README on the overview"
-        );
+        assert!(html.contains("<pre>"), "preview off: no plain README on the overview");
     }
     if page != "/blob/HEAD/README.md" {
         return;
@@ -316,12 +285,7 @@ fn check_inline(off: &Off, page: &str, html: &str) {
             assert!(!html.contains("class=\"mermaid\""), "mermaid block kept");
         }
         Off::Key(Feature::MarkdownPreview) => {
-            for trace in [
-                "markdown-body",
-                "data-show=",
-                "data-outline",
-                "data-md-view",
-            ] {
+            for trace in ["markdown-body", "data-show=", "data-outline", "data-md-view"] {
                 assert!(!html.contains(trace), "preview off still shows {trace}");
             }
         }
@@ -369,18 +333,12 @@ fn insights_pages_order_the_tabs() {
 /// whatever `[features]` says.
 #[test]
 fn the_file_never_reopens_a_public_route() {
-    let on = Feature::ALL
-        .map(|f| [f.key(), " = true\n"].concat())
-        .concat();
-    let cfg = parse(&format!("[server]\nis_public = true\n[features]\n{on}"))
-        .expect("parse")
-        .config;
+    let on = Feature::ALL.map(|f| [f.key(), " = true\n"].concat()).concat();
+    let cfg =
+        parse(&format!("[server]\nis_public = true\n[features]\n{on}")).expect("parse").config;
     for r in crate::public::LOCAL {
         let owned = FEATURE_ROUTES.iter().any(|(_, rs)| rs.contains(r));
-        assert!(
-            owned && !route_on(&cfg, None, r),
-            "{r} is reachable when public"
-        );
+        assert!(owned && !route_on(&cfg, None, r), "{r} is reachable when public");
     }
     let plain = parse("[server]\nis_public = true\n").expect("parse").config;
     assert!(!route_on(&plain, None, "/api/v1/repo"));
@@ -402,10 +360,7 @@ async fn a_public_server_keeps_its_gates() {
     let text = format!("[server]\nis_public = true\nhosts = [\"{HOST}\"]\n[features]\n{on}");
     let r = crate::app_router_with(&p, parse(&text).expect("parse").config).expect("router");
     let send = |uri: &str| {
-        let req = Request::get(uri)
-            .header("host", HOST)
-            .body(Body::empty())
-            .expect("req");
+        let req = Request::get(uri).header("host", HOST).body(Body::empty()).expect("req");
         let r = r.clone();
         async move {
             let res = r.oneshot(req).await.expect("response");
@@ -415,12 +370,7 @@ async fn a_public_server_keeps_its_gates() {
         }
     };
     assert_eq!(send("/r/repo/").await, 200);
-    for uri in [
-        "/r/repo/worktree",
-        "/r/repo/events",
-        "/r/repo/api/v1/repo",
-        "/_actions/status",
-    ] {
+    for uri in ["/r/repo/worktree", "/r/repo/events", "/r/repo/api/v1/repo", "/_actions/status"] {
         assert_eq!(send(uri).await, 404, "{uri}");
     }
 }

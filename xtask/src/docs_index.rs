@@ -65,31 +65,15 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Start,
         "The repository's front page: install, quickstart and every command",
     ),
-    (
-        "docs/using.md",
-        Kind::Guide,
-        "Repositories, the log graph, outlines, keys, settings",
-    ),
+    ("docs/using.md", Kind::Guide, "Repositories, the log graph, outlines, keys, settings"),
     (
         "docs/actions.md",
         Kind::Guide,
         "Send a selection to another app, or run your own program on it",
     ),
-    (
-        "docs/skills/review.md",
-        Kind::Guide,
-        "A skill to review a change",
-    ),
-    (
-        "docs/skills/history.md",
-        Kind::Guide,
-        "A skill to explore history",
-    ),
-    (
-        "docs/skills/hotspots.md",
-        Kind::Guide,
-        "A skill to find hotspots",
-    ),
+    ("docs/skills/review.md", Kind::Guide, "A skill to review a change"),
+    ("docs/skills/history.md", Kind::Guide, "A skill to explore history"),
+    ("docs/skills/hotspots.md", Kind::Guide, "A skill to find hotspots"),
     (
         "docs/online.md",
         Kind::Guide,
@@ -100,67 +84,27 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Reference,
         "Every `config.toml` key, its default and the naming rule",
     ),
-    (
-        "docs/cli.md",
-        Kind::Reference,
-        "Every command and flag of `git terrace`",
-    ),
-    (
-        "docs/api.md",
-        Kind::Reference,
-        "The JSON API and the MCP tools",
-    ),
+    ("docs/cli.md", Kind::Reference, "Every command and flag of `git terrace`"),
+    ("docs/api.md", Kind::Reference, "The JSON API and the MCP tools"),
     ("docs/why.md", Kind::Explain, "What gitterrace is for"),
     (
         "docs/security.md",
         Kind::Explain,
         "What is protected, from whom, and what holds each door shut",
     ),
-    (
-        "docs/benchmarks.md",
-        Kind::Explain,
-        "What is measured, the budgets and the newest results",
-    ),
+    ("docs/benchmarks.md", Kind::Explain, "What is measured, the budgets and the newest results"),
     (
         "docs/architecture.md",
         Kind::Contribute,
         "Crates, decisions, the cache, routes, security guards and their tests",
     ),
-    (
-        "docs/legal/imprint.md",
-        Kind::Legal,
-        "Who runs the site, as the law requires",
-    ),
-    (
-        "docs/legal/privacy.md",
-        Kind::Legal,
-        "What the site does with visitors' data",
-    ),
-    (
-        "CONTRIBUTING.md",
-        Kind::Project,
-        "Setup, the checks, commits, releasing",
-    ),
-    (
-        "AGENTS.md",
-        Kind::Project,
-        "Crate layout and code conventions",
-    ),
-    (
-        "SECURITY.md",
-        Kind::Project,
-        "Reporting a vulnerability, and what is in scope",
-    ),
-    (
-        "CHANGELOG.md",
-        Kind::Project,
-        "Changes per release, written from the commits",
-    ),
-    (
-        "docs/landing.md",
-        Kind::Project,
-        "The words on the landing page, each sentence once",
-    ),
+    ("docs/legal/imprint.md", Kind::Legal, "Who runs the site, as the law requires"),
+    ("docs/legal/privacy.md", Kind::Legal, "What the site does with visitors' data"),
+    ("CONTRIBUTING.md", Kind::Project, "Setup, the checks, commits, releasing"),
+    ("AGENTS.md", Kind::Project, "Crate layout and code conventions"),
+    ("SECURITY.md", Kind::Project, "Reporting a vulnerability, and what is in scope"),
+    ("CHANGELOG.md", Kind::Project, "Changes per release, written from the commits"),
+    ("docs/landing.md", Kind::Project, "The words on the landing page, each sentence once"),
     (
         "docs/screenshots/README.md",
         Kind::Project,
@@ -184,19 +128,13 @@ pub fn on_site() -> Vec<(&'static str, &'static str, &'static str)> {
 
 /// The legal documents, as repo path and the label the footer shows. They are pages of their
 /// own under `/legal/`, not part of the docs index.
-pub const LEGAL: [(&str, &str); 2] = [
-    ("docs/legal/imprint.md", "Imprint"),
-    ("docs/legal/privacy.md", "Privacy"),
-];
+pub const LEGAL: [(&str, &str); 2] =
+    [("docs/legal/imprint.md", "Imprint"), ("docs/legal/privacy.md", "Privacy")];
 
 pub fn render() -> Out {
     let mut s = String::new();
     for kind in Kind::ALL {
-        let _ = write!(
-            s,
-            "## {}\n\n| Document | Covers |\n| --- | --- |\n",
-            kind.heading()
-        );
+        let _ = write!(s, "## {}\n\n| Document | Covers |\n| --- | --- |\n", kind.heading());
         for (path, _, what) in DOCS.iter().filter(|d| d.1 == kind) {
             let _ = writeln!(s, "| [{}]({}) | {what} |", title(path), relative(path));
         }
@@ -212,18 +150,14 @@ pub fn covers(path: &str) -> Option<&'static str> {
 
 fn title(path: &str) -> &str {
     // A folder's README is named by its folder, so two READMEs in the index stay apart.
-    let path = path
-        .strip_suffix("/README.md")
-        .filter(|p| p.contains('/'))
-        .unwrap_or(path);
+    let path = path.strip_suffix("/README.md").filter(|p| p.contains('/')).unwrap_or(path);
     let name = path.rsplit('/').next().unwrap_or(path);
     name.strip_suffix(".md").unwrap_or(name)
 }
 
 /// The link from `docs/README.md` to `path`.
 fn relative(path: &str) -> String {
-    path.strip_prefix("docs/")
-        .map_or_else(|| format!("../{path}"), str::to_owned)
+    path.strip_prefix("docs/").map_or_else(|| format!("../{path}"), str::to_owned)
 }
 
 /// Every problem the documents have: unlisted, broken links, unknown keys or flags.
@@ -259,9 +193,7 @@ fn registry_problems<'a>(docs: &[String], listed: impl Iterator<Item = &'a str>)
     let mut bad = Vec::new();
     for d in docs {
         if d != INDEX && !listed.contains(d.as_str()) {
-            bad.push(format!(
-                "{d}: not listed in {INDEX} (add it to DOCS in xtask)"
-            ));
+            bad.push(format!("{d}: not listed in {INDEX} (add it to DOCS in xtask)"));
         }
     }
     for l in &listed {
@@ -292,9 +224,7 @@ fn documents(root: &Path) -> Result<Vec<String>> {
 }
 
 fn is_md(path: &str) -> bool {
-    Path::new(path)
-        .extension()
-        .is_some_and(|e| e.eq_ignore_ascii_case("md"))
+    Path::new(path).extension().is_some_and(|e| e.eq_ignore_ascii_case("md"))
 }
 
 /// Heading anchors as the page renderer and most Markdown hosts make them.
@@ -353,11 +283,7 @@ fn check_links(
             continue;
         }
         let (file, anchor) = dest.split_once('#').unwrap_or((&dest, ""));
-        let target = if file.is_empty() {
-            path.to_owned()
-        } else {
-            normalize(&dir.join(file))
-        };
+        let target = if file.is_empty() { path.to_owned() } else { normalize(&dir.join(file)) };
         if !file.is_empty() && !root.join(&target).exists() {
             bad.push(format!("{path}: link to {dest}: {target} does not exist"));
             continue;
@@ -373,9 +299,7 @@ fn check_links(
             |t| anchors(t).contains(anchor),
         );
         if !found {
-            bad.push(format!(
-                "{path}: link to {dest}: no heading #{anchor} in {target}"
-            ));
+            bad.push(format!("{path}: link to {dest}: no heading #{anchor} in {target}"));
         }
     }
     bad
@@ -419,9 +343,8 @@ pub fn normalize(p: &Path) -> String {
 /// program the docs run (git, cargo, brew, curl, make, docker, npm or node) and holds no
 /// description after a column gap: a table of commands and what they do stays `text`.
 fn plain_commands(path: &str, text: &str) -> Vec<String> {
-    const PROGRAMS: [&str; 8] = [
-        "git ", "cargo ", "brew ", "curl ", "make ", "docker ", "npm ", "node ",
-    ];
+    const PROGRAMS: [&str; 8] =
+        ["git ", "cargo ", "brew ", "curl ", "make ", "docker ", "npm ", "node "];
     let command = |l: &&str| PROGRAMS.iter().any(|p| l.starts_with(p)) && !l.contains("  ");
     let mut bad = Vec::new();
     let mut lines = text.lines().enumerate();
@@ -429,11 +352,8 @@ fn plain_commands(path: &str, text: &str) -> Vec<String> {
         if l.trim() != "```text" {
             continue;
         }
-        let body: Vec<&str> = lines
-            .by_ref()
-            .map(|(_, l)| l)
-            .take_while(|l| !l.starts_with("```"))
-            .collect();
+        let body: Vec<&str> =
+            lines.by_ref().map(|(_, l)| l).take_while(|l| !l.starts_with("```")).collect();
         if !body.is_empty() && body.iter().all(command) {
             bad.push(format!(
                 "{path}:{}: a block of commands is marked `text`: mark it `sh`",

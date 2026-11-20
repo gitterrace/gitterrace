@@ -37,11 +37,8 @@ fn unresolved_host_refs(
     files: &[String],
 ) -> Vec<String> {
     let known = |p: &str| {
-        let p = if p.is_empty() || p.ends_with('/') {
-            format!("{p}index.html")
-        } else {
-            p.to_owned()
-        };
+        let p =
+            if p.is_empty() || p.ends_with('/') { format!("{p}index.html") } else { p.to_owned() };
         files.contains(&p)
     };
     let mut bad = Vec::new();
@@ -66,11 +63,7 @@ fn unresolved_host_refs(
         }
     }
     for url in css.split("url(").skip(1) {
-        let dest = url
-            .split(')')
-            .next()
-            .unwrap_or("")
-            .trim_matches(['"', '\'']);
+        let dest = url.split(')').next().unwrap_or("").trim_matches(['"', '\'']);
         if !dest.starts_with("data:") && !files.contains(&asset_file(dest)) {
             bad.push(format!("assets/site.css: url({dest}): no built file"));
         }
@@ -100,14 +93,8 @@ fn every_built_reference_resolves_to_a_built_file() {
 /// The site's origin as the sitemap writes it.
 fn site_path_home() -> String {
     let sm = text_of("sitemap.xml");
-    let first = sm
-        .split("<loc>")
-        .nth(1)
-        .and_then(|l| l.split("</loc>").next());
-    first
-        .expect("a sitemap entry")
-        .trim_end_matches('/')
-        .to_owned()
+    let first = sm.split("<loc>").nth(1).and_then(|l| l.split("</loc>").next());
+    first.expect("a sitemap entry").trim_end_matches('/').to_owned()
 }
 
 #[test]
@@ -146,9 +133,7 @@ fn csp_problems(headers: &str, pages: &[(String, String)]) -> Vec<String> {
         }
     }
     for directive in ["style-src", "font-src", "img-src"] {
-        let ok = policy
-            .split(';')
-            .any(|d| d.trim().split(' ').eq([directive, "'self'"]));
+        let ok = policy.split(';').any(|d| d.trim().split(' ').eq([directive, "'self'"]));
         if !ok {
             bad.push(format!("_headers: CSP {directive} is not exactly 'self'"));
         }
@@ -162,10 +147,7 @@ fn csp_problems(headers: &str, pages: &[(String, String)]) -> Vec<String> {
             }
             let body = rest.split("</script>").next().unwrap_or("");
             if !policy.contains(&csp_hash(body)) {
-                bad.push(format!(
-                    "{path}: inline script {} is not in the CSP",
-                    csp_hash(body)
-                ));
+                bad.push(format!("{path}: inline script {} is not in the CSP", csp_hash(body)));
             }
         }
         if html.contains("<style") || html.contains(" style=\"") {
@@ -204,18 +186,12 @@ fn a_planted_inline_script_or_widened_policy_is_reported() {
          <link rel=\"stylesheet\" href=\"https://cdn.example/a.css\">",
     );
     let bad = csp_problems(&headers, &pages).join("\n");
-    assert!(
-        bad.contains("inline script") && bad.contains("not in the CSP"),
-        "{bad}"
-    );
+    assert!(bad.contains("inline script") && bad.contains("not in the CSP"), "{bad}");
     assert!(bad.contains("inline style"), "{bad}");
     assert!(bad.contains("is loaded, not inline"), "{bad}");
     assert!(bad.contains("another origin"), "{bad}");
     let wide = headers
-        .replace(
-            "script-src ",
-            "script-src 'unsafe-inline' https://cdn.example ",
-        )
+        .replace("script-src ", "script-src 'unsafe-inline' https://cdn.example ")
         .replace("style-src 'self'", "style-src 'self' https://f.example");
     let bad = csp_problems(&wide, &[]).join("\n");
     assert!(bad.contains("unsafe-inline"), "{bad}");
@@ -249,20 +225,15 @@ fn font_problems(css: &str, pages: &[(String, String)], files: &[String]) -> Vec
     }
     for face in css.split("@font-face").skip(1) {
         let block = face.split('}').next().unwrap_or("");
-        let srcs: Vec<&str> = block
-            .split("url(")
-            .skip(1)
-            .filter_map(|u| u.split(')').next())
-            .collect();
+        let srcs: Vec<&str> =
+            block.split("url(").skip(1).filter_map(|u| u.split(')').next()).collect();
         if srcs.is_empty() {
             bad.push("assets/site.css: an @font-face without a url()".to_owned());
         }
         for src in srcs {
             let src = src.trim_matches(['"', '\'']);
             if !files.contains(&asset_file(src)) {
-                bad.push(format!(
-                    "assets/site.css: @font-face src {src} is not built"
-                ));
+                bad.push(format!("assets/site.css: @font-face src {src} is not built"));
             }
         }
     }
@@ -294,15 +265,9 @@ fn a_planted_external_font_or_missing_face_file_is_reported() {
                @font-face{font-family:\"A\";src:url(fonts/nope.woff2)}";
     let bad = font_problems(css, &pages, &files).join("\n");
     assert!(bad.contains("external link"), "{bad}");
-    assert!(
-        bad.contains("names @import") && bad.contains("names ://"),
-        "{bad}"
-    );
+    assert!(bad.contains("names @import") && bad.contains("names ://"), "{bad}");
     assert!(bad.contains("src fonts/nope.woff2 is not built"), "{bad}");
-    assert!(
-        !font_problems("", &[], &files).is_empty(),
-        "no @font-face is red"
-    );
+    assert!(!font_problems("", &[], &files).is_empty(), "no @font-face is red");
 }
 
 /// The `<footer>` of a page, if it has exactly one.
@@ -354,11 +319,7 @@ fn chrome_problems(pages: &[(String, String)]) -> Vec<String> {
         }
         // A docs page's bar carries its Docs menu, which is the docs list and so differs by
         // page, and marks its Docs link current; the rest of the bar is the shared one.
-        let html = html.replacen(
-            "href=\"/docs/\" aria-current=\"page\">",
-            "href=\"/docs/\">",
-            1,
-        );
+        let html = html.replacen("href=\"/docs/\" aria-current=\"page\">", "href=\"/docs/\">", 1);
         let html = html.find("<details class=\"menu docsmenu\"").map_or_else(
             || html.clone(),
             |at| {
@@ -427,9 +388,7 @@ fn every_built_page_links_the_imprint_and_privacy_pages() {
 #[test]
 fn a_page_without_a_legal_link_is_reported() {
     let (mut pages, _) = generated();
-    pages[3].1 = pages[3]
-        .1
-        .replacen("href=\"/legal/privacy/\"", "href=\"/\"", 1);
+    pages[3].1 = pages[3].1.replacen("href=\"/legal/privacy/\"", "href=\"/\"", 1);
     let bad = legal_link_problems(&pages);
     assert_eq!(bad.len(), 1, "{bad:?}");
     assert!(bad[0].contains("/legal/privacy/"), "{bad:?}");
@@ -447,9 +406,7 @@ fn site_links_to_files(pages: &[(String, String)]) -> Vec<String> {
                 .iter()
                 .any(|e| file.ends_with(e));
             if on_site && source {
-                bad.push(format!(
-                    "{path}: {dest} names a file the site does not publish"
-                ));
+                bad.push(format!("{path}: {dest} names a file the site does not publish"));
             }
         }
     }
@@ -465,19 +422,14 @@ fn docs_links_to_unpublished_files_point_at_the_repository() {
     assert!(bad.is_empty(), "{}", bad.join("\n"));
     let links = docs::Links::new("https://github.com/o/r");
     let to = |d: &str| links.rewrite("docs/why.md", d, false);
-    assert_eq!(
-        to("../src/main.rs"),
-        "https://github.com/o/r/blob/main/src/main.rs"
-    );
+    assert_eq!(to("../src/main.rs"), "https://github.com/o/r/blob/main/src/main.rs");
     assert_eq!(to("api.md#x"), "/docs/api/#x");
 }
 
 #[test]
 fn a_planted_site_link_to_a_source_file_is_reported() {
     let (mut pages, _) = generated();
-    pages[0]
-        .1
-        .push_str("<a href=\"/src/main.rs\">x</a><a href=\"https://h/x.md\">y</a>");
+    pages[0].1.push_str("<a href=\"/src/main.rs\">x</a><a href=\"https://h/x.md\">y</a>");
     let bad = site_links_to_files(&pages);
     assert_eq!(bad.len(), 1, "{bad:?}");
 }
@@ -499,9 +451,7 @@ fn version_link_problems(landing: &str, changelog: &str, version: &str) -> Vec<S
         return if href == "/changelog/" && !released {
             Vec::new()
         } else {
-            vec![format!(
-                "the version link {href} is not the anchor of v{version}"
-            )]
+            vec![format!("the version link {href} is not the anchor of v{version}")]
         };
     };
     if !attrs(changelog, "id").contains(&anchor) {
@@ -515,13 +465,7 @@ fn version_link_problems(landing: &str, changelog: &str, version: &str) -> Vec<S
 #[test]
 fn the_footer_version_links_to_its_changelog_release() {
     let (pages, _) = generated();
-    let page = |p: &str| {
-        pages
-            .iter()
-            .find(|x| x.0 == p)
-            .map(|x| x.1.clone())
-            .expect(p)
-    };
+    let page = |p: &str| pages.iter().find(|x| x.0 == p).map(|x| x.1.clone()).expect(p);
     let ws = crate::facts::load(&crate::repo_root()).expect("facts");
     let version = ws.packages["gitterrace"].version.clone();
     let bad = version_link_problems(&page("index.html"), &page("changelog/index.html"), &version);
@@ -538,10 +482,7 @@ fn a_footer_version_without_its_changelog_heading_is_reported() {
     let page = "<footer><a href=\"/changelog/\">v9.9.9</a></footer>";
     let bad = version_link_problems(page, released, "9.9.9");
     assert!(bad[0].contains("not the anchor of v9.9.9"), "{bad:?}");
-    assert_eq!(
-        version_link_problems(page, changelog, "9.9.9"),
-        [] as [std::string::String; 0]
-    );
+    assert_eq!(version_link_problems(page, changelog, "9.9.9"), [] as [std::string::String; 0]);
     let bad = version_link_problems(landing, changelog, "1.0.0");
     assert!(bad[0].contains("no link to v1.0.0"), "{bad:?}");
 }
@@ -570,10 +511,7 @@ fn site_code() -> String {
 #[test]
 fn every_site_css_class_is_emitted_somewhere() {
     let dead = dead_site_classes(&text_of("assets/site.css"), &site_code());
-    assert!(
-        dead.is_empty(),
-        "classes in site.css that nothing emits: {dead:?}"
-    );
+    assert!(dead.is_empty(), "classes in site.css that nothing emits: {dead:?}");
 }
 
 #[test]

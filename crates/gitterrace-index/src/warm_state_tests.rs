@@ -40,10 +40,7 @@ fn a_link_at_the_state_file_is_replaced_and_its_target_kept() -> io::Result<()> 
     std::os::unix::fs::symlink(&victim, dir.join(CHAIN_STATE_FILE))?;
     save(&dir, StateFile::Chain, 1, b"x")?;
     assert_eq!(std::fs::read_to_string(&victim)?, "keep");
-    assert!(
-        std::fs::symlink_metadata(dir.join(CHAIN_STATE_FILE))?.is_file(),
-        "the link is gone"
-    );
+    assert!(std::fs::symlink_metadata(dir.join(CHAIN_STATE_FILE))?.is_file(), "the link is gone");
     assert_eq!(load(&dir, StateFile::Chain, 1).as_deref(), Some(&b"x"[..]));
     Ok(())
 }
@@ -65,10 +62,7 @@ fn a_failed_write_keeps_the_old_state_whole() -> io::Result<()> {
     let failed = save(&dir, StateFile::Chain, 2, b"new");
     std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o700))?;
     assert!(failed.is_err(), "a folder that takes no new file");
-    assert_eq!(
-        load(&dir, StateFile::Chain, 1).as_deref(),
-        Some(&b"old"[..])
-    );
+    assert_eq!(load(&dir, StateFile::Chain, 1).as_deref(), Some(&b"old"[..]));
     assert_eq!(load(&dir, StateFile::Chain, 2), None);
     Ok(())
 }

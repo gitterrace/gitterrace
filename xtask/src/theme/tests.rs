@@ -9,10 +9,7 @@ fn a_low_contrast_pair_is_reported() {
         .map(|n| (n, "#f0f0f0".to_owned()))
         .collect();
     let bad = contrast_problems(&pale, &pale).expect("problems");
-    assert!(
-        bad.iter().any(|b| b.starts_with("light: --n-6 on --n-1")),
-        "{bad:?}"
-    );
+    assert!(bad.iter().any(|b| b.starts_with("light: --n-6 on --n-1")), "{bad:?}");
 }
 
 #[test]
@@ -23,10 +20,7 @@ fn contrast_is_the_wcag_ratio() {
 
 #[test]
 fn a_shadow_keeps_its_shape_and_pairs_its_color() {
-    assert_eq!(
-        pair("0 8px rgba(1)", "0 8px rgba(2)"),
-        "0 8px light-dark(rgba(1),rgba(2))"
-    );
+    assert_eq!(pair("0 8px rgba(1)", "0 8px rgba(2)"), "0 8px light-dark(rgba(1),rgba(2))");
     assert_eq!(pair("#fff", "#000"), "light-dark(#fff,#000)");
 }
 

@@ -18,11 +18,7 @@ fn init(p: &Path, files: &[(&str, &str)]) {
 }
 
 fn kinds(repo: &Repo) -> Vec<(String, ChangeKind, Option<String>)> {
-    worktree_diff(repo)
-        .expect("diff")
-        .into_iter()
-        .map(|f| (f.path, f.kind, f.old_path))
-        .collect()
+    worktree_diff(repo).expect("diff").into_iter().map(|f| (f.path, f.kind, f.old_path)).collect()
 }
 
 /// A `git mv` (staged or not) is one pure rename; an edited move stays delete plus add.
@@ -41,11 +37,7 @@ fn an_exact_move_is_one_rename() {
         [
             ("b.txt".into(), ChangeKind::Deleted, None),
             ("c.txt".into(), ChangeKind::Added, None),
-            (
-                "moved.txt".into(),
-                ChangeKind::Renamed,
-                Some("a.txt".into())
-            ),
+            ("moved.txt".into(), ChangeKind::Renamed, Some("a.txt".into())),
         ]
     );
     assert!(d[2].hunks.is_empty() && d[2].additions == 0);
@@ -57,16 +49,7 @@ fn an_exact_move_is_one_rename() {
 fn identical_files_pair_in_order_and_empty_files_never() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    init(
-        p,
-        &[
-            ("d1", "x\n"),
-            ("d2", "x\n"),
-            ("d3", "x\n"),
-            ("e1", ""),
-            ("e2", ""),
-        ],
-    );
+    init(p, &[("d1", "x\n"), ("d2", "x\n"), ("d3", "x\n"), ("e1", ""), ("e2", "")]);
     for n in ["d1", "d2", "d3", "e1", "e2"] {
         std::fs::remove_file(p.join(n)).expect("rm");
     }
@@ -94,27 +77,14 @@ fn identical_files_pair_in_order_and_empty_files_never() {
 fn one_file_reads_only_a_changed_path() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    init(
-        p,
-        &[
-            (".gitignore", "*.env\n"),
-            ("a.txt", "1\n"),
-            ("d/k.txt", "k\n"),
-        ],
-    );
+    init(p, &[(".gitignore", "*.env\n"), ("a.txt", "1\n"), ("d/k.txt", "k\n")]);
     std::fs::write(p.join("a.txt"), "2\n").expect("write");
     std::fs::write(p.join("prod.env"), "SECRET=1\n").expect("write");
     std::fs::write(p.join("untracked.txt"), "u\n").expect("write");
     let repo = Repo::discover(p).expect("repo");
-    let one = worktree_file_diff(&repo, "a.txt")
-        .expect("read")
-        .expect("changed");
+    let one = worktree_file_diff(&repo, "a.txt").expect("read").expect("changed");
     assert_eq!((one.kind, one.additions), (ChangeKind::Modified, 1));
-    assert!(
-        worktree_file_diff(&repo, "untracked.txt")
-            .expect("read")
-            .is_some()
-    );
+    assert!(worktree_file_diff(&repo, "untracked.txt").expect("read").is_some());
     for bad in [
         "prod.env",
         ".git/config",
@@ -125,10 +95,7 @@ fn one_file_reads_only_a_changed_path() {
         "d/k.txt",
         "nope.txt",
     ] {
-        assert!(
-            worktree_file_diff(&repo, bad).expect("read").is_none(),
-            "{bad}"
-        );
+        assert!(worktree_file_diff(&repo, bad).expect("read").is_none(), "{bad}");
     }
 }
 
@@ -140,10 +107,7 @@ fn bytes_held_stay_one_file_wide() {
     let p = dir.path();
     let body = |i: usize| format!("{i:03}\n").repeat(16 * 1024);
     let files: Vec<(String, String)> = (0..60).map(|i| (format!("f{i:02}"), body(i))).collect();
-    let refs: Vec<(&str, &str)> = files
-        .iter()
-        .map(|(a, b)| (a.as_str(), b.as_str()))
-        .collect();
+    let refs: Vec<(&str, &str)> = files.iter().map(|(a, b)| (a.as_str(), b.as_str())).collect();
     init(p, &refs);
     for (i, (n, _)) in files.iter().enumerate() {
         if i < 30 {
@@ -157,15 +121,9 @@ fn bytes_held_stay_one_file_wide() {
     let d = worktree_diff(&repo).expect("diff");
     let peak = held::take_peak();
     assert_eq!(d.len(), 60);
-    assert_eq!(
-        d.iter().filter(|f| f.kind == ChangeKind::Renamed).count(),
-        30
-    );
+    assert_eq!(d.iter().filter(|f| f.kind == ChangeKind::Renamed).count(), 30);
     let one = body(0).len();
-    assert!(
-        peak <= 3 * one,
-        "{peak} bytes held at once, one file is {one}"
-    );
+    assert!(peak <= 3 * one, "{peak} bytes held at once, one file is {one}");
 }
 
 fn scoped(repo: &Repo, scope: crate::Scope) -> Vec<(String, u32, u32)> {
@@ -191,17 +149,10 @@ fn each_scope_lists_its_files_with_its_own_hunks() {
     std::fs::write(p.join("b.txt"), "a\nstaged\nmore\n").expect("w");
     std::fs::write(p.join("new.txt"), "n\n").expect("w");
     let repo = Repo::discover(p).expect("repo");
-    assert_eq!(
-        scoped(&repo, Scope::Staged),
-        [("b.txt".into(), 1, 0), ("s.txt".into(), 1, 0)]
-    );
+    assert_eq!(scoped(&repo, Scope::Staged), [("b.txt".into(), 1, 0), ("s.txt".into(), 1, 0)]);
     assert_eq!(
         scoped(&repo, Scope::Unstaged),
-        [
-            ("b.txt".into(), 1, 0),
-            ("new.txt".into(), 1, 0),
-            ("u.txt".into(), 1, 0)
-        ]
+        [("b.txt".into(), 1, 0), ("new.txt".into(), 1, 0), ("u.txt".into(), 1, 0)]
     );
     assert_eq!(
         scoped(&repo, Scope::All),
@@ -215,8 +166,6 @@ fn each_scope_lists_its_files_with_its_own_hunks() {
     let c = crate::worktree_counts(&repo).expect("counts");
     assert_eq!((c.all, c.staged, c.unstaged), (4, 2, 3));
     assert!(
-        crate::worktree_file_diff_scoped(&repo, "u.txt", Scope::Staged)
-            .expect("read")
-            .is_none()
+        crate::worktree_file_diff_scoped(&repo, "u.txt", Scope::Staged).expect("read").is_none()
     );
 }

@@ -87,12 +87,7 @@ impl SharedTables {
             if g.len() >= SHARED_SETS {
                 g.remove(0);
             }
-            g.push(SharedEntry {
-                key: key.to_owned(),
-                opts: opts.clone(),
-                at,
-                d: Arc::clone(&d),
-            });
+            g.push(SharedEntry { key: key.to_owned(), opts: opts.clone(), at, d: Arc::clone(&d) });
         }
         d
     }

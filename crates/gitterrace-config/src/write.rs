@@ -31,14 +31,8 @@ impl Stamp {
     pub fn of(path: &Path) -> io::Result<Option<Self>> {
         match fs::symlink_metadata(path) {
             Ok(m) => {
-                let mtime_ns = m
-                    .modified()?
-                    .duration_since(UNIX_EPOCH)
-                    .map_or(0, |d| d.as_nanos());
-                Ok(Some(Self {
-                    len: m.len(),
-                    mtime_ns,
-                }))
+                let mtime_ns = m.modified()?.duration_since(UNIX_EPOCH).map_or(0, |d| d.as_nanos());
+                Ok(Some(Self { len: m.len(), mtime_ns }))
             }
             Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
             Err(e) => Err(e),
@@ -47,10 +41,7 @@ impl Stamp {
 
     /// The form an HTTP tag carries: `<len>-<mtime_ns>`, or `none` for no file.
     pub fn tag(s: Option<Self>) -> String {
-        s.map_or_else(
-            || "none".to_owned(),
-            |s| format!("{}-{}", s.len, s.mtime_ns),
-        )
+        s.map_or_else(|| "none".to_owned(), |s| format!("{}-{}", s.len, s.mtime_ns))
     }
 
     /// Reads [`Stamp::tag`] back. `None` for text that is no tag.
@@ -59,10 +50,7 @@ impl Stamp {
             return Some(None);
         }
         let (len, ns) = t.split_once('-')?;
-        Some(Some(Self {
-            len: len.parse().ok()?,
-            mtime_ns: ns.parse().ok()?,
-        }))
+        Some(Some(Self { len: len.parse().ok()?, mtime_ns: ns.parse().ok()? }))
     }
 }
 
@@ -140,9 +128,7 @@ pub fn save(
 }
 
 fn split(target: &Path) -> io::Result<(&Path, &str)> {
-    let dir = target
-        .parent()
-        .ok_or_else(|| io::Error::other("no folder"))?;
+    let dir = target.parent().ok_or_else(|| io::Error::other("no folder"))?;
     let name = target
         .file_name()
         .and_then(|n| n.to_str())

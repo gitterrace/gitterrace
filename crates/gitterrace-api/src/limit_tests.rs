@@ -39,15 +39,9 @@ fn count(v: &serde_json::Value, key: &str) -> usize {
 fn log_page_commits_caps_the_page() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    assert_eq!(
-        count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"),
-        10
-    );
+    assert_eq!(count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"), 10);
     let s = with(s, |c| c.api.log_page_commits = 3);
-    assert_eq!(
-        count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"),
-        3
-    );
+    assert_eq!(count(&json(&s.log(None, None, 1, 100).expect("log")), "commits"), 3);
 }
 
 #[test]
@@ -66,17 +60,11 @@ fn blob_lines_and_blob_kb_cut_the_text() {
     let s = state(dir.path());
     let text = |s: &ApiState| {
         let v = json(&s.blob(None, "a.txt", None, None).expect("blob"));
-        (
-            v["text"].as_str().unwrap_or_default().to_owned(),
-            v["truncated"] == true,
-        )
+        (v["text"].as_str().unwrap_or_default().to_owned(), v["truncated"] == true)
     };
     assert_eq!(text(&s).0.lines().count(), 10);
     let s = with(s, |c| c.api.blob_lines = 4);
-    assert_eq!(
-        text(&s),
-        ("line 0\nline 1\nline 2\nline 3".to_owned(), true)
-    );
+    assert_eq!(text(&s), ("line 0\nline 1\nline 2\nline 3".to_owned(), true));
 }
 
 #[test]
@@ -99,10 +87,7 @@ fn blob_kb_cuts_by_bytes() {
 fn blame_lines_cut_the_blame() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
-    assert_eq!(
-        count(&json(&s.blame(None, "a.txt").expect("blame")), "lines"),
-        10
-    );
+    assert_eq!(count(&json(&s.blame(None, "a.txt").expect("blame")), "lines"), 10);
     let s = with(s, |c| c.api.blame_lines = 2);
     let v = json(&s.blame(None, "a.txt").expect("blame"));
     assert_eq!((count(&v, "lines"), v["truncated"] == true), (2, true));
@@ -115,9 +100,7 @@ fn diff_lines_cut_the_commit_diff() {
     let lines = |s: &ApiState| {
         let v = json(&s.commit("HEAD", true, None).expect("commit"));
         v["files"][0]["hunks"].as_array().map_or(0, |hs| {
-            hs.iter()
-                .map(|h| h["lines"].as_array().map_or(0, Vec::len))
-                .sum::<usize>()
+            hs.iter().map(|h| h["lines"].as_array().map_or(0, Vec::len)).sum::<usize>()
         })
     };
     assert!(lines(&s) > 1);

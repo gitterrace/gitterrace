@@ -59,8 +59,7 @@ impl InsightsSource for DiskSource {
                 return None;
             }
             let mut files = Vec::new();
-            self.ok(self.row_with(r, Some(&mut files)))
-                .map(|_| (r, files))
+            self.ok(self.row_with(r, Some(&mut files))).map(|_| (r, files))
         }))
     }
 
@@ -68,8 +67,7 @@ impl InsightsSource for DiskSource {
         if rank.0 >= self.len {
             return None;
         }
-        self.ok(self.decode(rank, None))
-            .map(|r| Arc::from(hex(&r.oid)))
+        self.ok(self.decode(rank, None)).map(|r| Arc::from(hex(&r.oid)))
     }
 
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
@@ -99,15 +97,12 @@ impl InsightsSource for DiskSource {
             e.0 += 1;
             self.over.note(e.1.merge(&c.sums));
         });
-        Box::new(
-            m.into_iter()
-                .map(|((day, ident), (commits, sums))| AuthorDayRow {
-                    day,
-                    ident,
-                    commits,
-                    sums,
-                }),
-        )
+        Box::new(m.into_iter().map(|((day, ident), (commits, sums))| AuthorDayRow {
+            day,
+            ident,
+            commits,
+            sums,
+        }))
     }
 
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
@@ -121,9 +116,7 @@ impl InsightsSource for DiskSource {
             for f in files {
                 let ok = *keep.entry(f.path).or_insert_with(|| {
                     prefix.is_empty()
-                        || self
-                            .path(f.path)
-                            .is_some_and(|p| crate::insights::under(&p, prefix))
+                        || self.path(f.path).is_some_and(|p| crate::insights::under(&p, prefix))
                 });
                 if ok {
                     let e = m.entry((f.path, c.ident)).or_default();
@@ -132,15 +125,12 @@ impl InsightsSource for DiskSource {
                 }
             }
         });
-        Box::new(
-            m.into_iter()
-                .map(|((path, ident), (touches, sums))| PathAuthorRow {
-                    path,
-                    ident,
-                    touches,
-                    sums,
-                }),
-        )
+        Box::new(m.into_iter().map(|((path, ident), (touches, sums))| PathAuthorRow {
+            path,
+            ident,
+            touches,
+            sums,
+        }))
     }
 
     fn postings(&self, key: Posting) -> Stream<'_, Hit> {
@@ -149,17 +139,11 @@ impl InsightsSource for DiskSource {
             Posting::Path(p) if !c.merge => {
                 for (i, f) in files.iter().enumerate() {
                     if f.path == p {
-                        out.push(Hit {
-                            rank: c.rank,
-                            row: u32::try_from(i).unwrap_or(u32::MAX),
-                        });
+                        out.push(Hit { rank: c.rank, row: u32::try_from(i).unwrap_or(u32::MAX) });
                     }
                 }
             }
-            Posting::Author(a) if c.ident == a => out.push(Hit {
-                rank: c.rank,
-                row: 0,
-            }),
+            Posting::Author(a) if c.ident == a => out.push(Hit { rank: c.rank, row: 0 }),
             _ => {}
         });
         Box::new(out.into_iter())
@@ -237,9 +221,7 @@ impl InsightsSource for DiskSource {
     }
 
     fn failure(&self) -> Option<SourceError> {
-        self.unreadable()
-            .map(SourceError)
-            .or_else(|| self.over.failure())
+        self.unreadable().map(SourceError).or_else(|| self.over.failure())
     }
 
     fn tip_touches(&self, each: &mut dyn FnMut(Rank, &[crate::feed::TipTouch])) -> bool {

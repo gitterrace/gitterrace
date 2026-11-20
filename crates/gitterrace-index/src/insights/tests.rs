@@ -19,10 +19,7 @@ fn derived_tables_are_built_once_per_key_and_options() {
     assert!(a.shares_tables_with(&b), "second page rebuilt the tables");
     assert_eq!(built.get(), 1);
     let gen2 = shared(&src, Options::default(), "t1\u{0}gen2");
-    let bots = Options {
-        include_bots: true,
-        ..Options::default()
-    };
+    let bots = Options { include_bots: true, ..Options::default() };
     let other = shared(&src, bots, "t1\u{0}gen1");
     let moved = shared(&copy, Options::default(), "t1\u{0}gen1");
     for x in [&gen2, &other, &moved] {

@@ -45,17 +45,8 @@ impl Postings {
         by_author: Vec<Vec<u32>>,
         edges: Vec<Edge>,
     ) -> Self {
-        let next = by_author
-            .iter()
-            .flatten()
-            .max()
-            .map_or(0, |m| m.saturating_add(1));
-        Self {
-            by_path,
-            by_author,
-            edges,
-            next,
-        }
+        let next = by_author.iter().flatten().max().map_or(0, |m| m.saturating_add(1));
+        Self { by_path, by_author, edges, next }
     }
 
     /// Folds the next record of the canonical order. `who` and `paths` come from
@@ -103,12 +94,7 @@ impl Postings {
                 self.by_path[p as usize].push(Hit { ordinal: ord, row });
             }
             if let Some(old) = f.old.as_ref().and_then(|o| strings.paths.get(o)) {
-                self.edges.push(Edge {
-                    ordinal: ord,
-                    row,
-                    old,
-                    new: p,
-                });
+                self.edges.push(Edge { ordinal: ord, row, old, new: p });
             }
         }
     }
@@ -166,17 +152,10 @@ pub(crate) fn follow(by_path: &[Vec<Hit>], edges: &[Edge], head: u32) -> Vec<Hit
         })
         .collect();
     ev.extend(
-        edges
-            .iter()
-            .filter(|e| cand.contains(&e.old))
-            .map(|e| (e.ordinal, e.row, None, Some(e))),
+        edges.iter().filter(|e| cand.contains(&e.old)).map(|e| (e.ordinal, e.row, None, Some(e))),
     );
     // Lookup before edge on the same row: `None` sorts first, so put lookups at key 0.
-    ev.sort_by(|x, y| {
-        y.0.cmp(&x.0)
-            .then(x.1.cmp(&y.1))
-            .then(x.3.is_some().cmp(&y.3.is_some()))
-    });
+    ev.sort_by(|x, y| y.0.cmp(&x.0).then(x.1.cmp(&y.1)).then(x.3.is_some().cmp(&y.3.is_some())));
     let mut alias: std::collections::BTreeMap<u32, bool> = std::collections::BTreeMap::new();
     let resolves = |alias: &std::collections::BTreeMap<u32, bool>, p: u32| {
         alias.get(&p).copied().unwrap_or(p == head)
@@ -305,10 +284,7 @@ fn chunks<T>(lists: &[Vec<T>]) -> Vec<(u32, &[T])> {
 }
 
 fn id_of(c: &Cursor<'_>, base: u32, delta: u64) -> SegResult<u32> {
-    u32::try_from(delta)
-        .ok()
-        .and_then(|d| base.checked_add(d))
-        .ok_or_else(|| c.err("id over u32"))
+    u32::try_from(delta).ok().and_then(|d| base.checked_add(d)).ok_or_else(|| c.err("id over u32"))
 }
 
 /// One path postings block: `f(path, hits)` per item, ids ascending.
@@ -329,10 +305,7 @@ pub(crate) fn decode_path_postings(
             let d = c.varint()?;
             ord = id_of(c, ord, d)?;
             let row = c.varint()?;
-            hits.push(Hit {
-                ordinal: ord,
-                row: id_of(c, 0, row)?,
-            });
+            hits.push(Hit { ordinal: ord, row: id_of(c, 0, row)? });
         }
         f(id, &hits);
     }
@@ -385,11 +358,7 @@ pub(crate) fn decode_author_postings(
 }
 
 fn end(c: &Cursor<'_>) -> SegResult<()> {
-    if c.is_empty() {
-        Ok(())
-    } else {
-        Err(c.err("bytes after the last item"))
-    }
+    if c.is_empty() { Ok(()) } else { Err(c.err("bytes after the last item")) }
 }
 
 #[cfg(test)]
@@ -434,11 +403,7 @@ mod tests {
             if want.is_empty() {
                 continue;
             }
-            assert_eq!(
-                p.follow(u32::try_from(id).unwrap_or(u32::MAX)),
-                want,
-                "{name}"
-            );
+            assert_eq!(p.follow(u32::try_from(id).unwrap_or(u32::MAX)), want, "{name}");
             checked += 1;
         }
         // e (a renamed twice) and the swapped pair: at least two heads with history.
@@ -449,10 +414,7 @@ mod tests {
     fn author_postings_keep_merges() {
         let (ids, p) = Postings::build(&fixture());
         let bob = ids.identities.get("Bob\u{0}bob@x.io");
-        assert_eq!(
-            bob.map(|b| p.by_author[b as usize].clone()),
-            Some(vec![2, 3, 5])
-        );
+        assert_eq!(bob.map(|b| p.by_author[b as usize].clone()), Some(vec![2, 3, 5]));
     }
 
     #[test]

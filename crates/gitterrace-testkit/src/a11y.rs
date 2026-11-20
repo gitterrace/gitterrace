@@ -18,9 +18,7 @@ pub fn problems(body: &str) -> Vec<String> {
 /// colour. A run is the gutter cell that opens a commit's lines (`<div class="bl">`).
 fn blame_runs(body: &str) -> Option<String> {
     let runs = body.matches("<div class=\"bl\">").count();
-    let said = body
-        .matches("<div class=\"bl\"><span class=\"vh\">Changed ")
-        .count();
+    let said = body.matches("<div class=\"bl\"><span class=\"vh\">Changed ").count();
     (runs != said).then(|| format!("{} of {runs} blame runs do not say their age", runs - said))
 }
 
@@ -97,9 +95,7 @@ fn elements<'a>(html: &'a str, tag: &'a str) -> impl Iterator<Item = &'a str> + 
                 rest = &rest[at + open.len()..];
                 continue;
             }
-            let end = rest[at..]
-                .find(&close)
-                .map_or(rest.len(), |e| at + e + close.len());
+            let end = rest[at..].find(&close).map_or(rest.len(), |e| at + e + close.len());
             let found = &rest[at..end];
             rest = &rest[end..];
             return Some(found);
@@ -136,17 +132,9 @@ mod tests {
     fn a_changed_diff_line_must_say_what_changed() {
         let page = |line: &str| format!("<h1>x</h1><div class=\"diff\">{line}</div>");
         let bare = page("<div class=\"add\" data-o=\"\" data-n=\"1\">a</div>");
-        assert!(
-            problems(&bare)[0].contains("Added"),
-            "{:?}",
-            problems(&bare)
-        );
+        assert!(problems(&bare)[0].contains("Added"), "{:?}", problems(&bare));
         let bare = page("<div class=\"del\" data-o=\"1\" data-n=\"\">a</div>");
-        assert!(
-            problems(&bare)[0].contains("Removed"),
-            "{:?}",
-            problems(&bare)
-        );
+        assert!(problems(&bare)[0].contains("Removed"), "{:?}", problems(&bare));
         let said = page(
             "<div class=\"add\" data-o=\"\" data-n=\"1\">\
              <span class=\"vh sign\">Added, </span>a</div>\

@@ -6,9 +6,7 @@ const WOFF2: &[u8] = include_bytes!(concat!(
 ));
 
 fn ttf() -> Vec<u8> {
-    unpack(WOFF2)
-        .expect("the vendored font unpacks")
-        .into_owned()
+    unpack(WOFF2).expect("the vendored font unpacks").into_owned()
 }
 
 #[test]
@@ -117,19 +115,10 @@ async fn a_font_blob_shows_its_facts_and_a_sample_from_raw() {
     let app = Arc::new(crate::app::App::new(repo, index));
     let (s, body) = crate::tests::get(&app, "/blob/HEAD/f.woff2").await;
     assert_eq!(s, 200);
-    assert!(
-        body.contains("JetBrains Mono") && body.contains("glyphs"),
-        "{body}"
-    );
-    assert!(
-        body.contains(r#"data-font-src="/raw/HEAD/f.woff2""#),
-        "{body}"
-    );
+    assert!(body.contains("JetBrains Mono") && body.contains("glyphs"), "{body}");
+    assert!(body.contains(r#"data-font-src="/raw/HEAD/f.woff2""#), "{body}");
     assert!(body.contains("/static/font.js?v="), "{body}");
     let (s, body) = crate::tests::get(&app, "/blob/HEAD/bad.ttf").await;
     assert_eq!(s, 200);
-    assert!(
-        !body.contains("font-sample") && body.contains("TrueType font"),
-        "{body}"
-    );
+    assert!(!body.contains("font-sample") && body.contains("TrueType font"), "{body}");
 }

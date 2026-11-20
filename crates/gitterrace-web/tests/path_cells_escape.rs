@@ -15,10 +15,7 @@ async fn a_marked_up_file_name_is_text_in_every_path_table() {
     let dir = tempfile::tempdir().expect("tmp");
     let mut f = Fixture::init(dir.path());
     // Three commits touching both files, so they rank as hot and as coupled.
-    for (i, day) in ["2024-03-01", "2024-03-02", "2024-03-03"]
-        .iter()
-        .enumerate()
-    {
+    for (i, day) in ["2024-03-01", "2024-03-02", "2024-03-03"].iter().enumerate() {
         f = f
             .at(&format!("{day}T10:00:00Z"))
             .write(&format!("{RAW}/lib.rs"), &format!("{i}\n"))
@@ -36,9 +33,6 @@ async fn a_marked_up_file_name_is_text_in_every_path_table() {
         let (status, html) = page(&router, uri).await;
         assert_eq!(status, 200, "{uri}");
         assert!(!html.contains(RAW), "{section}: raw name in {uri}");
-        assert!(
-            html.contains(SAFE),
-            "{section}: escaped name missing in {uri}"
-        );
+        assert!(html.contains(SAFE), "{section}: escaped name missing in {uri}");
     }
 }

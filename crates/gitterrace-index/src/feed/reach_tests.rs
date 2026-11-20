@@ -33,12 +33,8 @@ impl CommitSource for Git {
     }
 
     fn record(&self, id: &str) -> io::Result<CommitRecord> {
-        self.reads
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-        self.recs
-            .get(id)
-            .cloned()
-            .ok_or_else(|| io::Error::other("absent"))
+        self.reads.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.recs.get(id).cloned().ok_or_else(|| io::Error::other("absent"))
     }
 }
 
@@ -91,35 +87,17 @@ fn history() -> (Vec<CommitRecord>, Vec<CommitRecord>) {
             _ => vec![m(i - 1)],
         };
         let p: Vec<&str> = parents.iter().map(String::as_str).collect();
-        set.push(rec(
-            &m(i),
-            t,
-            &p,
-            ["ann", "bob"][i as usize % 2],
-            &[("src/a.rs", None)],
-        ));
+        set.push(rec(&m(i), t, &p, ["ann", "bob"][i as usize % 2], &[("src/a.rs", None)]));
         if i == 3 {
             set.push(rec(&s(1), t + 1, &[&m(3)], "cy", &[("src/b.rs", None)]));
-            set.push(rec(
-                &s(2),
-                t + 1,
-                &[&s(1)],
-                "cy",
-                &[("doc/b.md", Some("src/b.rs"))],
-            ));
+            set.push(rec(&s(2), t + 1, &[&s(1)], "cy", &[("doc/b.md", Some("src/b.rs"))]));
         }
     }
     set.sort_by_key(|r| (r.time, r.id.clone()));
     let fresh = vec![
         rec(&s(3), 30, &[&s(2)], "cy", &[("doc/b.md", None)]),
         rec(&s(4), 31, &[&s(3)], "ann", &[("src/a.rs", None)]),
-        rec(
-            &s(5),
-            32,
-            &[&s(4)],
-            "dee",
-            &[("new/c.rs", Some("doc/b.md"))],
-        ),
+        rec(&s(5), 32, &[&s(4)], "dee", &[("new/c.rs", Some("doc/b.md"))]),
     ];
     (set, fresh)
 }
@@ -140,9 +118,7 @@ fn view(s: &dyn InsightsSource) -> Vec<String> {
             s.parent_ids(c.rank)
         ));
     }
-    let ranks = (0..u32::try_from(s.len()).unwrap_or(0))
-        .map(crate::feed::Rank)
-        .collect();
+    let ranks = (0..u32::try_from(s.len()).unwrap_or(0)).map(crate::feed::Rank).collect();
     for (r, files) in s.rows_for(ranks) {
         for f in files {
             out.push(format!(
@@ -154,41 +130,21 @@ fn view(s: &dyn InsightsSource) -> Vec<String> {
         }
     }
     for p in ["src/a.rs", "src/b.rs", "doc/b.md", "new/c.rs"] {
-        let hits: Vec<_> = s
-            .path_id(p)
-            .map(|id| s.postings(Posting::Path(id)).collect())
-            .unwrap_or_default();
+        let hits: Vec<_> =
+            s.path_id(p).map(|id| s.postings(Posting::Path(id)).collect()).unwrap_or_default();
         out.push(format!("path {p} {hits:?}"));
     }
     for a in s.agg_author_day(i64::MIN..i64::MAX) {
-        out.push(format!(
-            "day {} {:?} {} {:?}",
-            a.day,
-            s.ident(a.ident),
-            a.commits,
-            a.sums
-        ));
+        out.push(format!("day {} {:?} {} {:?}", a.day, s.ident(a.ident), a.commits, a.sums));
     }
     let mut pa: Vec<String> = s
         .agg_path_author("")
-        .map(|a| {
-            format!(
-                "pa {:?} {:?} {}",
-                s.path(a.path),
-                s.ident(a.ident),
-                a.touches
-            )
-        })
+        .map(|a| format!("pa {:?} {:?} {}", s.path(a.path), s.ident(a.ident), a.touches))
         .collect();
     pa.sort();
     out.extend(pa);
     for e in s.rename_edges() {
-        out.push(format!(
-            "edge {:?} {:?} {:?}",
-            e.rank,
-            s.path(e.old),
-            s.path(e.new)
-        ));
+        out.push(format!("edge {:?} {:?} {:?}", e.rank, s.path(e.old), s.path(e.new)));
     }
     out
 }
@@ -204,21 +160,13 @@ fn a_rev_view_equals_a_fresh_load_of_that_rev() {
     let dir = tempfile::tempdir().expect("tmp");
     write_cache(dir.path(), &set, &[7]).expect("write");
     let git = Git {
-        recs: set
-            .iter()
-            .chain(&fresh)
-            .map(|r| (r.id.clone(), r.clone()))
-            .collect(),
+        recs: set.iter().chain(&fresh).map(|r| (r.id.clone(), r.clone())).collect(),
         reads: 0.into(),
     };
     for (tip, reads) in [(oid(9), 0), (oid(4), 0), (oid(102), 0), (oid(105), 3)] {
         git.reads.store(0, std::sync::atomic::Ordering::Relaxed);
-        let want: Vec<CommitRecord> = git
-            .rev_list(&tip)
-            .expect("list")
-            .iter()
-            .map(|id| git.recs[id].clone())
-            .collect();
+        let want: Vec<CommitRecord> =
+            git.rev_list(&tip).expect("list").iter().map(|id| git.recs[id].clone()).collect();
         let mem = MemorySource::shared(Arc::new(want));
         let got = match rev_view(disk(dir.path()), &git, &tip, &tip, 2000).expect("view") {
             RevView::Ready(v) => v,
@@ -237,11 +185,7 @@ fn past_the_cap_asks_for_a_reindex_and_stops_reading() {
     let dir = tempfile::tempdir().expect("tmp");
     write_cache(dir.path(), &set, &[]).expect("write");
     let git = Git {
-        recs: set
-            .iter()
-            .chain(&fresh)
-            .map(|r| (r.id.clone(), r.clone()))
-            .collect(),
+        recs: set.iter().chain(&fresh).map(|r| (r.id.clone(), r.clone())).collect(),
         reads: 0.into(),
     };
     let tip = oid(105);

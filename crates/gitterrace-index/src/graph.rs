@@ -97,11 +97,7 @@ impl Open {
             .lines()
             .map(|(i, l)| Seg {
                 from: i as u16,
-                to: if l.waits == row.id {
-                    col as u16
-                } else {
-                    i as u16
-                },
+                to: if l.waits == row.id { col as u16 } else { i as u16 },
                 color: l.color,
             })
             .collect();
@@ -129,58 +125,35 @@ impl Open {
                 let j = self.free_from(1);
                 self.reach(j);
                 let c = self.fresh();
-                self.cols[j] = Some(Line {
-                    waits: p.id,
-                    color: c,
-                });
+                self.cols[j] = Some(Line { waits: p.id, color: c });
                 opened.push(j);
             }
         }
         let mut bottom: Vec<Seg> = self
             .lines()
             .map(|(i, l)| Seg {
-                from: if opened.contains(&i) {
-                    col as u16
-                } else {
-                    i as u16
-                },
+                from: if opened.contains(&i) { col as u16 } else { i as u16 },
                 to: i as u16,
                 color: l.color,
             })
             .collect();
         for j in joins {
             if let Some(l) = self.cols[j] {
-                bottom.push(Seg {
-                    from: col as u16,
-                    to: j as u16,
-                    color: l.color,
-                });
+                bottom.push(Seg { from: col as u16, to: j as u16, color: l.color });
             }
         }
         while self.cols.last().is_some_and(Option::is_none) {
             self.cols.pop();
         }
-        Placed {
-            col: col as u16,
-            color,
-            tip: hits.is_empty(),
-            top,
-            bottom,
-            stubs,
-        }
+        Placed { col: col as u16, color, tip: hits.is_empty(), top, bottom, stubs }
     }
 
     fn lines(&self) -> impl Iterator<Item = (usize, Line)> + '_ {
-        self.cols
-            .iter()
-            .enumerate()
-            .filter_map(|(i, l)| l.map(|l| (i, l)))
+        self.cols.iter().enumerate().filter_map(|(i, l)| l.map(|l| (i, l)))
     }
 
     fn waiting_for(&self, id: u32) -> impl Iterator<Item = usize> + '_ {
-        self.lines()
-            .filter(move |(_, l)| l.waits == id)
-            .map(|(i, _)| i)
+        self.lines().filter(move |(_, l)| l.waits == id).map(|(i, _)| i)
     }
 
     fn free_from(&self, start: usize) -> usize {
@@ -216,13 +189,7 @@ mod tests {
     use super::{Open, Parent, Placed, Row, place_all};
 
     fn row(id: u32, parents: &[u32]) -> Row {
-        Row {
-            id,
-            parents: parents
-                .iter()
-                .map(|&id| Parent { id, far: false })
-                .collect(),
-        }
+        Row { id, parents: parents.iter().map(|&id| Parent { id, far: false }).collect() }
     }
 
     fn cols(placed: &[Placed]) -> Vec<u16> {
@@ -237,10 +204,7 @@ mod tests {
         let mut at = rows.first().map(|r| r.id);
         while let Some(id) = at {
             chain.push(id);
-            at = pos
-                .get(&id)
-                .and_then(|&i| rows[i].parents.first())
-                .map(|p| p.id);
+            at = pos.get(&id).and_then(|&i| rows[i].parents.first()).map(|p| p.id);
         }
         let mut open = Open::default();
         for (r, (row, want)) in rows.iter().zip(placed).enumerate() {
@@ -251,13 +215,7 @@ mod tests {
             }
             let col = got.col as usize;
             // A dot sits only on a column that is free or waits for it: no line crosses a node.
-            if before
-                .cols
-                .get(col)
-                .copied()
-                .flatten()
-                .is_some_and(|l| l.waits != row.id)
-            {
+            if before.cols.get(col).copied().flatten().is_some_and(|l| l.waits != row.id) {
                 return Err(format!("row {r}: column {col} passes through the commit"));
             }
             if (col == 0) != chain.contains(&row.id) {
@@ -351,13 +309,7 @@ mod tests {
 
     #[test]
     fn column_zero_never_stubs_its_first_parent() {
-        let rows = [
-            Row {
-                id: 1,
-                parents: vec![Parent { id: 2, far: true }],
-            },
-            row(2, &[]),
-        ];
+        let rows = [Row { id: 1, parents: vec![Parent { id: 2, far: true }] }, row(2, &[])];
         let placed = place_all(&mut Open::default(), &rows);
         assert_eq!(placed[0].stubs, 0);
         assert_eq!(cols(&placed), [0, 0]);
@@ -377,10 +329,7 @@ mod tests {
     fn history() -> impl Strategy<Value = (Vec<Row>, Vec<usize>)> {
         (2usize..80, 1u32..30).prop_flat_map(|(n, far)| {
             let picks = proptest::collection::vec(
-                (
-                    0usize..10,
-                    proptest::collection::vec(any::<prop::sample::Index>(), 8),
-                ),
+                (0usize..10, proptest::collection::vec(any::<prop::sample::Index>(), 8)),
                 n,
             );
             let cuts = proptest::collection::vec(1usize..12, 1..10);
@@ -403,22 +352,13 @@ mod tests {
                             .enumerate()
                             .map(|(k, x)| {
                                 // The first parent is usually close, as a branch's own history is.
-                                let span = if k == 0 {
-                                    x.index(below.min(3))
-                                } else {
-                                    x.index(below)
-                                };
+                                let span =
+                                    if k == 0 { x.index(below.min(3)) } else { x.index(below) };
                                 let j = i + 1 + span;
-                                Parent {
-                                    id: j as u32,
-                                    far: (j - i) as u32 > far,
-                                }
+                                Parent { id: j as u32, far: (j - i) as u32 > far }
                             })
                             .collect();
-                        Row {
-                            id: i as u32,
-                            parents,
-                        }
+                        Row { id: i as u32, parents }
                     })
                     .collect();
                 (rows, cuts)

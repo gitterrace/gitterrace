@@ -50,21 +50,13 @@ async fn multi_repo_host_guard_covers_nested_routes() {
         "/r/nope/",
     ] {
         assert_eq!(
-            fetch(&router, u, &gitterrace_testkit::on_port("evil.example"))
-                .await
-                .0,
+            fetch(&router, u, &gitterrace_testkit::on_port("evil.example")).await.0,
             403,
             "{u}"
         );
     }
     assert_eq!(
-        fetch(
-            &router,
-            "/r/alpha/api/v1/repo",
-            gitterrace_testkit::DEFAULT_ADDR
-        )
-        .await
-        .0,
+        fetch(&router, "/r/alpha/api/v1/repo", gitterrace_testkit::DEFAULT_ADDR).await.0,
         200
     );
 }
@@ -92,10 +84,7 @@ fn a_clashing_folder_name_is_first_come_and_frozen() {
     assert_eq!(names(vec![z.clone()]), ["app"], "alone it is plain");
     let both = names(vec![z.clone(), a.clone()]);
     assert_eq!(both[0], "app", "the first come keeps it");
-    assert!(
-        both[1].starts_with("app-") && both[1].len() == 10,
-        "{both:?}"
-    );
+    assert!(both[1].starts_with("app-") && both[1].len() == 10, "{both:?}");
     let reversed = names(vec![a, z]);
     assert_eq!(reversed, [both[1].clone(), both[0].clone()], "frozen");
 }
@@ -113,11 +102,7 @@ fn without_a_registry_a_clash_is_named_by_its_path() {
     let y_name = t.name_of(&y_root).expect("served");
     assert!(t.get("same").is_some() && y_name.starts_with("same-"));
     let t = crate::multi::Table::new(vec![y, x], env(), None).expect("t");
-    assert_eq!(
-        t.name_of(&y_root).as_deref(),
-        Some("same"),
-        "no registry, no memory"
-    );
+    assert_eq!(t.name_of(&y_root).as_deref(), Some("same"), "no registry, no memory");
 }
 
 #[tokio::test]
@@ -130,15 +115,8 @@ async fn a_single_repository_lives_under_its_name() {
     let (_, body) = fetch(&router, "/r/solo/", "localhost").await;
     assert!(body.contains("href=\"/r/solo/log/HEAD\""));
     assert!(body.contains("<meta name=\"gt-base\" content=\"/r/solo\">"));
-    assert!(
-        body.contains("id=\"reposwitch\" hidden"),
-        "one repository, no switcher"
-    );
-    assert_eq!(
-        fetch(&router, "/log/HEAD", "localhost").await.0,
-        404,
-        "no unprefixed pages"
-    );
+    assert!(body.contains("id=\"reposwitch\" hidden"), "one repository, no switcher");
+    assert_eq!(fetch(&router, "/log/HEAD", "localhost").await.0, 404, "no unprefixed pages");
 }
 
 /// The repositories home leads with today: a repository with a commit from this hour says how
@@ -158,25 +136,13 @@ async fn the_repositories_home_says_what_changed_today() {
     let router = crate::multi_router(vec![a, b]).expect("router");
     let (s, body) = fetch(&router, "/", "localhost").await;
     assert_eq!(s, 200);
-    assert!(
-        body.contains("2 commits today, last: fix: second"),
-        "{body}"
-    );
+    assert!(body.contains("2 commits today, last: fix: second"), "{body}");
     assert!(body.contains("Quiet today. Last commit"), "{body}");
-    assert!(
-        body.contains("<b>2</b> repositories, <b>2</b> commits today"),
-        "{body}"
-    );
+    assert!(body.contains("<b>2</b> repositories, <b>2</b> commits today"), "{body}");
     // The chips fill in after the rows: a cold page renders every one hidden.
-    assert!(
-        !body.contains("working tree\"><"),
-        "no chip before a scan: {body}"
-    );
+    assert!(!body.contains("working tree\"><"), "no chip before a scan: {body}");
     let (_, dirty) = fetch(&router, "/_dirty", "localhost").await;
-    assert_eq!(
-        dirty, r#"{"beta":true}"#,
-        "beta has uncommitted work, alpha is clean"
-    );
+    assert_eq!(dirty, r#"{"beta":true}"#, "beta has uncommitted work, alpha is clean");
 }
 
 /// `/?q=` narrows the list on the server, so the filter works without a script and a link
@@ -195,10 +161,7 @@ async fn the_repositories_home_filters_by_name_on_the_server() {
     let (s, one) = fetch(&router, "/?q=%20ALP", "localhost").await;
     assert_eq!(s, 200);
     assert!(shown(&one, "alpha") && !shown(&one, "beta"), "{one}");
-    assert!(
-        one.contains(">1 of 2<") && one.contains("value=\" ALP\""),
-        "{one}"
-    );
+    assert!(one.contains(">1 of 2<") && one.contains("value=\" ALP\""), "{one}");
     let (_, zero) = fetch(&router, "/?q=zzz", "localhost").await;
     assert!(zero.contains(">0 of 2<"), "{zero}");
     assert!(!zero.contains("repos-none\" hidden"), "{zero}");

@@ -44,18 +44,12 @@ struct OwnershipPage {
 /// person throughout.
 fn sole_owner(rows: &[DirRow]) -> Option<String> {
     let first = rows.first()?.owners.first()?.0.clone();
-    rows.iter()
-        .all(|r| r.owners.len() == 1 && r.owners[0].0 == first)
-        .then_some(first)
+    rows.iter().all(|r| r.owners.len() == 1 && r.owners[0].0 == first).then_some(first)
 }
 
 /// The repository root's own files come keyed by an empty path: name them.
 fn dir_label(path: &str) -> String {
-    if path.is_empty() {
-        "(root)".to_owned()
-    } else {
-        path.to_owned()
-    }
+    if path.is_empty() { "(root)".to_owned() } else { path.to_owned() }
 }
 
 /// An owner whose share rounds to 0% holds nothing the table can show, and is not counted.
@@ -74,11 +68,8 @@ pub(crate) async fn page(
         let scope = page_scope(&q, &d, period_of(&q, &d, Period::All));
         let ins = insights(a, r, scope.options().clone());
         let files = head_lines(a);
-        let rep = ins.ownership_in(
-            &files,
-            &counted(&ins, &scope, r),
-            gitterrace_api::OWNERSHIP_DEPTH,
-        );
+        let rep =
+            ins.ownership_in(&files, &counted(&ins, &scope, r), gitterrace_api::OWNERSHIP_DEPTH);
         let row = |d: &gitterrace_index::DirOwnership, name: String| DirRow {
             href: f.link("/stats/ownership", Dim::Path, &d.path),
             path: fmt::path_parts(&name),
@@ -94,12 +85,7 @@ pub(crate) async fn page(
             bus: d.bus_factor,
         };
         let mut rows = vec![row(&rep.overall, "(whole repository)".to_owned())];
-        rows.extend(
-            rep.dirs
-                .iter()
-                .take(TOP_DIRS)
-                .map(|d| row(d, dir_label(&d.path))),
-        );
+        rows.extend(rep.dirs.iter().take(TOP_DIRS).map(|d| row(d, dir_label(&d.path))));
         let solo = sole_owner(&rows);
         let fb = f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All));
         OwnershipPage {
@@ -119,10 +105,7 @@ pub(crate) async fn page(
                 Kpi("Bus factor", fmt::thousands(rep.overall.bus_factor)),
                 Kpi("Solo lines", fmt::thousands(rep.solo_lines)),
                 Kpi("Stale lines", fmt::thousands(rep.stale_lines)),
-                Kpi(
-                    "Directories at one",
-                    fmt::thousands(rep.dirs_with_bus_factor_one),
-                ),
+                Kpi("Directories at one", fmt::thousands(rep.dirs_with_bus_factor_one)),
             ],
             rows,
         }
@@ -140,20 +123,14 @@ mod tests {
             href: String::new(),
             lines: String::new(),
             files: String::new(),
-            owners: owners
-                .iter()
-                .map(|o| ((*o).to_owned(), "100%".to_owned()))
-                .collect(),
+            owners: owners.iter().map(|o| ((*o).to_owned(), "100%".to_owned())).collect(),
             bus: 1,
         }
     }
 
     #[test]
     fn one_owner_everywhere_is_named_once() {
-        assert_eq!(
-            sole_owner(&[row(&["Ann"]), row(&["Ann"])]).as_deref(),
-            Some("Ann")
-        );
+        assert_eq!(sole_owner(&[row(&["Ann"]), row(&["Ann"])]).as_deref(), Some("Ann"));
     }
 
     #[test]

@@ -74,16 +74,7 @@ impl TipIndex {
         }
         start.push(at);
         let mut fill = start.clone();
-        let mut touches = vec![
-            Tipped {
-                rank: 0,
-                row: 0,
-                path: 0,
-                raw: 0,
-                code: 0
-            };
-            flat.len()
-        ];
+        let mut touches = vec![Tipped { rank: 0, row: 0, path: 0, raw: 0, code: 0 }; flat.len()];
         for group in flat.chunk_by(|a, b| a.rank == b.rank).rev() {
             for t in group {
                 if let Some(f) = fill.get_mut(t.path as usize) {
@@ -92,11 +83,7 @@ impl TipIndex {
                 }
             }
         }
-        Some(Self {
-            start,
-            touches,
-            cols,
-        })
+        Some(Self { start, touches, cols })
     }
 
     /// Touches of tip name `id`, newest commit first.
@@ -157,10 +144,7 @@ impl Follow {
             }
             let canon = alias.get(&e.new).copied().unwrap_or(e.new);
             alias.insert(e.old, canon);
-            out.log
-                .entry(e.old)
-                .or_default()
-                .push((e.rank, e.row, canon));
+            out.log.entry(e.old).or_default().push((e.rank, e.row, canon));
             let n = out.names.entry(canon).or_default();
             if !n.contains(&e.old) {
                 n.push(e.old);
@@ -355,15 +339,7 @@ impl Insights<'_> {
                     .filter_map(|(commit, row, path)| {
                         let c = *commits.get(&commit)?;
                         let lines = lines.get(&(commit, row)).copied().unwrap_or(0);
-                        Some((
-                            TouchRaw {
-                                commit,
-                                row,
-                                path,
-                                lines,
-                            },
-                            c,
-                        ))
+                        Some((TouchRaw { commit, row, path, lines }, c))
                     })
                     .collect()
             })
@@ -420,9 +396,7 @@ impl Insights<'_> {
         c: &Counted<'_>,
         mut each: impl FnMut(usize, u32, usize, &CommitRow) -> bool,
     ) {
-        let tip = (paths.len() > PER_PATH_MAX)
-            .then(|| self.tip_index())
-            .flatten();
+        let tip = (paths.len() > PER_PATH_MAX).then(|| self.tip_index()).flatten();
         let Some(tip) = tip else {
             for (i, list) in self.touches_in(paths, c).into_iter().enumerate() {
                 for (t, row) in list {
@@ -473,9 +447,7 @@ impl Insights<'_> {
     /// view, bots included.
     #[cfg(test)]
     fn touches_of(&self, path: &str) -> Vec<(TouchRaw, CommitRow)> {
-        self.touches_many(&[path], |_| true)
-            .pop()
-            .unwrap_or_default()
+        self.touches_many(&[path], |_| true).pop().unwrap_or_default()
     }
 
     /// Touches of each head path by the commits `c` counts, newest first. The path selection
@@ -492,10 +464,7 @@ impl Insights<'_> {
     /// entry, for cross-checks against the segment postings.
     #[cfg(test)]
     pub(crate) fn follow_hits(&self, path: &str) -> Vec<(u32, u32)> {
-        self.touches_of(path)
-            .iter()
-            .map(|(t, _)| (t.commit.0, t.row))
-            .collect()
+        self.touches_of(path).iter().map(|(t, _)| (t.commit.0, t.row)).collect()
     }
 
     /// Full history of a file as it is named at the newest commit, following renames: every
@@ -512,10 +481,7 @@ impl Insights<'_> {
                 (
                     t.commit,
                     Touch {
-                        commit: src
-                            .commit_id(t.commit)
-                            .map(|s| s.to_string())
-                            .unwrap_or_default(),
+                        commit: src.commit_id(t.commit).map(|s| s.to_string()).unwrap_or_default(),
                         time: c.time,
                         author: self.d.people.list[self.person_of(c.ident)].name.clone(),
                         lines: t.lines,

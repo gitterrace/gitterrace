@@ -118,10 +118,7 @@ fn root_key(repo: &gix::Repository) -> Result<u64> {
     for reference in repo.references().map_err(git)?.all().map_err(git)? {
         let reference = reference.map_err(git)?;
         let name = reference.name().as_bstr();
-        if !PUBLIC_PREFIXES
-            .iter()
-            .any(|p| name.starts_with(p.as_bytes()))
-        {
+        if !PUBLIC_PREFIXES.iter().any(|p| name.starts_with(p.as_bytes())) {
             continue;
         }
         name.hash(&mut h);
@@ -148,9 +145,7 @@ fn public_roots(repo: &gix::Repository) -> HashSet<gix::ObjectId> {
     };
     for mut reference in all.flatten() {
         let name = reference.name().as_bstr();
-        if PUBLIC_PREFIXES
-            .iter()
-            .any(|p| name.starts_with(p.as_bytes()))
+        if PUBLIC_PREFIXES.iter().any(|p| name.starts_with(p.as_bytes()))
             && let Ok(c) = reference.peel_to_commit()
         {
             out.insert(c.id);

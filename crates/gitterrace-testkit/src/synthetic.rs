@@ -10,11 +10,7 @@ pub struct Rng(u64);
 impl Rng {
     #[must_use]
     pub const fn new(seed: u64) -> Self {
-        Self(if seed == 0 {
-            0x9e37_79b9_7f4a_7c15
-        } else {
-            seed
-        })
+        Self(if seed == 0 { 0x9e37_79b9_7f4a_7c15 } else { seed })
     }
 
     pub const fn next(&mut self) -> u64 {
@@ -98,10 +94,7 @@ pub fn build(dir: &Path, shape: Shape) {
         };
         let who = rng.below(shape.authors as u64);
         let (name, email) = if who % 10 == 9 {
-            (
-                format!("dep{who}[bot]"),
-                format!("dep{who}[bot]@users.noreply"),
-            )
+            (format!("dep{who}[bot]"), format!("dep{who}[bot]@users.noreply"))
         } else {
             (format!("Person {who}"), format!("p{who}@example.org"))
         };
@@ -154,11 +147,7 @@ pub fn build_renames(dir: &Path, files: usize, rounds: usize) {
     let mut commit = |stream: &mut String, ops: &str, msg: &str| {
         mark += 1;
         time += 3600;
-        let from = if mark > 1 {
-            format!("from :{}\n", mark - 1)
-        } else {
-            String::new()
-        };
+        let from = if mark > 1 { format!("from :{}\n", mark - 1) } else { String::new() };
         write!(
             stream,
             "commit refs/heads/main\nmark :{mark}\nauthor P <p@example.org> {time} +0000\n\
@@ -172,13 +161,8 @@ pub fn build_renames(dir: &Path, files: usize, rounds: usize) {
         let mut ops = String::new();
         for &f in chunk {
             let body = format!("file {f}\nline\nline\n");
-            write!(
-                ops,
-                "M 100644 inline {}\ndata {}\n{body}\n",
-                name(f, 0),
-                body.len()
-            )
-            .expect("write string");
+            write!(ops, "M 100644 inline {}\ndata {}\n{body}\n", name(f, 0), body.len())
+                .expect("write string");
         }
         commit(&mut stream, &ops, "feat: add files");
     }
@@ -192,13 +176,8 @@ pub fn build_renames(dir: &Path, files: usize, rounds: usize) {
             let mut ops = String::new();
             for &f in chunk {
                 let body = format!("file {f}\nline\nline\nround {r}\n");
-                write!(
-                    ops,
-                    "M 100644 inline {}\ndata {}\n{body}\n",
-                    name(f, r),
-                    body.len()
-                )
-                .expect("write string");
+                write!(ops, "M 100644 inline {}\ndata {}\n{body}\n", name(f, r), body.len())
+                    .expect("write string");
             }
             commit(&mut stream, &ops, "fix: edit moved files");
         }
@@ -221,35 +200,18 @@ mod tests {
         assert_eq!(tip(&a), tip(&b));
         assert_eq!(crate::git(&a, &["rev-list", "--count", "HEAD"]), "50");
         let c = tempfile_dir("c");
-        build(
-            &c,
-            Shape {
-                side: 7,
-                ..Shape::sized(50)
-            },
-        );
+        build(&c, Shape { side: 7, ..Shape::sized(50) });
         assert_eq!(crate::git(&c, &["rev-list", "--count", "main..side"]), "7");
         // Past the fresh-commit cap of the index (2000): the length the guards rely on.
         let d = tempfile_dir("d");
-        build(
-            &d,
-            Shape {
-                side: 2_500,
-                ..Shape::sized(100)
-            },
-        );
-        assert_eq!(
-            crate::git(&d, &["rev-list", "--count", "main..side"]),
-            "2500"
-        );
+        build(&d, Shape { side: 2_500, ..Shape::sized(100) });
+        assert_eq!(crate::git(&d, &["rev-list", "--count", "main..side"]), "2500");
         assert_eq!(crate::git(&c, &["rev-list", "--count", "HEAD"]), "50");
         std::fs::remove_dir_all(a.parent().expect("parent")).expect("clean");
         assert_ne!(Rng::new(1).next(), Rng::new(2).next());
     }
 
     fn tempfile_dir(n: &str) -> std::path::PathBuf {
-        std::env::temp_dir()
-            .join(format!("gt-synth-{}", std::process::id()))
-            .join(n)
+        std::env::temp_dir().join(format!("gt-synth-{}", std::process::id())).join(n)
     }
 }

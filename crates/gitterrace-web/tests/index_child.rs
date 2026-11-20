@@ -55,32 +55,19 @@ async fn the_server_builds_its_index_without_a_worker_of_its_own() {
         b.contains("\"ready\":true")
     })
     .await;
-    assert!(
-        body.contains("\"name\":\"stream\""),
-        "steps of the child: {body}"
-    );
+    assert!(body.contains("\"name\":\"stream\""), "steps of the child: {body}");
     // The child's CPU and worker busy share cross the pipe: a busy share is only measured
     // where the workers ran, so one here came from the child.
     let v: serde_json::Value = serde_json::from_str(&body).expect("json");
     let steps = v["phases"].as_array().expect("phases");
-    let stream = steps
-        .iter()
-        .find(|p| p["name"] == "stream")
-        .expect("stream");
+    let stream = steps.iter().find(|p| p["name"] == "stream").expect("stream");
     assert!(
         stream["busy"].as_f64().is_some_and(|b| b > 0.0),
         "no worker busy share from the child: {body}"
     );
     #[cfg(unix)]
-    assert!(
-        stream["cpu_secs"].as_f64().is_some(),
-        "no CPU seconds from the child: {body}"
-    );
-    assert_eq!(
-        WORKERS.load(Ordering::Relaxed),
-        0,
-        "index workers ran in the server"
-    );
+    assert!(stream["cpu_secs"].as_f64().is_some(), "no CPU seconds from the child: {body}");
+    assert_eq!(WORKERS.load(Ordering::Relaxed), 0, "index workers ran in the server");
 }
 
 /// Set in the re-executed test: it is the server whose index children hold.
@@ -99,11 +86,7 @@ fn a_removed_repository_leaves_no_index_child_behind() {
     if std::env::var_os(INNER_VAR).is_none() {
         let hold = tempfile::tempdir().expect("tmp");
         let status = std::process::Command::new(std::env::current_exe().expect("exe"))
-            .args([
-                "a_removed_repository_leaves_no_index_child_behind",
-                "--exact",
-                "--nocapture",
-            ])
+            .args(["a_removed_repository_leaves_no_index_child_behind", "--exact", "--nocapture"])
             .env(INNER_VAR, "1")
             .env("TEST_INDEX_CHILD_HOLD", hold.path())
             .status()
@@ -127,9 +110,7 @@ fn a_removed_repository_leaves_no_index_child_behind() {
     let cache = root.join("alpha/.git/gitterrace");
     let state = root.join("state");
     let rt = tokio::runtime::Runtime::new().expect("runtime");
-    let listener = rt
-        .block_on(tokio::net::TcpListener::bind("127.0.0.1:0"))
-        .expect("bind");
+    let listener = rt.block_on(tokio::net::TcpListener::bind("127.0.0.1:0")).expect("bind");
     let addr = listener.local_addr().expect("addr");
     let serve = gitterrace_web::serve_on(
         listener,
@@ -165,15 +146,8 @@ fn a_removed_repository_leaves_no_index_child_behind() {
         rustix::process::test_kill_process(pid).is_err(),
         "the index child of a removed repository still runs"
     );
-    assert_eq!(
-        files(&cache),
-        before,
-        "the stopped build wrote into the cache"
-    );
-    assert!(
-        !cache.join("MANIFEST").exists(),
-        "the stopped build published a set"
-    );
+    assert_eq!(files(&cache), before, "the stopped build wrote into the cache");
+    assert!(!cache.join("MANIFEST").exists(), "the stopped build published a set");
     // Beta's child holds forever: never wait for its update. It ends with this process,
     // whose exit closes its stdin.
     rt.shutdown_background();
@@ -229,10 +203,7 @@ fn an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes() {
     let hold = dir.path().join("hold");
     std::fs::create_dir(&hold).expect("hold dir");
     let mut child = std::process::Command::new(std::env::current_exe().expect("exe"))
-        .args([
-            "--exact",
-            "an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes",
-        ])
+        .args(["--exact", "an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes"])
         .env("GITTERRACE_INDEX_CHILD", repo.join(".git/gitterrace"))
         .env("GITTERRACE_INDEX_REV", "HEAD")
         .env("GITTERRACE_INDEX_GIT_DIR", repo.join(".git"))
@@ -253,11 +224,7 @@ fn an_index_child_follows_budget_lines_and_ends_when_its_stdin_closes() {
     // of blocking the suite on a read.
     let talk = std::thread::spawn(move || {
         let mut out = std::io::BufReader::new(stdout).lines();
-        let mut next = |want: &str| {
-            out.by_ref()
-                .map_while(Result::ok)
-                .any(|l| l.starts_with(want))
-        };
+        let mut next = |want: &str| out.by_ref().map_while(Result::ok).any(|l| l.starts_with(want));
         let mut seen = vec![next("gitterrace-index progress ")];
         for n in [2, 0, 3] {
             seen.push(writeln!(stdin, "budget {n}").is_ok());
@@ -287,9 +254,7 @@ struct KillOnDrop(u32);
 #[cfg(unix)]
 impl Drop for KillOnDrop {
     fn drop(&mut self) {
-        let pid = i32::try_from(self.0)
-            .ok()
-            .and_then(rustix::process::Pid::from_raw);
+        let pid = i32::try_from(self.0).ok().and_then(rustix::process::Pid::from_raw);
         // A child that already ended has nothing to kill: the error is the expected case.
         if let Some(p) = pid {
             rustix::process::kill_process(p, rustix::process::Signal::KILL).unwrap_or_default();

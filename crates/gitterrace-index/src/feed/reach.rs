@@ -72,8 +72,7 @@ pub fn rev_view<S: InsightsSource>(
 }
 
 fn bit(bits: &[u64], r: u32) -> bool {
-    bits.get(r as usize / 64)
-        .is_some_and(|w| w >> (r % 64) & 1 == 1)
+    bits.get(r as usize / 64).is_some_and(|w| w >> (r % 64) & 1 == 1)
 }
 
 impl<S: InsightsSource> Reach<S> {
@@ -146,14 +145,11 @@ impl<S: InsightsSource> Reach<S> {
         for _ in 0..dense.0 - self.before[w] {
             word &= word - 1;
         }
-        Some(Rank(
-            u32::try_from(w * 64).unwrap_or(u32::MAX) + word.trailing_zeros(),
-        ))
+        Some(Rank(u32::try_from(w * 64).unwrap_or(u32::MAX) + word.trailing_zeros()))
     }
 
     fn fresh_at(&self, r: Rank) -> Option<&FreshRow> {
-        r.0.checked_sub(self.inner)
-            .and_then(|i| self.fresh.rows.get(i as usize))
+        r.0.checked_sub(self.inner).and_then(|i| self.fresh.rows.get(i as usize))
     }
 
     fn each_row(&self, f: &mut dyn FnMut(&CommitRow, &[FileRow])) {
@@ -171,8 +167,7 @@ impl<S: InsightsSource> Reach<S> {
     }
 
     fn remap_hits(&self, s: Stream<'_, Hit>) -> Vec<Hit> {
-        s.filter_map(|h| self.dense(h.rank).map(|rank| Hit { rank, ..h }))
-            .collect()
+        s.filter_map(|h| self.dense(h.rank).map(|rank| Hit { rank, ..h })).collect()
     }
 }
 
@@ -220,20 +215,14 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
 
     fn parent_ids(&self, rank: Rank) -> Vec<Arc<str>> {
         self.to_base(rank).map_or_else(
-            || {
-                self.fresh_at(rank)
-                    .map(|f| f.parents.clone())
-                    .unwrap_or_default()
-            },
+            || self.fresh_at(rank).map(|f| f.parents.clone()).unwrap_or_default(),
             |b| self.base.parent_ids(b),
         )
     }
 
     fn find_commit(&self, id: &str) -> Result<Option<Rank>, SourceError> {
         if let Some(&i) = self.fresh.ids.get(id) {
-            return Ok(Some(Rank(
-                self.inner + u32::try_from(i).unwrap_or(u32::MAX),
-            )));
+            return Ok(Some(Rank(self.inner + u32::try_from(i).unwrap_or(u32::MAX))));
         }
         Ok(self.base.find_commit(id)?.and_then(|b| self.dense(b)))
     }
@@ -250,9 +239,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
             |p| {
                 *seen.entry(p).or_insert_with(|| {
                     prefix.is_empty()
-                        || self
-                            .path(p)
-                            .is_some_and(|n| crate::insights::under(&n, prefix))
+                        || self.path(p).is_some_and(|n| crate::insights::under(&n, prefix))
                 })
             },
             |f| self.each_row(f),
@@ -263,10 +250,7 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
         let mut out = self.remap_hits(self.base.postings(key));
         for FreshRow { row: c, files, .. } in &self.fresh.rows {
             match key {
-                Posting::Author(a) if c.ident == a => out.push(Hit {
-                    rank: c.rank,
-                    row: 0,
-                }),
+                Posting::Author(a) if c.ident == a => out.push(Hit { rank: c.rank, row: 0 }),
                 Posting::Path(p) if !c.merge => {
                     for (i, f) in files.iter().enumerate() {
                         if f.path == p {
@@ -325,10 +309,9 @@ impl<S: InsightsSource> InsightsSource for Reach<S> {
     }
 
     fn ident(&self, id: IdentId) -> Option<(Arc<str>, Arc<str>)> {
-        (id.0 as usize).checked_sub(self.base.idents()).map_or_else(
-            || self.base.ident(id),
-            |i| self.fresh.idents.get(i).cloned(),
-        )
+        (id.0 as usize)
+            .checked_sub(self.base.idents())
+            .map_or_else(|| self.base.ident(id), |i| self.fresh.idents.get(i).cloned())
     }
 
     fn idents(&self) -> usize {

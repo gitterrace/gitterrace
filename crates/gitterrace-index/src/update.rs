@@ -71,11 +71,8 @@ impl Index {
         let extend = previous
             .as_ref()
             .filter(|_| !held.is_empty() && held.iter().all(|o| reach.contains(o)));
-        let ids: Vec<String> = if extend.is_some() {
-            todo.into_iter().cloned().collect()
-        } else {
-            order.clone()
-        };
+        let ids: Vec<String> =
+            if extend.is_some() { todo.into_iter().cloned().collect() } else { order.clone() };
         let total = ids.len();
         progress(Progress { done: 0, total });
         let mut read = 0_usize;
@@ -171,9 +168,8 @@ impl Index {
         if self.merge_inline.load(std::sync::atomic::Ordering::Relaxed) {
             return run().map_or_else(|e| eprintln!("gitterrace: segment merge failed: {e}"), drop);
         }
-        let spawned = std::thread::Builder::new()
-            .name("gitterrace-merge".into())
-            .spawn(move || {
+        let spawned =
+            std::thread::Builder::new().name("gitterrace-merge".into()).spawn(move || {
                 if let Err(e) = run() {
                     eprintln!("gitterrace: segment merge failed: {e}");
                 }

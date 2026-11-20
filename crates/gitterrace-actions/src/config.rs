@@ -28,11 +28,8 @@ const DEFAULT_TIMEOUT: Duration = Duration::from_secs(10);
 /// Not configurable: the ceiling is part of the actions.toml contract (docs/actions.md).
 pub const MAX_TIMEOUT: Duration = Duration::from_secs(crate::numbers::timeout_secs!());
 /// The refusal of a `timeout` that does not parse or is over [`MAX_TIMEOUT`].
-const BAD_TIMEOUT: &str = concat!(
-    "timeout must be like 10s or 500ms, at most ",
-    crate::numbers::timeout_secs!(),
-    "s"
-);
+const BAD_TIMEOUT: &str =
+    concat!("timeout must be like 10s or 500ms, at most ", crate::numbers::timeout_secs!(), "s");
 /// A config larger than this is not hand-written; refuse instead of parsing it.
 /// Not configurable: a size bound read before parsing, against a file that is not a config.
 const MAX_CONFIG_BYTES: u64 = 256 * 1024;
@@ -243,10 +240,7 @@ impl Config {
     pub fn parse(text: &str, home: &Path) -> Result<Self, ConfigError> {
         let raw: RawFile = toml::from_str(text).map_err(|e| ConfigError::Parse(e.to_string()))?;
         if raw.version != 1 {
-            return Err(ConfigError::Parse(format!(
-                "unsupported version {}",
-                raw.version
-            )));
+            return Err(ConfigError::Parse(format!("unsupported version {}", raw.version)));
         }
         let mut scripts = BTreeMap::new();
         for sc in raw.script {
@@ -332,10 +326,8 @@ impl Config {
 /// The home folder, or the filesystem root when its variable is unset.
 pub(crate) fn home() -> PathBuf {
     let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    std::env::var_os(var).map_or_else(
-        || PathBuf::from(std::path::MAIN_SEPARATOR_STR),
-        PathBuf::from,
-    )
+    std::env::var_os(var)
+        .map_or_else(|| PathBuf::from(std::path::MAIN_SEPARATOR_STR), PathBuf::from)
 }
 
 fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
@@ -356,9 +348,7 @@ fn send_err(id: &str, why: impl Into<String>) -> ConfigError {
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 32
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 
 fn validate(
@@ -388,13 +378,7 @@ fn validate(
             let sc = scripts
                 .get(&name)
                 .ok_or_else(|| invalid(&id, format!("script {name:?} is not defined")))?;
-            (
-                sc.command.clone(),
-                sc.shell,
-                sc.cwd.clone(),
-                sc.timeout.clone(),
-                sc.stdin.clone(),
-            )
+            (sc.command.clone(), sc.shell, sc.cwd.clone(), sc.timeout.clone(), sc.stdin.clone())
         }
     };
     check_command(&command, shell, Some(&a.vars)).map_err(|why| invalid(&id, why.to_string()))?;
@@ -414,10 +398,7 @@ fn validate(
             v
         }
         (false, _) => {
-            return Err(invalid(
-                &id,
-                "command must be a non-empty array when shell = false",
-            ));
+            return Err(invalid(&id, "command must be a non-empty array when shell = false"));
         }
         (true, RawCommand::Shell(s)) if !s.trim().is_empty() => {
             vec!["/bin/sh".into(), "-c".into(), s]
@@ -430,10 +411,7 @@ fn validate(
         Some(p) => {
             let p = expand_tilde(p, home);
             if !p.is_absolute() || !p.is_dir() {
-                return Err(invalid(
-                    &id,
-                    "cwd must be repo, home or an existing absolute dir",
-                ));
+                return Err(invalid(&id, "cwd must be repo, home or an existing absolute dir"));
             }
             Cwd::Path(p)
         }
@@ -522,25 +500,18 @@ pub fn check_vars(vars: &BTreeMap<String, String>) -> Result<(), String> {
     for (name, value) in vars {
         let lower = name.to_ascii_lowercase();
         let fixable = lower.len() <= MAX_VAR_NAME
-            && lower
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
+            && lower.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_');
         if *name != lower && fixable {
             return Err(format!("vars.{name}: use lowercase: {lower}"));
         }
         if name.is_empty()
             || name.len() > MAX_VAR_NAME
-            || !name
-                .bytes()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
+            || !name.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_')
         {
             return Err(format!("vars.{name}: name must match [a-z0-9_]{{1,32}}"));
         }
         if value.len() > MAX_VAR_BYTES {
-            return Err(format!(
-                "vars.{name}: value over {} KiB",
-                MAX_VAR_BYTES / 1024
-            ));
+            return Err(format!("vars.{name}: value over {} KiB", MAX_VAR_BYTES / 1024));
         }
         if value.contains('\0') {
             return Err(format!("vars.{name}: value contains NUL"));

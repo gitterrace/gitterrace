@@ -39,12 +39,7 @@ fn row(page: &str, label: &str) -> u64 {
         .split("<b>")
         .nth(1)
         .expect("value");
-    cell.split("</b>")
-        .next()
-        .expect("end")
-        .replace(',', "")
-        .parse()
-        .expect("number")
+    cell.split("</b>").next().expect("end").replace(',', "").parse().expect("number")
 }
 
 fn bars(page: &str) -> u64 {
@@ -60,12 +55,7 @@ fn punch(page: &str) -> u64 {
     let heat = page.split("class=\"chart heat\"").nth(1).expect("heat");
     let tip = heat.split("data-tip=\"").nth(1).expect("tip");
     let tip = tip.split('"').next().expect("end");
-    tip.rsplit(" of ")
-        .next()
-        .expect("total")
-        .replace(',', "")
-        .parse()
-        .expect("number")
+    tip.rsplit(" of ").next().expect("total").replace(',', "").parse().expect("number")
 }
 
 #[tokio::test(flavor = "multi_thread")]

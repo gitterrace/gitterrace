@@ -152,17 +152,11 @@ pub(crate) fn outline(
     lines: usize,
     named: Vec<Symbol>,
 ) -> Vec<OutlineItem> {
-    let shown = text
-        .match_indices('\n')
-        .nth(lines.saturating_sub(1))
-        .map_or(text, |(i, _)| &text[..i]);
+    let shown =
+        text.match_indices('\n').nth(lines.saturating_sub(1)).map_or(text, |(i, _)| &text[..i]);
     let shown = if lines == 0 { "" } else { shown };
     let first = shown.lines().next().unwrap_or("");
-    let found = if scanned(path, first) {
-        symbols(path, shown)
-    } else {
-        named
-    };
+    let found = if scanned(path, first) { symbols(path, shown) } else { named };
     found
         .into_iter()
         .map(|s| OutlineItem {

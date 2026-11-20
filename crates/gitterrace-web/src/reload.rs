@@ -47,9 +47,7 @@ impl Reloader {
         let cfg = match (self.watched.load)() {
             Ok(c) => c,
             Err(e) => {
-                return vec![format!(
-                    "config not reloaded, keeping the old settings: {e}"
-                )];
+                return vec![format!("config not reloaded, keeping the old settings: {e}")];
             }
         };
         let mut lines = vec!["config reloaded".to_owned()];
@@ -124,17 +122,9 @@ mod tests {
         let index = gitterrace_index::Index::open(&r).expect("index");
         let app = Arc::new(App::configured(r, index, &env));
         env.register(&app);
-        let reloader = Reloader::new(Watched {
-            file: dir.path().join("config.toml"),
-            load: Box::new(load),
-        });
-        Fixture {
-            repo,
-            dir,
-            env,
-            app,
-            reloader,
-        }
+        let reloader =
+            Reloader::new(Watched { file: dir.path().join("config.toml"), load: Box::new(load) });
+        Fixture { repo, dir, env, app, reloader }
     }
 
     fn edit(f: &Fixture, text: &str) {
@@ -151,11 +141,7 @@ mod tests {
         f.reloader.poll(&f.env);
         assert_eq!(f.env.cfg().insights.period, Period::Year);
         assert_eq!(f.app.cfg().limits.text_kb, 7);
-        assert_eq!(
-            f.app.repo.text_limit(),
-            7 << 10,
-            "the repository handle follows"
-        );
+        assert_eq!(f.app.repo.text_limit(), 7 << 10, "the repository handle follows");
         assert!(f.app.memo_get("k").is_none(), "rendered pages are dropped");
         let c = tab.try_recv().expect("config event");
         assert_eq!(c.kinds, ["config"]);
@@ -166,22 +152,12 @@ mod tests {
         let mut f = fixture("[insights]\nperiod = \"1y\"\n");
         edit(&f, "[insights]\nperiod = \"forever\"\n");
         let lines = f.reloader.poll(&f.env);
-        assert!(
-            lines.iter().any(|l| l.contains("insights.period")),
-            "{lines:?}"
-        );
+        assert!(lines.iter().any(|l| l.contains("insights.period")), "{lines:?}");
         assert_eq!(f.env.cfg().insights.period, Period::Year);
-        assert!(
-            f.reloader.poll(&f.env).is_empty(),
-            "a bad file is not retried unchanged"
-        );
+        assert!(f.reloader.poll(&f.env).is_empty(), "a bad file is not retried unchanged");
         edit(&f, "[insights]\nperiod = \"3m\"\n");
         f.reloader.poll(&f.env);
-        assert_eq!(
-            f.env.cfg().insights.period,
-            Period::Quarter,
-            "the next good edit applies"
-        );
+        assert_eq!(f.env.cfg().insights.period, Period::Quarter, "the next good edit applies");
     }
 
     /// `/api/v1` counts under the settings in force, the same ones the pages read.
@@ -212,11 +188,7 @@ mod tests {
         assert_eq!(before, same, "nothing changed, same tag");
         edit(&f, &format!("{quiet}[insights]\nexclude = [\"a.txt\"]\n"));
         f.reloader.poll(&f.env);
-        assert_ne!(
-            before,
-            tag(router).await,
-            "the API counts under the reloaded options"
-        );
+        assert_ne!(before, tag(router).await, "the API counts under the reloaded options");
         assert_eq!(
             f.app.defaults().exclude,
             gitterrace_api::options_from(&f.env.cfg(), &f.app.name).exclude,
@@ -246,10 +218,7 @@ mod tests {
         }
         let cfg = f.env.cfg();
         let d = Config::default();
-        assert_eq!(
-            cfg.server, d.server,
-            "addr, public and hosts keep their running value"
-        );
+        assert_eq!(cfg.server, d.server, "addr, public and hosts keep their running value");
         assert!(!f.app.public(), "public mode is fixed at startup");
         assert_eq!(cfg.index.threads, d.index.threads);
         assert_eq!(cfg.multi, d.multi);

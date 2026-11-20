@@ -24,9 +24,7 @@ pub(super) fn port(root: &Path) -> (Option<u16>, Vec<String>) {
     if exposed.is_none() {
         bad.push("Dockerfile: no EXPOSE port".to_owned());
     } else if addr != exposed {
-        bad.push(format!(
-            "Dockerfile: --addr port {addr:?} is not the EXPOSE port {exposed:?}"
-        ));
+        bad.push(format!("Dockerfile: --addr port {addr:?} is not the EXPOSE port {exposed:?}"));
     }
     (exposed, bad)
 }
@@ -37,19 +35,13 @@ pub(super) fn check(path: &str, text: &str, port: u16) -> Vec<String> {
     let words = text.split(|c: char| c.is_whitespace() || c == '`');
     let mut words = words.peekable();
     while let Some(w) = words.next() {
-        let mapped = (w == "-p")
-            .then(|| words.peek().copied())
-            .flatten()
-            .and_then(|m| m.rsplit(':').next());
-        let local = w
-            .split("localhost:")
-            .nth(1)
-            .map(|p| p.trim_end_matches(|c: char| !c.is_ascii_digit()));
+        let mapped =
+            (w == "-p").then(|| words.peek().copied()).flatten().and_then(|m| m.rsplit(':').next());
+        let local =
+            w.split("localhost:").nth(1).map(|p| p.trim_end_matches(|c: char| !c.is_ascii_digit()));
         for found in [mapped, local].into_iter().flatten() {
             if found.parse::<u16>().is_ok_and(|p| p != port) {
-                bad.push(format!(
-                    "{path}: container port {found} is not the Dockerfile's {port}"
-                ));
+                bad.push(format!("{path}: container port {found} is not the Dockerfile's {port}"));
             }
         }
     }

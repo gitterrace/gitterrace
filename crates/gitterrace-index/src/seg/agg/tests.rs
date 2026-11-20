@@ -13,12 +13,7 @@ fn fixture() -> Vec<crate::CommitRecord> {
     let mut m = rec("e", "Cy", 50, vec![file("y.py", 9, 9, 9)]);
     m.merge = true;
     // y.py twice in one commit: still one touch.
-    v.push(rec(
-        "f",
-        "Cy",
-        45,
-        vec![renamed, file("y.py", 4, 0, 3204), file("y.py", 1, 0, 3205)],
-    ));
+    v.push(rec("f", "Cy", 45, vec![renamed, file("y.py", 4, 0, 3204), file("y.py", 1, 0, 3205)]));
     v.push(m);
     v
 }
@@ -33,27 +28,17 @@ fn path_author_sums_equal_file_churn() {
     let ws = Options::default().count_whitespace;
     let mut sums: BTreeMap<String, (usize, u64, u64)> = BTreeMap::new();
     for ((p, _), v) in &agg.path_author {
-        let e = sums
-            .entry(ids.paths.list[*p as usize].to_string())
-            .or_default();
+        let e = sums.entry(ids.paths.list[*p as usize].to_string()).or_default();
         e.0 += usize::try_from(v.touches).unwrap_or(0);
-        let (a, d) = if ws {
-            (v.lines.add, v.lines.del)
-        } else {
-            (v.lines.code_add, v.lines.code_del)
-        };
+        let (a, d) =
+            if ws { (v.lines.add, v.lines.del) } else { (v.lines.code_add, v.lines.code_del) };
         e.1 += a;
         e.2 += d;
     }
     sums.retain(|_, v| v.0 > 0);
     assert_eq!(sums.len(), today.len());
     for c in today {
-        assert_eq!(
-            sums[&c.path],
-            (c.commits, c.additions, c.deletions),
-            "{}",
-            c.path
-        );
+        assert_eq!(sums[&c.path], (c.commits, c.additions, c.deletions), "{}", c.path);
     }
 }
 
@@ -71,9 +56,7 @@ fn author_day_counts_equal_counted_commits() {
     }
     let mut ours: BTreeMap<String, u64> = BTreeMap::new();
     for ((_, who), v) in &agg.author_day {
-        *ours
-            .entry(ids.identities.list[*who as usize].to_string())
-            .or_default() += v.commits;
+        *ours.entry(ids.identities.list[*who as usize].to_string()).or_default() += v.commits;
     }
     assert_eq!(ours, today);
 }
@@ -146,8 +129,5 @@ fn aggregates_round_trip_through_blocks() {
     // Truncated block: an error, never a panic.
     let (s, n, b) = &blocks[0];
     let mut c = Cursor::new(&b[..b.len() - 1], "t", 0);
-    assert!(
-        super::decode_author_day(&mut c, *n, |_, _, _| Some(())).is_err(),
-        "{s}"
-    );
+    assert!(super::decode_author_day(&mut c, *n, |_, _, _| Some(())).is_err(), "{s}");
 }

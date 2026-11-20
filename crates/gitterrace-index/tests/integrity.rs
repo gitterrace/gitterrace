@@ -41,13 +41,7 @@ fn built() -> Built {
     let index = Index::open_dir(cache.clone()).expect("index");
     index.update(&repo, "HEAD", &|_| {}).expect("update");
     let head = repo.resolve("HEAD").expect("head");
-    Built {
-        _tmp: tmp,
-        repo,
-        index,
-        cache,
-        head,
-    }
+    Built { _tmp: tmp, repo, index, cache, head }
 }
 
 /// The segment file and the offset of the first block of `sec` in it.
@@ -59,11 +53,7 @@ fn first_block(cache: &Path, sec: u16) -> (PathBuf, u64) {
 
 /// Flips one byte in place, the same inode, so an already open handle sees it too.
 fn flip(path: &Path, at: u64) {
-    let mut f = fs::OpenOptions::new()
-        .read(true)
-        .write(true)
-        .open(path)
-        .expect("open");
+    let mut f = fs::OpenOptions::new().read(true).write(true).open(path).expect("open");
     let mut b = [0u8];
     f.seek(SeekFrom::Start(at)).expect("seek");
     std::io::Read::read_exact(&mut f, &mut b).expect("read");
@@ -72,11 +62,7 @@ fn flip(path: &Path, at: u64) {
 }
 
 fn find_head(b: &Built) -> Result<Option<u32>, String> {
-    let set = b
-        .index
-        .disk_source(&b.repo, &b.head)
-        .map_err(|e| e.to_string())?
-        .ok_or("no set")?;
+    let set = b.index.disk_source(&b.repo, &b.head).map_err(|e| e.to_string())?.ok_or("no set")?;
     set.run(|s| s.find_commit(&b.head).map(|r| r.map(|r| r.0)))
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
@@ -100,18 +86,11 @@ fn a_corrupt_oid_boundary_is_an_error_never_a_missing_head() {
 #[test]
 fn a_rank_changed_after_open_is_an_error_never_served() {
     let b = built();
-    let set = b
-        .index
-        .disk_source(&b.repo, &b.head)
-        .expect("open")
-        .expect("set");
+    let set = b.index.disk_source(&b.repo, &b.head).expect("open").expect("set");
     let (seg, at) = first_block(&b.cache, section::RANK);
     flip(&seg, at);
-    let got = set.run(|s| {
-        s.postings(Posting::Author(IdentId(0)))
-            .map(|h| h.rank.0)
-            .collect::<Vec<_>>()
-    });
+    let got =
+        set.run(|s| s.postings(Posting::Author(IdentId(0))).map(|h| h.rank.0).collect::<Vec<_>>());
     assert!(got.is_err(), "a changed rank was served: {got:?}");
 }
 
@@ -181,17 +160,10 @@ fn a_fifo_or_link_in_the_cache_never_hangs_and_rebuilds() {
                 std::os::unix::fs::symlink(&outside, &at).expect("link");
             }
             open_in_child(&b.cache, &case);
-            assert_eq!(
-                fs::read_to_string(&outside).expect("read"),
-                "keep",
-                "{case}"
-            );
+            assert_eq!(fs::read_to_string(&outside).expect("read"), "keep", "{case}");
             let index = Index::open_dir(b.cache.clone()).expect("reopen");
             let set = index.disk_source(&b.repo, &b.head);
-            assert!(
-                !matches!(set, Ok(Some(_))) || find_head(&b).is_ok(),
-                "{case}: partly trusted"
-            );
+            assert!(!matches!(set, Ok(Some(_))) || find_head(&b).is_ok(), "{case}: partly trusted");
             index.rebuild().expect("rebuild");
             index.update(&b.repo, "HEAD", &|_| {}).expect("update");
             let rank = index
@@ -202,10 +174,7 @@ fn a_fifo_or_link_in_the_cache_never_hangs_and_rebuilds() {
                 .expect("run")
                 .expect("find");
             assert!(rank.is_some(), "{case}: rebuilt set misses HEAD");
-            assert!(
-                !fs::symlink_metadata(&at).is_ok_and(|m| !m.is_file()),
-                "{case}"
-            );
+            assert!(!fs::symlink_metadata(&at).is_ok_and(|m| !m.is_file()), "{case}");
         }
     }
 }

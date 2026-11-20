@@ -72,9 +72,7 @@ fn pieces(html: &str) -> Vec<(Kind, &str)> {
             let (n, close) = name(&rest[..end]);
             if !close && RAW.contains(&n.as_str()) {
                 let shut = format!("</{n}>");
-                let end = rest[end..]
-                    .find(&shut)
-                    .map_or(rest.len(), |f| end + f + shut.len());
+                let end = rest[end..].find(&shut).map_or(rest.len(), |f| end + f + shut.len());
                 out.push((Kind::Raw, &rest[..end]));
                 rest = &rest[end..];
             } else {
@@ -103,11 +101,7 @@ fn join(html: &str) -> String {
             Kind::Tag => {
                 let (n, close) = name(s);
                 if n == "table" {
-                    depth = if close {
-                        depth.saturating_sub(1)
-                    } else {
-                        depth + 1
-                    };
+                    depth = if close { depth.saturating_sub(1) } else { depth + 1 };
                 }
                 out.push_str(s);
             }
@@ -257,11 +251,7 @@ fn tag(l: &mut Lines, s: &str) {
     for c in s.chars() {
         if c == '"' {
             if !quoted {
-                value = TEXT_ATTRS
-                    .iter()
-                    .find(|a| **a == attr)
-                    .copied()
-                    .unwrap_or("");
+                value = TEXT_ATTRS.iter().find(|a| **a == attr).copied().unwrap_or("");
             }
             quoted = !quoted;
             l.push(c);
@@ -343,16 +333,10 @@ mod tests {
         let out = fit(&html);
         assert!(out.starts_with("<a class=\"edit\"\n href="), "{out}");
         let desc = "one two three ".repeat(10);
-        let meta = format!(
-            "<meta name=\"description\" content=\"{}\">\n",
-            desc.trim_end()
-        );
+        let meta = format!("<meta name=\"description\" content=\"{}\">\n", desc.trim_end());
         let out = fit(&meta);
         assert!(widest(&out) <= WIDTH, "{out}");
-        assert_eq!(
-            out.replace("\n ", " ").replace('\n', " "),
-            meta.replace('\n', " ")
-        );
+        assert_eq!(out.replace("\n ", " ").replace('\n', " "), meta.replace('\n', " "));
     }
 
     #[test]
@@ -385,9 +369,6 @@ mod tests {
         assert_eq!(breakable_wide_lines(&prose).len(), 1);
         let url = format!("<a href=\"https://example.org/{}\">x</a>", "a".repeat(120));
         assert_eq!(breakable_wide_lines(&url), [] as [std::string::String; 0]);
-        assert_eq!(
-            breakable_wide_lines(&fit(&prose)),
-            [] as [std::string::String; 0]
-        );
+        assert_eq!(breakable_wide_lines(&fit(&prose)), [] as [std::string::String; 0]);
     }
 }

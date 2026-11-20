@@ -16,23 +16,11 @@ pub(crate) fn hostile_repo() -> (tempfile::TempDir, String) {
     git_at(d, T0, &["config", "user.name", "Eve <script>"]);
     git_at(d, T0, &["config", "user.email", "e@example.com"]);
     std::fs::create_dir(d.join("src")).expect("mkdir");
-    let body = (1..=500)
-        .map(|i| format!("line {i} $(touch pwned)"))
-        .collect::<Vec<_>>()
-        .join("\n")
-        + "\n";
+    let body =
+        (1..=500).map(|i| format!("line {i} $(touch pwned)")).collect::<Vec<_>>().join("\n") + "\n";
     std::fs::write(d.join("src/a.rs"), body).expect("write");
     git_at(d, T0, &["add", "-A"]);
-    git_at(
-        d,
-        T0,
-        &[
-            "commit",
-            "-q",
-            "-m",
-            "fix: $(touch pwned) `id` \"><img onerror=x>",
-        ],
-    );
+    git_at(d, T0, &["commit", "-q", "-m", "fix: $(touch pwned) `id` \"><img onerror=x>"]);
     let sha = git_at(d, T0, &["rev-parse", "HEAD"]);
     (t, sha)
 }
@@ -62,38 +50,22 @@ fn line_payload_is_read_from_git() {
     )
     .expect("build");
     assert_eq!(p.sha, sha);
-    assert_eq!(
-        p.text.as_deref(),
-        Some("line 2 $(touch pwned)\nline 3 $(touch pwned)\n")
-    );
+    assert_eq!(p.text.as_deref(), Some("line 2 $(touch pwned)\nline 3 $(touch pwned)\n"));
     assert_eq!(p.text_truncated, Some(false));
     let id = repo.id().expect("id");
     assert_eq!(
         p.permalink,
-        format!(
-            "{}/go/{id}/{sha}/src/a.rs#L2-L3",
-            gitterrace_testkit::base_url()
-        )
+        format!("{}/go/{id}/{sha}/src/a.rs#L2-L3", gitterrace_testkit::base_url())
     );
     let l = loc(Some("src/a.rs"), Some((2, 3)));
     let gt = Payload::build(&repo, "x", Kind::Line, &l, "o", LinkStyle::Gitterrace);
     let gt = gt.expect("build");
-    assert_eq!(
-        gt.permalink,
-        format!("gitterrace://{id}/{sha}/src/a.rs#L2-L3")
-    );
+    assert_eq!(gt.permalink, format!("gitterrace://{id}/{sha}/src/a.rs#L2-L3"));
+    assert!(gt.markdown.contains(&gt.permalink), "markdown carries the styled link");
+    assert_eq!(p.title, format!("a.rs:2-3 @ {}", gitterrace_git::short_id(&sha)));
     assert!(
-        gt.markdown.contains(&gt.permalink),
-        "markdown carries the styled link"
+        p.markdown.starts_with(&format!("**a.rs:2-3** @ {}\n", gitterrace_git::short_id(&sha)))
     );
-    assert_eq!(
-        p.title,
-        format!("a.rs:2-3 @ {}", gitterrace_git::short_id(&sha))
-    );
-    assert!(p.markdown.starts_with(&format!(
-        "**a.rs:2-3** @ {}\n",
-        gitterrace_git::short_id(&sha)
-    )));
     assert!(p.markdown.contains("```rs\nline 2"));
     // The last line is the machine line, and it reads back to this selection.
     let last = p.markdown.lines().last().expect("a line");
@@ -101,10 +73,7 @@ fn line_payload_is_read_from_git() {
     assert_eq!(src.sha, sha);
     assert_eq!(src.path.as_deref(), Some("src/a.rs"));
     assert_eq!(src.lines, Some(Lines { start: 2, end: 3 }));
-    assert_eq!(
-        p.commit.as_ref().expect("commit").date,
-        "2026-10-30T12:00:00Z"
-    );
+    assert_eq!(p.commit.as_ref().expect("commit").date, "2026-10-30T12:00:00Z");
 
     let json = serde_json::to_value(&p).expect("json");
     assert_eq!(json["v"], 1);
@@ -131,23 +100,13 @@ fn caps_and_commit_kind() {
     assert_eq!(p.text.as_deref().expect("text").lines().count(), 400);
     assert_eq!(p.text_truncated, Some(true));
 
-    let c = Payload::build(
-        &repo,
-        "x",
-        Kind::Commit,
-        &loc(None, None),
-        "o",
-        LinkStyle::Go,
-    );
+    let c = Payload::build(&repo, "x", Kind::Commit, &loc(None, None), "o", LinkStyle::Go);
     let c = c.expect("build");
     let json = serde_json::to_value(&c).expect("json");
     for absent in ["path", "lines", "text", "text_truncated"] {
         assert!(json.get(absent).is_none(), "{absent}");
     }
-    assert!(
-        c.title.contains("$(touch pwned)"),
-        "title is data, kept verbatim"
-    );
+    assert!(c.title.contains("$(touch pwned)"), "title is data, kept verbatim");
     assert!(!c.env()["GITTERRACE_TITLE"].contains('\n'));
 }
 

@@ -2,10 +2,7 @@
 //!
 //! Both surfaces call the same [`ApiState`] methods, so they return the same data.
 
-#![expect(
-    clippy::unused_async_trait_impl,
-    reason = "the trait fixes the async signature"
-)]
+#![expect(clippy::unused_async_trait_impl, reason = "the trait fixes the async signature")]
 
 mod bounds;
 mod core;

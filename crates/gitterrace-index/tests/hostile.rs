@@ -42,9 +42,7 @@ fn read_all(dir: &Path) -> Result<(), SegError> {
 }
 
 fn must_not_lie(dir: &Path, case: &str) {
-    ALLOC
-        .set_limit(ALLOC.allocated() + 2 * MIB)
-        .expect("set limit");
+    ALLOC.set_limit(ALLOC.allocated() + 2 * MIB).expect("set limit");
     let got = std::panic::catch_unwind(|| read_all(dir));
     ALLOC.set_limit(usize::MAX).expect("lift limit");
     match got {
@@ -74,11 +72,7 @@ fn crc32(b: &[u8]) -> u32 {
     for &x in b {
         c ^= u32::from(x);
         for _ in 0..8 {
-            c = if c & 1 == 1 {
-                (c >> 1) ^ 0xedb8_8320
-            } else {
-                c >> 1
-            };
+            c = if c & 1 == 1 { (c >> 1) ^ 0xedb8_8320 } else { c >> 1 };
         }
     }
     !c
@@ -94,16 +88,10 @@ fn random_bytes_flips_cuts_and_extensions_never_lie() {
     let _one = ONE_AT_A_TIME.lock().expect("lock");
     let d = tempfile::tempdir().expect("tmp");
     let m = common::valid(d.path());
-    let names: Vec<String> = m
-        .live
-        .iter()
-        .map(|f| f.name.clone())
-        .chain([MANIFEST.to_owned()])
-        .collect();
-    let good: Vec<Vec<u8>> = names
-        .iter()
-        .map(|n| fs::read(d.path().join(n)).expect("read"))
-        .collect();
+    let names: Vec<String> =
+        m.live.iter().map(|f| f.name.clone()).chain([MANIFEST.to_owned()]).collect();
+    let good: Vec<Vec<u8>> =
+        names.iter().map(|n| fs::read(d.path().join(n)).expect("read")).collect();
     let mut rng = Rng::new(0x5eed);
     for round in 0..ROUNDS {
         let which = rng.below(names.len() as u64) as usize;
@@ -124,10 +112,7 @@ fn random_bytes_flips_cuts_and_extensions_never_lie() {
             _ => b.extend((0..=rng.below(256)).map(|_| rng.next() as u8)),
         }
         fs::write(d.path().join(&names[which]), &b).expect("write");
-        must_not_lie(
-            d.path(),
-            &format!("round {round} kind {what} on {}", names[which]),
-        );
+        must_not_lie(d.path(), &format!("round {round} kind {what} on {}", names[which]));
         fs::write(d.path().join(&names[which]), &good[which]).expect("restore");
     }
 }
@@ -158,10 +143,7 @@ fn max_fields_behind_a_valid_crc_never_lie() {
                     }
                 }
                 mm.commit(d.path()).expect("manifest");
-                must_not_lie(
-                    d.path(),
-                    &format!("{} footer +{} x{width}", f.name, at - foot),
-                );
+                must_not_lie(d.path(), &format!("{} footer +{} x{width}", f.name, at - foot));
             }
         }
         fs::write(&path, &good).expect("restore");
@@ -229,9 +211,7 @@ fn a_record_claiming_millions_of_files_is_unreadable_under_the_cap() {
     m.commit(d.path()).expect("manifest");
     let store = Store::open(d.path()).expect("open").expect("store");
     let disk = DiskSource::open(store, &mut |pairs| Ok(pairs.to_vec())).expect("disk source");
-    ALLOC
-        .set_limit(ALLOC.allocated() + 2 * MIB)
-        .expect("set limit");
+    ALLOC.set_limit(ALLOC.allocated() + 2 * MIB).expect("set limit");
     let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         (disk.commit(Rank(0)), disk.rows_for(vec![Rank(0)]).count())
     }));
@@ -239,10 +219,7 @@ fn a_record_claiming_millions_of_files_is_unreadable_under_the_cap() {
     let (commit, rows) = got.expect("the disk source panicked");
     assert!(commit.is_none(), "a hostile record was served");
     assert_eq!(rows, 0);
-    assert!(
-        disk.unreadable().is_some(),
-        "the hostile record was not remembered"
-    );
+    assert!(disk.unreadable().is_some(), "the hostile record was not remembered");
 }
 
 /// Recomputes block `toc_index`'s crc in the toc, then the toc crc and the footer crc.
@@ -264,9 +241,7 @@ fn reseal_block(b: &mut [u8], toc_index: usize, at: usize, len: usize) {
 #[test]
 fn the_allocation_cap_is_enforced() {
     let _one = ONE_AT_A_TIME.lock().expect("lock");
-    ALLOC
-        .set_limit(ALLOC.allocated() + 2 * MIB)
-        .expect("set limit");
+    ALLOC.set_limit(ALLOC.allocated() + 2 * MIB).expect("set limit");
     let mut v: Vec<u8> = Vec::new();
     let refused = v.try_reserve_exact(3 * MIB).is_err();
     ALLOC.set_limit(usize::MAX).expect("lift limit");

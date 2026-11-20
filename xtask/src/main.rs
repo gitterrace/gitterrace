@@ -111,10 +111,7 @@ fn main() -> Result<()> {
             let outs = generators(&root, false)?;
             let unmarked = marks::check(&root, &outs)?;
             if !unmarked.is_empty() {
-                println!(
-                    "generated files are not marked:\n  {}",
-                    unmarked.join("\n  ")
-                );
+                println!("generated files are not marked:\n  {}", unmarked.join("\n  "));
                 std::process::exit(1);
             }
             let orphans = unowned_blocks(&root, &outs)?;
@@ -123,18 +120,11 @@ fn main() -> Result<()> {
                 std::process::exit(1);
             }
             let ws = facts::load(&root)?;
-            let repo = &ws
-                .packages
-                .get("gitterrace")
-                .context("package gitterrace")?
-                .repository;
+            let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
             let (site_outs, outs): (Vec<Out>, Vec<Out>) = outs.into_iter().partition(site::is_site);
             let stale = apply(&root, outs, Mode::Check)?;
             if !stale.is_empty() {
-                println!(
-                    "generated output is stale, run `make docs-gen`: {}",
-                    stale.join(", ")
-                );
+                println!("generated output is stale, run `make docs-gen`: {}", stale.join(", "));
                 std::process::exit(1);
             }
             println!("generated output: up to date");
@@ -154,10 +144,7 @@ fn main() -> Result<()> {
             );
             let bad = docs_index::check(&root)?;
             if !bad.is_empty() {
-                println!(
-                    "documents out of step with the code:\n  {}",
-                    bad.join("\n  ")
-                );
+                println!("documents out of step with the code:\n  {}", bad.join("\n  "));
                 std::process::exit(1);
             }
             println!("documents: links, anchors, keys, flags and the index check out");
@@ -196,10 +183,7 @@ fn theme_check(root: &Path) -> Result<()> {
     outs.extend(logo::outs(root)?);
     let stale = apply(root, outs, Mode::Check)?;
     if !stale.is_empty() {
-        println!(
-            "theme files are stale, run `make docs-gen`: {}",
-            stale.join(", ")
-        );
+        println!("theme files are stale, run `make docs-gen`: {}", stale.join(", "));
         std::process::exit(1);
     }
     println!("theme: tokens.css, the README headers and the logos match the snapshot");
@@ -213,7 +197,5 @@ fn tracked(outs: Vec<Out>) -> Vec<Out> {
 
 fn repo_root() -> PathBuf {
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".into());
-    PathBuf::from(manifest_dir)
-        .parent()
-        .map_or_else(|| PathBuf::from("."), Path::to_path_buf)
+    PathBuf::from(manifest_dir).parent().map_or_else(|| PathBuf::from("."), Path::to_path_buf)
 }

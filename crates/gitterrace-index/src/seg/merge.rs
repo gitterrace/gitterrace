@@ -36,12 +36,7 @@ impl Renumber {
             strings: Strings::default(),
         };
         for (who, paths) in uses {
-            give(
-                &mut n.identities,
-                &mut n.strings.identities,
-                &old.identities,
-                who,
-            );
+            give(&mut n.identities, &mut n.strings.identities, &old.identities, who);
             for &p in paths {
                 give(&mut n.paths, &mut n.strings.paths, &old.paths, p);
             }
@@ -109,10 +104,7 @@ pub(crate) fn postings(parts: &[Part<'_>], n: &Renumber) -> Postings {
         for (p, hits) in part.postings.by_path.iter().enumerate() {
             let p = n.path(u32::try_from(p).unwrap_or(u32::MAX));
             let v = by_path.entry(p).or_default();
-            v.extend(hits.iter().map(|h| Hit {
-                ordinal: rank(part.rank, h.ordinal),
-                row: h.row,
-            }));
+            v.extend(hits.iter().map(|h| Hit { ordinal: rank(part.rank, h.ordinal), row: h.row }));
         }
         for (w, ords) in part.postings.by_author.iter().enumerate() {
             let w = n.who(u32::try_from(w).unwrap_or(u32::MAX));
@@ -196,23 +188,12 @@ mod tests {
         let mut s = Strings::default();
         let (a0, p0, u0) = segment(&mut s, &s0);
         let (a1, p1, u1) = segment(&mut s, &s1);
-        assert_ne!(
-            s.paths.list, one_s.paths.list,
-            "the fixture must reorder ids"
-        );
+        assert_ne!(s.paths.list, one_s.paths.list, "the fixture must reorder ids");
         let ordered = [&u0[0], &u0[1], &u1[0], &u0[2], &u1[1]];
         let n = Renumber::new(&s, ordered.iter().map(|u| (u[0], &u[1..])));
         let parts = [
-            Part {
-                agg: &a0,
-                postings: &p0,
-                rank: &[0, 1, 3],
-            },
-            Part {
-                agg: &a1,
-                postings: &p1,
-                rank: &[2, 4],
-            },
+            Part { agg: &a0, postings: &p0, rank: &[0, 1, 3] },
+            Part { agg: &a1, postings: &p1, rank: &[2, 4] },
         ];
         let a = aggregates(&parts, &n).expect("aggregates");
         let p = postings(&parts, &n);

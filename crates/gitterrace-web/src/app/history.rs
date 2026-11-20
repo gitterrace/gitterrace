@@ -13,10 +13,8 @@ impl App {
         {
             return Ok(v);
         }
-        let mut list: Vec<String> = gitterrace_git::files(&self.repo, commit)?
-            .into_iter()
-            .map(|f| f.path)
-            .collect();
+        let mut list: Vec<String> =
+            gitterrace_git::files(&self.repo, commit)?.into_iter().map(|f| f.path).collect();
         // Without a ready index the list stays alphabetical and is not kept, so the next call
         // looks again once the records exist.
         let ranked = self.accelerate(commit, |s| last_touched(&**s))?;
@@ -47,10 +45,8 @@ impl App {
         let Some(owned) = self.accelerate(commit, |s| touching_history(&**s, path))? else {
             return Ok(None);
         };
-        let history: Vec<(&str, &[String], bool)> = owned
-            .iter()
-            .map(|(id, parents, t)| (id.as_str(), parents.as_slice(), *t))
-            .collect();
+        let history: Vec<(&str, &[String], bool)> =
+            owned.iter().map(|(id, parents, t)| (id.as_str(), parents.as_slice(), *t)).collect();
         let (ids, complete) = self.repo.touching(path, &history);
         let ids = Arc::new(PathLog { ids, complete });
         if let Ok(mut g) = self.caches.path_logs.lock() {
@@ -73,8 +69,7 @@ impl App {
         {
             return Arc::clone(s);
         }
-        self.chain_walks
-            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        self.chain_walks.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let s = Arc::new(self.build_chain(head, src, filter));
         // Built over a read that failed: the caller refuses it, and a rebuild keeps the
         // generation, so a kept copy would be served over the clean cache.
@@ -102,10 +97,7 @@ impl App {
             &format!("{:?}", gitterrace_index::Options::default()),
             &self.ignore_files(head).unwrap_or_default(),
         );
-        let prev = self
-            .index
-            .load_state(file, key)
-            .and_then(|b| State::decode(&b));
+        let prev = self.index.load_state(file, key).and_then(|b| State::decode(&b));
         let (sk, state) = prev
             .as_ref()
             .and_then(|p| Skeleton::extend(src, filter, p))
@@ -200,10 +192,8 @@ fn last_touched(
     src: &dyn gitterrace_index::feed::InsightsSource,
 ) -> std::collections::HashMap<String, i64> {
     use gitterrace_index::feed::CommitRange;
-    let times: std::collections::HashMap<_, _> = src
-        .commits_in(CommitRange::All)
-        .map(|c| (c.rank, c.time))
-        .collect();
+    let times: std::collections::HashMap<_, _> =
+        src.commits_in(CommitRange::All).map(|c| (c.rank, c.time)).collect();
     let ranks: Vec<_> = times.keys().copied().collect();
     let mut ranks = ranks;
     ranks.sort_unstable();
@@ -247,22 +237,13 @@ fn touching_history(
         .map(|(rank, rows)| {
             let touched = path.is_empty()
                 || rows.iter().any(|f| {
-                    src.path(f.path)
-                        .is_some_and(|p| crate::filter::under(&p, path))
+                    src.path(f.path).is_some_and(|p| crate::filter::under(&p, path))
                         || f.old
                             .and_then(|o| src.path(o))
                             .is_some_and(|o| crate::filter::under(&o, path))
                 });
-            let id = src
-                .commit_id(rank)
-                .as_deref()
-                .unwrap_or_default()
-                .to_owned();
-            let parents = src
-                .parent_ids(rank)
-                .iter()
-                .map(ToString::to_string)
-                .collect();
+            let id = src.commit_id(rank).as_deref().unwrap_or_default().to_owned();
+            let parents = src.parent_ids(rank).iter().map(ToString::to_string).collect();
             (id, parents, touched)
         })
         .collect();
@@ -300,9 +281,7 @@ mod tests {
         let head = app.repo.resolve("HEAD").expect("head");
         let before = app.file_paths(&head).expect("files");
         assert_eq!(*before, ["a.txt", "b.txt", "c.txt"], "no index yet");
-        app.index
-            .update(&app.repo, "HEAD", &|_| {})
-            .expect("update");
+        app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         app.mark_ready();
         let after = app.file_paths(&head).expect("files");
         assert_eq!(*after, ["c.txt", "b.txt", "a.txt"]);
@@ -323,16 +302,10 @@ mod tests {
         let repo = gitterrace_git::Repo::discover(p).expect("repo");
         let index = gitterrace_index::Index::open(&repo).expect("index");
         let app = Arc::new(App::new(repo, index));
-        app.index
-            .update(&app.repo, "HEAD", &|_| {})
-            .expect("update");
+        app.index.update(&app.repo, "HEAD", &|_| {}).expect("update");
         app.mark_ready();
         let head = app.repo.resolve("HEAD").expect("head");
-        let src = app
-            .source(&head)
-            .expect("source")
-            .expect("ready")
-            .unchecked();
+        let src = app.source(&head).expect("source").expect("ready").unchecked();
         zero_blocks(app.index.dir());
         let filter = crate::languages::path_filter(&app, &head);
         app.chain(&head, &*src, &filter);

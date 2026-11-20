@@ -11,10 +11,7 @@ use crate::charts::view::{Fig, Row, Table};
 /// The id stem shared by a chart's svg, summary and table, from its name.
 pub(crate) fn chart_id(name: &str) -> String {
     let mut id = String::from("chart");
-    for w in name
-        .split(|c: char| !c.is_ascii_alphanumeric())
-        .filter(|w| !w.is_empty())
-    {
+    for w in name.split(|c: char| !c.is_ascii_alphanumeric()).filter(|w| !w.is_empty()) {
         id.push('-');
         id.push_str(&w.to_ascii_lowercase());
     }
@@ -22,29 +19,18 @@ pub(crate) fn chart_id(name: &str) -> String {
 }
 
 pub(crate) fn fig(name: &str, summary: String, table: Table) -> Fig {
-    Fig {
-        id: chart_id(name),
-        name: name.to_owned(),
-        summary,
-        table,
-    }
+    Fig { id: chart_id(name), name: name.to_owned(), summary, table }
 }
 
 /// "from Mon to Sun", or "for Mon" for a single column.
 fn span(first: &str, last: &str) -> String {
-    if first == last {
-        format!("for {first}")
-    } else {
-        format!("from {first} to {last}")
-    }
+    if first == last { format!("for {first}") } else { format!("from {first} to {last}") }
 }
 
 /// `word` with its first letter in upper case, for a column head.
 fn cap(word: &str) -> String {
     let mut c = word.chars();
-    c.next().map_or_else(String::new, |f| {
-        f.to_uppercase().chain(c).collect::<String>()
-    })
+    c.next().map_or_else(String::new, |f| f.to_uppercase().chain(c).collect::<String>())
 }
 
 fn heads(cols: &[&str]) -> Vec<String> {
@@ -55,10 +41,7 @@ fn heads(cols: &[&str]) -> Vec<String> {
 fn sum_row(label: &str, vals: &[u64]) -> Row {
     let mut cells: Vec<String> = vals.iter().map(|v| fmt::thousands(*v)).collect();
     cells.push(fmt::thousands(vals.iter().sum::<u64>()));
-    Row {
-        label: label.to_owned(),
-        cells,
-    }
+    Row { label: label.to_owned(), cells }
 }
 
 /// A single-series chart: its span, its total and its highest column, and one row per column
@@ -70,9 +53,7 @@ pub(crate) fn bars(name: &str, points: &[(String, u64)], unit: Unit) -> Fig {
             let total = fmt::count(all, unit.0, unit.1);
             let span = span(&first.0, &last.0);
             // The first of equal maxima, as a reader scanning left to right finds it.
-            let top = points
-                .iter()
-                .fold(first, |best, p| if p.1 > best.1 { p } else { best });
+            let top = points.iter().fold(first, |best, p| if p.1 > best.1 { p } else { best });
             if all == 0 {
                 format!("{total} {span}.")
             } else {
@@ -104,20 +85,14 @@ pub(crate) fn bars(name: &str, points: &[(String, u64)], unit: Unit) -> Fig {
 
 /// Stacked columns: `series` names the parts, `cols` holds each column's part values.
 pub(crate) fn stacked(name: &str, labels: &[&str], series: &[&str], cols: &[Vec<u64>]) -> Fig {
-    let sums: Vec<u64> = (0..series.len())
-        .map(|k| cols.iter().map(|c| c[k]).sum())
-        .collect();
+    let sums: Vec<u64> = (0..series.len()).map(|k| cols.iter().map(|c| c[k]).sum()).collect();
     let all: u64 = sums.iter().sum();
     let mut head = vec!["Column".to_owned()];
     head.extend(series.iter().map(|s| (*s).to_owned()));
     head.push("Commits".to_owned());
     let table = Table {
         head,
-        rows: labels
-            .iter()
-            .zip(cols)
-            .map(|(l, c)| sum_row(l, &c[..series.len()]))
-            .collect(),
+        rows: labels.iter().zip(cols).map(|(l, c)| sum_row(l, &c[..series.len()])).collect(),
         total: Some(sum_row("Total", &sums)),
     };
     let summary = match (labels.first(), labels.last(), series.first()) {
@@ -159,15 +134,11 @@ pub(crate) fn diverging(name: &str, points: &[(String, u64, u64)]) -> Fig {
 
 /// The share line: where it started, ended and peaked.
 pub(crate) fn percent_line(name: &str, points: &[(String, Option<f64>)]) -> Fig {
-    let read: Vec<(&str, f64)> = points
-        .iter()
-        .filter_map(|(l, v)| v.map(|v| (l.as_str(), v)))
-        .collect();
+    let read: Vec<(&str, f64)> =
+        points.iter().filter_map(|(l, v)| v.map(|v| (l.as_str(), v))).collect();
     let summary = match (read.first(), read.last()) {
         (Some(a), Some(b)) => {
-            let hi = read
-                .iter()
-                .fold(a, |best, p| if p.1 > best.1 { p } else { best });
+            let hi = read.iter().fold(a, |best, p| if p.1 > best.1 { p } else { best });
             format!(
                 "Rework went from {} in {} to {} in {}, highest at {} in {}.",
                 charttip::percent(a.1),
@@ -214,11 +185,7 @@ pub(crate) fn scatter(name: &str, x_title: &str, dots: &[(&str, u64, u64, u64)])
             .iter()
             .map(|d| Row {
                 label: d.0.to_owned(),
-                cells: vec![
-                    fmt::thousands(d.1),
-                    fmt::thousands(d.2),
-                    fmt::thousands(d.3),
-                ],
+                cells: vec![fmt::thousands(d.1), fmt::thousands(d.2), fmt::thousands(d.3)],
             })
             .collect(),
         total: None,
@@ -251,16 +218,10 @@ pub(crate) fn heatmap(name: &str, cells: &[[u32; 24]; 7]) -> Fig {
     let mut head = vec!["Day".to_owned()];
     head.extend((0..24).map(|h| format!("{h:02}")));
     head.push("Commits".to_owned());
-    let by_hour: Vec<u64> = (0..24)
-        .map(|h| cells.iter().map(|r| u64::from(r[h])).sum())
-        .collect();
+    let by_hour: Vec<u64> = (0..24).map(|h| cells.iter().map(|r| u64::from(r[h])).sum()).collect();
     let table = Table {
         head,
-        rows: cells
-            .iter()
-            .zip(DAYS)
-            .map(|(r, d)| sum_row(d, &r.map(u64::from)))
-            .collect(),
+        rows: cells.iter().zip(DAYS).map(|(r, d)| sum_row(d, &r.map(u64::from))).collect(),
         total: Some(sum_row("Total", &by_hour)),
     };
     fig(name, summary, table)

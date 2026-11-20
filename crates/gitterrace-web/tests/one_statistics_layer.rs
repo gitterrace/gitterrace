@@ -80,10 +80,8 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
         let (s, page) = get(&router, &format!("/stats?{q}")).await;
         assert_eq!(s, 200, "/stats?{q}");
         let sum = api(&router, "summary", q).await;
-        let now: Vec<String> = rows(&page, "class=\"r\"><b>")
-            .into_iter()
-            .map(|r| r[1].clone())
-            .collect();
+        let now: Vec<String> =
+            rows(&page, "class=\"r\"><b>").into_iter().map(|r| r[1].clone()).collect();
         let c = &sum["current"];
         let want = [
             num(&c["commits"]),
@@ -107,21 +105,14 @@ async fn api_and_pages_give_the_same_numbers_for_the_same_filter() {
             .as_array()
             .expect("files")
             .iter()
-            .map(|h| {
-                (
-                    h["path"].as_str().expect("path").to_owned(),
-                    num(&h["changes"]),
-                )
-            })
+            .map(|h| (h["path"].as_str().expect("path").to_owned(), num(&h["changes"])))
             .collect();
         assert_eq!(web, api_rows, "Hotspots page against API for {q:?}");
 
         let (_, page) = get(&router, &format!("/stats/contributors?{q}")).await;
         let people = api(&router, "contributors", q).await;
-        let web: Vec<String> = rows(&page, "class=\"av ")
-            .into_iter()
-            .map(|r| r[2].clone())
-            .collect();
+        let web: Vec<String> =
+            rows(&page, "class=\"av ").into_iter().map(|r| r[2].clone()).collect();
         let api_rows: Vec<String> = people["contributors"]
             .as_array()
             .expect("contributors")

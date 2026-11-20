@@ -31,10 +31,7 @@ fn zip_of(parts: &[(&str, String)]) -> Vec<u8> {
 fn repeated_ods() -> Vec<u8> {
     let office = "urn:oasis:names:tc:opendocument:xmlns";
     zip_of(&[
-        (
-            "mimetype",
-            "application/vnd.oasis.opendocument.spreadsheet".into(),
-        ),
+        ("mimetype", "application/vnd.oasis.opendocument.spreadsheet".into()),
         (
             "META-INF/manifest.xml",
             format!("<manifest:manifest xmlns:manifest='{office}:manifest:1.0'/>"),
@@ -118,10 +115,7 @@ async fn a_workbook_declaring_a_huge_grid_renders_without_building_it() {
         let (status, body) = page(&router, &format!("/blob/HEAD/{name}")).await;
         let peak = ALLOC.max_allocated().saturating_sub(before) >> 20;
         assert_eq!(status, 200, "{name}");
-        assert!(
-            !body.contains("class=\"data-table\""),
-            "{name}: rendered a table"
-        );
+        assert!(!body.contains("class=\"data-table\""), "{name}: rendered a table");
         assert!(peak < PEAK_MB, "{name}: peak heap grew {peak} MB");
     }
 }

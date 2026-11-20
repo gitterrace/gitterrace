@@ -170,13 +170,7 @@ impl DiskSource {
     }
 
     pub fn open(store: Store, map: IdentMap<'_>) -> SegResult<Self> {
-        let Store {
-            manifest,
-            segments,
-            strings,
-            tip,
-            ..
-        } = store;
+        let Store { manifest, segments, strings, tip, .. } = store;
         let tip = match tip {
             Some(c) => crate::tip::current(&c, &manifest)?.map(|_| c),
             None => None,
@@ -200,9 +194,8 @@ impl DiskSource {
         }
         let mut strs: [StrIndex; 3] = Default::default();
         let mut counts = [0u32; 3];
-        for (k, sec) in [section::PATHS, section::IDENTITIES, section::LABELS]
-            .into_iter()
-            .enumerate()
+        for (k, sec) in
+            [section::PATHS, section::IDENTITIES, section::LABELS].into_iter().enumerate()
         {
             let mut id = 0u32;
             for (d, c) in strings.iter().enumerate() {
@@ -229,10 +222,7 @@ impl DiskSource {
             labels: Vec::new(),
             len: next,
             latest: crate::wall_clock().saturating_add(crate::insights::DAY),
-            cache: Mutex::new(Cache {
-                limit: block_cache_default(),
-                ..Cache::default()
-            }),
+            cache: Mutex::new(Cache { limit: block_cache_default(), ..Cache::default() }),
             path_hash: OnceLock::new(),
             broken: Mutex::new(None),
             over: crate::feed::SumOverflow::new(),
@@ -250,10 +240,7 @@ impl DiskSource {
                 "identity map returned the wrong number of pairs",
             )));
         }
-        src.idents = mapped
-            .into_iter()
-            .map(|(n, e)| (Arc::from(n), Arc::from(e)))
-            .collect();
+        src.idents = mapped.into_iter().map(|(n, e)| (Arc::from(n), Arc::from(e))).collect();
         for id in 0..counts[2] {
             let l = src.string(2, id)?;
             src.labels.push(l);
@@ -332,10 +319,7 @@ impl DiskSource {
             }
         }
         let b = Arc::new(Block { bytes, starts });
-        self.cache
-            .lock()
-            .map_err(|_| poisoned())?
-            .put(key, Arc::clone(&b));
+        self.cache.lock().map_err(|_| poisoned())?.put(key, Arc::clone(&b));
         Ok(b)
     }
 
@@ -358,10 +342,7 @@ impl DiskSource {
             .ok_or_else(|| SegError::unreadable(name, 0, "string id past block"))?;
         // The starts were built from this block's bytes, so the ranges are inside it.
         let start = *start as usize;
-        let len = usize::from(u16::from_le_bytes([
-            block.bytes[start],
-            block.bytes[start + 1],
-        ]));
+        let len = usize::from(u16::from_le_bytes([block.bytes[start], block.bytes[start + 1]]));
         let text = std::str::from_utf8(&block.bytes[start + 2..start + 2 + len])
             .map_err(|_| SegError::unreadable(name, 0, "string not utf-8"))?;
         Ok(Arc::from(text))
@@ -372,19 +353,12 @@ impl DiskSource {
         let mut parts = s.split('\0');
         match (parts.next(), parts.next(), parts.next()) {
             (Some(n), Some(e), None) => Ok((n.to_owned(), e.to_owned())),
-            _ => Err(SegError::unreadable(
-                "strings",
-                0,
-                "identity is not name NUL email",
-            )),
+            _ => Err(SegError::unreadable("strings", 0, "identity is not name NUL email")),
         }
     }
 
     fn seg_of(&self, rank: Rank) -> Option<(usize, u32)> {
-        let i = self
-            .segs
-            .partition_point(|s| s.first <= rank.0)
-            .checked_sub(1)?;
+        let i = self.segs.partition_point(|s| s.first <= rank.0).checked_sub(1)?;
         let s = &self.segs[i];
         (rank.0 - s.first < s.n).then_some((i, rank.0 - s.first))
     }
@@ -393,10 +367,7 @@ impl DiskSource {
     fn row_offset(&self, s: usize, o: u32) -> SegResult<u64> {
         let seg = &self.segs[s];
         let bi = seg.idx_first.partition_point(|&f| f <= o) - 1;
-        let start = seg
-            .c
-            .toc()
-            .partition_point(|e| e.section < section::ROW_INDEX);
+        let start = seg.c.toc().partition_point(|e| e.section < section::ROW_INDEX);
         let b = self.block(Key::Seg(s, start + bi))?;
         let at = (o - seg.idx_first[bi]) as usize * 8;
         let bytes = b
@@ -467,10 +438,7 @@ impl DiskSource {
             .ok_or_else(|| SegError::unreadable("columns", 0, "rank out of range"))?;
         let seg = &self.segs[s];
         let bi = seg.col_first.partition_point(|&f| f <= o) - 1;
-        let start = seg
-            .c
-            .toc()
-            .partition_point(|e| e.section < section::COMMITS);
+        let start = seg.c.toc().partition_point(|e| e.section < section::COMMITS);
         let b = self.block(Key::Seg(s, start + bi))?;
         let at = (o - seg.col_first[bi]) as usize * columns::ITEM;
         let bytes = b
@@ -482,11 +450,7 @@ impl DiskSource {
         // caught here too, not only by pages that read file rows.
         let rec = self.decode(rank, files)?;
         if !it.agrees(&rec) {
-            return Err(SegError::unreadable(
-                seg.c.name(),
-                0,
-                "commit columns differ from rows",
-            ));
+            return Err(SegError::unreadable(seg.c.name(), 0, "commit columns differ from rows"));
         }
         Ok(self.commit_row(rank, &it))
     }
@@ -511,10 +475,7 @@ impl DiskSource {
     /// boundary is then `Unreadable`, never a commit reported missing.
     fn rank_of(&self, oid: &Oid) -> SegResult<Option<Rank>> {
         for (s, seg) in self.segs.iter().enumerate() {
-            let start = seg
-                .c
-                .toc()
-                .partition_point(|e| e.section < section::OID_INDEX);
+            let start = seg.c.toc().partition_point(|e| e.section < section::OID_INDEX);
             let bi = seg.oid_first.partition_point(|f| f <= oid);
             let Some(bi) = bi.checked_sub(1) else {
                 self.oid_block(s, start, 0)?;

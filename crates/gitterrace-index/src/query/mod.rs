@@ -97,12 +97,7 @@ impl Query {
     #[must_use]
     pub fn replace(&self, drop: impl Fn(&Leaf) -> bool, add: Option<Term>) -> Self {
         let at = self.terms.iter().position(|t| drop(&t.leaf));
-        let mut terms: Vec<Term> = self
-            .terms
-            .iter()
-            .filter(|t| !drop(&t.leaf))
-            .cloned()
-            .collect();
+        let mut terms: Vec<Term> = self.terms.iter().filter(|t| !drop(&t.leaf)).cloned().collect();
         if let Some(t) = add {
             terms.insert(at.unwrap_or(terms.len()), t);
         }
@@ -118,11 +113,8 @@ impl Query {
 pub fn day_range(from: &str, to: &str) -> Option<[Term; 2]> {
     let (f, t) = (crate::parse_day(from.trim())?, crate::parse_day(to.trim())?);
     (f <= t).then(|| {
-        [
-            Leaf::After(When::Day(f)),
-            Leaf::Before(When::Day(t.saturating_add(1))),
-        ]
-        .map(|leaf| Term { neg: false, leaf })
+        [Leaf::After(When::Day(f)), Leaf::Before(When::Day(t.saturating_add(1)))]
+            .map(|leaf| Term { neg: false, leaf })
     })
 }
 

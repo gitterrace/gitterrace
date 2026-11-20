@@ -39,11 +39,7 @@ impl People {
     /// what it left apart: the same address under several names, the same name under several
     /// addresses.
     pub fn build(records: &[CommitRecord]) -> Self {
-        Self::from_counts(
-            records
-                .iter()
-                .map(|r| ((r.author.as_str(), r.email.as_str()), 1)),
-        )
+        Self::from_counts(records.iter().map(|r| ((r.author.as_str(), r.email.as_str()), 1)))
     }
 
     /// Same as [`Self::build`] from commit counts per (name, e-mail) pair, so a source that
@@ -95,16 +91,15 @@ impl People {
                 .unwrap_or_default()
         };
         ranked.sort_by(|a, b| {
-            b.1.commits
-                .cmp(&a.1.commits)
-                .then_with(|| display(&a.1).cmp(&display(&b.1)))
-                .then_with(|| {
+            b.1.commits.cmp(&a.1.commits).then_with(|| display(&a.1).cmp(&display(&b.1))).then_with(
+                || {
                     let mut x: Vec<&String> = a.1.emails.iter().collect();
                     let mut y: Vec<&String> = b.1.emails.iter().collect();
                     x.sort();
                     y.sort();
                     x.cmp(&y)
-                })
+                },
+            )
         });
         let mut list = Vec::with_capacity(ranked.len());
         let mut slot: HashMap<usize, usize> = HashMap::new();
@@ -112,30 +107,19 @@ impl People {
             slot.insert(root, list.len());
             let mut emails: Vec<String> = g.emails.iter().cloned().collect();
             emails.sort();
-            list.push(Person {
-                name: display(&g),
-                bot: g.bot,
-                commits: g.commits,
-                emails,
-            });
+            list.push(Person { name: display(&g), bot: g.bot, commits: g.commits, emails });
         }
         let mut index = HashMap::new();
         for (name, email) in seen.keys() {
             let a = dsu.node(format!("n:{}", norm_name(name)));
-            index.insert(
-                ((*name).to_owned(), (*email).to_owned()),
-                slot[&dsu.find(a)],
-            );
+            index.insert(((*name).to_owned(), (*email).to_owned()), slot[&dsu.find(a)]);
         }
         Self { list, index }
     }
 
     /// Person for an author pair; pairs never seen map to person 0.
     pub fn index_of(&self, name: &str, email: &str) -> usize {
-        self.index
-            .get(&(name.to_owned(), email.to_owned()))
-            .copied()
-            .unwrap_or(0)
+        self.index.get(&(name.to_owned(), email.to_owned())).copied().unwrap_or(0)
     }
 }
 
@@ -152,24 +136,14 @@ pub fn is_bot(name: &str, email: &str) -> bool {
 fn has_bot_prefix(s: &str) -> bool {
     BOT_PREFIXES.iter().any(|p| {
         s.strip_prefix(p).is_some_and(|rest| {
-            rest.chars()
-                .next()
-                .is_none_or(|c| !(c.is_alphanumeric() || c == '_'))
+            rest.chars().next().is_none_or(|c| !(c.is_alphanumeric() || c == '_'))
         })
     })
 }
 
 fn norm_name(name: &str) -> String {
-    let key: String = name
-        .to_lowercase()
-        .chars()
-        .filter(|c| c.is_alphanumeric())
-        .collect();
-    if key.is_empty() {
-        name.trim().to_lowercase()
-    } else {
-        key
-    }
+    let key: String = name.to_lowercase().chars().filter(|c| c.is_alphanumeric()).collect();
+    if key.is_empty() { name.trim().to_lowercase() } else { key }
 }
 
 struct Group {
@@ -216,11 +190,7 @@ mod tests {
     use crate::CommitRecord;
 
     fn r(name: &str, email: &str) -> CommitRecord {
-        CommitRecord {
-            author: name.into(),
-            email: email.into(),
-            ..CommitRecord::default()
-        }
+        CommitRecord { author: name.into(), email: email.into(), ..CommitRecord::default() }
     }
 
     #[test]
@@ -237,22 +207,13 @@ mod tests {
         assert_eq!(p.list.len(), 3);
         assert_eq!(p.list[0].name, "Ada Lovelace");
         assert_eq!(p.list[0].commits, 4);
-        assert_eq!(
-            p.index_of("ada", "ada@a.org"),
-            p.index_of("ada lovelace", "ada@home.net")
-        );
-        assert_ne!(
-            p.index_of("Bob", "noreply@x.io"),
-            p.index_of("Carol", "noreply@x.io")
-        );
+        assert_eq!(p.index_of("ada", "ada@a.org"), p.index_of("ada lovelace", "ada@home.net"));
+        assert_ne!(p.index_of("Bob", "noreply@x.io"), p.index_of("Carol", "noreply@x.io"));
     }
 
     #[test]
     fn detects_bots() {
-        assert!(is_bot(
-            "dependabot[bot]",
-            "49699333+dependabot[bot]@users.noreply.github.com"
-        ));
+        assert!(is_bot("dependabot[bot]", "49699333+dependabot[bot]@users.noreply.github.com"));
         assert!(is_bot("Renovate Bot", "bot@renovateapp.com"));
         assert!(is_bot("x", "github-actions@github.com"));
         assert!(!is_bot("Robot Ross", "ross@x.io"));

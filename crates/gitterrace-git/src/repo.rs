@@ -34,12 +34,8 @@ const INDEX_WORKER_PACK_CACHE_BYTES: usize = 24 * 1024 * 1024;
 /// of 4096 commits, samples of the linux build showed workers waiting on it for over half of
 /// their time. So the count is wide, and the held results are bounded by their estimated
 /// bytes instead, which a run of huge merges reaches long before the count.
-pub(crate) const NUMSTAT_WINDOW: crate::diff::Window<'static> = crate::diff::Window {
-    items: 1 << 16,
-    bytes: 64 * 1024 * 1024,
-    first: &[],
-    budget: None,
-};
+pub(crate) const NUMSTAT_WINDOW: crate::diff::Window<'static> =
+    crate::diff::Window { items: 1 << 16, bytes: 64 * 1024 * 1024, first: &[], budget: None };
 /// Blob pairs whose line counts one index build remembers (about 100 bytes each with the map's
 /// overhead, so 256k pairs is about 25 MB). Past that the memo starts over: slower, never
 /// different.
@@ -193,8 +189,7 @@ impl Repo {
     /// in bytes (`limits.worktree_files`, `limits.worktree_diff_kb`).
     pub fn set_worktree_limits(&self, files: usize, diff_bytes: u64) {
         self.worktree_files.store(files, Ordering::Relaxed);
-        self.worktree_diff_bytes
-            .store(diff_bytes, Ordering::Relaxed);
+        self.worktree_diff_bytes.store(diff_bytes, Ordering::Relaxed);
     }
 
     /// The thread count set by [`Repo::with_workers`], 0 for one per core.
@@ -238,10 +233,7 @@ impl Repo {
     /// The worktree folder, canonical; for a bare repository its git dir (or the folder
     /// holding a `.git` dir).
     pub fn root(&self) -> PathBuf {
-        let root = self
-            .inner
-            .work_dir()
-            .unwrap_or_else(|| self.inner.git_dir());
+        let root = self.inner.work_dir().unwrap_or_else(|| self.inner.git_dir());
         let root = root.canonicalize().unwrap_or_else(|_| root.to_path_buf());
         if root.file_name().is_some_and(|n| n == ".git") {
             root.parent().map(Path::to_path_buf).unwrap_or(root)
@@ -252,10 +244,9 @@ impl Repo {
 
     /// Display name: the worktree folder name.
     pub fn name(&self) -> String {
-        self.root().file_name().map_or_else(
-            || "repository".to_string(),
-            |n| n.to_string_lossy().into_owned(),
-        )
+        self.root()
+            .file_name()
+            .map_or_else(|| "repository".to_string(), |n| n.to_string_lossy().into_owned())
     }
 
     /// Resolves a revision (branch, tag, sha, `HEAD`) to a full commit id.
@@ -358,9 +349,7 @@ impl Repo {
         let id = if committed {
             committed_rev(repo, rev).ok_or_else(not_found)?
         } else {
-            repo.rev_parse_single(rev)
-                .map_err(|_| not_found())?
-                .detach()
+            repo.rev_parse_single(rev).map_err(|_| not_found())?.detach()
         };
         let id = repo.find_object(id).map_err(|_| not_found())?;
         let commit = id.peel_to_commit().map_err(|_| not_found())?;
@@ -387,14 +376,9 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
     } else if base.len() == 40 {
         gix::ObjectId::from_hex(base.as_bytes()).ok()?
     } else {
-        let mut reference = ["refs/heads/", "refs/tags/", "refs/remotes/"]
-            .iter()
-            .find_map(|p| {
-                let full = if base.starts_with(p) {
-                    base.to_owned()
-                } else {
-                    format!("{p}{base}")
-                };
+        let mut reference =
+            ["refs/heads/", "refs/tags/", "refs/remotes/"].iter().find_map(|p| {
+                let full = if base.starts_with(p) { base.to_owned() } else { format!("{p}{base}") };
                 repo.try_find_reference(full.as_str()).ok().flatten()
             })?;
         reference.peel_to_id().ok()?.detach()
@@ -403,11 +387,7 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
     while let Some(op) = steps.chars().next() {
         steps = &steps[1..];
         let digits = steps.bytes().take_while(u8::is_ascii_digit).count();
-        let n: usize = if digits == 0 {
-            1
-        } else {
-            steps[..digits].parse().ok()?
-        };
+        let n: usize = if digits == 0 { 1 } else { steps[..digits].parse().ok()? };
         budget = budget.checked_sub(n)?;
         steps = &steps[digits..];
         let commit = repo.find_object(id).ok()?.peel_to_commit().ok()?;

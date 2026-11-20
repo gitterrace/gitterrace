@@ -25,10 +25,7 @@ fn nav_links(body: &str) -> Vec<String> {
     }
     for open in ["<nav class=\"tabnav\">", "<nav class=\"tabs\">"] {
         for r in body.split(open).skip(1) {
-            take(&format!(
-                "x{}",
-                r.split("</nav>").next().unwrap_or_default()
-            ));
+            take(&format!("x{}", r.split("</nav>").next().unwrap_or_default()));
         }
     }
     out
@@ -43,13 +40,7 @@ async fn every_nav_link_keeps_the_selected_branch() {
     // `?rev=dev`, so the warm-up's page is in place before the branch is asked for.
     gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
         .await;
-    for url in [
-        "/?rev=dev",
-        "/tree/dev",
-        "/log/dev",
-        "/refs?rev=dev",
-        "/stats?rev=dev",
-    ] {
+    for url in ["/?rev=dev", "/tree/dev", "/log/dev", "/refs?rev=dev", "/stats?rev=dev"] {
         let (status, body) = page(&router, url).await;
         assert_eq!(status, 200, "{url}");
         let links = nav_links(&body);

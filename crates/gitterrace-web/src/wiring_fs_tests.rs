@@ -144,19 +144,13 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     // under what polling gives.
     let idle = scans(&a) - before;
     let most = window.as_secs() / RESCAN + 1 + 3;
-    assert!(
-        idle <= most,
-        "{idle} scans in {window:?} while nothing changes"
-    );
+    assert!(idle <= most, "{idle} scans in {window:?} while nothing changes");
     // The positive control: every touch shows as a worktree change within the documented bound.
     for i in 0..3 {
         wait::pause(Duration::from_millis(500)).await;
         while rx.try_recv().is_ok() {}
         std::fs::write(p.join("small.txt"), format!("touch {i}\n")).expect("write");
-        assert!(
-            worktree_change(&mut rx, BOUND).await,
-            "touch {i} not shown within {BOUND:?}"
-        );
+        assert!(worktree_change(&mut rx, BOUND).await, "touch {i} not shown within {BOUND:?}");
     }
 }
 
@@ -190,10 +184,7 @@ async fn a_burst_of_five_thousand_files_is_a_few_scans() {
     for i in 0..5000 {
         std::fs::write(out.join(format!("f{i}.txt")), "x").expect("write");
     }
-    assert!(
-        scanned_after(&a, before, BOUND + MARGIN).await,
-        "the burst is scanned"
-    );
+    assert!(scanned_after(&a, before, BOUND + MARGIN).await, "the burst is scanned");
     // Settled once two seconds pass without a scan; `busy` is how long scans kept coming.
     let (mut last, mut moved) = (scans(&a), Instant::now());
     while moved.elapsed() < Duration::from_secs(2) && t0.elapsed() < Duration::from_secs(120) {
@@ -208,10 +199,7 @@ async fn a_burst_of_five_thousand_files_is_a_few_scans() {
     // an overflow notice. A loaded machine that delivers events late earns a longer window,
     // but a scan per file (thousands) never fits it.
     let most = busy.as_millis() / 500 + 6;
-    assert!(
-        u128::from(got) <= most,
-        "{got} scans for 5000 files over {busy:?}, most {most}"
-    );
+    assert!(u128::from(got) <= most, "{got} scans for 5000 files over {busy:?}, most {most}");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -237,8 +225,7 @@ async fn a_removed_repository_leaves_nothing_running() {
 /// A served repository's refresher with no tab open, its first fingerprint taken.
 async fn refresher(p: &std::path::Path, rescan_secs: u64, os_events: bool) -> Arc<crate::app::App> {
     let a = app(p, with(|c| c.watch.rescan_secs = rescan_secs));
-    a.os_events
-        .store(os_events, std::sync::atomic::Ordering::Release);
+    a.os_events.store(os_events, std::sync::atomic::Ordering::Release);
     tokio::spawn(crate::app::keep_index_fresh_supervised(Arc::clone(&a)));
     wait::until("the first fingerprint", || async { a.version() != 0 }).await;
     a
@@ -276,29 +263,16 @@ async fn a_dropped_event_still_shows_within_the_rescan() {
     let a = refresher(&p, rescan, false).await;
     // Align with a rescan: the version moves only when one finds the commit.
     let start = a.version();
-    git(
-        &p,
-        &["commit", "-q", "--allow-empty", "-m", "chore: unseen"],
-    );
+    git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: unseen"]);
     let t0 = Instant::now();
     let bound = Duration::from_secs(rescan + 5);
-    wait::within(bound.saturating_sub(t0.elapsed()), || async {
-        a.version() != start
-    })
-    .await;
+    wait::within(bound.saturating_sub(t0.elapsed()), || async { a.version() != start }).await;
     assert_ne!(a.version(), start, "not shown within {bound:?}");
     // The next commit waits for the next rescan: nothing polls in between.
     let seen = a.version();
-    git(
-        &p,
-        &["commit", "-q", "--allow-empty", "-m", "chore: unseen 2"],
-    );
+    git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: unseen 2"]);
     wait::pause(Duration::from_millis(1500)).await;
-    assert_eq!(
-        a.version(),
-        seen,
-        "a change showed between rescans with events off"
-    );
+    assert_eq!(a.version(), seen, "a change showed between rescans with events off");
 }
 
 /// Guard class: a commit and a working tree edit reach an open tab's event stream within
@@ -336,15 +310,9 @@ async fn an_open_tab_hears_a_commit_and_an_edit_within_the_rescan() {
         // The edit comes first: a baseline taken from the first scan, not the render, would
         // swallow it and the tab would never hear it.
         std::fs::write(p.join("small.txt"), "edited\n").expect("write");
-        assert!(
-            hears("worktree").await,
-            "events {os}: no edit within {bound:?}"
-        );
+        assert!(hears("worktree").await, "events {os}: no edit within {bound:?}");
         git(&p, &["commit", "-q", "--allow-empty", "-m", "chore: live"]);
-        assert!(
-            hears("refs").await,
-            "events {os}: no commit within {bound:?}"
-        );
+        assert!(hears("refs").await, "events {os}: no commit within {bound:?}");
         task.abort();
     }
 }

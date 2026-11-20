@@ -54,10 +54,7 @@ pub fn index_child() {
         return;
     };
     let budget = gitterrace_git::Budget::new(
-        std::env::var(BUDGET_VAR)
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(usize::MAX),
+        std::env::var(BUDGET_VAR).ok().and_then(|v| v.parse().ok()).unwrap_or(usize::MAX),
     );
     let lines = budget.clone();
     // A server that dies leaves this child with a closed stdin: stop with it, never keep
@@ -101,12 +98,8 @@ fn run(dir: &std::path::Path, budget: gitterrace_git::Budget) -> io::Result<()> 
             hold_here(h, dir);
         }
     })?;
-    let steps: Vec<String> = index
-        .phases()
-        .0
-        .iter()
-        .map(gitterrace_index::PhaseTime::encode)
-        .collect();
+    let steps: Vec<String> =
+        index.phases().0.iter().map(gitterrace_index::PhaseTime::encode).collect();
     report(&format!("phases {}", steps.join(" ")));
     Ok(())
 }
@@ -144,11 +137,7 @@ fn follow(input: impl BufRead, budget: &gitterrace_git::Budget) {
 
 /// The worker count of a [`BUDGET_LINE`] line, `None` for any other line.
 fn parse_budget(line: &str) -> Option<usize> {
-    line.strip_prefix(BUDGET_LINE)?
-        .strip_prefix(' ')?
-        .trim()
-        .parse()
-        .ok()
+    line.strip_prefix(BUDGET_LINE)?.strip_prefix(' ')?.trim().parse().ok()
 }
 
 fn one_line(s: &str) -> String {
@@ -178,10 +167,7 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         .env(GIT_VAR, app.repo.git_dir())
         .env(THREADS_VAR, cfg.index.threads.to_string())
         .env(BUDGET_VAR, start.to_string())
-        .env(
-            MESSAGES_VAR,
-            if app.index.message_index() { "1" } else { "0" },
-        )
+        .env(MESSAGES_VAR, if app.index.message_index() { "1" } else { "0" })
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
@@ -199,10 +185,7 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         if let Some(stdin) = child.stdin.take() {
             forward(stdin, budgets);
         }
-        let out = child
-            .stdout
-            .take()
-            .ok_or_else(|| io::Error::other("no child stdout"))?;
+        let out = child.stdout.take().ok_or_else(|| io::Error::other("no child stdout"))?;
         *slot = Some(child);
         out
     };
@@ -220,13 +203,10 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
                     app.set_progress(Progress { done, total });
                 }
             }
-            "phases" => app
-                .index
-                .adopt_phases(gitterrace_index::PhaseTime::decode(body)),
+            "phases" => app.index.adopt_phases(gitterrace_index::PhaseTime::decode(body)),
             "unreadable" => {
-                failure = Some(io::Error::other(gitterrace_index::feed::SourceError(
-                    body.to_owned(),
-                )));
+                failure =
+                    Some(io::Error::other(gitterrace_index::feed::SourceError(body.to_owned())));
             }
             "failed" => failure = Some(io::Error::other(body.to_owned())),
             _ => {}
@@ -250,18 +230,13 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
 /// Sends each budget of `budgets` to the child as a [`BUDGET_LINE`] line, until the build's
 /// lease ends or the child's stdin breaks.
 fn forward(mut stdin: std::process::ChildStdin, budgets: std::sync::mpsc::Receiver<usize>) {
-    let spawned = std::thread::Builder::new()
-        .name("index-budget".into())
-        .spawn(move || {
-            for n in budgets {
-                if writeln!(stdin, "{BUDGET_LINE} {n}")
-                    .and_then(|()| stdin.flush())
-                    .is_err()
-                {
-                    return;
-                }
+    let spawned = std::thread::Builder::new().name("index-budget".into()).spawn(move || {
+        for n in budgets {
+            if writeln!(stdin, "{BUDGET_LINE} {n}").and_then(|()| stdin.flush()).is_err() {
+                return;
             }
-        });
+        }
+    });
     if let Err(e) = spawned {
         tracing::warn!("index budget thread not started: {e}");
     }

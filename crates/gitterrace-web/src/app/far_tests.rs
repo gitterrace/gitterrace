@@ -16,11 +16,7 @@ fn far_branch_app() -> (tempfile::TempDir, Arc<App>) {
     let mut s = String::new();
     let far = gitterrace_index::feed::FRESH_CAP + 5;
     for n in 0..=far {
-        let (branch, from) = if n == 0 {
-            ("main", None)
-        } else {
-            ("far", Some(n))
-        };
+        let (branch, from) = if n == 0 { ("main", None) } else { ("far", Some(n)) };
         let t = 1_700_000_000 + n * 60;
         writeln!(
             s,

@@ -53,21 +53,14 @@ fn the_built_tip_opens_without_a_history_walk() {
         git(path, &["add", "."]);
         git(path, &["commit", "-q", "-m", &format!("c{n}")]);
     }
-    let src = Counting {
-        repo: Repo::discover(path).expect("repo"),
-        walks: AtomicUsize::new(0),
-    };
+    let src = Counting { repo: Repo::discover(path).expect("repo"), walks: AtomicUsize::new(0) };
     let index = Index::open_dir(dir.path().join("cache")).expect("index");
     index.update(&src, "HEAD", &|_| {}).expect("update");
     let tip = src.resolve("HEAD").expect("tip");
     src.walks.store(0, Ordering::Relaxed);
     let set = index.disk_source(&src, &tip).expect("open");
     assert!(set.is_some(), "the built tip reads the segment set");
-    assert_eq!(
-        src.walks.load(Ordering::Relaxed),
-        0,
-        "history walks on open"
-    );
+    assert_eq!(src.walks.load(Ordering::Relaxed), 0, "history walks on open");
     // Another commit has no marker: the set is checked against its history.
     let first = git(path, &["rev-list", "--max-parents=0", "HEAD"]);
     let other = index.disk_source(&src, first.trim()).expect("open");
@@ -94,15 +87,9 @@ fn source_for_picks_the_set_then_the_reach_view() {
     assert!(none.is_none(), "no set before the first build");
     index.update(&repo, "HEAD", &|_| {}).expect("update");
     let ready = |rev: &str, tip: &str| {
-        matches!(
-            index.source_for(&repo, rev, tip).expect("select"),
-            Some(Selected::Ready(_))
-        )
+        matches!(index.source_for(&repo, rev, tip).expect("select"), Some(Selected::Ready(_)))
     };
     assert!(ready("HEAD", &tip), "the built tip");
     let first = git(path, &["rev-list", "--max-parents=0", "HEAD"]);
-    assert!(
-        ready(first.trim(), first.trim()),
-        "an older commit reads the reach view"
-    );
+    assert!(ready(first.trim(), first.trim()), "an older commit reads the reach view");
 }

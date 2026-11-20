@@ -4,22 +4,11 @@ use gitterrace_index::Period;
 
 #[test]
 fn range_is_clamped_and_ordered() {
-    let q = LocQuery {
-        from: Some(50),
-        to: Some(7),
-        ..LocQuery::default()
-    };
+    let q = LocQuery { from: Some(50), to: Some(7), ..LocQuery::default() };
     assert_eq!(View::parse(&q, None, 100, Period::All).range, Some((7, 7)));
-    let q = LocQuery {
-        from: Some(3),
-        to: Some(999),
-        ..LocQuery::default()
-    };
+    let q = LocQuery { from: Some(3), to: Some(999), ..LocQuery::default() };
     assert_eq!(View::parse(&q, None, 100, Period::All).range, Some((3, 99)));
-    assert_eq!(
-        View::parse(&LocQuery::default(), None, 100, Period::All).range,
-        None
-    );
+    assert_eq!(View::parse(&LocQuery::default(), None, 100, Period::All).range, None);
 }
 
 #[test]
@@ -45,10 +34,7 @@ fn subjects_fetched_are_bounded_by_what_the_page_shows() {
         held: Held::Commits,
     };
     assert!(shown(400_000, view).len() <= 702 + 500);
-    let ranged = View {
-        range: Some((10, 399_990)),
-        ..view
-    };
+    let ranged = View { range: Some((10, 399_990)), ..view };
     let v = shown(400_000, ranged);
     assert!(v.len() <= 704 + 500);
     assert!(v.contains(&10) && v.contains(&399_990) && v.contains(&399_500));
@@ -65,10 +51,7 @@ fn links_keep_state() {
         dflt: Period::All,
         held: Held::Commits,
     };
-    assert_eq!(
-        v.href(|v| v.share = true),
-        "/stats/languages?x=time&scale=share&from=1&to=2"
-    );
+    assert_eq!(v.href(|v| v.share = true), "/stats/languages?x=time&scale=share&from=1&to=2");
 }
 
 /// Days listed newest first: position 4 is the oldest, 0 the newest.

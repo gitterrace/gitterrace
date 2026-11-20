@@ -56,11 +56,7 @@ fn find(files: &[FileDiff], needle: &str) -> Found {
         return out;
     }
     for f in files {
-        let mut hit = Hit {
-            path: f.path.clone(),
-            count: 0,
-            lines: Vec::new(),
-        };
+        let mut hit = Hit { path: f.path.clone(), count: 0, lines: Vec::new() };
         for l in f.hunks.iter().flat_map(|h| &h.lines) {
             if !l.text.to_lowercase().contains(&needle) {
                 continue;
@@ -68,11 +64,7 @@ fn find(files: &[FileDiff], needle: &str) -> Found {
             hit.count += 1;
             if hit.lines.len() < LINES_PER_FILE {
                 hit.lines.push(Line {
-                    no: if l.kind == LineKind::Removed {
-                        l.old_no
-                    } else {
-                        l.new_no
-                    },
+                    no: if l.kind == LineKind::Removed { l.old_no } else { l.new_no },
                     text: l.text.chars().take(LINE_CHARS).collect(),
                 });
             }
@@ -122,10 +114,7 @@ pub(crate) async fn worktree(
     let n = needle(&q);
     let scope = crate::worktree_scope::named(q.scope.as_deref());
     let found = blocking(&app, move |a| {
-        Ok(find(
-            &gitterrace_git::worktree_diff_scoped(&a.repo, scope)?,
-            &n,
-        ))
+        Ok(find(&gitterrace_git::worktree_diff_scoped(&a.repo, scope)?, &n))
     })
     .await?;
     Ok(Json(found))
@@ -167,10 +156,7 @@ mod tests {
 
     #[test]
     fn a_query_matches_any_case_and_counts_every_line() {
-        let files = [
-            file("a.rs", &["Foo", "bar", "fOO again"]),
-            file("b.rs", &["x"]),
-        ];
+        let files = [file("a.rs", &["Foo", "bar", "fOO again"]), file("b.rs", &["x"])];
         let r = find(&files, "foo");
         assert_eq!((r.files.len(), r.total), (1, 2));
         assert_eq!(r.files[0].lines[1].no, Some(3));
@@ -185,9 +171,6 @@ mod tests {
     fn a_file_lists_a_few_lines_but_counts_all() {
         let t = ["hit"; 5];
         let r = find(&[file("a.rs", &t)], "hit");
-        assert_eq!(
-            (r.files[0].count, r.files[0].lines.len()),
-            (5, LINES_PER_FILE)
-        );
+        assert_eq!((r.files[0].count, r.files[0].lines.len()), (5, LINES_PER_FILE));
     }
 }

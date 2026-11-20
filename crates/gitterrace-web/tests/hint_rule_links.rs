@@ -49,14 +49,8 @@ fn surprising_counts_are_explained_in_their_hint() {
 fn no_page_links_a_counting_page() {
     for (file, code) in templates() {
         for hint in hints(&code) {
-            assert!(
-                !hint.contains("href=\"http"),
-                "{file}: a hint links off the machine: {hint}"
-            );
+            assert!(!hint.contains("href=\"http"), "{file}: a hint links off the machine: {hint}");
         }
-        assert!(
-            !code.contains("/docs/counting"),
-            "{file} links the counting page"
-        );
+        assert!(!code.contains("/docs/counting"), "{file} links the counting page");
     }
 }

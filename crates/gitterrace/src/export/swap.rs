@@ -46,10 +46,7 @@ impl Dir {
             use rustix::fs::{Mode, OFlags};
             let flags = OFlags::RDONLY | OFlags::DIRECTORY | OFlags::NOFOLLOW | OFlags::CLOEXEC;
             let fd = rustix::fs::open(path, flags, Mode::empty())?;
-            Ok(Self {
-                path: path.to_path_buf(),
-                fd,
-            })
+            Ok(Self { path: path.to_path_buf(), fd })
         }
         #[cfg(not(unix))]
         {
@@ -57,9 +54,7 @@ impl Dir {
             if !m.is_dir() {
                 return Err(io::Error::other("not a real folder"));
             }
-            Ok(Self {
-                path: path.to_path_buf(),
-            })
+            Ok(Self { path: path.to_path_buf() })
         }
     }
 
@@ -124,25 +119,14 @@ impl Dir {
     }
 }
 
-#[cfg(all(
-    unix,
-    any(target_vendor = "apple", target_os = "linux", target_os = "android")
-))]
+#[cfg(all(unix, any(target_vendor = "apple", target_os = "linux", target_os = "android")))]
 fn rename_at(from: &Dir, name: &str, to: &Dir, to_name: &str, fresh: bool) -> io::Result<()> {
-    let flags = if fresh {
-        rustix::fs::RenameFlags::NOREPLACE
-    } else {
-        rustix::fs::RenameFlags::empty()
-    };
-    Ok(rustix::fs::renameat_with(
-        &from.fd, name, &to.fd, to_name, flags,
-    )?)
+    let flags =
+        if fresh { rustix::fs::RenameFlags::NOREPLACE } else { rustix::fs::RenameFlags::empty() };
+    Ok(rustix::fs::renameat_with(&from.fd, name, &to.fd, to_name, flags)?)
 }
 
-#[cfg(all(
-    unix,
-    not(any(target_vendor = "apple", target_os = "linux", target_os = "android"))
-))]
+#[cfg(all(unix, not(any(target_vendor = "apple", target_os = "linux", target_os = "android"))))]
 fn rename_at(from: &Dir, name: &str, to: &Dir, to_name: &str, fresh: bool) -> io::Result<()> {
     if fresh && to.kind(to_name)?.is_some() {
         return Err(io::ErrorKind::AlreadyExists.into());
@@ -170,11 +154,7 @@ impl Staging {
         let path = target.parent.join(&name);
         std::fs::create_dir(&path).with_context(|| format!("creating {}", path.display()))?;
         let dir = Dir::open(&path).with_context(|| format!("opening {}", path.display()))?;
-        Ok(Self {
-            dir,
-            target: target.clone(),
-            published: false,
-        })
+        Ok(Self { dir, target: target.clone(), published: false })
     }
 
     pub(super) fn path(&self) -> &Path {
@@ -202,10 +182,7 @@ impl Staging {
         rustix::fs::sync();
         match owned {
             None | Some(Owned::All) => {
-                write_leaf(
-                    &self.dir.path.join(MARKER),
-                    marker(repos, &Owned::All).as_bytes(),
-                )?;
+                write_leaf(&self.dir.path.join(MARKER), marker(repos, &Owned::All).as_bytes())?;
                 self.replace(&parent)?;
                 self.published = true;
             }
@@ -225,16 +202,12 @@ impl Staging {
         }
         if let Err(e) = parent.rename(&staging_name(name), parent, name, true) {
             if had {
-                parent
-                    .rename(&aside, parent, name, true)
-                    .context("putting the old site back")?;
+                parent.rename(&aside, parent, name, true).context("putting the old site back")?;
             }
             return Err(e);
         }
         if had {
-            parent
-                .remove(&aside)
-                .context("removing the replaced site")?;
+            parent.remove(&aside).context("removing the replaced site")?;
         }
         Ok(())
     }
@@ -304,13 +277,10 @@ impl Staging {
         })();
         if let Err(e) = done {
             for n in placed {
-                out.rename(n, &self.dir, n, true)
-                    .context("taking back a new entry")?;
+                out.rename(n, &self.dir, n, true).context("taking back a new entry")?;
             }
             for n in moved {
-                aside
-                    .rename(n, &out, n, true)
-                    .context("putting an old entry back")?;
+                aside.rename(n, &out, n, true).context("putting an old entry back")?;
             }
             write_leaf(
                 &out.path.join(MARKER),
@@ -319,13 +289,8 @@ impl Staging {
             parent.remove(&aside_name)?;
             return Err(e);
         }
-        write_leaf(
-            &out.path.join(MARKER),
-            marker(repos, &Owned::Entries(names)).as_bytes(),
-        )?;
-        parent
-            .remove(&aside_name)
-            .context("removing the replaced entries")
+        write_leaf(&out.path.join(MARKER), marker(repos, &Owned::Entries(names)).as_bytes())?;
+        parent.remove(&aside_name).context("removing the replaced entries")
     }
 }
 
@@ -358,9 +323,7 @@ fn recover_with(target: &Target, alive: fn(u32) -> bool) -> anyhow::Result<()> {
         let Some(rest) = name.strip_prefix(&prefix) else {
             continue;
         };
-        let (pid, old) = rest
-            .strip_suffix(".old")
-            .map_or((rest, false), |p| (p, true));
+        let (pid, old) = rest.strip_suffix(".old").map_or((rest, false), |p| (p, true));
         let Ok(n) = pid.parse::<u32>() else {
             continue;
         };
@@ -428,17 +391,11 @@ fn alive(pid: u32) -> bool {
     if pid == std::process::id() {
         return true;
     }
-    let Some(p) = i32::try_from(pid)
-        .ok()
-        .and_then(rustix::process::Pid::from_raw)
-    else {
+    let Some(p) = i32::try_from(pid).ok().and_then(rustix::process::Pid::from_raw) else {
         return false;
     };
     // EPERM means it exists under another user, which is alive for our purpose.
-    !matches!(
-        rustix::process::test_kill_process(p),
-        Err(rustix::io::Errno::SRCH)
-    )
+    !matches!(rustix::process::test_kill_process(p), Err(rustix::io::Errno::SRCH))
 }
 
 /// Without a cheap check every other folder is taken as in use and left alone.

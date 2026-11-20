@@ -42,9 +42,7 @@ fn wait_for(n: &AtomicUsize, at_least: usize, within: Duration) -> bool {
 /// does. The test uses a short rescan and never times the OS events themselves.
 #[test]
 fn a_write_nudges() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _one = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
     let rescan = Duration::from_millis(300);
@@ -62,9 +60,7 @@ fn a_write_nudges() {
 /// does. The test uses a short rescan and never times the OS events themselves.
 #[test]
 fn a_file_saved_by_rename_and_a_new_directory_are_seen() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _one = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
     let rescan = Duration::from_millis(300);
@@ -90,13 +86,7 @@ fn a_skipped_tree_and_pure_reads_never_count() {
     let none: Option<&mut notify::NullWatcher> = None;
     let write = EventKind::Modify(notify::event::ModifyKind::Any);
     let read = EventKind::Access(notify::event::AccessKind::Any);
-    assert!(!relevant(
-        &c,
-        &ev(write, "target/a.o"),
-        none,
-        &mut 0,
-        &|_| {}
-    ));
+    assert!(!relevant(&c, &ev(write, "target/a.o"), none, &mut 0, &|_| {}));
     let none: Option<&mut notify::NullWatcher> = None;
     assert!(!relevant(&c, &ev(read, "src.rs"), none, &mut 0, &|_| {}));
     let none: Option<&mut notify::NullWatcher> = None;
@@ -150,20 +140,14 @@ fn a_folder_created_past_the_cap_degrades_instead_of_being_watched() {
     assert_eq!(watched, c.max_watches, "no watch was added past the cap");
     let mut room = 0;
     assert!(relevant(&c, &e, Some(&mut w), &mut room, &on));
-    assert_eq!(
-        degraded.load(Ordering::SeqCst),
-        1,
-        "under the cap it is watched quietly"
-    );
+    assert_eq!(degraded.load(Ordering::SeqCst), 1, "under the cap it is watched quietly");
     assert_eq!(room, 1);
 }
 
 #[cfg(target_os = "linux")]
 #[test]
 fn above_the_cap_the_safety_timer_still_nudges_and_degrades() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _one = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     for i in 0..4 {
         std::fs::create_dir(dir.path().join(format!("d{i}"))).expect("dir");
@@ -181,10 +165,7 @@ fn above_the_cap_the_safety_timer_still_nudges_and_degrades() {
     let mut c = cfg(dir.path(), rescan, true);
     c.max_watches = 2;
     let _w = Nudger::start(c, on).expect("starts");
-    assert!(
-        wait_for(&n, 3, rescan * 3 + Duration::from_secs(3)),
-        "timer nudges"
-    );
+    assert!(wait_for(&n, 3, rescan * 3 + Duration::from_secs(3)), "timer nudges");
     assert_eq!(degraded.load(Ordering::SeqCst), 1);
 }
 
@@ -219,10 +200,7 @@ fn a_burst_of_writes_is_one_or_a_few_nudges() {
     let most =
         usize::try_from(streamed.as_millis() / max_delay.as_millis()).unwrap_or(usize::MAX) + 2;
     assert!(got >= 1, "the burst was never answered");
-    assert!(
-        got <= most,
-        "{got} nudges for 5000 events over {streamed:?}, most {most}"
-    );
+    assert!(got <= most, "{got} nudges for 5000 events over {streamed:?}, most {most}");
 }
 
 #[test]
@@ -238,9 +216,7 @@ fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
     let stamps = Arc::new(std::sync::Mutex::new(Vec::<Instant>::new()));
     let sink = Arc::clone(&stamps);
     let on_decided = move |_, at| {
-        sink.lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .push(at);
+        sink.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(at);
     };
     let t = std::thread::spawn(move || {
         run_decided::<notify::NullWatcher>(&c, None, 0, &rx, &on_decided);
@@ -257,14 +233,8 @@ fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
     pause_blocking(max_delay * 2);
     tx.send(Msg::Stop).expect("stop");
     t.join().expect("join");
-    let at = stamps
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    assert!(
-        at.len() >= 2,
-        "the first nudge is at once and the owed one follows: {at:?}"
-    );
+    let at = stamps.lock().unwrap_or_else(std::sync::PoisonError::into_inner).clone();
+    assert!(at.len() >= 2, "the first nudge is at once and the owed one follows: {at:?}");
     assert!(at.len() < sent, "{} nudges for {sent} notices", at.len());
     let tightest = at.windows(2).map(|w| w[1] - w[0]).min().expect("a gap");
     assert!(
@@ -275,9 +245,7 @@ fn a_storm_of_drop_notices_nudges_at_most_once_per_max_delay() {
 
 #[test]
 fn without_os_events_the_safety_timer_still_nudges() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _one = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
     let _w = Nudger::start(cfg(dir.path(), Duration::from_millis(300), false), f).expect("w");
@@ -286,19 +254,13 @@ fn without_os_events_the_safety_timer_still_nudges() {
 
 #[test]
 fn dropping_the_watcher_ends_its_thread() {
-    let _one = SERIAL
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let _one = SERIAL.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let (n, f) = counting();
     let w = Nudger::start(cfg(dir.path(), Duration::from_millis(50), true), f).expect("w");
     assert_eq!(Arc::strong_count(&n), 2, "the thread holds the callback");
     drop(w);
-    assert_eq!(
-        Arc::strong_count(&n),
-        1,
-        "the callback is gone with the thread"
-    );
+    assert_eq!(Arc::strong_count(&n), 1, "the callback is gone with the thread");
 }
 
 /// Class guard: a test that starts a real OS watcher and waits for a nudge must bound the wait
@@ -327,13 +289,7 @@ fn every_real_watcher_test_waits_by_the_rescan_bound() {
             continue;
         }
         checked += 1;
-        assert_eq!(
-            waits, bounded,
-            "{name} waits on a real watcher without a rescan bound"
-        );
+        assert_eq!(waits, bounded, "{name} waits on a real watcher without a rescan bound");
     }
-    assert!(
-        checked >= 2,
-        "the guard found only {checked} real watcher tests"
-    );
+    assert!(checked >= 2, "the guard found only {checked} real watcher tests");
 }

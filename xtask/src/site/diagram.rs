@@ -69,15 +69,10 @@ fn parse(src: &str) -> Result<(Vec<Node>, Edges)> {
             };
             edges.push((a, b));
         } else if let Some((id, rest)) = line.split_once("[\"") {
-            let label = rest
-                .strip_suffix("\"]")
-                .context("mermaid node without `\"]`")?;
+            let label = rest.strip_suffix("\"]").context("mermaid node without `\"]`")?;
             let (name, role) = label.split_once(": ").unwrap_or((label, ""));
             index.insert(id.to_owned(), nodes.len());
-            nodes.push(Node {
-                name: name.to_owned(),
-                role: role.to_owned(),
-            });
+            nodes.push(Node { name: name.to_owned(), role: role.to_owned() });
         } else {
             anyhow::bail!("a mermaid line the site cannot draw: {line}");
         }
@@ -112,10 +107,7 @@ pub(super) fn svg(src: &str, id: &str, title: &str) -> Result<String> {
     let rows = layer.iter().max().map_or(0, |m| m + 1);
     let width_of = |n: &Node| {
         let chars = n.name.chars().count().max(n.role.chars().count());
-        u32::try_from(chars)
-            .unwrap_or(u32::MAX)
-            .saturating_mul(CHAR_W)
-            + MARGIN
+        u32::try_from(chars).unwrap_or(u32::MAX).saturating_mul(CHAR_W) + MARGIN
     };
     let mut row_w = vec![0; rows];
     for (i, n) in nodes.iter().enumerate() {
@@ -123,10 +115,8 @@ pub(super) fn svg(src: &str, id: &str, title: &str) -> Result<String> {
     }
     let width = row_w.iter().max().copied().unwrap_or(0) - COL_GAP + 2 * PAD;
     let mut place = vec![(0, 0, 0); nodes.len()];
-    let mut cursor: Vec<u32> = row_w
-        .iter()
-        .map(|w| PAD + (width - 2 * PAD - (w - COL_GAP)) / 2)
-        .collect();
+    let mut cursor: Vec<u32> =
+        row_w.iter().map(|w| PAD + (width - 2 * PAD - (w - COL_GAP)) / 2).collect();
     for (i, n) in nodes.iter().enumerate() {
         let r = layer[i];
         let w = width_of(n);
@@ -158,16 +148,7 @@ pub(super) fn svg(src: &str, id: &str, title: &str) -> Result<String> {
             role: &n.role,
         })
         .collect();
-    let html = Svg {
-        id,
-        title,
-        width,
-        height,
-        box_h: BOX_H,
-        edges,
-        nodes,
-    }
-    .render()?;
+    let html = Svg { id, title, width, height, box_h: BOX_H, edges, nodes }.render()?;
     Ok(format!("{html}\n"))
 }
 
@@ -183,15 +164,9 @@ mod tests {
         let s = svg(SRC, "d", "Crates").expect("svg");
         assert_eq!(s.matches("<rect").count(), 3, "{s}");
         assert_eq!(s.matches("marker-end").count(), 3, "{s}");
-        assert!(
-            s.contains("base &amp; co") || s.contains("base &#38; co"),
-            "{s}"
-        );
+        assert!(s.contains("base &amp; co") || s.contains("base &#38; co"), "{s}");
         assert!(s.lines().all(|l| l.chars().count() <= 100), "{s}");
-        assert_eq!(
-            layers(3, &[(0, 1), (1, 2), (0, 2)]).expect("layers"),
-            [0, 1, 2]
-        );
+        assert_eq!(layers(3, &[(0, 1), (1, 2), (0, 2)]).expect("layers"), [0, 1, 2]);
     }
 
     #[test]

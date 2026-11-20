@@ -62,10 +62,8 @@ fn fragments(out: &Path) -> BTreeSet<(String, usize)> {
     tree(out)
         .into_keys()
         .filter_map(|p| {
-            let parts: Vec<String> = p
-                .components()
-                .map(|c| c.as_os_str().to_string_lossy().into_owned())
-                .collect();
+            let parts: Vec<String> =
+                p.components().map(|c| c.as_os_str().to_string_lossy().into_owned()).collect();
             let at = parts.iter().position(|s| s == "diff")?;
             Some((parts.get(at + 1)?.clone(), parts.get(at + 2)?.parse().ok()?))
         })
@@ -104,23 +102,15 @@ async fn a_wide_export_writes_the_expected_pages_within_one_budget() {
         }
     }
     let out = dir.path().join("out");
-    let n = export(&repos, &out, &scope(in_scope), None)
-        .await
-        .expect("export");
+    let n = export(&repos, &out, &scope(in_scope), None).await.expect("export");
     assert_eq!(fragments(&out), want, "fragment pages");
     // Every file but the forward page, the marker and the three fixed files took a page.
     let pages = tree(&out).len() - 5;
     assert_eq!(n, pages + 3, "files reported");
-    assert!(
-        pages > want.len(),
-        "{pages} pages, {} fragments",
-        want.len()
-    );
+    assert!(pages > want.len(), "{pages} pages, {} fragments", want.len());
 
     let fits = dir.path().join("fits");
-    export(&repos, &fits, &scope(in_scope), Some(pages))
-        .await
-        .expect("the exact budget fits");
+    export(&repos, &fits, &scope(in_scope), Some(pages)).await.expect("the exact budget fits");
     assert_eq!(fragments(&fits), want);
     let over = dir.path().join("over");
     let err = export(&repos, &over, &scope(in_scope), Some(pages - 1))
@@ -142,18 +132,12 @@ async fn folded_files_cost_less_than_ten_commit_pages() {
     let width = 120;
     let mut fx = Fixture::init(&dir.path().join("r"));
     for i in 0..width {
-        fx = fx.write(
-            &format!("old/{i:03}.txt"),
-            &format!("old {i}\n{}", "a\n".repeat(i)),
-        );
+        fx = fx.write(&format!("old/{i:03}.txt"), &format!("old {i}\n{}", "a\n".repeat(i)));
     }
     fx = fx.commit("root");
     std::fs::remove_dir_all(fx.path().join("old")).expect("rm");
     for i in 0..width {
-        fx = fx.write(
-            &format!("new/{i:03}.txt"),
-            &format!("new {i}\n{}", "b\n".repeat(i)),
-        );
+        fx = fx.write(&format!("new/{i:03}.txt"), &format!("new {i}\n{}", "b\n".repeat(i)));
     }
     fx = fx.commit("replace everything");
     let repo = gitterrace_git::Repo::discover(fx.path()).expect("repo");
@@ -169,20 +153,14 @@ async fn folded_files_cost_less_than_ten_commit_pages() {
     let site = format!("/r/{}", repo.name());
 
     let t = Instant::now();
-    let (status, _, body) = fetch(&router, &format!("{site}/commit/{id}"))
-        .await
-        .expect("page");
+    let (status, _, body) = fetch(&router, &format!("{site}/commit/{id}")).await.expect("page");
     let page = t.elapsed();
     assert!(status.is_success(), "{status}");
     let links: Vec<String> = crate::export::links(&String::from_utf8_lossy(&body))
         .into_iter()
         .filter(|l| l.contains("/diff/"))
         .collect();
-    assert!(
-        links.len() >= 2 * width - SHOWN,
-        "{} folded files",
-        links.len()
-    );
+    assert!(links.len() >= 2 * width - SHOWN, "{} folded files", links.len());
     let budget = page * 10 + Duration::from_millis(50);
     let t = Instant::now();
     for (done, link) in links.iter().enumerate() {
@@ -211,9 +189,7 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
     let parent = dir.path().join("sites");
     std::fs::create_dir(&parent).expect("mkdir");
     let earlier = parent.join("earlier");
-    export(&repos, &earlier, &scope(2), None)
-        .await
-        .expect("first export");
+    export(&repos, &earlier, &scope(2), None).await.expect("first export");
     let foreign = parent.join("foreign");
     std::fs::create_dir(&foreign).expect("mkdir");
     std::fs::write(foreign.join("mine.txt"), "keep").expect("write");
@@ -222,19 +198,15 @@ async fn a_capped_export_leaves_the_existing_folder_untouched() {
     for (out, force) in [(&earlier, false), (&foreign, true)] {
         let before = tree(out);
         let capped = Scope { force, ..scope(2) };
-        let err = export(&repos, out, &capped, Some(3))
-            .await
-            .expect_err("capped");
+        let err = export(&repos, out, &capped, Some(3)).await.expect_err("capped");
         let msg = err.to_string();
         for part in ["cap of 3 pages", "--commits (now 2)", "--file-kb (now 64)"] {
             assert!(msg.contains(part), "{part:?} missing from: {msg}");
         }
         assert_eq!(tree(out), before, "{} changed", out.display());
     }
-    let left: Vec<_> = std::fs::read_dir(&parent)
-        .expect("read")
-        .map(|e| e.expect("entry").file_name())
-        .collect();
+    let left: Vec<_> =
+        std::fs::read_dir(&parent).expect("read").map(|e| e.expect("entry").file_name()).collect();
     assert_eq!(left.len(), 2, "left beside the sites: {left:?}");
 }
 
@@ -261,10 +233,7 @@ async fn the_flag_beats_the_config_and_the_cap_error_names_both() {
     .expect_err("one page cannot hold a site");
     let msg = err.to_string();
     assert!(msg.contains("cap of 1 pages"), "{msg}");
-    assert!(
-        msg.contains("--export-pages") && msg.contains("limits.export_pages"),
-        "{msg}"
-    );
+    assert!(msg.contains("--export-pages") && msg.contains("limits.export_pages"), "{msg}");
 }
 
 /// A page over the body limit fails with an error naming the settings that make pages larger,
@@ -282,15 +251,11 @@ async fn a_page_over_the_body_limit_fails_naming_the_knobs() {
     .expect("router");
     let (_, _, whole) = fetch(&router, "/refs").await.expect("page");
     assert!(whole.len() > 100);
-    let err = fetch_within(&router, "/refs", 100)
-        .await
-        .expect_err("a page over 100 bytes must fail");
+    let err =
+        fetch_within(&router, "/refs", 100).await.expect_err("a page over 100 bytes must fail");
     let msg = err.to_string();
     assert!(msg.contains("/refs is larger than"), "{msg}");
-    assert!(
-        msg.contains("limits.blob_lines") && msg.contains("limits.highlight_kb"),
-        "{msg}"
-    );
+    assert!(msg.contains("limits.blob_lines") && msg.contains("limits.highlight_kb"), "{msg}");
 }
 
 /// A page count far past any fixed default cap a config could ship.
@@ -305,8 +270,7 @@ fn the_default_budget_has_no_page_limit() {
     let config = gitterrace_config::Config::default();
     let mut caps = crate::export::Caps::new(crate::export::budget(None, &config), &scope(1));
     for i in 0..=MANY_PAGES {
-        caps.take(&format!("/blob/HEAD/{i}.txt"))
-            .unwrap_or_else(|e| panic!("page {i}: {e}"));
+        caps.take(&format!("/blob/HEAD/{i}.txt")).unwrap_or_else(|e| panic!("page {i}: {e}"));
     }
     let mut capped = crate::export::Caps::new(crate::export::budget(Some(2), &config), &scope(1));
     capped.take("/").expect("first");
@@ -324,18 +288,10 @@ async fn an_export_does_not_flush_per_page() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = wide(&dir.path().join("r"), 20, 5);
     let before = gitterrace_git::synced_files();
-    let written = export(
-        &[repo.path().to_path_buf()],
-        &dir.path().join("out"),
-        &scope(20),
-        None,
-    )
-    .await
-    .expect("export");
+    let written = export(&[repo.path().to_path_buf()], &dir.path().join("out"), &scope(20), None)
+        .await
+        .expect("export");
     let synced = gitterrace_git::synced_files() - before;
     assert!(written > 40, "{written} pages written");
-    assert!(
-        synced * 4 < written as u64,
-        "{synced} files synced for {written} pages"
-    );
+    assert!(synced * 4 < written as u64, "{synced} files synced for {written} pages");
 }

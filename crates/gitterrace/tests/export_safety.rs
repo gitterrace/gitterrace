@@ -79,18 +79,9 @@ fn an_output_holding_a_served_repository_is_refused_even_when_forced() {
     ];
     for (out, repos, extra) in cases {
         let o = export(home, out, &repos, extra);
-        assert!(
-            !o.status.success(),
-            "{} {repos:?} was accepted",
-            out.display()
-        );
+        assert!(!o.status.success(), "{} {repos:?} was accepted", out.display());
         assert!(stderr(&o).contains("holds"), "{}", stderr(&o));
-        assert_eq!(
-            tree(home),
-            before,
-            "export into {} changed files",
-            out.display()
-        );
+        assert_eq!(tree(home), before, "export into {} changed files", out.display());
     }
 }
 
@@ -108,10 +99,7 @@ fn repeated_exports_into_a_foreign_folder_keep_every_unrelated_file() {
     std::fs::write(out.join("docs/deep/plan.txt"), "plan").expect("write");
     std::fs::write(out.join("top.txt"), "top").expect("write");
     let refused = export(home, &out, &[src.path()], &[]);
-    assert!(
-        !refused.status.success(),
-        "a foreign folder was accepted without --force"
-    );
+    assert!(!refused.status.success(), "a foreign folder was accepted without --force");
     let forced = export(home, &out, &[src.path()], &["--force"]);
     assert!(forced.status.success(), "{}", stderr(&forced));
     let source = tree(src.path());
@@ -119,10 +107,7 @@ fn repeated_exports_into_a_foreign_folder_keep_every_unrelated_file() {
         let o = export(home, &out, &[src.path()], &[]);
         assert!(o.status.success(), "run {run}: {}", stderr(&o));
         assert_eq!(std::fs::read(out.join("top.txt")).expect("top"), b"top");
-        assert_eq!(
-            std::fs::read(out.join("docs/deep/plan.txt")).expect("nested"),
-            b"plan"
-        );
+        assert_eq!(std::fs::read(out.join("docs/deep/plan.txt")).expect("nested"), b"plan");
         assert!(out.join("index.html").is_file(), "run {run}: no site");
         assert_eq!(tree(src.path()), source, "run {run}: the source changed");
     }
@@ -143,11 +128,7 @@ fn a_forced_export_never_clears_a_foreign_folder_in_its_way() {
     let before = tree(home);
     let o = export(home, &out, &[a.path(), b.path()], &["--force"]);
     assert!(!o.status.success(), "a foreign folder was cleared");
-    assert!(
-        stderr(&o).contains("not made by an export"),
-        "{}",
-        stderr(&o)
-    );
+    assert!(stderr(&o).contains("not made by an export"), "{}", stderr(&o));
     assert_eq!(tree(home), before);
 }
 
@@ -168,10 +149,7 @@ fn a_managed_update_drops_stale_pages_and_nothing_else() {
     assert!(o.status.success(), "{}", stderr(&o));
     assert!(!out.join("old").exists(), "a stale page survived");
     assert!(out.join("index.html").is_file());
-    assert_eq!(
-        std::fs::read(home.join("beside.txt")).expect("beside"),
-        b"beside"
-    );
+    assert_eq!(std::fs::read(home.join("beside.txt")).expect("beside"), b"beside");
     assert_eq!(tree(src.path()), source);
 }
 
@@ -193,16 +171,10 @@ fn a_symlinked_output_or_alias_is_refused_and_never_written_through() {
     let before = tree(home);
     for extra in [&[][..], &["--force"]] {
         let o = export(home, &link, &[src.path()], extra);
-        assert!(
-            !o.status.success(),
-            "a symlinked output was written through"
-        );
+        assert!(!o.status.success(), "a symlinked output was written through");
         assert!(stderr(&o).contains("symlink"), "{}", stderr(&o));
         let o = export(home, &alias.join("site"), &[src.path()], extra);
-        assert!(
-            !o.status.success(),
-            "an aliased ancestor of the repository was accepted"
-        );
+        assert!(!o.status.success(), "an aliased ancestor of the repository was accepted");
         assert_eq!(tree(home), before, "{extra:?} changed files");
     }
     assert_eq!(std::fs::read_dir(&ext).expect("read").count(), 0);
@@ -240,10 +212,7 @@ fn a_site_left_aside_by_a_crash_is_restored_by_the_next_export() {
     let o = export(home, &out, &[src.path()], &[]);
     assert!(o.status.success(), "{}", stderr(&o));
     assert!(out.join("index.html").is_file());
-    assert!(
-        !aside.exists(),
-        "the old site stayed after a new one was in place"
-    );
+    assert!(!aside.exists(), "the old site stayed after a new one was in place");
     let left: Vec<_> = std::fs::read_dir(home)
         .expect("read")
         .map(|e| e.expect("entry").file_name())
@@ -261,16 +230,8 @@ fn names_repo(at: &Path, names: &[(&str, &str)]) -> Fixture {
         "commit refs/heads/main\ncommitter T <t@example.com> 1700000000 +0000\ndata 2\nc\n",
     );
     for (name, body) in names {
-        s += &[
-            "M 100644 inline ",
-            name,
-            "\ndata ",
-            &body.len().to_string(),
-            "\n",
-            body,
-            "\n",
-        ]
-        .concat();
+        s += &["M 100644 inline ", name, "\ndata ", &body.len().to_string(), "\n", body, "\n"]
+            .concat();
     }
     gitterrace_testkit::git_stdin(f.path(), &["fast-import", "--quiet"], s.as_bytes());
     f
@@ -306,19 +267,10 @@ fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
     // Names are reported quoted, a combining mark escaped.
     for [kept, skipped] in [["README.md", "readme.md"], [nfd, nfc]] {
         let [kept, skipped] = [format!("{kept:?}"), format!("{skipped:?}")];
-        let line = err
-            .lines()
-            .find(|l| l.contains(&skipped))
-            .unwrap_or_default();
-        assert!(
-            line.contains(&kept),
-            "no line names {skipped} and {kept}: {err}"
-        );
+        let line = err.lines().find(|l| l.contains(&skipped)).unwrap_or_default();
+        assert!(line.contains(&kept), "no line names {skipped} and {kept}: {err}");
     }
-    assert!(
-        !device || err.contains("NUL.txt"),
-        "the device name was not reported: {err}"
-    );
+    assert!(!device || err.contains("NUL.txt"), "the device name was not reported: {err}");
     let blob = out.join("r/src/blob/HEAD");
     let names: Vec<String> = std::fs::read_dir(&blob)
         .expect("read")
@@ -334,10 +286,7 @@ fn names_one_disk_stores_as_one_file_are_skipped_with_a_line() {
 
 /// Every file under `dir` read as text, lossily, with its path.
 fn texts(dir: &Path) -> Vec<(PathBuf, String)> {
-    tree(dir)
-        .into_iter()
-        .map(|(p, b)| (p, String::from_utf8_lossy(&b).into_owned()))
-        .collect()
+    tree(dir).into_iter().map(|(p, b)| (p, String::from_utf8_lossy(&b).into_owned())).collect()
 }
 
 /// Guard class: anything of this machine reaching a published export under the default
@@ -395,14 +344,7 @@ fn a_default_config_export_holds_nothing_a_public_server_refuses() {
             }
         }
         let p = path.to_string_lossy();
-        for local in [
-            "worktree",
-            "stashes",
-            "_settings",
-            "_actions",
-            "_send",
-            "events",
-        ] {
+        for local in ["worktree", "stashes", "_settings", "_actions", "_send", "events"] {
             if p.split('/').any(|seg| seg == local) {
                 found.push(format!("{p} is a local page"));
             }

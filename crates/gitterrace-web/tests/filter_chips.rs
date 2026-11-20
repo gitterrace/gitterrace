@@ -40,8 +40,5 @@ async fn chip_labels_are_escaped_exactly_once() {
         .and_then(|s| s.split("</div>").next())
         .expect("chips");
     assert!(!chips.contains("amp;"), "{chips}");
-    assert!(
-        !chips.contains("<Jerry>") && !chips.contains("<b>"),
-        "{chips}"
-    );
+    assert!(!chips.contains("<Jerry>") && !chips.contains("<b>"), "{chips}");
 }

@@ -20,29 +20,17 @@ async fn a_former_submodule_path_answers_below_5xx_and_last_commits_are_exact() 
     git_at(p, D, &["add", "a.txt"]);
     let info = format!("160000,{GONE},sub");
     git_at(p, D, &["update-index", "--add", "--cacheinfo", &info]);
-    git_at(
-        p,
-        "2024-01-01T01:00:00+00:00",
-        &["commit", "-q", "-m", "submodule"],
-    );
+    git_at(p, "2024-01-01T01:00:00+00:00", &["commit", "-q", "-m", "submodule"]);
     let with_gitlink = head_of(p, "HEAD");
     git_at(p, D, &["rm", "-q", "--cached", "sub"]);
     std::fs::create_dir_all(p.join("sub")).expect("mkdir");
     std::fs::write(p.join("sub/f"), "x\n").expect("write");
     git_at(p, D, &["add", "sub"]);
-    git_at(
-        p,
-        "2024-01-02T01:00:00+00:00",
-        &["commit", "-q", "-m", "vendored"],
-    );
+    git_at(p, "2024-01-02T01:00:00+00:00", &["commit", "-q", "-m", "vendored"]);
     let vendored = head_of(p, "HEAD");
     std::fs::write(p.join("b.txt"), "b\n").expect("write");
     git_at(p, D, &["add", "b.txt"]);
-    git_at(
-        p,
-        "2024-01-03T01:00:00+00:00",
-        &["commit", "-q", "-m", "more"],
-    );
+    git_at(p, "2024-01-03T01:00:00+00:00", &["commit", "-q", "-m", "more"]);
 
     let router = gitterrace_web::app_router(p).expect("router");
     oracle::ready(&router).await;
@@ -74,10 +62,6 @@ async fn a_former_submodule_path_answers_below_5xx_and_last_commits_are_exact() 
     };
     let first = head_of(p, &with_gitlink);
     assert_eq!(id_of("a.txt"), Some(first), "a.txt was never touched again");
-    assert_eq!(
-        id_of("sub"),
-        Some(vendored),
-        "sub changed when it was vendored"
-    );
+    assert_eq!(id_of("sub"), Some(vendored), "sub changed when it was vendored");
     assert_eq!(id_of("b.txt"), Some(head_of(p, "HEAD")));
 }

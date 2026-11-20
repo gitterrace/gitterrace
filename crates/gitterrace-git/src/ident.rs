@@ -10,8 +10,7 @@ pub(crate) fn mailmap_blob(repo: &gix::Repository, commit: gix::ObjectId) -> Opt
         .and_then(|c| c.tree().ok())
         .and_then(|t| t.find_entry(".mailmap").map(|e| e.object_id()))
         .filter(|id| {
-            repo.find_header(*id)
-                .is_ok_and(|h| h.size() <= crate::ignore::MAX_CONFIG_BYTES)
+            repo.find_header(*id).is_ok_and(|h| h.size() <= crate::ignore::MAX_CONFIG_BYTES)
         })
 }
 

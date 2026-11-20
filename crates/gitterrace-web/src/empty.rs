@@ -17,10 +17,7 @@ pub(crate) struct Empty {
 
 impl Empty {
     pub(crate) fn new(message: impl Into<String>) -> Self {
-        Self {
-            message: message.into(),
-            step: None,
-        }
+        Self { message: message.into(), step: None }
     }
 
     /// Offers `label` as a link to `href` under the message.
@@ -40,9 +37,7 @@ struct EmptyMarkup<'a> {
 
 impl fmt::Display for Empty {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        EmptyMarkup { e: self }
-            .render_into(f)
-            .map_err(|_| fmt::Error)
+        EmptyMarkup { e: self }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 
@@ -54,15 +49,10 @@ mod tests {
 
     #[test]
     fn the_next_step_is_a_link_under_the_message() {
-        let s = Empty::new("No stashes.")
-            .step("Branches & tags", "/refs")
-            .to_string();
+        let s = Empty::new("No stashes.").step("Branches & tags", "/refs").to_string();
         assert!(s.starts_with("<div class=\"empty\""), "{s}");
         assert!(s.contains("<p>No stashes.</p>"), "{s}");
-        assert!(
-            s.contains("<p class=\"next\"><a href=\"/refs\">Branches &"),
-            "{s}"
-        );
+        assert!(s.contains("<p class=\"next\"><a href=\"/refs\">Branches &"), "{s}");
     }
 
     #[test]

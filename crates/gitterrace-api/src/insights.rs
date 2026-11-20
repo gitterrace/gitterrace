@@ -60,10 +60,7 @@ pub const INSIGHTS: &[Insight] = &[
         summary: "People with commits, lines, active days and a per-bucket series, bots flagged. \
             Takes `metric` and `limit`.",
         compute: |c, q| {
-            let m = q
-                .metric
-                .as_deref()
-                .map_or_else(Default::default, Metric::parse);
+            let m = q.metric.as_deref().map_or_else(Default::default, Metric::parse);
             let mut r = c.contributors(m);
             r.contributors.truncate(q.limit.unwrap_or(usize::MAX));
             val(&r)
@@ -113,10 +110,7 @@ pub const HEAD_INSIGHTS: &[(&str, &str)] = &[
 
 /// Every insight name with its summary, in documentation order.
 pub fn list() -> impl Iterator<Item = (&'static str, &'static str)> {
-    INSIGHTS
-        .iter()
-        .map(|i| (i.name, i.summary))
-        .chain(HEAD_INSIGHTS.iter().copied())
+    INSIGHTS.iter().map(|i| (i.name, i.summary)).chain(HEAD_INSIGHTS.iter().copied())
 }
 
 /// The request's [`Scope`]: the period (default `all`), the selection and the options over
@@ -243,8 +237,6 @@ fn label(p: &Params) -> Result<Label, ApiError> {
     match p.label.as_deref().unwrap_or("kind") {
         "kind" => Ok(Label::Kind),
         "scope" => Ok(Label::Scope),
-        other => Err(ApiError::BadRequest(format!(
-            "label must be kind or scope, got {other}"
-        ))),
+        other => Err(ApiError::BadRequest(format!("label must be kind or scope, got {other}"))),
     }
 }

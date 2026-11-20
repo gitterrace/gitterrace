@@ -62,10 +62,7 @@ impl Cache {
 /// The shares as one sentence for the configuration page, in [`SHARES`] order.
 #[must_use]
 pub fn shares_doc() -> String {
-    let list: Vec<String> = SHARES
-        .iter()
-        .map(|(c, p)| format!("{} {p}", c.label()))
-        .collect();
+    let list: Vec<String> = SHARES.iter().map(|(c, p)| format!("{} {p}", c.label())).collect();
     format!("Parts of {PARTS}: {}.", list.join(", "))
 }
 
@@ -73,10 +70,7 @@ impl Config {
     /// Bytes `cache` may keep: its share of `resources.cache_mb`.
     #[must_use]
     pub fn cache_bytes(&self, cache: Cache) -> usize {
-        let parts = SHARES
-            .iter()
-            .find(|(c, _)| *c == cache)
-            .map_or(0, |(_, p)| *p);
+        let parts = SHARES.iter().find(|(c, _)| *c == cache).map_or(0, |(_, p)| *p);
         (self.resources.cache_mb << 20) / PARTS * parts
     }
 }

@@ -37,17 +37,9 @@ pub enum ApiError {
 /// `OpenAPI` schema are rendered from this list.
 pub const ERROR_CODES: &[(&str, u16, &str)] = &[
     ("bad_request", 400, "a parameter is missing or invalid"),
-    (
-        "forbidden",
-        403,
-        "the read is not served on a public server",
-    ),
+    ("forbidden", 403, "the read is not served on a public server"),
     ("rev_not_found", 404, "the revision does not exist"),
-    (
-        "path_not_found",
-        404,
-        "the path does not exist at the revision",
-    ),
+    ("path_not_found", 404, "the path does not exist at the revision"),
     (
         "needs_reindex",
         409,
@@ -127,12 +119,7 @@ impl IntoResponse for ApiError {
         } else {
             self.to_string()
         };
-        let body = ErrorBody {
-            error: ErrorDetail {
-                code: self.code(),
-                message,
-            },
-        };
+        let body = ErrorBody { error: ErrorDetail { code: self.code(), message } };
         let mut res = (status, Json(body)).into_response();
         // A 503 is a cache that cannot answer yet: a client retries instead of giving up.
         if status == StatusCode::SERVICE_UNAVAILABLE {
@@ -166,9 +153,7 @@ mod tests {
         ];
         for e in &all {
             assert!(
-                ERROR_CODES
-                    .iter()
-                    .any(|(c, s, _)| *c == e.code() && *s == e.status().as_u16()),
+                ERROR_CODES.iter().any(|(c, s, _)| *c == e.code() && *s == e.status().as_u16()),
                 "{} ({}) is not documented",
                 e.code(),
                 e.status()

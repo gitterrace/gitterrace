@@ -8,9 +8,7 @@ use gitterrace_testkit::Fixture;
 
 fn export(quiet: bool) -> (String, String) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let fx = Fixture::init(&dir.path().join("r"))
-        .write("a.txt", "a\n")
-        .commit("one");
+    let fx = Fixture::init(&dir.path().join("r")).write("a.txt", "a\n").commit("one");
     let out = dir.path().join("out");
     let mut cmd = Command::new(env!("CARGO_BIN_EXE_git-terrace"));
     cmd.arg("export")
@@ -37,10 +35,7 @@ fn export(quiet: bool) -> (String, String) {
 fn a_piped_export_prints_phases_and_the_count_as_plain_lines() {
     let (out, err) = export(false);
     assert!(out.starts_with("wrote "), "{out}");
-    assert!(
-        err.contains("note: _headers carries the CSP"),
-        "a host needs it: {err}"
-    );
+    assert!(err.contains("note: _headers carries the CSP"), "a host needs it: {err}");
     assert!(!err.contains('\x1b') && !err.contains('\r'), "{err:?}");
     assert!(err.contains("building the cache for /"), "{err}");
     assert!(err.contains("writing pages ("), "{err}");

@@ -13,8 +13,6 @@ fn last_commits_and_path_log_succeed_at_a_shallow_boundary() {
     let (found, _) =
         last_commits(&repo, "HEAD", "", Duration::from_secs(60)).expect("last commits");
     assert!(!found.is_empty());
-    let log = repo
-        .log("HEAD", Some(&found[0].name), 0, 100)
-        .expect("path log");
+    let log = repo.log("HEAD", Some(&found[0].name), 0, 100).expect("path log");
     assert!(!log.is_empty());
 }

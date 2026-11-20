@@ -10,10 +10,7 @@ impl Table {
     /// The URL name the repository at `root` is served under.
     pub(crate) fn name_of(&self, root: &Path) -> Option<String> {
         let g = self.read();
-        g.order
-            .iter()
-            .find(|s| s.root == root)
-            .map(|s| s.name.clone())
+        g.order.iter().find(|s| s.root == root).map(|s| s.name.clone())
     }
 }
 
@@ -35,10 +32,7 @@ fn names() {
 
 #[test]
 fn recent_is_memoised_by_head() {
-    let dir = tempfile::Builder::new()
-        .prefix("repo")
-        .tempdir()
-        .expect("tmp");
+    let dir = tempfile::Builder::new().prefix("repo").tempdir().expect("tmp");
     let p = dir.path();
     git(p, &["init", "-q", "-b", "main"]);
     git(p, &["commit", "-q", "--allow-empty", "-m", "one"]);
@@ -51,10 +45,7 @@ fn recent_is_memoised_by_head() {
     let s = table.snapshot()[0].clone();
     let now = crate::fmt::now() + 60;
     let first = s.recent(now);
-    assert!(
-        std::sync::Arc::ptr_eq(&first, &s.recent(now)),
-        "same HEAD reuses the read"
-    );
+    assert!(std::sync::Arc::ptr_eq(&first, &s.recent(now)), "same HEAD reuses the read");
     git(p, &["commit", "-q", "--allow-empty", "-m", "two"]);
     let after = s.recent(now);
     let total = |r: &super::Recent| r.series.counts.iter().sum::<u32>();
@@ -86,10 +77,7 @@ fn the_window_counts_every_commit_in_it() {
 /// start comes from the bounded walk meeting the root, so no bucket is time before it.
 #[test]
 fn a_young_repository_fits_its_window_to_its_age() {
-    let dir = tempfile::Builder::new()
-        .prefix("repo")
-        .tempdir()
-        .expect("tmp");
+    let dir = tempfile::Builder::new().prefix("repo").tempdir().expect("tmp");
     let f = gitterrace_testkit::Fixture::init(dir.path());
     let f = f.at("2024-03-08T00:30:00+00:00").commit("one");
     let _f = f.at("2024-03-10T00:00:00+00:00").commit("two");
@@ -109,10 +97,7 @@ fn a_young_repository_fits_its_window_to_its_age() {
 /// so the window stays capped and nothing piles into its first bucket.
 #[test]
 fn a_young_merged_root_does_not_shrink_the_window() {
-    let dir = tempfile::Builder::new()
-        .prefix("repo")
-        .tempdir()
-        .expect("tmp");
+    let dir = tempfile::Builder::new().prefix("repo").tempdir().expect("tmp");
     let f = gitterrace_testkit::Fixture::init(dir.path());
     let f = f.at("2022-01-01T00:00:00+00:00").commit("old");
     let f = f.at("2024-03-01T00:00:00+00:00").commit("recent");
@@ -120,14 +105,7 @@ fn a_young_merged_root_does_not_shrink_the_window() {
     f.git(&["checkout", "-q", "--orphan", "x"]);
     let f = f.write("b", "1").commit("orphan").checkout("main");
     let f = f.at("2024-03-09T00:00:00+00:00");
-    f.git(&[
-        "merge",
-        "-q",
-        "--allow-unrelated-histories",
-        "-m",
-        "merge x",
-        "x",
-    ]);
+    f.git(&["merge", "-q", "--allow-unrelated-histories", "-m", "merge x", "x"]);
     let table = super::Table::new(
         vec![dir.path().to_path_buf()],
         crate::app::Env::new(gitterrace_config::Config::default()),
@@ -141,9 +119,7 @@ fn a_young_merged_root_does_not_shrink_the_window() {
 
 #[tokio::test]
 async fn the_slash_redirect_keeps_the_query() {
-    let r = super::slash("/r/a?period=1y&bots=1".parse().expect("uri"))
-        .await
-        .into_response();
+    let r = super::slash("/r/a?period=1y&bots=1".parse().expect("uri")).await.into_response();
     let to = r.headers().get("location").expect("location");
     assert_eq!(to, "/r/a/?period=1y&bots=1");
 }
@@ -161,22 +137,13 @@ fn a_repository_that_will_not_open_hides_host_paths_when_public() {
         assert_eq!(r.status(), 500);
         let body = futures_body(r);
         assert!(body.contains("repo could not be opened"), "{body}");
-        assert_eq!(
-            body.contains("/srv/private"),
-            shows,
-            "public={public}: {body}"
-        );
+        assert_eq!(body.contains("/srv/private"), shows, "public={public}: {body}");
     }
 }
 
 fn futures_body(r: axum::response::Response) -> String {
-    let rt = tokio::runtime::Builder::new_current_thread()
-        .build()
-        .expect("rt");
-    let b = rt
-        .block_on(http_body_util::BodyExt::collect(r.into_body()))
-        .expect("body")
-        .to_bytes();
+    let rt = tokio::runtime::Builder::new_current_thread().build().expect("rt");
+    let b = rt.block_on(http_body_util::BodyExt::collect(r.into_body())).expect("body").to_bytes();
     String::from_utf8_lossy(&b).into_owned()
 }
 
@@ -188,9 +155,8 @@ fn futures_body(r: axum::response::Response) -> String {
 #[tokio::test(flavor = "multi_thread")]
 async fn every_start_shape_serves_and_indexes_its_repositories() {
     let dir = tempfile::tempdir().expect("tmp");
-    let work = gitterrace_testkit::Fixture::standard(&dir.path().join("all/work"))
-        .path()
-        .to_owned();
+    let work =
+        gitterrace_testkit::Fixture::standard(&dir.path().join("all/work")).path().to_owned();
     let bare = dir.path().join("all/git.git");
     let clone = |to: &Path| {
         let (from, to) = (work.to_str().expect("utf8"), to.to_str().expect("utf8"));
@@ -221,13 +187,9 @@ async fn every_start_shape_serves_and_indexes_its_repositories() {
         .header("host", gitterrace_testkit::on_port("localhost"))
         .header("content-type", "application/json")
         .header(crate::add::TOKEN_HEADER, secret)
-        .body(axum::body::Body::from(
-            serde_json::json!({ "path": root }).to_string(),
-        ))
+        .body(axum::body::Body::from(serde_json::json!({ "path": root }).to_string()))
         .expect("req");
-    let res = tower::ServiceExt::oneshot(router.clone(), req)
-        .await
-        .expect("res");
+    let res = tower::ServiceExt::oneshot(router.clone(), req).await.expect("res");
     assert_eq!(res.status(), 202, "join a bare clone");
     assert_eq!(listed(&router).await, ["work", "jq"]);
     assert_indexed(&router, "jq").await;
@@ -261,11 +223,7 @@ async fn assert_indexed(router: &Router, name: &str) {
     assert!(ready, "{name} never indexed: {last}");
     let (s, repo) = gitterrace_testkit::get(router, &format!("/r/{name}/api/v1/repo")).await;
     let v: serde_json::Value = serde_json::from_str(&repo).expect("repo json");
-    assert_eq!(
-        (s, v["totals"]["commits"].as_u64()),
-        (200, Some(2)),
-        "{name}: {repo}"
-    );
+    assert_eq!((s, v["totals"]["commits"].as_u64()), (200, Some(2)), "{name}: {repo}");
 }
 
 /// The today count is keyed on the local day too: the same HEAD read a minute after midnight
@@ -293,9 +251,7 @@ fn the_today_count_resets_at_midnight() {
 #[test]
 fn the_dirty_chip_follows_the_tree_within_the_bound() {
     let dir = tempfile::tempdir().expect("tmp");
-    let f = gitterrace_testkit::Fixture::init(dir.path())
-        .write("a", "1")
-        .commit("one");
+    let f = gitterrace_testkit::Fixture::init(dir.path()).write("a", "1").commit("one");
     let table = super::Table::new(
         vec![dir.path().to_path_buf()],
         crate::app::Env::new(gitterrace_config::Config::default()),
@@ -352,12 +308,8 @@ fn the_home_page_over_many_repositories_finds_every_dirty_tree() {
         paths.push(p);
     }
     let table = std::sync::Arc::new(
-        super::Table::new(
-            paths,
-            crate::app::Env::new(gitterrace_config::Config::default()),
-            None,
-        )
-        .expect("table"),
+        super::Table::new(paths, crate::app::Env::new(gitterrace_config::Config::default()), None)
+            .expect("table"),
     );
     let rows = table.snapshot();
     assert_eq!(rows.iter().filter(|s| s.dirty()).count(), 2);
@@ -379,11 +331,7 @@ fn the_home_page_over_many_repositories_finds_every_dirty_tree() {
 #[tokio::test(flavor = "multi_thread")]
 async fn the_log_links_served_clones_by_name_only() {
     let dir = tempfile::tempdir().expect("tmp");
-    let (a, b, c) = (
-        dir.path().join("alpha"),
-        dir.path().join("beta"),
-        dir.path().join("gamma"),
-    );
+    let (a, b, c) = (dir.path().join("alpha"), dir.path().join("beta"), dir.path().join("gamma"));
     for (d, msg) in [(&a, "root"), (&c, "other")] {
         std::fs::create_dir_all(d).expect("dir");
         git(d, &["init", "-q", "-b", "main"]);
@@ -394,11 +342,7 @@ async fn the_log_links_served_clones_by_name_only() {
     let router = crate::multi_router(vec![a.clone(), b, c]).expect("router");
     // The roots warm in the background when a repository joins: a cold page shows no line.
     let want = "<span class=\"related\">Related: <a href=\"/r/beta/log\">beta</a></span>";
-    let alpha = || async {
-        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD")
-            .await
-            .1
-    };
+    let alpha = || async { gitterrace_testkit::get(&router, "/r/alpha/log/HEAD").await.1 };
     gitterrace_testkit::wait::until("the related line on alpha's log", || async {
         alpha().await.contains(want)
     })
@@ -406,10 +350,7 @@ async fn the_log_links_served_clones_by_name_only() {
     let log = alpha().await;
     assert!(log.contains(want), "{log}");
     assert!(!log.contains("/r/gamma/log"), "a stranger is not related");
-    assert!(
-        !log.contains(&*dir.path().to_string_lossy()),
-        "no path on the page"
-    );
+    assert!(!log.contains(&*dir.path().to_string_lossy()), "no path on the page");
     let (_, other) = gitterrace_testkit::get(&router, "/r/gamma/log/HEAD").await;
     assert!(!other.contains("class=\"related\""), "{other}");
     let lone = crate::app_router(&a).expect("router");
@@ -435,10 +376,7 @@ async fn the_first_log_does_not_wait_for_a_held_root_walk() {
     }
     let router = crate::multi_router(vec![a.clone(), b.clone()]).expect("router");
     gitterrace_testkit::wait::until("alpha is ready", || async {
-        gitterrace_testkit::get(&router, "/r/alpha/api/progress")
-            .await
-            .1
-            .contains("\"ready\":true")
+        gitterrace_testkit::get(&router, "/r/alpha/api/progress").await.1.contains("\"ready\":true")
     })
     .await;
     let first = tokio::time::timeout(
@@ -453,10 +391,7 @@ async fn the_first_log_does_not_wait_for_a_held_root_walk() {
     assert_eq!(status, 200);
     assert!(!log.contains("class=\"related\""), "held: no line yet");
     gitterrace_testkit::wait::until("the Related line once the walk is freed", || async {
-        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD")
-            .await
-            .1
-            .contains("class=\"related\"")
+        gitterrace_testkit::get(&router, "/r/alpha/log/HEAD").await.1.contains("class=\"related\"")
     })
     .await;
 }
@@ -468,12 +403,9 @@ async fn the_first_log_does_not_wait_for_a_held_root_walk() {
 #[tokio::test]
 async fn a_router_built_after_the_stop_starts_no_lasting_task() {
     let dir = tempfile::tempdir().expect("tmp");
-    let table = Table::new(
-        Vec::new(),
-        crate::app::Env::new(gitterrace_config::Config::default()),
-        None,
-    )
-    .expect("table");
+    let table =
+        Table::new(Vec::new(), crate::app::Env::new(gitterrace_config::Config::default()), None)
+            .expect("table");
     let p = dir.path().to_path_buf();
     let served = table.write().insert("gone".into(), p.clone(), p, false);
     served.stop();
@@ -482,10 +414,7 @@ async fn a_router_built_after_the_stop_starts_no_lasting_task() {
     let ended = tokio::time::timeout(std::time::Duration::from_secs(10), late)
         .await
         .expect("the late task was left running");
-    assert!(
-        ended.is_err_and(|e| e.is_cancelled()),
-        "the late task is aborted"
-    );
+    assert!(ended.is_err_and(|e| e.is_cancelled()), "the late task is aborted");
 }
 
 /// Taking an entry off by a stale handle leaves a repository added under the same name since.
@@ -502,12 +431,9 @@ async fn a_stale_handle_does_not_remove_a_re_added_repository() {
             .expect("canon")
     };
     let (a, b) = (mk("a"), mk("b"));
-    let table = Table::new(
-        vec![a],
-        crate::app::Env::new(gitterrace_config::Config::default()),
-        None,
-    )
-    .expect("table");
+    let table =
+        Table::new(vec![a], crate::app::Env::new(gitterrace_config::Config::default()), None)
+            .expect("table");
     let super::Added::Fresh(first) = table.add(b.clone(), "b").expect("add") else {
         panic!("fresh");
     };
@@ -516,11 +442,7 @@ async fn a_stale_handle_does_not_remove_a_re_added_repository() {
         panic!("fresh again");
     };
     assert!(!table.remove(&first), "the stale entry was not served");
-    assert!(
-        table
-            .get("b")
-            .is_some_and(|s| std::sync::Arc::ptr_eq(&s, &second))
-    );
+    assert!(table.get("b").is_some_and(|s| std::sync::Arc::ptr_eq(&s, &second)));
     assert!(table.remove(&second));
     assert!(table.get("b").is_none());
 }

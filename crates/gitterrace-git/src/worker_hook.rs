@@ -82,11 +82,7 @@ pub(crate) struct WorkerGuard {
 impl WorkerGuard {
     pub(crate) fn start() -> Self {
         worker(true);
-        Self {
-            started: Instant::now(),
-            busy: Duration::ZERO,
-            parked: Duration::ZERO,
-        }
+        Self { started: Instant::now(), busy: Duration::ZERO, parked: Duration::ZERO }
     }
 
     /// Runs one piece of work, counted as busy.

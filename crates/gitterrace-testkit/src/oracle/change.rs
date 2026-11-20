@@ -53,10 +53,8 @@ impl Change {
         } else if canonical(&was) == canonical(&now) {
             self.ties.push(key.to_owned());
         } else {
-            let (body_was, body_now) = (
-                canonical(&without_chrome(key, &was)),
-                canonical(&without_chrome(key, &now)),
-            );
+            let (body_was, body_now) =
+                (canonical(&without_chrome(key, &was)), canonical(&without_chrome(key, &now)));
             if body_was == body_now {
                 self.chrome.push(key.to_owned());
             } else {
@@ -115,10 +113,7 @@ pub fn read_dump(dir: &Path) -> BTreeMap<String, String> {
         .expect("dump dir")
         .filter_map(Result::ok)
         .filter_map(|e| std::fs::read_to_string(e.path()).ok())
-        .filter_map(|t| {
-            t.split_once('\n')
-                .map(|(k, b)| (k.to_owned(), b.to_owned()))
-        })
+        .filter_map(|t| t.split_once('\n').map(|(k, b)| (k.to_owned(), b.to_owned())))
         .collect()
 }
 

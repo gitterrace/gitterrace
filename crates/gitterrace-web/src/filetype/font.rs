@@ -51,9 +51,7 @@ struct FontMarkup<'a> {
 /// Whether `path` names a font this module reads.
 pub(crate) fn is_font(path: &str) -> bool {
     path.rsplit_once('.').is_some_and(|(_, e)| {
-        ["ttf", "otf", "woff", "woff2"]
-            .iter()
-            .any(|f| e.eq_ignore_ascii_case(f))
+        ["ttf", "otf", "woff", "woff2"].iter().any(|f| e.eq_ignore_ascii_case(f))
     })
 }
 
@@ -80,11 +78,8 @@ fn read(bytes: &[u8]) -> Option<Info> {
     let sfnt = unpack(bytes)?;
     let font = FontRef::new(&sfnt).ok()?;
     let glyphs = u32::from(font.maxp().ok()?.num_glyphs());
-    let family = name(
-        &font,
-        &[StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME],
-    )
-    .unwrap_or_else(|| "unnamed".to_owned());
+    let family = name(&font, &[StringId::TYPOGRAPHIC_FAMILY_NAME, StringId::FAMILY_NAME])
+        .unwrap_or_else(|| "unnamed".to_owned());
     let mut styles: Vec<String> = Vec::new();
     for i in font.named_instances().iter().take(NAMES_CAP) {
         if let Some(n) = name(&font, &[i.subfamily_name_id()])
@@ -94,13 +89,7 @@ fn read(bytes: &[u8]) -> Option<Info> {
         }
     }
     if styles.is_empty() {
-        let one = name(
-            &font,
-            &[
-                StringId::TYPOGRAPHIC_SUBFAMILY_NAME,
-                StringId::SUBFAMILY_NAME,
-            ],
-        );
+        let one = name(&font, &[StringId::TYPOGRAPHIC_SUBFAMILY_NAME, StringId::SUBFAMILY_NAME]);
         styles.push(one.unwrap_or_else(|| format!("weight {}", font.attributes().weight.value())));
     }
     let axes: Vec<String> = font
@@ -109,12 +98,7 @@ fn read(bytes: &[u8]) -> Option<Info> {
         .take(NAMES_CAP)
         .map(|a| format!("{} {} to {}", a.tag(), a.min_value(), a.max_value()))
         .collect();
-    Some(Info {
-        family,
-        styles: styles.join(", "),
-        glyphs,
-        axes: axes.join(", "),
-    })
+    Some(Info { family, styles: styles.join(", "), glyphs, axes: axes.join(", ") })
 }
 
 /// The first of `ids` the font names, English or else the first language, made safe to show.
@@ -143,18 +127,14 @@ fn unpack(bytes: &[u8]) -> Option<Cow<'_, [u8]>> {
                     return Err("font unpacks past the cap".into());
                 }
                 let mut out = Vec::with_capacity(size);
-                flate2::read::ZlibDecoder::new(data)
-                    .take(size as u64 + 1)
-                    .read_to_end(&mut out)?;
+                flate2::read::ZlibDecoder::new(data).take(size as u64 + 1).read_to_end(&mut out)?;
                 Ok(out)
             };
-            wuff::decompress_woff1_with_custom_z(bytes, &mut inflate)
-                .ok()
-                .map(Cow::Owned)
+            wuff::decompress_woff1_with_custom_z(bytes, &mut inflate).ok().map(Cow::Owned)
         }
-        b"wOF2" => wuff::decompress_woff2_with_custom_brotli(bytes, &mut unbrotli)
-            .ok()
-            .map(Cow::Owned),
+        b"wOF2" => {
+            wuff::decompress_woff2_with_custom_brotli(bytes, &mut unbrotli).ok().map(Cow::Owned)
+        }
         _ => Some(Cow::Borrowed(bytes)),
     }
 }

@@ -5,9 +5,7 @@ use crate::{Key, Reload, keys, parse};
 /// Whether the doc lists choices as `a, b or c`.
 fn lists_choices(doc: &str) -> bool {
     let words: Vec<&str> = doc.split_whitespace().collect();
-    words
-        .windows(3)
-        .any(|w| w[0].ends_with(',') && (w[1] == "or" || w[2] == "or"))
+    words.windows(3).any(|w| w[0].ends_with(',') && (w[1] == "or" || w[2] == "or"))
 }
 
 /// Whether the loader takes a value that is no choice at all.
@@ -26,10 +24,7 @@ fn untyped_choices(all: &[Key], accepts: fn(&Key) -> bool) -> Vec<&'static str> 
 
 #[test]
 fn keys_that_document_choices_reject_other_text() {
-    assert_eq!(
-        untyped_choices(&keys(), accepts_anything),
-        Vec::<&str>::new()
-    );
+    assert_eq!(untyped_choices(&keys(), accepts_anything), Vec::<&str>::new());
 }
 
 #[test]

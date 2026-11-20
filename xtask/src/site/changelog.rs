@@ -12,17 +12,9 @@ pub const PATH: &str = "changelog/";
 
 /// The id of a release heading such as `[0.3.0] - 2026-01-02` or `[Unreleased]`.
 fn release_id(heading: &str) -> String {
-    let version = heading
-        .trim_start_matches('[')
-        .split(']')
-        .next()
-        .unwrap_or(heading);
+    let version = heading.trim_start_matches('[').split(']').next().unwrap_or(heading);
     let bare = version.strip_prefix('v').unwrap_or(version);
-    if bare.starts_with(|c: char| c.is_ascii_digit()) {
-        format!("v{bare}")
-    } else {
-        slug(version)
-    }
+    if bare.starts_with(|c: char| c.is_ascii_digit()) { format!("v{bare}") } else { slug(version) }
 }
 
 /// The footer's link for version `ver`: its release heading when the changelog has one, else

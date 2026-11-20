@@ -50,28 +50,17 @@ pub fn generated_paths<'p>(
 ) -> Result<HashSet<String>> {
     let r = repo.repo();
     let id = repo.resolve_id(&r, rev)?;
-    let tree = r
-        .find_commit(id)
-        .map_err(git)?
-        .tree_id()
-        .map_err(git)?
-        .detach();
+    let tree = r.find_commit(id).map_err(git)?.tree_id().map_err(git)?.detach();
     let index = r.index_from_tree(&tree).map_err(git)?;
     let mut stack = r
-        .attributes_only(
-            &index,
-            gix::worktree::stack::state::attributes::Source::IdMapping,
-        )
+        .attributes_only(&index, gix::worktree::stack::state::attributes::Source::IdMapping)
         .map_err(git)?;
     let mut out = stack.selected_attribute_matches([ATTRIBUTE]);
     let mut found = HashSet::new();
     for path in paths {
         let platform = stack.at_entry(path, None).map_err(git)?;
         platform.matching_attributes(&mut out);
-        let said = out
-            .iter_selected()
-            .next()
-            .and_then(|m| attribute(m.assignment.state));
+        let said = out.iter_selected().next().and_then(|m| attribute(m.assignment.state));
         if said.unwrap_or_else(|| is_lockfile(path)) {
             found.insert(path.to_owned());
         }
@@ -107,9 +96,7 @@ mod tests {
             .write("sub/yarn.lock", "x\n")
             .commit("one");
         let first = f.git(&["rev-parse", "HEAD"]).trim().to_owned();
-        let _f = f
-            .write(".gitattributes", "main.rs linguist-generated=true\n")
-            .commit("two");
+        let _f = f.write(".gitattributes", "main.rs linguist-generated=true\n").commit("two");
         let repo = crate::Repo::discover(dir.path())?;
         let all = ["gen.rs", "main.rs", "Cargo.lock", "sub/yarn.lock"];
         let mut at_first: Vec<String> = generated_paths(&repo, &first, all)?.into_iter().collect();

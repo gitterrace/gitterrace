@@ -27,9 +27,7 @@ impl Packed {
 
     fn unpack(&self) -> Option<String> {
         let mut out = String::new();
-        flate2::read::DeflateDecoder::new(&self.0[..])
-            .read_to_string(&mut out)
-            .ok()?;
+        flate2::read::DeflateDecoder::new(&self.0[..]).read_to_string(&mut out).ok()?;
         Some(out)
     }
 }
@@ -61,11 +59,7 @@ impl App {
             |_| Arc::new(tokio::sync::Mutex::new(())),
             |mut g| Arc::clone(g.entry(key.to_owned()).or_default()),
         );
-        RenderLock {
-            app: self,
-            key: key.to_owned(),
-            lock: Some(lock),
-        }
+        RenderLock { app: self, key: key.to_owned(), lock: Some(lock) }
     }
 
     pub(crate) fn memo_put(&self, key: String, html: &str) {
