@@ -33,6 +33,7 @@ mod one_count_scope;
 mod one_statistics_layer;
 mod outline_loaded;
 mod ownership_marks;
+mod page_weight;
 mod pages_read_well;
 mod path_cells_escape;
 mod public_error_bodies;
