@@ -50,9 +50,7 @@ const FILES: [(&str, &str); 6] = [
 
 #[test]
 fn source_pages_with_their_symbol_outline_match_the_oracle() {
-    if !oracle::frozen(
-        "symbol_outline_pages::source_pages_with_their_symbol_outline_match_the_oracle",
-    ) {
+    if !oracle::frozen("source_pages_with_their_symbol_outline_match_the_oracle") {
         return;
     }
     let rt = tokio::runtime::Runtime::new().expect("runtime");

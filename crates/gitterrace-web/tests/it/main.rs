@@ -1,6 +1,7 @@
-//! One integration binary for the page, API and cache tests, linked once. The oracle, the memory
-//! budget, the hostile workbook and the index child stay apart: each owns a global or a
-//! release-only run, or counts the workers of its own process.
+//! One integration binary for the page, API and cache tests, linked once. The golden tests, the
+//! memory budget, the hostile workbook and the index child stay apart: the golden runner runs
+//! each golden by its own test binary, and the others own a global or a release-only run, or
+//! count the workers of their own process.
 
 mod appended_pages;
 mod blob_tables_and_archives;
@@ -42,7 +43,6 @@ mod sha_links;
 mod shared_markup_pages;
 mod stats_chip_anchor;
 mod stats_drill;
-mod symbol_outline_pages;
 mod theme;
 mod top_tab_follows_section;
 mod unreadable_never_shown;
