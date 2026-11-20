@@ -28,7 +28,7 @@ docker build -q -t gitterrace-act -f "$root/deploy/test/act.Dockerfile" "$root/d
 for job in check-linux deny msrv; do
   (cd "$tmp/r" && act workflow_call -W .github/workflows/lint-and-test.yml -j "$job" \
     --container-architecture "linux/$arch" -P ubuntu-latest=gitterrace-act --pull=false \
-    --container-options "--init --user runner") ||
+    --container-options "--init") ||
     die "ci.yml job $job failed on ${sha:0:12}, main stays unpushed"
 done
 # The Docker job bind-mounts job paths onto the host daemon, which act cannot give it, so the
