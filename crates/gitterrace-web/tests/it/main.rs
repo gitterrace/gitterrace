@@ -1,4 +1,6 @@
-//! One integration binary for the page, API and cache tests, linked once. The oracle, the memory budget and the hostile workbook stay apart: each owns a global or a release-only run.
+//! One integration binary for the page, API and cache tests, linked once. The oracle, the memory
+//! budget, the hostile workbook and the index child stay apart: each owns a global or a
+//! release-only run, or counts the workers of its own process.
 
 mod appended_pages;
 mod blob_tables_and_archives;
