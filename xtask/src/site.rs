@@ -144,7 +144,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         version: &pkg.version,
         version_href: &version_href,
     };
-    let pitch = pitch(root, &pkg.description)?;
+    let pitch = pitch(&pkg.description)?;
     let h = landing::body(ws, &pitch, &docs::Links::new(repo), &read)?;
     outs.push(Out::file(
         at("index.html"),
@@ -408,20 +408,9 @@ fn redirects(repo: &str, name: &str) -> String {
 
 /// The one pitch sentence: the package description, which the README, the landing page and the
 /// meta description show. The README header draws it as outlined text, so generation fails when
-/// `TAGLINE` in `scripts/release/site/theme-tagline-gen.py` says something else.
-fn pitch(root: &Path, desc: &str) -> Result<String> {
-    let src = std::fs::read_to_string(root.join("scripts/release/site/theme-tagline-gen.py"))
-        .context("reading scripts/release/site/theme-tagline-gen.py")?;
-    let tag = src
-        .lines()
-        .find_map(|l| l.strip_prefix("TAGLINE = \""))
-        .and_then(|l| l.strip_suffix('"'))
-        .context("TAGLINE in scripts/release/site/theme-tagline-gen.py")?;
-    anyhow::ensure!(
-        tag == desc,
-        "TAGLINE in scripts/release/site/theme-tagline-gen.py is not the package description \
-         {desc:?}: set it and run the script to redraw the README header"
-    );
+/// `TAGLINE` in `xtask/src/tagline.rs` says something else.
+fn pitch(desc: &str) -> Result<String> {
+    crate::tagline::same_as(desc)?;
     Ok(desc.to_owned())
 }
 

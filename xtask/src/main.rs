@@ -19,6 +19,7 @@ mod docs_index;
 mod docs_md;
 mod facts;
 mod kit_path;
+mod logo;
 mod main_guard;
 mod notices_md;
 mod openapi_json;
@@ -26,6 +27,8 @@ mod out;
 mod plate;
 mod readme_agents_md;
 mod site;
+mod tagline;
+mod theme;
 
 use std::path::{Path, PathBuf};
 
@@ -47,8 +50,12 @@ enum Cmd {
     Generate,
     /// Fail when a generated file is stale, then build the site and run its guards
     Check,
+    /// Fail when tokens.css, the README headers or the logos differ from the snapshot
+    Theme,
     /// Fail while a legal page still has a {{PLACEHOLDER}}; run before a deploy
     DeployCheck,
+    /// Draw the tagline again into the README headers, after a wording change
+    Tagline,
     /// Build only the site into target/site, from the files as they are, writing no tracked file
     Site,
 }
@@ -69,6 +76,8 @@ fn generators(root: &Path, refresh: bool) -> Result<Vec<Out>> {
     outs.extend(readme_agents_md::render(&ws, &scripts));
     outs.extend(docs_md::render(root, &ws, &scripts)?);
     outs.extend(plate::outs(root, plate::PLATE_COLOR)?);
+    outs.push(theme::render(root)?);
+    outs.extend(logo::outs(root)?);
     outs.extend(changelog_md::render(root, refresh)?);
     outs.extend(site::render(root, &ws)?);
     Ok(outs)
@@ -146,6 +155,12 @@ fn main() -> Result<()> {
             site::legal::check(&root)?;
             println!("legal pages: the sources exist");
         }
+        Cmd::Theme => theme_check(&root)?,
+        Cmd::Tagline => {
+            for path in tagline::rewrite(&root)? {
+                println!("  wrote {path}");
+            }
+        }
         Cmd::Site => {
             // `refresh` false: the changelog's Unreleased block is read, not rewritten.
             let dir = site::build(&root, generators(&root, false)?)?;
@@ -163,6 +178,22 @@ fn main() -> Result<()> {
             println!("deploy-check: the legal pages have no placeholders");
         }
     }
+    Ok(())
+}
+
+/// Fails when `tokens.css`, the README headers or the logos differ from the snapshot.
+fn theme_check(root: &Path) -> Result<()> {
+    let mut outs = vec![theme::render(root)?];
+    outs.extend(logo::outs(root)?);
+    let stale = apply(root, outs, Mode::Check)?;
+    if !stale.is_empty() {
+        println!(
+            "theme files are stale, run `make docs-gen`: {}",
+            stale.join(", ")
+        );
+        std::process::exit(1);
+    }
+    println!("theme: tokens.css, the README headers and the logos match the snapshot");
     Ok(())
 }
 

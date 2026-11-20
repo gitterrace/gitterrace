@@ -3,7 +3,7 @@
 html{scrollbar-gutter:stable;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-base)/var(--leading) var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--accent-fg);text-decoration:none;text-underline-offset:3px}a:hover{text-decoration:underline}
-/* --focus is opaque (3:1 on every surface, theme-gen.py --check); --ring is a tint for fills. */
+/* --focus is opaque (3:1 on every surface, `cargo xtask check`); --ring is a tint for fills. */
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--radius)}
 /* Skip link: the first stop on every page, shown while focused; main takes focus quietly. */
 .skip{position:absolute;left:var(--space-4);top:var(--space-2);z-index:70;padding:var(--space-2) var(--space-3);background:var(--surface);color:var(--fg);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);transform:translateY(-200%)}.skip:focus{transform:none}main:focus{outline:none}svg.chart[data-marks]:focus-visible{outline-offset:4px}

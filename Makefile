@@ -50,7 +50,7 @@ check: gc-guard theme actions send-vectors names lines bench-guard docs-check fm
 	clippy-features clippy-cross lint deny test doc
 
 ## check-static: The check steps that build nothing, in the same order, fast and cargo-build free
-check-static: gc-guard theme actions send-vectors names lines fmt lint
+check-static: gc-guard actions send-vectors names lines fmt lint
 
 # fmt: Check formatting
 fmt:
@@ -125,9 +125,7 @@ doc:
 # theme: Snapshot matches its manifest, generated files match the snapshot
 theme:
 	python3 vendor/schwarzwald/kit/check.py
-	python3 scripts/release/site/theme-gen.py --check
-	python3 scripts/release/site/theme-logo-gen.py --check
-	python3 scripts/release/site/theme-tagline-gen.py --check
+	cargo xtask theme
 
 # actions: Example actions work per OS profile (stubbed PATH)
 actions:

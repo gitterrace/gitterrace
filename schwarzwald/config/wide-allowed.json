@@ -100,8 +100,6 @@
     "scripts/verify/smoke-check.sh": 11,
     "scripts/lint/text-check.py": 1,
     "scripts/lint/stubs-check.py": 1,
-    "scripts/lint/tests-check.py": 1,
-    "scripts/release/site/theme-gen.py": 1,
-    "scripts/release/site/theme-tagline-gen.py": 2
+    "scripts/lint/tests-check.py": 1
   }
 }

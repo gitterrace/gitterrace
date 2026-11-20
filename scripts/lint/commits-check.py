@@ -35,8 +35,15 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
     ("css-button", [PY, "scripts/lint/css-button-check.py"], (".css", ".html", ".js")),
     (
         "theme",
-        [PY, "scripts/release/site/theme-gen.py", "--check"],
-        (".css", "scripts/release/site/theme-", "vendor/schwarzwald/kit/"),
+        ["cargo", "xtask", "theme"],
+        (
+            ".css",
+            "docs/brand/",
+            "xtask/src/theme",
+            "xtask/src/logo",
+            "xtask/src/tagline",
+            "vendor/schwarzwald/kit/",
+        ),
     ),
     (
         "make-targets",
