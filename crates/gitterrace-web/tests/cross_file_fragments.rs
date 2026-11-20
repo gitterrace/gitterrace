@@ -3,50 +3,47 @@
 
 use gitterrace_testkit::{Fixture, page};
 
-#[test]
-fn cross_file_fragments_stay_plain() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        let f = Fixture::init(dir.path())
-            .at("2024-01-01T00:00:00+00:00")
-            .write(
-                "docs/guide.md",
-                "# Intro\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
-                 [c](./sub/page.md#a-b) [d](#intro)\n",
-            )
-            .commit("docs");
-        let sha = f.git(&["rev-parse", "HEAD"]);
-        let router = gitterrace_web::app_router(f.path()).expect("router");
-        let (status, body) = page(&router, &format!("/blob/{sha}/docs/guide.md")).await;
-        assert_eq!(status, 200, "{body}");
-        for want in [
-            "/blob/SHA/docs/architecture.md#syntax-highlighting",
-            "/blob/SHA/other.md#top",
-            "/blob/SHA/docs/sub/page.md#a-b",
-        ] {
-            let want = format!("{}\"", want.replace("SHA", &sha));
-            assert!(body.contains(&want), "{want} missing in {body}");
-        }
-        assert!(
-            body.contains("href=\"#intro\"") && body.contains("id=\"intro\""),
-            "same-page link and its heading stay plain"
-        );
-        assert!(
-            !body.contains(
-                "href=\"/blob/SHA/other.md#user-content-"
-                    .replace("SHA", &sha)
-                    .as_str()
-            ) && !body.contains("#user-content-top\""),
-            "cross-file fragment was prefixed"
-        );
-        assert!(
-            !body.contains("other.md#user-content-"),
-            "cross-file fragment was prefixed"
-        );
-        assert!(
-            !body.contains("page.md#user-content-"),
-            "cross-file fragment was prefixed"
-        );
-    });
+#[tokio::test(flavor = "multi_thread")]
+async fn cross_file_fragments_stay_plain() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let f = Fixture::init(dir.path())
+        .at("2024-01-01T00:00:00+00:00")
+        .write(
+            "docs/guide.md",
+            "# Intro\n\n[a](architecture.md#syntax-highlighting) [b](../other.md#top) \
+             [c](./sub/page.md#a-b) [d](#intro)\n",
+        )
+        .commit("docs");
+    let sha = f.git(&["rev-parse", "HEAD"]);
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    let (status, body) = page(&router, &format!("/blob/{sha}/docs/guide.md")).await;
+    assert_eq!(status, 200, "{body}");
+    for want in [
+        "/blob/SHA/docs/architecture.md#syntax-highlighting",
+        "/blob/SHA/other.md#top",
+        "/blob/SHA/docs/sub/page.md#a-b",
+    ] {
+        let want = format!("{}\"", want.replace("SHA", &sha));
+        assert!(body.contains(&want), "{want} missing in {body}");
+    }
+    assert!(
+        body.contains("href=\"#intro\"") && body.contains("id=\"intro\""),
+        "same-page link and its heading stay plain"
+    );
+    assert!(
+        !body.contains(
+            "href=\"/blob/SHA/other.md#user-content-"
+                .replace("SHA", &sha)
+                .as_str()
+        ) && !body.contains("#user-content-top\""),
+        "cross-file fragment was prefixed"
+    );
+    assert!(
+        !body.contains("other.md#user-content-"),
+        "cross-file fragment was prefixed"
+    );
+    assert!(
+        !body.contains("page.md#user-content-"),
+        "cross-file fragment was prefixed"
+    );
 }

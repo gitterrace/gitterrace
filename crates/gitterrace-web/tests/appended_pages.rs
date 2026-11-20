@@ -28,45 +28,42 @@ async fn answers(repo: &Path) -> BTreeMap<String, String> {
     out
 }
 
-#[test]
-fn pages_are_the_same_built_fresh_or_by_appends() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let tmp = tempfile::tempdir().expect("tmp");
-        let r = RenameChain::build(tmp.path());
-        let cache = r.repo.join(".git/gitterrace");
-        let fresh = {
-            let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
-            let index = gitterrace_index::Index::open(&repo).expect("index");
-            index.update(&repo, "HEAD", &|_| {}).expect("build");
-            answers(&r.repo).await
-        };
-        std::fs::remove_dir_all(&cache).expect("drop the cache");
-        {
-            let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
-            let index = gitterrace_index::Index::open(&repo).expect("index");
-            let ids = git(
-                &r.repo,
-                &["rev-list", "--first-parent", "--reverse", "HEAD"],
-            );
-            for id in ids.lines().step_by(4) {
-                index.update(&repo, id, &|_| {}).expect("append");
-            }
-            index.update(&repo, "HEAD", &|_| {}).expect("append");
-            let segs = std::fs::read_dir(&cache)
-                .expect("cache")
-                .flatten()
-                .filter(|e| e.file_name().to_string_lossy().starts_with("seg-"))
-                .count();
-            assert!(segs > 1, "built by appends, {segs} segments");
+#[tokio::test(flavor = "multi_thread")]
+async fn pages_are_the_same_built_fresh_or_by_appends() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let r = RenameChain::build(tmp.path());
+    let cache = r.repo.join(".git/gitterrace");
+    let fresh = {
+        let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        index.update(&repo, "HEAD", &|_| {}).expect("build");
+        answers(&r.repo).await
+    };
+    std::fs::remove_dir_all(&cache).expect("drop the cache");
+    {
+        let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
+        let index = gitterrace_index::Index::open(&repo).expect("index");
+        let ids = git(
+            &r.repo,
+            &["rev-list", "--first-parent", "--reverse", "HEAD"],
+        );
+        for id in ids.lines().step_by(4) {
+            index.update(&repo, id, &|_| {}).expect("append");
         }
-        let appended = answers(&r.repo).await;
-        assert_eq!(fresh.len(), appended.len());
-        let bad: Vec<&String> = fresh
-            .iter()
-            .filter(|(k, v)| appended.get(*k) != Some(v))
-            .map(|(k, _)| k)
-            .collect();
-        assert!(bad.is_empty(), "differ: {bad:?}");
-    });
+        index.update(&repo, "HEAD", &|_| {}).expect("append");
+        let segs = std::fs::read_dir(&cache)
+            .expect("cache")
+            .flatten()
+            .filter(|e| e.file_name().to_string_lossy().starts_with("seg-"))
+            .count();
+        assert!(segs > 1, "built by appends, {segs} segments");
+    }
+    let appended = answers(&r.repo).await;
+    assert_eq!(fresh.len(), appended.len());
+    let bad: Vec<&String> = fresh
+        .iter()
+        .filter(|(k, v)| appended.get(*k) != Some(v))
+        .map(|(k, _)| k)
+        .collect();
+    assert!(bad.is_empty(), "differ: {bad:?}");
 }

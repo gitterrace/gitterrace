@@ -34,38 +34,35 @@ fn nav_links(body: &str) -> Vec<String> {
     out
 }
 
-#[test]
-fn every_nav_link_keeps_the_selected_branch() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        repo(dir.path());
-        let router = gitterrace_web::app_router(dir.path()).expect("router");
-        // `dev` and HEAD name one commit: a memo the HEAD page filled first must not answer
-        // `?rev=dev`, so the warm-up's page is in place before the branch is asked for.
-        gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
-            .await;
-        for url in [
-            "/?rev=dev",
-            "/tree/dev",
-            "/log/dev",
-            "/refs?rev=dev",
-            "/stats?rev=dev",
-        ] {
-            let (status, body) = page(&router, url).await;
-            assert_eq!(status, 200, "{url}");
-            let links = nav_links(&body);
-            assert!(links.len() >= 4, "{url}: found only {links:?}");
-            for l in links {
-                assert!(
-                    l.contains("rev=dev") || l.contains("/dev"),
-                    "{url}: nav link {l} drops the selected branch"
-                );
-            }
+#[tokio::test(flavor = "multi_thread")]
+async fn every_nav_link_keeps_the_selected_branch() {
+    let dir = tempfile::tempdir().expect("tmp");
+    repo(dir.path());
+    let router = gitterrace_web::app_router(dir.path()).expect("router");
+    // `dev` and HEAD name one commit: a memo the HEAD page filled first must not answer
+    // `?rev=dev`, so the warm-up's page is in place before the branch is asked for.
+    gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
+        .await;
+    for url in [
+        "/?rev=dev",
+        "/tree/dev",
+        "/log/dev",
+        "/refs?rev=dev",
+        "/stats?rev=dev",
+    ] {
+        let (status, body) = page(&router, url).await;
+        assert_eq!(status, 200, "{url}");
+        let links = nav_links(&body);
+        assert!(links.len() >= 4, "{url}: found only {links:?}");
+        for l in links {
+            assert!(
+                l.contains("rev=dev") || l.contains("/dev"),
+                "{url}: nav link {l} drops the selected branch"
+            );
         }
-        let (_, body) = page(&router, "/").await;
-        for l in nav_links(&body) {
-            assert!(!l.contains("rev="), "the default branch adds no ?rev=: {l}");
-        }
-    });
+    }
+    let (_, body) = page(&router, "/").await;
+    for l in nav_links(&body) {
+        assert!(!l.contains("rev="), "the default branch adds no ?rev=: {l}");
+    }
 }

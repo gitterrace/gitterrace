@@ -51,83 +51,71 @@ fn keys(v: &serde_json::Value) -> Vec<serde_json::Value> {
 }
 
 /// "Last month" ends on the repository's newest day, with or without a chip.
-#[test]
-fn a_chip_keeps_the_period_anchor() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-        oracle::ready(&router).await;
-        let api = "/api/v1/insights";
-        let all = json(&router, &format!("{api}/summary?period=1m")).await;
-        let bob = json(
-            &router,
-            &format!("{api}/summary?q=author:bob%40y.io&period=1m"),
-        )
-        .await;
-        assert_eq!(
-            (&bob["from"], &bob["to"]),
-            (&all["from"], &all["to"]),
-            "{bob}"
-        );
-        let fa = json(&router, &format!("{api}/frequency?period=1m")).await;
-        let fb = json(&router, &format!("{api}/frequency?q=type:fix&period=1m")).await;
-        assert_eq!(keys(&fb), keys(&fa), "frequency buckets with a chip");
-    });
+#[tokio::test(flavor = "multi_thread")]
+async fn a_chip_keeps_the_period_anchor() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let api = "/api/v1/insights";
+    let all = json(&router, &format!("{api}/summary?period=1m")).await;
+    let bob = json(
+        &router,
+        &format!("{api}/summary?q=author:bob%40y.io&period=1m"),
+    )
+    .await;
+    assert_eq!(
+        (&bob["from"], &bob["to"]),
+        (&all["from"], &all["to"]),
+        "{bob}"
+    );
+    let fa = json(&router, &format!("{api}/frequency?period=1m")).await;
+    let fb = json(&router, &format!("{api}/frequency?q=type:fix&period=1m")).await;
+    assert_eq!(keys(&fb), keys(&fa), "frequency buckets with a chip");
 }
 
 /// Bob's first commit ever is before the month, so his fix in it does not make him new,
 /// even when the type chip hides that first commit.
-#[test]
-fn new_is_judged_on_the_whole_history() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-        oracle::ready(&router).await;
-        let c = json(
-            &router,
-            "/api/v1/insights/contributors?q=type:fix&period=1m",
-        )
-        .await;
-        let bob = c["contributors"]
-            .as_array()
-            .expect("people")
-            .iter()
-            .find(|p| p["name"] == "Bob")
-            .expect("Bob")
-            .clone();
-        assert_eq!(bob["first_time"], false, "{bob}");
-    });
+#[tokio::test(flavor = "multi_thread")]
+async fn new_is_judged_on_the_whole_history() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let c = json(
+        &router,
+        "/api/v1/insights/contributors?q=type:fix&period=1m",
+    )
+    .await;
+    let bob = c["contributors"]
+        .as_array()
+        .expect("people")
+        .iter()
+        .find(|p| p["name"] == "Bob")
+        .expect("Bob")
+        .clone();
+    assert_eq!(bob["first_time"], false, "{bob}");
 }
 
 /// Under `path=src`, `docs/guide.md` is not a line of the path, tracked or not.
-#[test]
-fn a_path_covers_only_its_head_files() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-        oracle::ready(&router).await;
-        let o = json(&router, "/api/v1/insights/ownership?q=path:src&period=all").await;
-        assert_eq!(o["untracked_lines"], 0, "{o}");
-    });
+#[tokio::test(flavor = "multi_thread")]
+async fn a_path_covers_only_its_head_files() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let o = json(&router, "/api/v1/insights/ownership?q=path:src&period=all").await;
+    assert_eq!(o["untracked_lines"], 0, "{o}");
 }
 
 /// The hotspots page, patterns included, is empty when the period holds no selected commit,
 /// judged on the repository's newest day: Bob's last commit is ten days before Ann's, so his week
 /// is empty.
-#[test]
-fn patterns_empty_state_follows_the_period_anchor() {
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    rt.block_on(async {
-        let dir = tempfile::tempdir().expect("tmp");
-        let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
-        oracle::ready(&router).await;
-        let (status, body) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=1w").await;
-        assert_eq!(status, 200, "{body}");
-        assert!(body.contains("No commits match these filters."), "{body}");
-        let (_, all) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=all").await;
-        assert!(!all.contains("No commits match these filters."), "{all}");
-    });
+#[tokio::test(flavor = "multi_thread")]
+async fn patterns_empty_state_follows_the_period_anchor() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let router = gitterrace_web::app_router(repo(dir.path())).expect("router");
+    oracle::ready(&router).await;
+    let (status, body) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=1w").await;
+    assert_eq!(status, 200, "{body}");
+    assert!(body.contains("No commits match these filters."), "{body}");
+    let (_, all) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=all").await;
+    assert!(!all.contains("No commits match these filters."), "{all}");
 }
