@@ -4,13 +4,7 @@
 const DEFAULT_PAGES: Option<usize> = None;
 
 fn scope(force: bool) -> crate::export::Scope {
-    crate::export::Scope {
-        commits: 3,
-        max_file: 1024,
-        projects: Vec::new(),
-        force,
-        config: gitterrace_config::Config::default(),
-    }
+    crate::export::scope_of(3, 1024, force)
 }
 
 #[test]

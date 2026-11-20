@@ -14,13 +14,7 @@ use crate::export::{Scope, export, fetch, fetch_within};
 const SHOWN: usize = 50;
 
 fn scope(commits: usize) -> Scope {
-    Scope {
-        commits,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    }
+    crate::export::scope_of(commits, 64 * 1024, false)
 }
 
 /// `commits` commits after a root, each changing `width` files.

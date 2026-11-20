@@ -17,13 +17,7 @@ async fn exported_fragments_resolve_without_script() {
         )
         .commit("readme");
     let out = dir.path().join("out");
-    let scope = crate::export::Scope {
-        commits: 5,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(5, 64 * 1024, false);
     crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
@@ -68,13 +62,7 @@ async fn every_exported_link_reaches_a_written_file() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let out = dir.path().join("out");
-    let scope = crate::export::Scope {
-        commits: 2,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(2, 64 * 1024, false);
     crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");

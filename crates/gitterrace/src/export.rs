@@ -103,6 +103,18 @@ fn exclude_from_worktree(out: &Path) {
     }
 }
 
+/// A scope with the default settings, for tests.
+#[cfg(test)]
+pub(crate) fn scope_of(commits: usize, max_file: u64, force: bool) -> Scope {
+    Scope {
+        commits,
+        max_file,
+        projects: Vec::new(),
+        force,
+        config: gitterrace_config::Config::default(),
+    }
+}
+
 /// [`export_with`] without progress output, for tests.
 #[cfg(test)]
 pub(crate) async fn export(

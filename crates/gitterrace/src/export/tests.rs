@@ -159,13 +159,7 @@ fn write_page_refuses_a_symlink_at_the_leaf() {
 }
 
 fn scope(force: bool) -> crate::export::Scope {
-    crate::export::Scope {
-        commits: 3,
-        max_file: 1024,
-        projects: Vec::new(),
-        force,
-        config: gitterrace_config::Config::default(),
-    }
+    crate::export::scope_of(3, 1024, force)
 }
 
 /// Class guard: export never writes into or clears a folder it did not create, unless
@@ -224,13 +218,7 @@ async fn default_folder_is_used_when_none_is_named() {
 async fn export_refuses_a_repository_root_as_output() {
     let repo = tempfile::tempdir().expect("tempdir");
     std::fs::create_dir(repo.path().join(".git")).expect("mkdir");
-    let scope = crate::export::Scope {
-        commits: 1,
-        max_file: 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(1, 1024, false);
     let err =
         crate::export::export(&[repo.path().to_path_buf()], repo.path(), &scope, DEFAULT_PAGES)
             .await
@@ -247,13 +235,7 @@ async fn export_writes_every_prewarmed_page() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
     let out = dir.path().join("out");
-    let scope = crate::export::Scope {
-        commits: 5,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(5, 64 * 1024, false);
     crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
@@ -293,13 +275,7 @@ async fn several_repositories_export_like_the_server_serves_them() {
     let a = gitterrace_testkit::Fixture::standard(&dir.path().join("alpha"));
     let b = gitterrace_testkit::Fixture::standard(&dir.path().join("beta"));
     let out = dir.path().join("out");
-    let scope = crate::export::Scope {
-        commits: 5,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(5, 64 * 1024, false);
     crate::export::export(
         &[a.path().to_path_buf(), b.path().to_path_buf()],
         &out,
@@ -349,13 +325,7 @@ async fn export_ships_no_scriptable_raw_file() {
     std::fs::write(fx.path().join("a.png"), b"\x89PNG\r\n\x1a\n").expect("png");
     fx = fx.commit("files");
     let out = dir.path().join("out");
-    let scope = crate::export::Scope {
-        commits: 5,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config: gitterrace_config::Config::default(),
-    };
+    let scope = crate::export::scope_of(5, 64 * 1024, false);
     crate::export::export(&[fx.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
@@ -430,13 +400,7 @@ async fn export_skips_what_features_turn_off() {
         gitterrace_config::parse("[features]\ninsights_enabled = false\ncredit_enabled = false\n")
             .expect("parse")
             .config;
-    let scope = crate::export::Scope {
-        commits: 5,
-        max_file: 64 * 1024,
-        projects: Vec::new(),
-        force: false,
-        config,
-    };
+    let scope = crate::export::Scope { config, ..crate::export::scope_of(5, 64 * 1024, false) };
     crate::export::export(&[repo.path().to_path_buf()], &out, &scope, DEFAULT_PAGES)
         .await
         .expect("export");
