@@ -34,9 +34,16 @@ case ${1:-} in
 dump)
   : "${GOLDEN_DUMP:?set by vendor/schwarzwald/kit/tools/golden.py}"
   # Its own target dir: the old build must not replace the binary classify uses.
+  # cargo test takes one filter before `--`, so both test names go after it.
   CARGO_TARGET_DIR=$PWD/target/golden-check TEST_ORACLE_DUMP=$GOLDEN_DUMP \
-    cargo test --release --no-fail-fast -q -p "$crate" --test "$test" \
-    every_cell_matches_the_oracle other_revisions_match_the_oracle -- --exact
+    cargo test --release --no-fail-fast -q -p "$crate" --test "$test" -- --exact \
+    every_cell_matches_the_oracle other_revisions_match_the_oracle
+  # golden.py silences the dump, so a refused command or a renamed test reads as an empty
+  # dump there: say so here.
+  [[ -n $(ls -A "$GOLDEN_DUMP") ]] || {
+    echo "golden-proof-run: the dump wrote no answers, rerun it unsilenced" >&2
+    exit 1
+  }
   ;;
 classify)
   classify "$2" "$3" "$4"
