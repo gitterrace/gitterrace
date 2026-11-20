@@ -202,6 +202,15 @@ run_tests() {
   fi
 }
 
+# The conventions test over the whole tree, unless the suite of these scope arguments already
+# ran it: --workspace and -p of its crate both run every test target of that crate.
+conventions_step() {
+  [[ " $* " == *" --workspace "* ]] && return 0
+  [[ " $* " == *" -p $(land_cfg conventions.crate) "* ]] && return 0
+  step cargo test --no-fail-fast -p "$(land_cfg conventions.crate)" \
+    --test "$(land_cfg conventions.test)"
+}
+
 step() {
   echo "== $*"
   "$@"
@@ -358,6 +367,26 @@ self_test() {
       echo "self-test: the oracle is skipped though its crate was not tested" >&2
       exit 1
     }
+  # The conventions run once: left to a suite of their crate, run on their own otherwise.
+  local ran
+  ran=$(
+    step() { echo ran; }
+    conventions_step -p "$(land_cfg selftest.leaf)"
+  )
+  [[ -n $ran ]] ||
+    {
+      echo "self-test: the conventions never run for a scope without their crate" >&2
+      exit 1
+    }
+  ran=$(
+    step() { echo ran; }
+    conventions_step -p "$(land_cfg conventions.crate)"
+  )
+  [[ -z $ran ]] ||
+    {
+      echo "self-test: the conventions ran again after their crate's suite" >&2
+      exit 1
+    }
   # The tests step: green on a passing crate, red on a failing one.
   mkdir -p "$d/t/src"
   printf '[package]\nname = "t"\nversion = "0.0.0"\nedition = "2021"\n[workspace]\n' \
@@ -431,7 +460,7 @@ if [[ -z $base ]] && ((tests_only)); then
   if [[ -z $base ]]; then
     echo "land-check: no landing base found, testing the whole workspace" >&2
     run_tests --workspace
-    exit 0
+    exit $?
   fi
 fi
 if [[ -z $base ]]; then
@@ -461,7 +490,8 @@ fi
 echo "land-check: ${scope[*]:-no crate touched}"
 ((explain)) && exit 0
 if ((tests_only)); then
-  if ((${#scope[@]})); then run_tests "${scope[@]}"; fi
+  if ((${#scope[@]})); then run_tests "${scope[@]}" || exit 1; fi
+  conventions_step ${scope[@]+"${scope[@]}"}
   exit 0
 fi
 
@@ -481,8 +511,7 @@ fi
 step make lines names
 step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --self-test
 step "$py" vendor/schwarzwald/kit/tools/ratchet-check.py --base "$base"
-step cargo test --no-fail-fast -p "$(land_cfg conventions.crate)" \
-  --test "$(land_cfg conventions.test)"
+conventions_step ${scope[@]+"${scope[@]}"}
 step bash vendor/schwarzwald/kit/lint/run.sh
 step python3 vendor/schwarzwald/kit/lint/root-entries.py
 step make docs-check
