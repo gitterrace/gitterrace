@@ -116,19 +116,38 @@ pub fn worktree_counts(repo: &Repo) -> Result<ScopeCounts> {
     })
 }
 
-/// Adds the paths staged against HEAD to `out`, stopping once it holds `limit`: a huge staged
-/// change must stay as cheap as a huge untracked tree.
+/// Adds the paths staged against HEAD to `out`, stopping once it lists `limit` files: a huge
+/// staged change must stay as cheap as a huge untracked tree.
+///
+/// Exact renames are tracked, so a `git mv` lists both of its paths but counts as one file:
+/// counting paths would cut the deleted sides (they sort after the new names) off a big move
+/// and leave `pair::exact_moves` nothing to pair.
 fn staged_paths(repo: &gix::Repository, out: &mut BTreeSet<String>, limit: usize) -> Result<()> {
+    use gix::diff::index::ChangeRef;
+
     let head_tree = repo.head_tree_id_or_empty().map_err(git)?;
     let index = repo.index_or_empty().map_err(git)?;
+    let exact = gix::diff::Rewrites {
+        percentage: None,
+        limit: 0,
+        ..Default::default()
+    };
+    let mut pairs = 0;
     repo.tree_index_status(
         &head_tree,
         &index,
         None,
-        gix::status::tree_index::TrackRenames::Disabled,
+        gix::status::tree_index::TrackRenames::Given(exact),
         |change, _, _| {
+            if let ChangeRef::Rewrite {
+                source_location, ..
+            } = &change
+                && out.insert(source_location.to_str_lossy().into_owned())
+            {
+                pairs += 1;
+            }
             out.insert(change.location().to_str_lossy().into_owned());
-            Ok(if out.len() >= limit {
+            Ok(if out.len() - pairs >= limit {
                 std::ops::ControlFlow::Break(())
             } else {
                 std::ops::ControlFlow::Continue(())

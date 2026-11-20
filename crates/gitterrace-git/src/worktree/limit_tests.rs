@@ -55,3 +55,31 @@ fn worktree_diff_bytes_lists_larger_files_without_hunks() {
         "1200-byte files over a 1 KiB limit keep no hunks"
     );
 }
+
+/// A rename is two paths but one listed file: the cap must not cut the deleted sides off
+/// (they sort after the new names) and leave the renames as delete plus add.
+#[test]
+fn worktree_files_counts_a_rename_as_one_file() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    git(p, &["init", "-q", "-b", "main"]);
+    std::fs::create_dir(p.join("old")).expect("mkdir");
+    for i in 0..10 {
+        std::fs::write(
+            p.join("old").join(format!("m{i}.txt")),
+            format!("file {i}\nmore {i}\n"),
+        )
+        .expect("write");
+    }
+    git(p, &["add", "."]);
+    git(p, &["commit", "-qm", "init"]);
+    git(p, &["mv", "old", "new"]);
+    let repo = Repo::discover(p).expect("repo");
+    repo.set_worktree_limits(10, crate::WORKTREE_DIFF_BYTES);
+    let files = worktree_diff(&repo).expect("diff");
+    assert_eq!(files.len(), 10, "{files:?}");
+    assert!(
+        files.iter().all(|f| f.kind == crate::ChangeKind::Renamed),
+        "{files:?}"
+    );
+}
