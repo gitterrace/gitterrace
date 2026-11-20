@@ -42,8 +42,8 @@ preview:
 	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
-.PHONY: check check-static fmt clippy clippy-features clippy-cross lint harness-links test doc \
-	theme actions send-vectors names lines docs-check gc-guard bench-guard deny
+.PHONY: check check-static check-built fmt clippy clippy-features clippy-cross lint harness-links \
+	test doc theme actions send-vectors names lines docs-check gc-guard bench-guard deny
 
 ## check: Every gate, in the order CI runs them
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check fmt clippy \
@@ -51,6 +51,9 @@ check: gc-guard theme actions send-vectors names lines bench-guard docs-check fm
 
 ## check-static: The check steps that build nothing, in the same order, fast and cargo-build free
 check-static: gc-guard actions send-vectors names lines fmt lint
+
+## check-built: The check steps check-static leaves out, in order, for a runner that skips them
+check-built: theme bench-guard docs-check clippy clippy-features clippy-cross deny test doc
 
 # fmt: Check formatting
 fmt:

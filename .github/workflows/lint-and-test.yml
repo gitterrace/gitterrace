@@ -189,7 +189,10 @@ jobs:
             ${{ runner.os }}-cargo-${{ steps.toolchain.outputs.cachekey }}-
       - uses: ./.github/actions/lint-tools
       # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
-      - run: make -k check CROSS=none MEMORY=0
+      # The static steps (theme, names, fmt) read files and do not depend on the OS: the Ubuntu
+      # job runs them. lint runs here too, as its shell and Python tools can differ by OS.
+      # check-built is the rest of `make check`, so every step still runs.
+      - run: make -k check-built lint CROSS=none MEMORY=0
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/dev/wine-run.sh use.

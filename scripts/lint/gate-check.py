@@ -9,6 +9,9 @@ So a step added to `make check` cannot reach main unseen by the gate: it is red 
 gated or skipped on purpose. Also red: a skip entry for a step `make check` no longer has, an
 empty reason, and a step both gated and skipped.
 
+`make check-built` is the rest of `check`, in order, so check-static plus check-built run every
+step once: the macOS runner runs only check-built, as the static steps do not depend on the OS.
+
 `make check-static` is the `check` steps whose recipe builds nothing, in the same order, so one
 target runs every gate step that needs no build. A step whose recipe calls cargo (other
 than `cargo fmt`) or clippy is a build step. Red when the two lists drift either way.
@@ -91,6 +94,18 @@ def static_problems(makefile: str, steps: list[str]) -> list[str]:
     ]
 
 
+def built_problems(makefile: str, steps: list[str]) -> list[str]:
+    static = prerequisites(makefile, "check-static")
+    want = [s for s in steps if s not in static]
+    got = prerequisites(makefile, "check-built")
+    if got == want:
+        return []
+    return [
+        f"check-built: is {' '.join(got) or 'missing'}, the `check` steps check-static leaves "
+        f"out, in order, are {' '.join(want)}"
+    ]
+
+
 def gated(gate: list[str]) -> set[str]:
     return {t for cmd in gate for m in MAKE_CMD.finditer(cmd) for t in m.group(1).split()}
 
@@ -101,6 +116,7 @@ def landing_problems(repo: Path) -> list[str]:
         return ["Makefile: no `check:` target with prerequisites"]
     landing = tomllib.loads((repo / "schwarzwald/config/land.toml").read_text())["landing"]
     bad = static_problems((repo / "Makefile").read_text(), steps)
+    bad += built_problems((repo / "Makefile").read_text(), steps)
     run = gated(landing.get("gate", []))
     skip: dict[str, str] = landing.get("skip", {})
     for s in steps:
@@ -297,13 +313,16 @@ def landing_fixture(
     gate: list[str],
     skip: dict[str, str],
     static: str | None = None,
+    built: str | None = None,
 ) -> Path:
     (d / "schwarzwald/config").mkdir(parents=True, exist_ok=True)
     if static is None:
         static = " ".join(s for s in check.replace("\\\n", " ").split() if s != "test")
+    if built is None:
+        built = " ".join(s for s in check.replace("\\\n", " ").split() if s == "test")
     (d / "Makefile").write_text(
-        f"check: {check}\n\ncheck-static: {static}\n\nfmt:\n\tcargo fmt --check\n"
-        "test:\n\tcargo test\n"
+        f"check: {check}\n\ncheck-static: {static}\n\ncheck-built: {built}\n\n"
+        "fmt:\n\tcargo fmt --check\ntest:\n\tcargo test\n"
     )
     lines = [
         "[landing]",
@@ -390,29 +409,33 @@ def shell_self_test() -> int:
 class Landing(NamedTuple):
     """One landing case: the landing_fixture arguments after the folder, and whether it is red."""
 
-    fixture: tuple[str, list[str], dict[str, str], str | None]
+    fixture: tuple[str, list[str], dict[str, str], str | None, str | None]
     red: bool
 
 
 def self_test() -> int:
     landing_cases: list[Landing] = [
-        # ((check prerequisites, gate, skip[, check-static]), red?)
-        Landing(("fmt \\\n  lint", ["make fmt lint"], {}, None), False),
+        # ((check prerequisites, gate, skip[, check-static[, check-built]]), red?)
+        Landing(("fmt \\\n  lint", ["make fmt lint"], {}, None, None), False),
         Landing(
-            ("fmt lint", ["cargo xtask check && make fmt"], {"lint": "slow"}, None),
+            ("fmt lint", ["cargo xtask check && make fmt"], {"lint": "slow"}, None, None),
             False,
         ),
         # The bug this guards: a new step the gate never runs.
-        Landing(("fmt send", ["make fmt"], {}, None), True),
+        Landing(("fmt send", ["make fmt"], {}, None, None), True),
         # A stale skip entry for a step that left `make check`.
-        Landing(("fmt", ["make fmt"], {"gone": "was slow"}, None), True),
-        Landing(("fmt lint", ["make fmt"], {"lint": " "}, None), True),
-        Landing(("fmt", ["make fmt"], {"fmt": "both"}, None), True),
+        Landing(("fmt", ["make fmt"], {"gone": "was slow"}, None, None), True),
+        Landing(("fmt lint", ["make fmt"], {"lint": " "}, None, None), True),
+        Landing(("fmt", ["make fmt"], {"fmt": "both"}, None, None), True),
         # check-static: a build step in it, a build-free step missing, the order changed.
-        Landing(("fmt test", ["make fmt test"], {}, None), False),
-        Landing(("fmt test", ["make fmt test"], {}, "fmt test"), True),
-        Landing(("fmt lint", ["make fmt lint"], {}, "fmt"), True),
-        Landing(("fmt lint", ["make fmt lint"], {}, "lint fmt"), True),
+        Landing(("fmt test", ["make fmt test"], {}, None, None), False),
+        Landing(("fmt test", ["make fmt test"], {}, "fmt test", None), True),
+        Landing(("fmt lint", ["make fmt lint"], {}, "fmt", None), True),
+        Landing(("fmt lint", ["make fmt lint"], {}, "lint fmt", None), True),
+        # check-built: a step in neither list (so one CI runner would drop it), or out of order.
+        Landing(("fmt test", ["make fmt test"], {}, None, ""), True),
+        Landing(("fmt test send", ["make fmt test send"], {}, "fmt send", "test"), False),
+        Landing(("fmt test send", ["make fmt test send"], {}, "fmt send", "send test"), True),
     ]
     tier_cases = [
         (CALL, FAST + MAC + WIN, REL, False),
