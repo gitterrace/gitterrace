@@ -211,7 +211,12 @@ fn guard_8_a_page_left_out_of_the_index_the_list_or_the_chain_is_red() {
 #[test]
 fn a_page_over_its_byte_budget_is_reported() {
     let got = plant(|p| {
-        edit_page(p, "docs/a/index.html", "</main>", &format!("<svg>{}</svg></main>", "9".repeat(10_000)));
+        edit_page(
+            p,
+            "docs/a/index.html",
+            "</main>",
+            &format!("<svg>{}</svg></main>", "9".repeat(10_000)),
+        );
     });
     assert!(got.contains("docs/a/index.html") && got.contains("docs budget"), "{got}");
     assert!(!plant(|_| {}).contains("budget"));

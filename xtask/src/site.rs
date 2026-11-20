@@ -22,8 +22,8 @@ mod fit;
 mod frame;
 mod guards;
 mod landing;
-mod minify;
 pub mod legal;
+mod minify;
 mod shots;
 
 pub use landing::SHOTS;

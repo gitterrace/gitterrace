@@ -254,7 +254,8 @@ fn relative(d: &str) -> Result<String> {
             if ch.len() != width {
                 bail!("header layout changed: a wordmark command with missing numbers");
             }
-            let letter = if &c[1] == "M" && i > 0 { 'l' } else { cmd.chars().next().unwrap_or('l') };
+            let letter =
+                if &c[1] == "M" && i > 0 { 'l' } else { cmd.chars().next().unwrap_or('l') };
             if letter != last || letter == 'm' {
                 out.push(letter);
             }

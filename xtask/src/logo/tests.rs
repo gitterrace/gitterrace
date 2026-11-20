@@ -41,7 +41,10 @@ fn a_relative_path_command_is_refused_in_the_wordmark() {
 #[test]
 fn relative_data_lands_on_the_same_points() {
     assert_eq!(relative("M1 2H5V9Z").expect("rel"), "m1 2h4v7z");
-    assert_eq!(relative("M10.5 10Q10.25 9.5 10 9L9 9Z").expect("rel"), "m10.5 10q-.25-.5-.5-1l-1 0z");
+    assert_eq!(
+        relative("M10.5 10Q10.25 9.5 10 9L9 9Z").expect("rel"),
+        "m10.5 10q-.25-.5-.5-1l-1 0z"
+    );
 }
 
 #[test]
