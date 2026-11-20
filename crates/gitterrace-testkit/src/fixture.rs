@@ -224,4 +224,9 @@ impl Fixture {
             .write("src/a.rs", "fn main() {\n}\n")
             .commit("fix: second")
     }
+
+    /// The repository already at `dir`, for tests that add commits to one they built.
+    pub fn open(dir: &Path) -> Self {
+        Self { dir: dir.to_owned(), date: None }
+    }
 }

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use gitterrace_testkit::git;
+use gitterrace_testkit::{Fixture, git};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode, header};
@@ -13,15 +13,12 @@ use crate::{ApiState, McpServer, router};
 pub(crate) fn fixture() -> (tempfile::TempDir, ApiState) {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "one\ntwo\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "feat(core): first"]);
-    std::fs::create_dir(p.join("src")).expect("mkdir");
-    std::fs::write(p.join("src/b.rs"), "fn main() {}\n").expect("write");
-    std::fs::write(p.join("a.txt"), "one\ntwo\nthree\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "fix: second"]);
+    let _ = Fixture::init(p)
+        .write("a.txt", "one\ntwo\n")
+        .commit("feat(core): first")
+        .write("src/b.rs", "fn main() {}\n")
+        .write("a.txt", "one\ntwo\nthree\n")
+        .commit("fix: second");
     let state = ApiState::open(p).expect("open");
     state.refresh_index().expect("index");
     (dir, state)
@@ -183,9 +180,7 @@ async fn errors_and_etag() {
 fn one_huge_line_is_capped_by_bytes() {
     let (d, _) = fixture();
     let p = d.path();
-    std::fs::write(p.join("min.js"), "é".repeat(400 * 1024)).expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "chore: minified"]);
+    let _ = Fixture::open(p).write("min.js", &"é".repeat(400 * 1024)).commit("chore: minified");
     let s = ApiState::open(p).expect("open");
     let v = serde_json::to_value(s.blob(None, "min.js", None, None).expect("blob")).expect("json");
     assert!(v["text"].as_str().expect("text").len() <= 256 * 1024);
@@ -300,11 +295,8 @@ fn hostile_paging_and_rev_syntax_are_refused() {
 fn caller_cannot_lift_caps() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
     let big = "x\n".repeat(gitterrace_config::Api::default().diff_lines + 10);
-    std::fs::write(p.join("big.txt"), big).expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "big"]);
+    let _ = Fixture::init(p).write("big.txt", &big).commit("big");
     let s = ApiState::open(p).expect("open");
     let lines = |v: &serde_json::Value| -> usize {
         v["files"][0]["hunks"]
@@ -341,10 +333,7 @@ fn free_text_tools_warn_about_untrusted_content() {
 fn etag_moves_with_cache_generation_and_defaults() {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
-    git(p, &["init", "-q", "-b", "main"]);
-    std::fs::write(p.join("a.txt"), "one\n").expect("write");
-    git(p, &["add", "."]);
-    git(p, &["commit", "-q", "-m", "first"]);
+    let _ = Fixture::init(p).write("a.txt", "one\n").commit("first");
     let s = ApiState::open(p).expect("open");
     let empty = s.etag().expect("tag");
     s.refresh_index().expect("index");
