@@ -5,7 +5,7 @@
 
 use std::fmt::Write as _;
 
-use gitterrace_testkit::{Fixture, page};
+use gitterrace_testkit::{Fixture, oracle, page};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_side_branch_compares_and_an_empty_range_says_so() {
@@ -22,7 +22,8 @@ async fn a_side_branch_compares_and_an_empty_range_says_so() {
         .at("2024-03-03T10:00:00Z")
         .write("a.rs", "fn a() {}\nfn b() {}\n")
         .commit("fix(core): main work");
-    let router = crate::common::ready_router(f.path()).await;
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    oracle::ready(&router).await;
 
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
@@ -67,7 +68,8 @@ fn long_side(n: usize) -> (tempfile::TempDir, Fixture) {
 #[tokio::test(flavor = "multi_thread")]
 async fn a_range_past_the_cap_asks_for_a_nearer_base() {
     let (_dir, f) = long_side(2_001);
-    let router = crate::common::ready_router(f.path()).await;
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    oracle::ready(&router).await;
     let t = std::time::Instant::now();
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
@@ -98,9 +100,62 @@ async fn a_failed_git_read_shows_an_error_not_zeros() {
     let tree = f.git(&["rev-parse", concat!("side^", "{", "tree}")]);
     let obj = f.path().join(".git/objects").join(&tree[..2]).join(&tree[2..]);
     std::fs::remove_file(&obj).expect("loose tree after fast-import unpack");
-    let router = crate::common::ready_router(f.path()).await;
+    let router = gitterrace_web::app_router(f.path()).expect("router");
+    oracle::ready(&router).await;
     let (status, html) = page(&router, "/compare?base=main&head=side").await;
     assert_eq!(status, 200);
     assert!(html.contains("could not be read"), "the failure is said");
     assert!(!html.contains("<b>0</b><span>Commits"), "never zeros");
+}
+
+/// A branch off main where main moved on: the two-dot range lists main's newer commit too,
+/// the three-dot range only the branch's own, and the branch's log links to the three-dot
+/// start. Catches a merge base that follows the base tip, or a mode that is ignored.
+#[test]
+fn three_dots_leave_out_what_the_base_gained_after_the_fork() {
+    let rt = tokio::runtime::Runtime::new().expect("runtime");
+    rt.block_on(async {
+        let dir = tempfile::tempdir().expect("tmp");
+        let f = Fixture::init(dir.path())
+            .at("2024-03-01T10:00:00Z")
+            .write("a.rs", "fn a() {}\n")
+            .commit("feat(core): start")
+            .branch("side")
+            .at("2024-03-02T10:00:00Z")
+            .write("b.py", "x = 1\n")
+            .commit("feat(core): side work")
+            .checkout("main")
+            .at("2024-03-03T10:00:00Z")
+            .write("a.rs", "fn a() {}\nfn b() {}\n")
+            .commit("fix(core): main work");
+        let router = gitterrace_web::app_router(f.path()).expect("router");
+        oracle::ready(&router).await;
+
+        let (_, two) = page(&router, "/compare?base=side&head=main").await;
+        assert!(two.contains("main work"), "two dots list the head's own");
+        let (_, two) = page(&router, "/compare?base=main&head=side").await;
+        assert!(two.contains("side work"));
+        assert!(
+            !two.contains("class=\"checked\"") && two.contains("name=\"mode\""),
+            "the form offers the toggle"
+        );
+
+        let (_, three) = page(&router, "/compare?base=side&head=main&mode=merge-base").await;
+        assert!(three.contains("main work"), "main's own commit stays");
+        assert!(!three.contains("side work"), "the branch's commit is not main's");
+        let (_, rev) = page(&router, "/compare?base=main&head=side&mode=merge-base").await;
+        assert!(rev.contains("side work"));
+        assert!(!rev.contains("main work"), "three dots drop what main gained after the fork");
+        assert!(rev.contains("checked"), "{}", &rev[rev.find("cmp").unwrap_or(0)..][..900]);
+        assert!(rev.contains("<b>1</b><span>Commits without merges"), "one commit counted");
+
+        let (_, log) = page(&router, "/log/side").await;
+        let base = f.git(&["merge-base", "main", "side"]);
+        assert!(
+            log.contains(&format!("compare?base={}&#38;head=side", base.trim())),
+            "the branch log links its fork point"
+        );
+        let (_, log) = page(&router, "/log/main").await;
+        assert!(!log.contains("Since it left"), "the default branch has none");
+    });
 }

@@ -62,7 +62,9 @@ fn corrupt(cache: &std::path::Path) {
 /// How long the API may answer 503 after its cache went bad. These tests guard recovery, not
 /// speed: a 10 s bound failed once in a landing gate at load 15, so the wait is the shared
 /// hang deadline and the time taken goes to stderr for the log.
-const REBUILT_WITHIN: std::time::Duration = wait::DEADLINE;
+fn rebuilt_within() -> std::time::Duration {
+    wait::deadline()
+}
 
 /// Segments corrupted under a running server: never a 500, a 503 with `Retry-After` while the
 /// cache is rebuilt, then 200 again, asked through the API alone. The API hands the failure to
@@ -76,7 +78,7 @@ async fn a_running_server_rebuilds_a_cache_corrupted_underneath_for_the_api_too(
     let (s, _) = api(&router, &format!("{prefix}/api/v1/repo")).await;
     assert_eq!(s, 200, "the API answers before the corruption");
     corrupt(&cache);
-    let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+    let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
     assert!(errors.is_empty(), "while rebuilding:\n{}", errors.join("\n"));
     assert!(took.is_some(), "the API answers 200 again after the rebuild");
     // The pages answer from the rebuilt cache too, and never with a 5xx.
@@ -181,7 +183,7 @@ fn a_truncated_or_garbage_segment_under_a_running_server_is_rebuilt() {
             let errors = std::sync::Mutex::new(Vec::new());
             let mut round = 0;
             // Each round asks the pages, so a page may meet the damage and start the rebuild.
-            let healed = wait::within(wait::DEADLINE, || {
+            let healed = wait::within(wait::deadline(), || {
                 round += 1;
                 let (router, prefix, cache, damaged, errors) =
                     (&router, &prefix, &cache, &damaged, &errors);
@@ -340,7 +342,7 @@ async fn a_repository_initialized_again_under_a_running_server_recovers() {
     wait::until_blocking("drop .git", || std::fs::remove_dir_all(&git).is_ok() || !git.exists());
     let again = Fixture::init(&repo).write("again.txt", "x\n").commit("feat: start over");
     assert_eq!(again.path(), repo, "the same folder, a new history");
-    let (took, errors) = until_api_answers(&router, &prefix, REBUILT_WITHIN).await;
+    let (took, errors) = until_api_answers(&router, &prefix, rebuilt_within()).await;
     assert!(errors.is_empty(), "while rebuilding:\n{}", errors.join("\n"));
     assert!(took.is_some(), "the API answers 200 again after the rebuild");
     assert!(repo.join(".git/gitterrace").is_dir(), "the cache folder was made again");
@@ -348,4 +350,33 @@ async fn a_repository_initialized_again_under_a_running_server_recovers() {
         let (s, _) = get(&router, &format!("{prefix}{p}")).await;
         assert!(s < 500, "{p} -> {s} after the reset");
     }
+}
+
+/// `oracle::ready` returns only once the warm-up is done, so nothing writes the cache after
+/// it: a test that edits the cache next cannot race the warm-up's last write (the languages
+/// state came after the pages answered). Red when `ready` waits for the pages alone: the
+/// state is still warming then, and the cache listing moves.
+#[tokio::test(flavor = "multi_thread")]
+async fn nothing_writes_the_cache_once_ready_returns() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (repo, router, prefix) = built(tmp.path()).await;
+    gitterrace_testkit::oracle::ready(&router).await;
+    let (_, body) = get(&router, &format!("{prefix}/api/progress")).await;
+    assert!(body.contains("\"ready\":true"), "not ready: {body}");
+    let listing = || {
+        let mut v: Vec<_> = std::fs::read_dir(repo.join(".git/gitterrace"))
+            .expect("dir")
+            .flatten()
+            .map(|e| (e.file_name(), e.metadata().map_or(0, |m| m.len())))
+            .collect();
+        v.sort();
+        v
+    };
+    let before = listing();
+    for p in ["/stats", "/stats/languages", "/log/HEAD"] {
+        let (s, _) = get(&router, &format!("{prefix}{p}")).await;
+        assert!(s < 500, "{p} -> {s}");
+    }
+    wait::pause(std::time::Duration::from_millis(300)).await;
+    assert_eq!(before, listing(), "the cache changed after ready");
 }
