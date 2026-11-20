@@ -428,6 +428,24 @@ async fn an_unreadable_cache_is_rebuilt_by_the_api_alone() {
     gitterrace_testkit::wait::until("the API rebuilt its unreadable cache", rebuilt).await;
 }
 
+/// A background rebuild that cannot write fails without taking the API down: the request
+/// still answers 503 and the rebuild flag is released, so the next read may try again.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_failed_background_rebuild_releases_its_flag() {
+    use std::os::unix::fs::PermissionsExt;
+    let (d, built) = fixture();
+    drop(built);
+    corrupt_segments(d.path());
+    let cache = d.path().join(".git/gitterrace");
+    std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o555)).expect("chmod");
+    let s = ApiState::open(d.path()).expect("open");
+    assert_eq!(get(&s, "/repo").await.0, StatusCode::SERVICE_UNAVAILABLE);
+    let idle = || async { !s.rebuild_running() };
+    gitterrace_testkit::wait::until("the failed rebuild released its flag", idle).await;
+    std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+}
+
 /// With a server's rebuild installed, an unreadable cache goes to it, not to a second
 /// rebuild of the API's own: one rebuild for pages and API.
 #[tokio::test]

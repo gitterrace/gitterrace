@@ -232,6 +232,11 @@ impl ApiState {
     /// Whether the head memo holds anything (a test hook for [`ApiState::release_records`]).
     /// Destructured, so a new field fails to compile here until the release test sees it.
     #[cfg(test)]
+    pub(crate) fn rebuild_running(&self) -> bool {
+        self.rebuilding.load(std::sync::atomic::Ordering::Acquire)
+    }
+
+    #[cfg(test)]
     pub(crate) fn head_memo_held(&self) -> bool {
         self.head.lock().is_ok_and(|g| {
             let HeadMemo { ignores, lines } = &*g;
