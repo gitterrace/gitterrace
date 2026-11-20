@@ -232,83 +232,83 @@ mod tests {
             None
         );
     }
-}
 
-#[cfg(all(test, unix))]
-mod unix_tests {
-    use std::os::unix::fs::symlink;
+    #[cfg(unix)]
+    mod unix {
+        use std::os::unix::fs::symlink;
 
-    use super::{open_read_no_follow, read_no_follow_bounded, write_atomic};
+        use crate::atomic::{open_read_no_follow, read_no_follow_bounded, write_atomic};
 
-    #[test]
-    fn a_link_at_the_file_or_the_folder_is_refused_and_its_target_kept() {
-        let t = tempfile::tempdir().expect("tmp");
-        let victim = t.path().join("victim");
-        std::fs::write(&victim, "keep").expect("seed");
-        let dir = t.path().join("d");
-        std::fs::create_dir(&dir).expect("mkdir");
-        symlink(&victim, dir.join("f")).expect("link");
-        assert!(write_atomic(&dir, "f", b"x", 0o644).is_err());
-        assert!(read_no_follow_bounded(&dir, "f", 1024).is_err());
-        let linked = t.path().join("linked");
-        symlink(&dir, &linked).expect("link dir");
-        assert!(write_atomic(&linked, "g", b"x", 0o644).is_err());
-        assert!(!dir.join("g").exists());
-        assert_eq!(std::fs::read_to_string(&victim).expect("read"), "keep");
+        #[test]
+        fn a_link_at_the_file_or_the_folder_is_refused_and_its_target_kept() {
+            let t = tempfile::tempdir().expect("tmp");
+            let victim = t.path().join("victim");
+            std::fs::write(&victim, "keep").expect("seed");
+            let dir = t.path().join("d");
+            std::fs::create_dir(&dir).expect("mkdir");
+            symlink(&victim, dir.join("f")).expect("link");
+            assert!(write_atomic(&dir, "f", b"x", 0o644).is_err());
+            assert!(read_no_follow_bounded(&dir, "f", 1024).is_err());
+            let linked = t.path().join("linked");
+            symlink(&dir, &linked).expect("link dir");
+            assert!(write_atomic(&linked, "g", b"x", 0o644).is_err());
+            assert!(!dir.join("g").exists());
+            assert_eq!(std::fs::read_to_string(&victim).expect("read"), "keep");
+        }
+
+        #[test]
+        fn a_fifo_is_refused_at_once_and_a_long_file_past_its_bound() {
+            let t = tempfile::tempdir().expect("tmp");
+            // The crate forbids unsafe, so the FIFO comes from the system tool.
+            let made = std::process::Command::new("mkfifo")
+                .arg(t.path().join("p"))
+                .status()
+                .expect("mkfifo");
+            assert!(made.success(), "mkfifo");
+            assert!(open_read_no_follow(t.path(), "p").is_err());
+            write_atomic(t.path(), "f", b"12345", 0o644).expect("write");
+            assert!(read_no_follow_bounded(t.path(), "f", 4).is_err());
+            assert_eq!(
+                read_no_follow_bounded(t.path(), "f", 5).expect("read"),
+                Some(b"12345".to_vec())
+            );
+        }
     }
 
-    #[test]
-    fn a_fifo_is_refused_at_once_and_a_long_file_past_its_bound() {
-        let t = tempfile::tempdir().expect("tmp");
-        // The crate forbids unsafe, so the FIFO comes from the system tool.
-        let made = std::process::Command::new("mkfifo")
-            .arg(t.path().join("p"))
-            .status()
-            .expect("mkfifo");
-        assert!(made.success(), "mkfifo");
-        assert!(open_read_no_follow(t.path(), "p").is_err());
-        write_atomic(t.path(), "f", b"12345", 0o644).expect("write");
-        assert!(read_no_follow_bounded(t.path(), "f", 4).is_err());
-        assert_eq!(
-            read_no_follow_bounded(t.path(), "f", 5).expect("read"),
-            Some(b"12345".to_vec())
-        );
-    }
-}
+    #[cfg(all(test, windows))]
+    mod windows {
+        use std::path::Path;
 
-#[cfg(all(test, windows))]
-mod windows_tests {
-    use std::path::Path;
+        use crate::atomic::{open_append_no_follow, write_atomic};
 
-    use super::{open_append_no_follow, write_atomic};
+        /// Plants a directory junction at `at` pointing to `to`: junctions need no privilege.
+        fn junction(at: &Path, to: &Path) -> std::io::Result<()> {
+            let made = std::process::Command::new("cmd")
+                .args(["/c", "mklink", "/J"])
+                .arg(at)
+                .arg(to)
+                .status()?;
+            assert!(made.success(), "mklink /J");
+            Ok(())
+        }
 
-    /// Plants a directory junction at `at` pointing to `to`: junctions need no privilege.
-    fn junction(at: &Path, to: &Path) -> std::io::Result<()> {
-        let made = std::process::Command::new("cmd")
-            .args(["/c", "mklink", "/J"])
-            .arg(at)
-            .arg(to)
-            .status()?;
-        assert!(made.success(), "mklink /J");
-        Ok(())
-    }
+        #[test]
+        fn open_append_refuses_reparse_point() {
+            let t = tempfile::tempdir().expect("tmp");
+            let target = t.path().join("target");
+            std::fs::create_dir(&target).expect("mkdir");
+            junction(&t.path().join("f"), &target).expect("junction");
+            assert!(open_append_no_follow(t.path(), "f", 0o644).is_err());
+        }
 
-    #[test]
-    fn open_append_refuses_reparse_point() {
-        let t = tempfile::tempdir().expect("tmp");
-        let target = t.path().join("target");
-        std::fs::create_dir(&target).expect("mkdir");
-        junction(&t.path().join("f"), &target).expect("junction");
-        assert!(open_append_no_follow(t.path(), "f", 0o644).is_err());
-    }
-
-    #[test]
-    fn write_atomic_refuses_reparse_point() {
-        let t = tempfile::tempdir().expect("tmp");
-        let target = t.path().join("target");
-        std::fs::create_dir(&target).expect("mkdir");
-        junction(&t.path().join("f"), &target).expect("junction");
-        assert!(write_atomic(t.path(), "f", b"x", 0o644).is_err());
-        assert!(std::fs::read_dir(&target).expect("list").next().is_none());
+        #[test]
+        fn write_atomic_refuses_reparse_point() {
+            let t = tempfile::tempdir().expect("tmp");
+            let target = t.path().join("target");
+            std::fs::create_dir(&target).expect("mkdir");
+            junction(&t.path().join("f"), &target).expect("junction");
+            assert!(write_atomic(t.path(), "f", b"x", 0o644).is_err());
+            assert!(std::fs::read_dir(&target).expect("list").next().is_none());
+        }
     }
 }

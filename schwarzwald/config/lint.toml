@@ -141,6 +141,8 @@ steps = [
   "super-ratchet|python3|install python3|python3 scripts/lint/super-check.py",
   "super-ratchet-test|python3|install python3|python3 scripts/lint/super-check.py --self-test",
   "tests-cfg|python3|install python3|python3 scripts/lint/tests-check.py",
+  "test-layout|python3|install python3|python3 scripts/lint/test-layout-check.py",
+  "test-layout-test|python3|install python3|python3 scripts/lint/test-layout-check.py --self-test",
   "css-button|python3|install python3|python3 scripts/lint/css-button-check.py",
   "css-button-test|python3|install python3|python3 scripts/lint/css-button-check.py --self-test",
   "site-csp|python3|install python3|python3 scripts/release/site/site-check.py csp",

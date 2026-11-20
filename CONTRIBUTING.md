@@ -65,6 +65,21 @@ Install any tool it reports as missing.
   new files go under `scripts/`, `tests/`, `docs/`, `deploy/` or
   `schwarzwald/config/`
 
+## Testing
+
+- Unit tests sit in one `#[cfg(test)] mod tests` at the bottom of the file they
+  test, or in a `tests.rs` file declared under `#[cfg(test)]`. Platform or topic
+  variants nest inside it (`#[cfg(unix)] mod unix`), never as a second top-level
+  test module.
+- Test-only helpers are gated with `#[cfg(test)]`, not left in production code.
+- No section-divider banners in test code, blank lines separate groups.
+- Integration tests live in each crate's `tests/`, one behavior per file.
+- Two tests hitting the same branch with trivially different inputs become one
+  table-driven test. A test that cannot fail is deleted.
+
+`scripts/lint/test-layout-check.py` enforces the first and third rules, with a
+red and a green case in its `--self-test`.
+
 ## Commits
 
 Conventional Commits, `type(scope): subject`, with the subject under 72
