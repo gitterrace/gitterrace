@@ -26,6 +26,9 @@ use crate::error::ApiError;
 use crate::{insights, wire};
 
 const DEFAULT_REV: &str = "HEAD";
+/// Commits per log page when the caller names none, for HTTP and MCP alike. Not configurable:
+/// `api.log_page_commits` caps it.
+pub(crate) const DEFAULT_PER_PAGE: usize = 50;
 
 /// Whether `file` is `dir` or inside it.
 fn under(file: &str, dir: &str) -> bool {

@@ -188,7 +188,7 @@ pub(crate) async fn log(
             q.rev.as_deref(),
             q.path.as_deref(),
             q.page.unwrap_or(1),
-            q.per_page.unwrap_or(50),
+            q.per_page.unwrap_or(crate::core::DEFAULT_PER_PAGE),
         )
     })
     .await

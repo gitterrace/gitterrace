@@ -163,7 +163,7 @@ args! {
         path: Option<String>,
         /// 1-based page. Defaults to 1.
         page: Option<usize>,
-        /// Commits per page, default 30, max 500.
+        /// Commits per page, default 50, max 500.
         per_page: Option<usize>,
     }
     ShowArgs {
@@ -301,7 +301,7 @@ impl McpServer {
                 a.rev.as_deref(),
                 a.path.as_deref(),
                 a.page.unwrap_or(1),
-                a.per_page.unwrap_or(30),
+                a.per_page.unwrap_or(crate::core::DEFAULT_PER_PAGE),
             )
         })
         .await

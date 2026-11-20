@@ -114,6 +114,9 @@ async fn a_tool_reads_the_repository_its_repo_argument_names() {
     let res = s.log(args("beta")).await.expect("result");
     assert!(text(&res).contains("beta one"), "{}", text(&res));
     assert!(!text(&res).contains("alpha one"), "{}", text(&res));
+    // Guard class: a default the HTTP route and the MCP tool each spell out drifts apart.
+    let per_page = format!("\"per_page\":{}", crate::core::DEFAULT_PER_PAGE);
+    assert!(text(&res).contains(&per_page), "{}", text(&res));
 }
 
 #[tokio::test]
