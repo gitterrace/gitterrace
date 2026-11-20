@@ -10,6 +10,7 @@ use serde::Serialize;
 use crate::git::{RefKind, TreeEntryKind};
 
 mod commit;
+mod insights;
 
 #[cfg(test)]
 mod tests;
@@ -17,6 +18,12 @@ mod tests;
 pub use commit::{
     CommitResponse, CompareResponse, DiffHunk, DiffLine, FileItem, LogCommit, LogResponse,
     WorktreeResponse,
+};
+pub use insights::{
+    InsightContributor, InsightContributors, InsightData, InsightDirChurn, InsightDirOwnership,
+    InsightFileChurn, InsightFrequency, InsightHotspot, InsightHotspots, InsightLabelBucket,
+    InsightLabelCount, InsightOwner, InsightOwnership, InsightPeriod, InsightPeriodStats,
+    InsightPeriodSummary, InsightResponse, InsightRhythm, InsightSeriesPoint, InsightUnit,
 };
 
 /// Who did something and when.

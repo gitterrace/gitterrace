@@ -442,7 +442,9 @@ fn configured_state_counts_with_the_config() {
         .insight("hotspots", None, &crate::Params::default())
         .expect("hotspots");
     assert!(
-        !hot.data.to_string().contains("src/b.rs"),
+        !serde_json::to_string(&hot.data)
+            .expect("json")
+            .contains("src/b.rs"),
         "repo exclude ignored: {hot:?}"
     );
 }

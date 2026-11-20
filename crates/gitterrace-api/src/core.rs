@@ -16,8 +16,8 @@ use gitterrace_git::Repo;
 use gitterrace_index::feed::{Checked, InsightsSource};
 use gitterrace_index::{Index, Options, Selected};
 use gitterrace_types::api::{
-    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, LogResponse, RefsResponse,
-    RepoResponse, RepoTotals, TreeResponse,
+    BlameResponse, BlobResponse, CommitResponse, ContributorsResponse, InsightResponse,
+    LogResponse, RefsResponse, RepoResponse, RepoTotals, TreeResponse,
 };
 
 use crate::bounds::{checked, checked_path};
@@ -522,7 +522,7 @@ impl ApiState {
         name: &str,
         rev: Option<&str>,
         params: &insights::Params,
-    ) -> Result<insights::InsightResponse, ApiError> {
+    ) -> Result<InsightResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let tip = self.repo.resolve(rev)?;
         let scope = insights::scope(params, self.settings().defaults)?;
@@ -534,7 +534,8 @@ impl ApiState {
             insights::compute(name, &counted, params, || self.head_lines(&tip))
         })??;
         let data = insights::with_links(name, data, |p| self.links(&tip, Some(p), None));
-        Ok(insights::InsightResponse {
+        let data = insights::typed(name, data)?;
+        Ok(InsightResponse {
             commits_indexed,
             query: scope.query_text(),
             data,

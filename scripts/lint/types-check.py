@@ -5,7 +5,7 @@ scripts/guards/shared-types.json, so another project reuses the script with its 
 1. No crate defines a type whose name the shared-types crate exports, and no crate renames
    a shared type with `pub use shared::X as Y`.
 2. The OpenAPI document types every 200 response: each is an object whose properties are all
-   non-empty schemas. Off while the config says so, with the reason.
+   non-empty schemas, except the paths the config skips, with the reason.
 
   python3 scripts/lint/types-check.py [--config FILE] [--root DIR]
   python3 scripts/lint/types-check.py --self-test    prove each rule goes red on a planted offender
@@ -121,7 +121,6 @@ def problems_in(root: Path, cfg: dict[str, Any]) -> list[str]:
 def self_test() -> int:
     cfg = json.loads(DEFAULT_CONFIG.read_text(encoding="utf-8"))
     cfg["openapi"]["enabled"] = True
-    cfg["openapi"]["skip_path_prefixes"] = []
     with tempfile.TemporaryDirectory() as d:
         root = Path(d)
         types = root / cfg["types_src"]
@@ -153,6 +152,21 @@ def self_test() -> int:
                 }
             }
         }
+        skipped = {"paths": {"/skip/x": good_api["paths"]["/a"]}}
+        skipped["paths"]["/skip/x"] = {
+            "get": {
+                "responses": {
+                    "200": {
+                        "content": {
+                            "application/json": {
+                                "schema": {"type": "object", "properties": {"x": {}}}
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        cfg["openapi"]["skip_path_prefixes"] = ["/skip/"]
         cases = [
             ("a second struct", "pub struct Person {}\n", good_api, True),
             (
@@ -163,6 +177,7 @@ def self_test() -> int:
             ),
             ("a rename alias", "use gitterrace_types::Person as P;\n", good_api, True),
             ("an unrelated type", "pub struct Other {}\n", good_api, False),
+            ("an untyped skipped path", "pub struct Other {}\n", skipped, False),
             (
                 "an untyped response",
                 "pub struct Other {}\n",
@@ -205,7 +220,7 @@ def main() -> int:
     if "--self-test" in args:
         return self_test()
     cfg_path = Path(args[args.index("--config") + 1]) if "--config" in args else DEFAULT_CONFIG
-    root = Path(args[args.index("--root") + 1]) if "--root" in args else HERE.parent
+    root = Path(args[args.index("--root") + 1]) if "--root" in args else HERE.parent.parent
     cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
     bad = problems_in(root, cfg)
     print("\n".join(bad) or "types: ok")

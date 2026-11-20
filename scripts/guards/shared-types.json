@@ -7,8 +7,7 @@
   "allowed_definitions": [],
   "openapi": {
     "file": "docs/openapi.json",
-    "enabled": false,
-    "disabled_reason": "insights responses are not typed yet, so their schema properties are still empty",
+    "enabled": true,
     "skip_path_prefixes": []
   }
 }

@@ -5,6 +5,7 @@
 use gitterrace_index::{
     Counted, Label, Metric, OptionParams, Period, Scope, ScopeParams, Selection,
 };
+use gitterrace_types::api::InsightData;
 use serde::Deserialize;
 use serde_json::{Value, to_value};
 
@@ -169,16 +170,25 @@ pub fn compute(
     }
 }
 
-/// `GET /insights/{name}`. `data` is the insight's own shape, typed per insight later.
-#[derive(Debug, Clone, serde::Serialize)]
-pub struct InsightResponse {
-    pub commits_indexed: usize,
-    /// The filter the numbers were counted under, as canonical text: `q` and the one-key
-    /// parameters read into one, so a client sees how its request was understood.
-    pub query: String,
-    pub data: Value,
-    pub insight: String,
-    pub rev: String,
+/// The typed `data` of insight `name`, read back from the value `compute` and [`with_links`]
+/// built, so the answer's shape is the one type the schema is made from.
+pub(crate) fn typed(name: &str, data: Value) -> Result<InsightData, ApiError> {
+    fn read<T: serde::de::DeserializeOwned>(v: Value) -> Result<T, ApiError> {
+        serde_json::from_value(v).map_err(|e| ApiError::Task(e.to_string()))
+    }
+    Ok(match name {
+        "summary" => InsightData::Summary(read(data)?),
+        "activity" => InsightData::Activity(Box::new(read(data)?)),
+        "contributors" => InsightData::Contributors(read(data)?),
+        "file_churn" => InsightData::FileChurn(read(data)?),
+        "dir_churn" => InsightData::DirChurn(read(data)?),
+        "label_breakdown" => InsightData::LabelBreakdown(read(data)?),
+        "label_over_time" => InsightData::LabelOverTime(read(data)?),
+        "frequency" => InsightData::Frequency(read(data)?),
+        "hotspots" => InsightData::Hotspots(read(data)?),
+        "ownership" => InsightData::Ownership(read(data)?),
+        other => return Err(ApiError::BadRequest(format!("unknown insight: {other}"))),
+    })
 }
 
 /// Adds `permalink` and `link` from `links` to every row of the per-file insights.

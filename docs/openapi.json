@@ -570,6 +570,454 @@
         ],
         "type": "object"
       },
+      "InsightContributor": {
+        "description": "One person of `contributors`.",
+        "properties": {
+          "active_days": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "bot": {
+            "type": "boolean"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "emails": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "first_commit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "first_time": {
+            "type": "boolean"
+          },
+          "last_commit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "name": {
+            "type": "string"
+          },
+          "series": {
+            "description": "Commits per bucket, aligned with `labels`.",
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "active_days",
+          "additions",
+          "bot",
+          "commits",
+          "deletions",
+          "emails",
+          "first_commit",
+          "first_time",
+          "last_commit",
+          "name",
+          "series"
+        ],
+        "type": "object"
+      },
+      "InsightContributors": {
+        "description": "`contributors`.",
+        "properties": {
+          "contributors": {
+            "items": {
+              "$ref": "#/components/schemas/InsightContributor"
+            },
+            "type": "array"
+          },
+          "labels": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/InsightUnit"
+          }
+        },
+        "required": [
+          "contributors",
+          "labels",
+          "unit"
+        ],
+        "type": "object"
+      },
+      "InsightData": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/InsightPeriodSummary"
+          },
+          {
+            "$ref": "#/components/schemas/InsightRhythm"
+          },
+          {
+            "$ref": "#/components/schemas/InsightContributors"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/InsightFileChurn"
+            },
+            "type": "array"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/InsightDirChurn"
+            },
+            "type": "array"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/InsightLabelCount"
+            },
+            "type": "array"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/InsightLabelBucket"
+            },
+            "type": "array"
+          },
+          {
+            "items": {
+              "$ref": "#/components/schemas/InsightFrequency"
+            },
+            "type": "array"
+          },
+          {
+            "$ref": "#/components/schemas/InsightHotspots"
+          },
+          {
+            "$ref": "#/components/schemas/InsightOwnership"
+          }
+        ],
+        "description": "The `data` of an insight answer. Which variant it is follows from `insight`."
+      },
+      "InsightDirChurn": {
+        "description": "One row of `dir_churn`, `.` for files at the repository root.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "additions",
+          "commits",
+          "deletions",
+          "files",
+          "path"
+        ],
+        "type": "object"
+      },
+      "InsightDirOwnership": {
+        "description": "One directory of `ownership`.",
+        "properties": {
+          "bus_factor": {
+            "description": "People who together hold at least half of the knowledge.",
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lines": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "owners": {
+            "items": {
+              "$ref": "#/components/schemas/InsightOwner"
+            },
+            "type": "array"
+          },
+          "path": {
+            "description": "Empty for the whole repository.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bus_factor",
+          "files",
+          "lines",
+          "owners",
+          "path"
+        ],
+        "type": "object"
+      },
+      "InsightFileChurn": {
+        "description": "One row of `file_churn`.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "last_commit": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "additions",
+          "commits",
+          "deletions",
+          "last_commit",
+          "path"
+        ],
+        "type": "object"
+      },
+      "InsightFrequency": {
+        "description": "One bucket of `frequency`.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          },
+          "rewritten": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "additions",
+          "deletions",
+          "key",
+          "label",
+          "rewritten"
+        ],
+        "type": "object"
+      },
+      "InsightHotspot": {
+        "description": "One file of `hotspots`.",
+        "properties": {
+          "authors": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "changes": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "language": {
+            "type": "string"
+          },
+          "last_change": {
+            "format": "int64",
+            "type": "integer"
+          },
+          "lines": {
+            "description": "Lines now.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "lines_changed": {
+            "description": "Added plus removed lines in the period.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "path": {
+            "type": "string"
+          },
+          "permalink": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "score": {
+            "description": "`changes * sqrt(lines)`.",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "authors",
+          "changes",
+          "language",
+          "last_change",
+          "lines",
+          "lines_changed",
+          "path",
+          "score"
+        ],
+        "type": "object"
+      },
+      "InsightHotspots": {
+        "description": "`hotspots`.",
+        "properties": {
+          "concentration": {
+            "description": "Share of all changes that hit the top 10% of files.",
+            "format": "double",
+            "type": "number"
+          },
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/InsightHotspot"
+            },
+            "type": "array"
+          },
+          "single_author_files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "top_tenth": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "total_changes": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "concentration",
+          "files",
+          "single_author_files",
+          "top_tenth",
+          "total_changes"
+        ],
+        "type": "object"
+      },
+      "InsightLabelBucket": {
+        "description": "One bucket of `label_over_time`.",
+        "properties": {
+          "counts": {
+            "items": {
+              "$ref": "#/components/schemas/InsightLabelCount"
+            },
+            "type": "array"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "counts",
+          "key",
+          "label"
+        ],
+        "type": "object"
+      },
+      "InsightLabelCount": {
+        "description": "One row of `label_breakdown`.",
+        "properties": {
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commits",
+          "label"
+        ],
+        "type": "object"
+      },
       "InsightList": {
         "description": "`GET /insights`.",
         "properties": {
@@ -582,6 +1030,250 @@
         },
         "required": [
           "insights"
+        ],
+        "type": "object"
+      },
+      "InsightOwner": {
+        "description": "One person's share of a directory.",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "share": {
+            "description": "Share of the knowledge, 0 to 1.",
+            "format": "double",
+            "type": "number"
+          }
+        },
+        "required": [
+          "name",
+          "share"
+        ],
+        "type": "object"
+      },
+      "InsightOwnership": {
+        "description": "`ownership`.",
+        "properties": {
+          "dirs": {
+            "items": {
+              "$ref": "#/components/schemas/InsightDirOwnership"
+            },
+            "type": "array"
+          },
+          "dirs_with_bus_factor_one": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "overall": {
+            "$ref": "#/components/schemas/InsightDirOwnership"
+          },
+          "solo_lines": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stale_lines": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "untracked_lines": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "dirs",
+          "dirs_with_bus_factor_one",
+          "overall",
+          "solo_lines",
+          "stale_lines",
+          "untracked_lines"
+        ],
+        "type": "object"
+      },
+      "InsightPeriod": {
+        "description": "The reporting window as the summary writes it: the variant name, not the canonical text.",
+        "enum": [
+          "Week",
+          "Month",
+          "Quarter",
+          "Year",
+          "All"
+        ],
+        "type": "string"
+      },
+      "InsightPeriodStats": {
+        "description": "Counts over one period.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "authors": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commits": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "additions",
+          "authors",
+          "commits",
+          "deletions",
+          "files"
+        ],
+        "type": "object"
+      },
+      "InsightPeriodSummary": {
+        "description": "`summary`: the period against the one right before it.",
+        "properties": {
+          "current": {
+            "$ref": "#/components/schemas/InsightPeriodStats"
+          },
+          "from": {
+            "format": "int64",
+            "type": [
+              "integer",
+              "null"
+            ]
+          },
+          "period": {
+            "$ref": "#/components/schemas/InsightPeriod"
+          },
+          "previous": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsightPeriodStats"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Null for `All`."
+          },
+          "to": {
+            "format": "int64",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "current",
+          "period",
+          "to"
+        ],
+        "type": "object"
+      },
+      "InsightResponse": {
+        "description": "`GET /insights/{name}`. The fields keep the order the answer was always written in.",
+        "properties": {
+          "commits_indexed": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "data": {
+            "$ref": "#/components/schemas/InsightData"
+          },
+          "insight": {
+            "type": "string"
+          },
+          "query": {
+            "description": "The filter the numbers were counted under, as canonical text: `q` and the one-key\nparameters read into one, so a client sees how its request was understood.",
+            "type": "string"
+          },
+          "rev": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "commits_indexed",
+          "query",
+          "data",
+          "insight",
+          "rev"
+        ],
+        "type": "object"
+      },
+      "InsightRhythm": {
+        "description": "`activity`: when work happens, in each commit's own timezone.",
+        "properties": {
+          "by_hour": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 24,
+            "minItems": 24,
+            "type": "array"
+          },
+          "by_weekday": {
+            "items": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "maxItems": 7,
+            "minItems": 7,
+            "type": "array"
+          },
+          "punch_card": {
+            "description": "`[weekday][hour]`, Monday is 0.",
+            "items": {
+              "items": {
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "maxItems": 24,
+              "minItems": 24,
+              "type": "array"
+            },
+            "maxItems": 7,
+            "minItems": 7,
+            "type": "array"
+          },
+          "punch_max": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "series": {
+            "items": {
+              "$ref": "#/components/schemas/InsightSeriesPoint"
+            },
+            "type": "array"
+          },
+          "unit": {
+            "$ref": "#/components/schemas/InsightUnit"
+          }
+        },
+        "required": [
+          "by_hour",
+          "by_weekday",
+          "punch_card",
+          "punch_max",
+          "series",
+          "unit"
         ],
         "type": "object"
       },
@@ -600,6 +1292,51 @@
           "summary"
         ],
         "type": "object"
+      },
+      "InsightSeriesPoint": {
+        "description": "One bucket of the activity series.",
+        "properties": {
+          "additions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "commits": {
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "deletions": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "key": {
+            "type": "string"
+          },
+          "label": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "additions",
+          "commits",
+          "deletions",
+          "key",
+          "label"
+        ],
+        "type": "object"
+      },
+      "InsightUnit": {
+        "description": "Width of one bucket.",
+        "enum": [
+          "Day",
+          "Week",
+          "Month",
+          "Quarter",
+          "Year"
+        ],
+        "type": "string"
       },
       "LineKind": {
         "enum": [
@@ -1651,22 +2388,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "properties": {
-                    "commits_indexed": {
-                      "type": "integer"
-                    },
-                    "data": {},
-                    "insight": {
-                      "type": "string"
-                    },
-                    "query": {
-                      "type": "string"
-                    },
-                    "rev": {
-                      "type": "string"
-                    }
-                  },
-                  "type": "object"
+                  "$ref": "#/components/schemas/InsightResponse"
                 }
               }
             },

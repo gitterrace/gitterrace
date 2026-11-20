@@ -3,6 +3,13 @@
 * text=auto eol=lf
 vendor/schwarzwald/kit/tokens/theme-tokens.json linguist-generated
 crates/gitterrace-web/static/vendor/** linguist-vendored
+# Written by `cargo xtask generate`, tracked and checked by `cargo xtask check`.
 docs/openapi.json linguist-generated
+docs/api.md linguist-generated
+docs/configuration.md linguist-generated
+docs/screenshots/README.md linguist-generated
 tests/bench/results/*.json linguist-generated
+# Drawn from the run JSON by `make bench-report`, not tracked.
+tests/bench/results/**/*.svg linguist-generated
+tests/bench/results/**/README.md linguist-generated
 Cargo.lock linguist-generated

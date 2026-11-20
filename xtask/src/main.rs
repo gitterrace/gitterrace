@@ -21,6 +21,7 @@ mod facts;
 mod kit_path;
 mod logo;
 mod main_guard;
+mod marks;
 mod notices_md;
 mod openapi_json;
 mod out;
@@ -108,6 +109,14 @@ fn main() -> Result<()> {
         }
         Cmd::Check => {
             let outs = generators(&root, false)?;
+            let unmarked = marks::check(&root, &outs)?;
+            if !unmarked.is_empty() {
+                println!(
+                    "generated files are not marked:\n  {}",
+                    unmarked.join("\n  ")
+                );
+                std::process::exit(1);
+            }
             let orphans = unowned_blocks(&root, &outs)?;
             if !orphans.is_empty() {
                 println!("generated blocks nobody fills: {}", orphans.join(", "));

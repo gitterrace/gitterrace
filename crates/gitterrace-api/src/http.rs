@@ -6,8 +6,8 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    EndpointDoc, IndexResponse, InsightList, InsightRow, LogResponse, ParamDoc, RefsResponse,
-    RepoResponse, TreeResponse, WorktreeResponse,
+    EndpointDoc, IndexResponse, InsightList, InsightResponse, InsightRow, LogResponse, ParamDoc,
+    RefsResponse, RepoResponse, TreeResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -330,7 +330,7 @@ pub(crate) async fn insight(
     State(s): State<ApiState>,
     Path(name): Path<String>,
     Query(q): Query<InsightQuery>,
-) -> Reply<insights::InsightResponse> {
+) -> Reply<InsightResponse> {
     let InsightQuery { rev, params } = q;
     blocking(&s, move |s| s.insight(&name, rev.as_deref(), &params)).await
 }

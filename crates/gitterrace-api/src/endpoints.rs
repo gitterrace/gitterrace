@@ -4,10 +4,10 @@
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    IndexResponse, InsightList, LogResponse, RefsResponse, RepoResponse, TreeResponse,
-    WorktreeResponse,
+    IndexResponse, InsightList, InsightResponse, LogResponse, RefsResponse, RepoResponse,
+    TreeResponse, WorktreeResponse,
 };
-use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings, json_schema};
+use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
 
 use crate::core::ApiState;
@@ -73,20 +73,6 @@ pub fn generator() -> SchemaGenerator {
 
 fn of<T: JsonSchema>(g: &mut SchemaGenerator) -> Schema {
     g.subschema_for::<T>()
-}
-
-/// The insight answer. Its `data` is typed per insight in a later change, so it is open for now.
-fn insight_schema(_: &mut SchemaGenerator) -> Schema {
-    json_schema!({
-        "type": "object",
-        "properties": {
-            "commits_indexed": { "type": "integer" },
-            "data": {},
-            "insight": { "type": "string" },
-            "query": { "type": "string" },
-            "rev": { "type": "string" }
-        }
-    })
 }
 
 const fn p(name: &'static str, ty: &'static str, description: &'static str) -> Param {
@@ -318,7 +304,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
             WS,
             EXCLUDE,
         ],
-        schema: insight_schema,
+        schema: of::<InsightResponse>,
         route: || get(http::insight),
     },
 ];
