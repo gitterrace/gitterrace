@@ -93,6 +93,14 @@ index is ready, the log stops after the newest 2,000 commits.
 Good to know: source outlines work in about 90 languages. In a large file the
 list covers the part already highlighted.
 
+## Mark files as viewed
+
+Each file of a commit, compare or working tree diff has a **Viewed** box, and
+a line above the diff counts the marked files. The marks live in this
+browser's localStorage, per page address, and never leave the machine. A file
+marked viewed whose diff changed since (a live refresh of the working tree, say)
+is unchecked and shows a **Changed since viewed** badge until you mark it again.
+
 ## Share a link to a line
 
 1. Click a line number. Shift-click another to select a range.

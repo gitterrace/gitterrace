@@ -286,7 +286,10 @@
   if (document.querySelector("[data-outline], [data-filter-help]")) window.gtLazy("outline");
 
   // Folded diff files: only where the page has one, or once a live refresh brings one.
-  function withDiffs() { if (document.querySelector("[data-load-diff]")) window.gtLazy("diffs"); }
+  function withDiffs() {
+    if (document.querySelector("[data-load-diff]")) window.gtLazy("diffs");
+    if (document.querySelector("section.file[data-path]")) window.gtLazy("diffs-viewed");
+  }
   withDiffs();
   document.addEventListener("gt:live-refreshed", withDiffs);
 
