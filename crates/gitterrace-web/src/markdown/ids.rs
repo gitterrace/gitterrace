@@ -11,99 +11,21 @@ pub(crate) const USER_ID: &str = "user-content-";
 
 /// Every literal id the page chrome uses: templates, static scripts and Rust views. The
 /// `chrome_ids_match_the_sources` test fails when this list and the sources disagree.
-pub(crate) const CHROME_IDS: [&str; 60] = [
-    "about",
-    "actcommit",
-    "activity-counts",
-    "activity-hours",
-    "activity-series",
-    "actmark",
-    "actnote",
-    "actpage",
-    "actsel",
-    "branches",
-    "code-age",
-    "commits",
-    "coupled",
-    "files-size",
-    "formoff",
-    "frequency",
-    "gt-main",
-    "gt-repolist",
-    "gt-tip",
-    "headstate",
-    "hotspot-files",
-    "hotspot-map",
-    "keys-off",
-    "livenote",
-    "loc",
-    "loc-data",
-    "logq",
-    "logq-error",
-    "logq-help",
-    "logq-list",
-    "patterns",
-    "q",
-    "range",
-    "refbtn",
-    "remotes",
-    "releases",
-    "repobtn",
-    "repocount",
-    "repolink",
-    "repoq",
-    "reposwitch",
-    "searchbtn",
-    "send-ctx",
-    "send-head",
-    "send-title",
-    "seterrs",
-    "seterrsum",
-    "setform",
-    "setgut",
-    "setnote",
-    "setplain",
-    "setsave",
-    "settext",
-    "sizes",
-    "stashes",
-    "tags",
-    "theme",
-    "types",
-    "worktrees",
-    "wtchip",
-];
+pub(crate) const CHROME_IDS: &str = "\
+    about actcommit activity-counts activity-hours activity-series actmark actnote actpage \
+    actsel branches code-age commits coupled files-size formoff frequency gt-main \
+    gt-repolist gt-tip headstate hotspot-files hotspot-map keys-off livenote loc loc-data logq \
+    logq-error logq-help logq-list patterns q range refbtn remotes releases repobtn \
+    repocount repolink repoq reposwitch searchbtn send-ctx send-head send-title seterrs \
+    seterrsum setform setgut setnote setplain setsave settext sizes stashes tags theme types \
+    worktrees wtchip";
 
 /// Names that are dangerous whatever the templates hold: an element with such an id shadows
 /// a `window` or `document` property through named access, or one of our script globals.
-const NAMED_ACCESS: [&str; 26] = [
-    "location",
-    "top",
-    "name",
-    "opener",
-    "parent",
-    "self",
-    "window",
-    "document",
-    "frames",
-    "length",
-    "history",
-    "navigator",
-    "localstorage",
-    "sessionstorage",
-    "origin",
-    "closed",
-    "frameelement",
-    "body",
-    "head",
-    "forms",
-    "cookie",
-    "domain",
-    "gtcopy",
-    "gttoast",
-    "gtoverlay",
-    "gtsend",
-];
+const NAMED_ACCESS: &str = "\
+    location top name opener parent self window document frames length history navigator \
+    localstorage sessionstorage origin closed frameelement body head forms cookie domain \
+    gtcopy gttoast gtoverlay gtsend";
 
 /// Ids the code generates by pattern: `L12` and `L3-L9` line anchors, `f4` diff files.
 fn generated(id: &str) -> bool {
@@ -119,8 +41,8 @@ fn generated(id: &str) -> bool {
 
 fn reserved(id: &str) -> bool {
     let lower = id.to_ascii_lowercase();
-    CHROME_IDS.contains(&id)
-        || NAMED_ACCESS.contains(&lower.as_str())
+    CHROME_IDS.split_whitespace().any(|c| c == id)
+        || NAMED_ACCESS.split_whitespace().any(|n| n == lower)
         || generated(id)
         || id.starts_with(USER_ID)
 }
@@ -176,13 +98,13 @@ mod tests {
                 }
             }
         }
-        let listed: BTreeSet<String> = CHROME_IDS.iter().map(|s| (*s).to_owned()).collect();
+        let listed: BTreeSet<String> = CHROME_IDS.split_whitespace().map(str::to_owned).collect();
         assert_eq!(found, listed, "CHROME_IDS must list every chrome id in the sources");
     }
 
     #[test]
     fn reserved_ids_get_the_prefix() {
-        for id in CHROME_IDS.iter().chain(NAMED_ACCESS.iter()) {
+        for id in CHROME_IDS.split_whitespace().chain(NAMED_ACCESS.split_whitespace()) {
             assert_eq!(doc_id(id), format!("{USER_ID}{id}"), "{id}");
         }
         for id in ["Location", "L12", "L3-L9", "L3-9", "f4", "user-content-q"] {

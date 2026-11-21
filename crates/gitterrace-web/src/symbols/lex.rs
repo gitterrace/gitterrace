@@ -25,23 +25,8 @@ pub(crate) enum Dialect {
 }
 
 /// Words after which a `/` starts a regex rather than a division.
-const REGEX_AFTER: [&str; 15] = [
-    "return",
-    "typeof",
-    "instanceof",
-    "in",
-    "of",
-    "new",
-    "delete",
-    "void",
-    "throw",
-    "case",
-    "do",
-    "else",
-    "yield",
-    "await",
-    "extends",
-];
+const REGEX_AFTER: &str =
+    "return typeof instanceof in of new delete void throw case do else yield await extends";
 
 const fn is_ident_start(b: u8) -> bool {
     b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b >= 0x80
@@ -186,7 +171,7 @@ impl Lexer<'_> {
             Kind::Punct(p) => !matches!(p, b')' | b']' | b'}'),
             Kind::Ident => {
                 let word = &self.src[t.start as usize..t.end as usize];
-                REGEX_AFTER.iter().any(|k| k.as_bytes() == word)
+                REGEX_AFTER.split_whitespace().any(|k| k.as_bytes() == word)
             }
         })
     }

@@ -9,18 +9,7 @@ const STATEMENTS: [&str; 8] =
     ["const", "let", "var", "function", "class", "export", "if", "return"];
 
 /// TypeScript and JavaScript member modifiers, which may stand before a method name.
-const MODIFIERS: [&str; 10] = [
-    "static",
-    "async",
-    "get",
-    "set",
-    "public",
-    "private",
-    "protected",
-    "readonly",
-    "abstract",
-    "override",
-];
+const MODIFIERS: &str = "static async get set public private protected readonly abstract override";
 
 /// TypeScript and JavaScript: functions, classes, interfaces, types, enums, namespaces,
 /// class methods and top-level `const f = (...) =>` or `= function`.
@@ -221,7 +210,7 @@ fn member_start(w: &Walk<'_>, k: usize) -> bool {
     };
     match p.kind {
         Kind::Punct(b'{' | b'}' | b';' | b'*') => true,
-        Kind::Ident if MODIFIERS.contains(&w.text(p)) => true,
+        Kind::Ident if MODIFIERS.split_whitespace().any(|m| m == w.text(p)) => true,
         Kind::Ident | Kind::Lit | Kind::Punct(b')' | b']') => p.line < t.line,
         Kind::Punct(_) => false,
     }
@@ -241,7 +230,7 @@ fn class_member(w: &mut Walk<'_>, k: usize) {
     } else {
         let name = w.text(t);
         // A modifier followed by a name is not the member's name.
-        if MODIFIERS.contains(&name)
+        if MODIFIERS.split_whitespace().any(|m| m == name)
             && w.tok(k + 1).is_some_and(|n| n.kind == Kind::Ident || n.kind == Kind::Punct(b'['))
         {
             return;
