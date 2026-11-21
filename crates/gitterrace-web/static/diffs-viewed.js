@@ -14,12 +14,7 @@
       else localStorage.removeItem(KEY);
     } catch (e) { /* storage refused: the marks last for this page view only */ }
   }
-  function el(tag, cls, text) {
-    var n = document.createElement(tag);
-    n.className = cls;
-    if (text) n.textContent = text;
-    return n;
-  }
+  var el = window.gtNav.el;
   function count(files, marks) {
     var n = 0, p = document.querySelector("p.viewed-count");
     files.forEach(function (s) { if (marks[s.dataset.path] === s.dataset.h) n++; });

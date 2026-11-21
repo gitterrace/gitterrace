@@ -6,8 +6,7 @@
   "use strict";
   if (typeof document === "undefined") { module.exports = { enc: enc, fill: fill, sourceLine: sourceLine, titleOf: titleOf }; return; }
   var el = window.gtNav.el;
-  var meta = document.querySelector('meta[name="gt-base"]');
-  var B = meta ? meta.content : "";
+  var B = window.gtNav.B;
   var KEY = "gitterrace-send-target";
   var COPY = "__copy";
   var cur = null;

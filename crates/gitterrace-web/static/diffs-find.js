@@ -3,19 +3,13 @@
 // app.js loads this only on a commit or working tree page with diff files.
 (function () {
   "use strict";
-  var meta = document.querySelector('meta[name="gt-base"]');
-  var base = meta ? meta.content : "";
+  var base = window.gtNav.B;
   var path = location.pathname.slice(base.length);
   var m = /^\/commit\/([^/]+)$/.exec(path), url;
   if (m) url = base + "/diff-find/" + m[1];
   else if (path === "/worktree") url = base + "/worktree/find" + location.search;
   if (!url) return;
-  function el(tag, cls, text) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text !== undefined) n.textContent = text;
-    return n;
-  }
+  var el = window.gtNav.el;
   function build() {
     var first = document.querySelector("section.file[data-path]");
     if (!first || document.querySelector(".diff-find")) return;
