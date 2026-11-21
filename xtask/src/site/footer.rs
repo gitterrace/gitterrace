@@ -1,11 +1,7 @@
 //! Checks over the footer of the built docs pages.
 
+use crate::site::built::footer_of;
 use crate::site::tests::generated;
-
-fn footer_of(html: &str) -> Option<&str> {
-    let (_, rest) = html.split_once("<footer>")?;
-    rest.split_once("</footer>").map(|x| x.0)
-}
 
 /// The class this guards: a docs page whose footer lost its two labelled navs (the project on
 /// the left, the legal pages last on the right), repeats a link, or breaks the project

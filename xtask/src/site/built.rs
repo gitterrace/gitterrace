@@ -271,7 +271,7 @@ fn a_planted_external_font_or_missing_face_file_is_reported() {
 }
 
 /// The `<footer>` of a page, if it has exactly one.
-fn footer_of(html: &str) -> Option<&str> {
+pub(super) fn footer_of(html: &str) -> Option<&str> {
     let (_, rest) = html.split_once("<footer>")?;
     let (inner, tail) = rest.split_once("</footer>")?;
     (!tail.contains("<footer>")).then_some(inner)
