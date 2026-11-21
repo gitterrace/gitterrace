@@ -39,6 +39,7 @@ pub(crate) enum Renames {
     Index,
 }
 
+#[derive(Clone, Default)]
 struct Counted {
     additions: u32,
     deletions: u32,
@@ -55,22 +56,12 @@ struct Counted {
 /// rust. A hit skips reading, inflating and diffing both blobs. Bounded: when full it starts
 /// over, which costs only recomputation, never a different answer.
 pub(crate) struct CountMemo {
-    map: std::sync::Mutex<std::collections::HashMap<MemoKey, MemoCounts>>,
+    map: std::sync::Mutex<std::collections::HashMap<MemoKey, Counted>>,
     cap: usize,
 }
 
 /// (old blob, new blob, rename tracking found them identical).
 type MemoKey = (Option<gix::ObjectId>, Option<gix::ObjectId>, bool);
-
-#[derive(Clone, Copy)]
-struct MemoCounts {
-    additions: u32,
-    deletions: u32,
-    binary: bool,
-    lines: u32,
-    rewritten: u32,
-    code: CodeCounts,
-}
 
 impl CountMemo {
     pub(crate) fn new(cap: usize) -> Self {
@@ -78,48 +69,22 @@ impl CountMemo {
     }
 
     fn get(&self, key: &MemoKey) -> Option<Counted> {
-        let c = *self.map.lock().ok()?.get(key)?;
-        Some(Counted {
-            additions: c.additions,
-            deletions: c.deletions,
-            binary: c.binary,
-            hunks: Vec::new(),
-            lines: c.lines,
-            rewritten: c.rewritten,
-            code: c.code,
-        })
+        self.map.lock().ok()?.get(key).cloned()
     }
 
     fn put(&self, key: MemoKey, c: &Counted) {
+        debug_assert!(c.hunks.is_empty(), "the memo is only used without hunks");
         let Ok(mut map) = self.map.lock() else { return };
         if map.len() >= self.cap {
             map.clear();
         }
-        map.insert(
-            key,
-            MemoCounts {
-                additions: c.additions,
-                deletions: c.deletions,
-                binary: c.binary,
-                lines: c.lines,
-                rewritten: c.rewritten,
-                code: c.code,
-            },
-        );
+        map.insert(key, c.clone());
     }
 }
 
 impl Counted {
     fn empty(binary: bool) -> Self {
-        Self {
-            additions: 0,
-            deletions: 0,
-            binary,
-            hunks: Vec::new(),
-            lines: 0,
-            rewritten: 0,
-            code: CodeCounts::default(),
-        }
+        Self { binary, ..Self::default() }
     }
 }
 
