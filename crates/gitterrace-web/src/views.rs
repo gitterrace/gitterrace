@@ -279,6 +279,12 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
 }
 
 impl Chrome {
+    /// The stylesheet that closes the cascade: led by the rendered-markdown rules on a page that
+    /// renders markdown, without them everywhere else.
+    pub(crate) const fn late_css(&self) -> &'static str {
+        if self.md { "late-md.css" } else { "late.css" }
+    }
+
     /// A server's own page, not a repository's.
     pub(crate) fn bare(&self) -> bool {
         self.owner == Owner::Server

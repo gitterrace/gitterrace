@@ -175,6 +175,11 @@
       var next = doc.getElementById("gt-main");
       var cur = document.getElementById("gt-main");
       if (!next || !cur) return;
+      // A README that appeared since the first render needs the markdown rules the page left out.
+      var sheet = document.querySelector('link[href*="/static/late"]');
+      var want = doc.querySelector('link[href*="/static/late"]');
+      var href = want && want.getAttribute("href");
+      if (sheet && href && sheet.getAttribute("href") !== href) sheet.setAttribute("href", href);
       var a = anchor(cur);
       var y = window.scrollY;
       var fresh = document.importNode(next, true);

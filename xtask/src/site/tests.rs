@@ -482,7 +482,7 @@ fn docs_nav_headings_order_and_pager_follow_the_index() {
 fn site_css_carries_the_app_syntax_colours() {
     let css = super::css(
         "/* BEGIN generated */\n:root{}\n/* END generated */\n/* roles */\n",
-        include_str!("../../../crates/gitterrace-web/static/markdown.css"),
+        include_str!("../../../crates/gitterrace-web/static/syntax.css"),
     )
     .expect("css");
     assert!(css.contains("pre [class~=s-keyword]"), "{css}");

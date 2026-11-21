@@ -1,0 +1,16 @@
+/* Syntax colours and their aliases, shared by rendered markdown, code and diffs: every page
+   carries them, the rest of the markdown rules only the pages that render markdown. */
+:is(.markdown-body,.code,.diff){--md-note:var(--info);--md-tip:var(--add);--md-important:var(--done);--md-warning:var(--warn);--md-caution:var(--del);--md-k1:var(--syn-keyword);--md-k2:var(--syn-entity);--md-k3:var(--syn-constant);--md-k4:var(--syn-string);--md-k5:var(--syn-comment);--md-k6:var(--syn-tag);--md-k7:var(--syn-param)}
+/* Code and diffs share only the colours above. Their size and leading are the code tokens,
+   so a gutter number and its line have one height. */
+/* syntax (syntect classes, prefix s-) */
+:is(.markdown-body,.code,.diff) [class~=s-comment]{color:var(--md-k5)}
+:is(.markdown-body,.code,.diff) [class~=s-keyword],:is(.markdown-body,.code,.diff) [class~=s-storage]{color:var(--md-k1)}
+:is(.markdown-body,.code,.diff) [class~=s-string]{color:var(--md-k4)}
+:is(.markdown-body,.code,.diff) :is([class~=s-constant],[class~=s-support]){color:var(--md-k3)}
+:is(.markdown-body,.code,.diff) :is([class~=s-entity],[class~=s-variable]){color:var(--md-k2)}
+:is(.markdown-body,.code,.diff) [class~=s-tag]{color:var(--md-k6)}
+:is(.markdown-body,.code,.diff) [class~=s-numeric]{color:var(--md-k3)}
+:is(.markdown-body,.code,.diff) [class~=s-invalid]{color:var(--md-caution)}
+:is(.markdown-body,.code,.diff) [class~=s-punctuation]{color:var(--fg)}
+:is(.markdown-body,.code,.diff) [class~=s-parameter]{color:var(--md-k7)}

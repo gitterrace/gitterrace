@@ -29,7 +29,8 @@ HISTORY = re.compile(r"\b(?:no longer|used to|previously|was changed)\b", re.I)
 ALLOW: set[str] = set()
 EXTS = (".rs", ".html", ".js", ".mjs", ".md")
 EXCLUDE = ("static/vendor/", "vendor/schwarzwald/kit/", "target/", "CHANGELOG.md")
-MARKDOWN_CSS = "crates/gitterrace-web/static/markdown.css"
+CSS_DIR = "crates/gitterrace-web/static/"
+MARKDOWN_CSS = (CSS_DIR + "markdown.css", CSS_DIR + "syntax.css")
 W = r"(?:clean|dirty|ahead|behind|detached|untracked|modified)"
 PATTERNS = [
     # "on main clean", "branch {name} ahead 2"
@@ -103,7 +104,7 @@ def css_scope(text: str, name: str) -> list[str]:
 RULES: dict[str, tuple[Callable[[str], bool], Callable[[str, str], list[str]]]] = {
     "status-words": (lambda f: f.endswith(EXTS + tuple(COMMENT_EXTS)), status_words),
     "history-comments": (lambda f: Path(f).suffix in COMMENT_EXTS, history_comments),
-    "css-scope": (lambda f: f == MARKDOWN_CSS, css_scope),
+    "css-scope": (lambda f: f in MARKDOWN_CSS, css_scope),
 }
 
 # (rule, file name, text, red?)
@@ -120,8 +121,8 @@ CASES = [
     ("history-comments", "x.py", "# was changed", True),
     ("history-comments", "x.rs", '// the cache holds now\nlet s = "no longer";', False),
     ("history-comments", "x.sh", "#!/bin/sh -e", False),
-    ("css-scope", MARKDOWN_CSS, ".seg { color: x }", True),
-    ("css-scope", MARKDOWN_CSS, ".markdown-body .seg, .code a { color: x }", False),
+    ("css-scope", MARKDOWN_CSS[0], ".seg { color: x }", True),
+    ("css-scope", MARKDOWN_CSS[0], ".markdown-body .seg, .code a { color: x }", False),
 ]
 
 

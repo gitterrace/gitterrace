@@ -30,7 +30,7 @@ const CSS: &str = "text/css; charset=utf-8";
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 /// Every embedded script and stylesheet: (name under `/static/`, type, body).
-const TABLE: [(&str, &str, &str); 29] = [
+const TABLE: [(&str, &str, &str); 30] = [
     ("loc.js", JS, include_str!("../../static/loc.js")),
     ("tokens.css", CSS, include_str!("../../static/tokens.css")),
     ("app.css", CSS, include_str!("../../static/app.css")),
@@ -40,6 +40,7 @@ const TABLE: [(&str, &str, &str); 29] = [
     ("tip.js", JS, include_str!("../../static/tip.js")),
     ("app.js", JS, include_str!("../../static/app.js")),
     ("markdown.css", CSS, include_str!("../../static/markdown.css")),
+    ("syntax.css", CSS, include_str!("../../static/syntax.css")),
     ("media.css", CSS, include_str!("../../static/media.css")),
     ("send.css", CSS, include_str!("../../static/send.css")),
     ("buttons.css", CSS, include_str!("../../static/buttons.css")),
@@ -122,9 +123,14 @@ fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
 /// The stylesheets every page loads, joined in cascade order into one request each: `base.css`
 /// before the page's own sheet, `late.css` after it. A bundle is its parts back to back, so no
 /// rule moves relative to another.
-const BUNDLES: [(&str, &[&str]); 2] = [
-    ("base.css", &["tokens.css", "buttons.css", "app.css", "pagehead.css", "charts.css"]),
-    ("late.css", &["markdown.css", "media.css", "docnav.css", "diffview.css"]),
+const BUNDLES: [(&str, &[&str]); 3] = [
+    (
+        "base.css",
+        &["tokens.css", "buttons.css", "app.css", "pagehead.css", "charts.css", "syntax.css"],
+    ),
+    ("late.css", &["media.css", "docnav.css", "diffview.css"]),
+    // The same, led by the rendered-markdown rules, for the pages that render markdown.
+    ("late-md.css", &["markdown.css", "media.css", "docnav.css", "diffview.css"]),
 ];
 
 /// The bundle `name` as served, minified, or `None` for a name that is no bundle.
@@ -157,6 +163,7 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
         })
         .route("/static/base.css", static_asset(CSS, bundled("base.css").unwrap_or_default()))
         .route("/static/late.css", static_asset(CSS, bundled("late.css").unwrap_or_default()))
+        .route("/static/late-md.css", static_asset(CSS, bundled("late-md.css").unwrap_or_default()))
         .route(crate::MERMAID_JS, get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
 }

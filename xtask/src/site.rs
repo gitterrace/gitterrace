@@ -49,7 +49,7 @@ pub fn at(rel: &str) -> String {
 const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", "mark"];
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
 /// The app's syntax colours, which the site's code blocks share.
-const MARKDOWN_CSS: &str = "crates/gitterrace-web/static/markdown.css";
+const SYNTAX_CSS: &str = "crates/gitterrace-web/static/syntax.css";
 /// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
 /// out; a passed date tells reporters the contact may be dead.
 /// The two mailboxes of the site: the legal pages name `SUPPORT_EMAIL` for contact and rights
@@ -94,7 +94,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     };
     let pkg = ws.packages.get("gitterrace").context("package gitterrace")?;
     let mut outs = Vec::new();
-    outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?, &read(MARKDOWN_CSS)?)?));
+    outs.push(Out::file(at("assets/site.css"), css(&read(TOKENS)?, &read(SYNTAX_CSS)?)?));
     for (dir, file) in FONTS {
         let path = format!("vendor/schwarzwald/kit/fonts/{dir}/{file}");
         let bytes = std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
@@ -398,7 +398,7 @@ fn pitch(desc: &str) -> Result<String> {
     Ok(desc.to_owned())
 }
 
-/// The app's syntax colours from `markdown.css` for the site's `pre` blocks: the rules after its
+/// The app's syntax colours from `syntax.css` for the site's `pre` blocks: the rules after its
 /// `/* syntax` comment, scoped to `pre`, with each `--md-*` alias resolved to the token it names
 /// so the site needs no markdown variables. Light and dark come with the tokens.
 fn syntax_css(markdown: &str) -> Result<String> {
@@ -406,14 +406,14 @@ fn syntax_css(markdown: &str) -> Result<String> {
     let vars = markdown
         .lines()
         .find(|l| l.starts_with(SCOPE.trim_end()) && l.contains("--md-k1:"))
-        .context("markdown.css: no --md-* aliases")?;
+        .context("syntax.css: no --md-* aliases")?;
     let aliases: Vec<(&str, &str)> = vars
         .split(['{', ';'])
         .filter_map(|d| d.split_once(':'))
         .filter(|(k, _)| k.starts_with("--md-"))
         .collect();
-    let at = markdown.find("/* syntax").context("markdown.css: no syntax block")?;
-    let mut out = String::from("/* syntax: generated from the app's markdown.css */\n");
+    let at = markdown.find("/* syntax").context("syntax.css: no syntax block")?;
+    let mut out = String::from("/* syntax: generated from the app's syntax.css */\n");
     for line in markdown[at..].lines().skip(1) {
         if !line.contains("[class~=s-") {
             break;
@@ -423,7 +423,7 @@ fn syntax_css(markdown: &str) -> Result<String> {
             rule = rule.replace(&format!("var({k})"), v);
         }
         if rule.contains("--md-") {
-            anyhow::bail!("markdown.css: unresolved alias in {rule}");
+            anyhow::bail!("syntax.css: unresolved alias in {rule}");
         }
         out.push_str(&rule);
         out.push('\n');

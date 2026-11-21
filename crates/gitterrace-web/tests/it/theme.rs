@@ -1,7 +1,8 @@
 //! Colours live in `static/tokens.css` only, and it is generated from the snapshot.
 
 /// Every stylesheet but tokens.css: a new file added here is checked by every rule below.
-const SHEETS: [(&str, &str); 10] = [
+const SHEETS: [(&str, &str); 11] = [
+    ("syntax.css", include_str!("../../static/syntax.css")),
     ("app.css", include_str!("../../static/app.css")),
     ("markdown.css", include_str!("../../static/markdown.css")),
     ("media.css", include_str!("../../static/media.css")),
