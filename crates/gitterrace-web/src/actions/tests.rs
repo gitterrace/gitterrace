@@ -234,7 +234,7 @@ async fn run_route_security_table() {
     let mut runs = Vec::new();
     for id in ["nap1", "nap2", "nap3", "nap4"] {
         let (r, t) = (on.clone(), tok.clone());
-        runs.push(tokio::spawn(async move { send(&r, Req::ok(&t, body(id, "page", ""))).await.0 }));
+        runs.push(tokio::spawn(async move { send(&r, Req::ok(&t, body(id, "page", ""))).await }));
     }
     // Each nap marks itself started and runs until released, so all four hold a slot now. A
     // nap that answers before the release did not run (refused, or its spawn failed under load):
@@ -246,16 +246,16 @@ async fn run_route_security_table() {
     };
     gitterrace_testkit::wait::within(gitterrace_testkit::wait::deadline(), settled).await;
     if let Some(i) = runs.iter().position(tokio::task::JoinHandle::is_finished) {
-        let s = runs.swap_remove(i).await.expect("join");
+        let (s, res) = runs.swap_remove(i).await.expect("join");
         std::fs::write(cfg.path().join("release"), "").expect("release");
-        panic!("nap run {} answered {s} before the release", i + 1);
+        panic!("nap run {} answered {s} before the release: {res}", i + 1);
     }
     assert!(["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)), "four runs started");
     let (s, res) = send(&on, Req::ok(&tok, body("echo", "page", ""))).await;
     std::fs::write(cfg.path().join("release"), "").expect("release");
     assert_eq!(s, 429, "5th concurrent: {res}");
     for r in runs {
-        assert_eq!(r.await.expect("join"), 200);
+        assert_eq!(r.await.expect("join").0, 200);
     }
 
     // 18. the repo's own actions.toml files never load: naming one is refused.
