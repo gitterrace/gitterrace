@@ -68,29 +68,25 @@ impl Live {
         self.config.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c))
     }
 
-    /// The menu entries the client renders, see [`menu_entries`].
+    /// The one list every view's action menu is built from: every action in file order with
+    /// its label, shortcut, kinds and `why`, the tip a disabled entry shows. The page never
+    /// drops an entry: one the selection's kind does not fit stays in place, disabled, so the
+    /// menu has the same entries in the same order on every view.
     pub(crate) fn menu_json(&self) -> String {
-        menu_entries(&self.config())
+        let config = self.config();
+        let items: Vec<MenuEntry<'_>> = config
+            .actions
+            .iter()
+            .map(|a| MenuEntry {
+                id: &a.id,
+                key: a.key.map(String::from),
+                kinds: &a.kinds,
+                label: &a.label,
+                why: why_off(&a.kinds),
+            })
+            .collect();
+        serde_json::to_string(&items).unwrap_or_default()
     }
-}
-
-/// The one list every view's action menu is built from: every action in file order with its
-/// label, shortcut, kinds and `why`, the tip a disabled entry shows. The page never drops an
-/// entry: one the selection's kind does not fit stays in place, disabled, so the menu has the
-/// same entries in the same order on every view.
-pub(crate) fn menu_entries(config: &Config) -> String {
-    let items: Vec<MenuEntry<'_>> = config
-        .actions
-        .iter()
-        .map(|a| MenuEntry {
-            id: &a.id,
-            key: a.key.map(String::from),
-            kinds: &a.kinds,
-            label: &a.label,
-            why: why_off(&a.kinds),
-        })
-        .collect();
-    serde_json::to_string(&items).unwrap_or_default()
 }
 
 // Fields are declared in alphabetical order: this was a serde_json map, which sorts keys.
