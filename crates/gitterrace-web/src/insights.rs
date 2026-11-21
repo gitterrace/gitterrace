@@ -61,6 +61,18 @@ impl Defaults {
     }
 }
 
+/// The four on/off counting options a link can flip: URL key, chip label, what "off" reads as,
+/// the option's value and its default. Gitignored (inverted) and Exclude (a list) are written
+/// by hand.
+type Opt = (&'static str, &'static str, &'static str, fn(&Options) -> bool, fn(&Defaults) -> bool);
+
+const OPTS: [Opt; 4] = [
+    ("generated", "Generated files", "left out", |o| o.include_generated, |d| d.generated),
+    ("ws", "Whitespace", "ignored", |o| o.count_whitespace, |_| false),
+    ("bots", "Bots", "left out", |o| o.include_bots, |d| d.bots),
+    ("merges", "Merges", "left out", |o| o.include_merges, |_| false),
+];
+
 impl App {
     /// The counting options come from the function `/api/v1` and the MCP use, so a page and
     /// the API agree on what the config leaves out.
@@ -96,13 +108,9 @@ impl InsightsQuery {
         if !own.is_empty() {
             v.push(("exclude", own.join(",")));
         }
-        for (k, on, default) in [
-            ("generated", o.include_generated, d.generated),
-            ("ws", o.count_whitespace, false),
-            ("bots", o.include_bots, d.bots),
-            ("merges", o.include_merges, false),
-        ] {
-            if on != default {
+        for (k, _, _, get, default) in OPTS {
+            let on = get(&o);
+            if on != default(d) {
                 v.push((k, (if on { "1" } else { "0" }).to_owned()));
             }
         }
@@ -142,18 +150,21 @@ impl InsightsQuery {
     pub(crate) fn row(&self, d: &Defaults, base: &str) -> Vec<OptLink> {
         let o = self.options(d);
         // The link that flips an option: the opposite value, or none when that is the default.
-        let flip = |key: &'static str, now: bool, default: bool| {
-            let to = !now;
-            self.link(d, base, key, (to != default).then_some(if to { "1" } else { "0" }))
-        };
-        let mut row = vec![
-            OptLink::new(
-                "Generated files",
-                o.include_generated,
-                "counted",
-                "left out",
-                flip("generated", o.include_generated, d.generated),
-            ),
+        let mut row: Vec<OptLink> = OPTS
+            .iter()
+            .map(|&(key, label, no, get, default)| {
+                let to = !get(&o);
+                let href = self.link(
+                    d,
+                    base,
+                    key,
+                    (to != default(d)).then_some(if to { "1" } else { "0" }),
+                );
+                OptLink::new(label, get(&o), "counted", no, href)
+            })
+            .collect();
+        row.insert(
+            1,
             OptLink::new(
                 "Gitignored",
                 !o.respect_ignore,
@@ -161,28 +172,7 @@ impl InsightsQuery {
                 "left out",
                 self.link(d, base, "ignore", o.respect_ignore.then_some("0")),
             ),
-            OptLink::new(
-                "Whitespace",
-                o.count_whitespace,
-                "counted",
-                "ignored",
-                flip("ws", o.count_whitespace, false),
-            ),
-            OptLink::new(
-                "Bots",
-                o.include_bots,
-                "counted",
-                "left out",
-                flip("bots", o.include_bots, d.bots),
-            ),
-            OptLink::new(
-                "Merges",
-                o.include_merges,
-                "counted",
-                "left out",
-                flip("merges", o.include_merges, false),
-            ),
-        ];
+        );
         let own = self.own_exclude();
         if !own.is_empty() {
             row.push(OptLink {
@@ -422,10 +412,10 @@ pub(crate) async fn contributors(
                 format!("Show all {}", fmt::count(total, "contributor", "contributors")),
             )
         });
-        let shown_rows = shown.len().min(if all { usize::MAX } else { PEOPLE_SHOWN });
+        let limit = if all { usize::MAX } else { PEOPLE_SHOWN };
         let widest = shown
             .iter()
-            .take(shown_rows)
+            .take(limit)
             .map(|p| p.additions.max(p.deletions))
             .max()
             .unwrap_or(0)
@@ -433,7 +423,7 @@ pub(crate) async fn contributors(
         let pct = |v: u64| format!("{}", (v as f64 * 100.0 / widest as f64).round());
         let people: Vec<PersonRow> = shown
             .iter()
-            .take(if all { usize::MAX } else { PEOPLE_SHOWN })
+            .take(limit)
             .map(|p| {
                 let email = p.emails.first().map_or(p.name.as_str(), String::as_str);
                 PersonRow {
