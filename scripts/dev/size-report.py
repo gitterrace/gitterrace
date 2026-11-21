@@ -1,21 +1,34 @@
 #!/usr/bin/env python3
-"""Count repository lines per area and per kind, and print the total.
+"""Report the project's size: gitterrace's languages insight, split into prod, test and comment.
 
-Counted: rs py js mjs json sh css html toml. Skipped: vendor/, *.lock,
+The languages insight (`git-terrace mcp`, tool `languages`) is the one size metric: the total
+and the lines per language come from it, the same numbers the web Languages page and
+`/api/v1/insights/languages` show for the HEAD tree. This script counts nothing for the total.
+It keeps only a breakdown of that total by kind, and the breakdown sums to it: lines of the
+files below are classified, every other line of the total is `other`. A classified count above
+the total, or a sum that differs from it, is an error.
+
+Classified: rs py js mjs json sh css html toml at HEAD, minus vendor/, *.lock,
 tests/bench/results and golden/. Kinds: prod (non-test, non-comment Rust and
 web assets), test (tests/ files, tests.rs, the tail after `#[cfg(test)]`),
 comment (Rust and script comment lines), generated (json), tooling (scripts/,
-xtask, tests/ harness scripts). Area is the first two path parts under crates/,
-else the first part. Usage: size-report.py [--repo DIR] [--self-test]. Stdlib only.
+xtask, tests/ harness scripts), blank. Area is the first two path parts under crates/,
+else the first part.
+
+Usage: size-report.py [--repo DIR] [--self-test]. Stdlib only. The binary is $GITTERRACE_BIN,
+else target/debug/git-terrace of the repository, built with cargo when missing.
 """
 
 from __future__ import annotations
 
+import json
+import os
 import subprocess
 import sys
 import tempfile
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 EXTS = {"rs", "py", "js", "mjs", "json", "sh", "css", "html", "toml"}
 SKIP = ("vendor/", "tests/bench/results", "golden/")
@@ -24,7 +37,11 @@ LIMIT = 100_000
 
 def files(repo: Path) -> list[str]:
     out = subprocess.run(
-        ["git", "ls-files"], cwd=repo, capture_output=True, text=True, check=True
+        ["git", "ls-tree", "-r", "--name-only", "HEAD"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=True,
     ).stdout.split("\n")
     keep = []
     for p in out:
@@ -82,30 +99,111 @@ def classify(p: str, text: str) -> dict[str, int]:
     return c
 
 
+def blobs(repo: Path, paths: list[str]) -> dict[str, str]:
+    """The text of each path at HEAD, read through one `git cat-file --batch`."""
+    if not paths:
+        return {}
+    ask = "".join(f"HEAD:{p}\n" for p in paths).encode()
+    out = subprocess.run(
+        ["git", "cat-file", "--batch"], cwd=repo, input=ask, capture_output=True, check=True
+    ).stdout
+    texts, at = {}, 0
+    for p in paths:
+        end = out.index(b"\n", at)
+        head = out[at:end].split()
+        if len(head) < 3 or head[1] != b"blob":
+            at = end + 1
+            continue
+        size = int(head[2])
+        texts[p] = out[end + 1 : end + 1 + size].decode(errors="replace")
+        at = end + 1 + size + 1
+    return texts
+
+
 def count(repo: Path):
     areas: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
     kinds: dict[str, int] = defaultdict(int)
-    for p in files(repo):
-        try:
-            text = (repo / p).read_text(errors="replace")
-        except OSError:
-            continue
+    paths = files(repo)
+    for p, text in blobs(repo, paths).items():
         for k, n in classify(p, text).items():
             areas[area(p)][k] += n
             kinds[k] += n
     return areas, kinds
 
 
+def binary(repo: Path) -> list[str]:
+    """The gitterrace command: $GITTERRACE_BIN, else the repository's debug build."""
+    if os.environ.get("GITTERRACE_BIN"):
+        return [os.environ["GITTERRACE_BIN"]]
+    exe = Path(os.environ.get("CARGO_TARGET_DIR", repo / "target")) / "debug" / "git-terrace"
+    subprocess.run(["cargo", "build", "-q", "-p", "gitterrace"], cwd=repo, check=True)
+    return [str(exe)]
+
+
+def languages(repo: Path, cmd: list[str]) -> dict[str, Any]:
+    """The `languages` insight of `repo` at HEAD, asked of `git-terrace mcp` over stdio."""
+
+    def msg(i: int | None, method: str, params: dict[str, Any] | None = None) -> str:
+        m: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
+        if i is not None:
+            m["id"] = i
+        if params is not None:
+            m["params"] = params
+        return json.dumps(m) + "\n"
+
+    init = {
+        "protocolVersion": "2025-03-26",
+        "capabilities": {},
+        "clientInfo": {"name": "size-report", "version": "1"},
+    }
+    ask = (
+        msg(1, "initialize", init)
+        + msg(None, "notifications/initialized")
+        + msg(2, "tools/call", {"name": "languages", "arguments": {"rev": "HEAD"}})
+    )
+    run = subprocess.run(
+        [*cmd, "mcp", str(repo)], input=ask, capture_output=True, text=True, timeout=900
+    )
+    for line in run.stdout.splitlines():
+        reply = json.loads(line)
+        if reply.get("id") != 2:
+            continue
+        result = reply.get("result", {})
+        text = "".join(c.get("text", "") for c in result.get("content", []))
+        if result.get("isError") or "error" in reply:
+            raise SystemExit(f"size-report: the languages tool failed: {text or reply}")
+        return json.loads(text)["data"]
+    raise SystemExit(f"size-report: no languages answer from {cmd}: {run.stderr[-400:]}")
+
+
+def breakdown(total: int, kinds: dict[str, int]) -> dict[str, int]:
+    """`kinds` plus `other`, the rest of `total`. Sums to `total` or the two disagree."""
+    split = sum(kinds.values())
+    if split > total:
+        raise SystemExit(
+            f"size-report: the kinds count {split} lines, more than the languages total {total}"
+        )
+    parts = {**kinds, "other": total - split}
+    if sum(parts.values()) != total:
+        raise SystemExit(f"size-report: the breakdown sums to {sum(parts.values())}, not {total}")
+    return parts
+
+
 def report(repo: Path) -> int:
+    data = languages(repo, binary(repo))
+    total = data["total_lines"]
     areas, kinds = count(repo)
-    cols = ["prod", "test", "comment", "generated", "tooling", "blank"]
-    print("area".ljust(28) + "".join(c.rjust(10) for c in cols) + "total".rjust(10))
+    parts = breakdown(total, kinds)
+    print(f"lines: {total} ({data['files']} files, languages insight at HEAD)")
+    for lang in data["languages"][:12]:
+        share = lang["lines"] * 100 / max(total, 1)
+        print(f"  {lang['language']:<16}{lang['lines']:>10}{share:>7.1f}%")
+    print("breakdown (sums to the total)")
+    for k in ("prod", "test", "comment", "generated", "tooling", "blank", "other"):
+        print(f"  {k:<16}{parts.get(k, 0):>10}")
+    print("area".ljust(28) + "classified".rjust(10))
     for a, d in sorted(areas.items(), key=lambda kv: -sum(kv[1].values())):
-        cells = "".join(str(d.get(c, 0)).rjust(10) for c in cols)
-        print(a.ljust(28) + cells + str(sum(d.values())).rjust(10))
-    total = sum(kinds.values())
-    cells = "".join(str(kinds.get(c, 0)).rjust(10) for c in cols)
-    print("TOTAL".ljust(28) + cells + str(total).rjust(10))
+        print(a.ljust(28) + str(sum(d.values())).rjust(10))
     print(f"lines: {total} (target under {LIMIT})")
     return 0
 
@@ -121,13 +219,28 @@ def self_test() -> int:
         (r / "scripts/a.sh").write_text("#!/bin/sh\n# c\necho\n")
         (r / "golden").mkdir()
         (r / "golden/g.html").write_text("x\n")
+        (r / "NOTES.txt").write_text("one\ntwo\n")
         sh("git", "add", "-A")
+        sh("git", "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "init")
         areas, kinds = count(r)
         want = {"comment": 2, "prod": 1, "blank": 1, "test": 2, "tooling": 2}
-        want["tooling"] = 2
         # shebang line counts as tooling, the echo line too
         assert dict(kinds) == want, dict(kinds)
         assert "golden" not in areas and areas["crates/x"]["test"] == 2
+        # the breakdown sums to the total, and disagreement is an error
+        parts = breakdown(10, dict(kinds))
+        assert sum(parts.values()) == 10 and parts["other"] == 2, parts
+        try:
+            breakdown(7, dict(kinds))
+        except SystemExit:
+            pass
+        else:
+            raise AssertionError("a classified count above the total must fail")
+        # the total is gitterrace's: ask it about this repository and compare
+        data = languages(r, binary(Path(__file__).resolve().parents[2]))
+        assert data["total_lines"] == sum(x["lines"] for x in data["languages"]), data
+        parts = breakdown(data["total_lines"], dict(kinds))
+        assert sum(parts.values()) == data["total_lines"], (parts, data)
     print("size-report self-test ok")
     return 0
 
