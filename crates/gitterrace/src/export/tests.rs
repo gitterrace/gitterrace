@@ -441,3 +441,17 @@ fn strip_tags(s: &str) -> String {
     }
     out
 }
+
+/// The links an export follows and the links it rewrites are one scan: every followed path is
+/// rewritten, and a rewritten page names no rooted link any more.
+#[test]
+fn followed_links_are_the_rewritten_links() {
+    let html = concat!(
+        r#"<a href="/a/b?x=1">a</a><img src="/raw/x.png">"#,
+        r#"<i style="background:url('/static/f.woff2')"></i>"#,
+        r#"<a href="//cdn/x">c</a><a href="https://x.dev/">e</a>"#
+    );
+    assert_eq!(links(html), vec!["/a/b", "/raw/x.png", "/static/f.woff2"]);
+    let out = crate::export::relative::relativize(html, "/p", true);
+    assert!(links(&out).is_empty(), "{out}");
+}

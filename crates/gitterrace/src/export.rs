@@ -33,7 +33,7 @@ use crate::export::caps::{Caps, is_fragment};
 use crate::export::credit::{Credit, add_footer, repo_list};
 use crate::export::out::{Target, check_out};
 pub(crate) use crate::export::progress::{Mode, Progress};
-use crate::export::relative::relativize;
+use crate::export::relative::{MARKERS, is_site_path, link_spans, relativize};
 use crate::export::seeds::{queue_seeds, seeds};
 use crate::export::seen::Seen;
 #[cfg(test)]
@@ -531,23 +531,13 @@ fn walk(
 /// Same-origin absolute paths from `href`/`src` attributes and CSS `url()`s,
 /// without query strings or fragments.
 fn links(html: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for marker in ["href=\"", "src=\"", "url("] {
-        let mut rest = html;
-        while let Some(i) = rest.find(marker) {
-            rest = &rest[i + marker.len()..];
-            // `url('x')` and `url("x")` open with a quote; skip it before
-            // looking for the closing delimiter.
-            rest = rest.trim_start_matches(['"', '\'']);
-            let end = rest.find(['"', ')', '\'']).unwrap_or(rest.len());
-            let raw = &rest[..end];
-            if raw.starts_with('/') && !raw.starts_with("//") {
-                let path = raw.split(['?', '#']).next().unwrap_or(raw);
-                out.push(decode_entities(path));
-            }
-        }
-    }
-    out
+    MARKERS
+        .iter()
+        .flat_map(|m| link_spans(html, std::slice::from_ref(m)))
+        .map(|span| &html[span])
+        .filter(|raw| is_site_path(raw))
+        .map(|raw| decode_entities(raw.split(['?', '#']).next().unwrap_or(raw)))
+        .collect()
 }
 
 fn decode_entities(s: &str) -> String {
