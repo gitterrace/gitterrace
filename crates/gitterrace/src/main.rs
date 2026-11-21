@@ -182,7 +182,7 @@ impl Flags {
             loaded.config.server.is_public = true;
             loaded.flagged("server.is_public");
         }
-        loaded.validate()?;
+        loaded.config.validate()?;
         Ok(loaded)
     }
 }

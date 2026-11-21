@@ -122,7 +122,7 @@ pub fn expand_tilde(p: &str, home: &Path) -> PathBuf {
 }
 
 /// A loaded config plus where each key came from and what was ignored.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Loaded {
     pub config: Config,
     pub sources: BTreeMap<&'static str, Source>,
@@ -136,18 +136,12 @@ impl Loaded {
         self.sources.insert(key, Source::Flag);
     }
 
-    /// Fails with the key name when a value is out of range.
-    pub fn validate(&self) -> Result<(), ConfigError> {
-        self.config.validate()
-    }
-
     /// One line per key: `key = value  (source)`.
     pub fn describe(&self) -> String {
         let mut out = String::new();
         for k in &keys() {
-            let name = format!("{}.{}", k.section, k.name);
-            let src = self.sources.get(name.as_str()).copied().unwrap_or(Source::Default);
-            let _ = writeln!(out, "{name} = {}  ({})", self.config.show(k), src.label());
+            let src = self.sources.get(k.id).copied().unwrap_or(Source::Default);
+            let _ = writeln!(out, "{} = {}  ({})", k.id, self.config.show(k), src.label());
         }
         for (repo, o) in &self.config.repo {
             let _ = writeln!(out, "repo.{repo}.exclude = {:?}  (file)", o.exclude);
@@ -171,7 +165,7 @@ pub fn load(dir: Option<&Path>) -> Result<Loaded, ConfigError> {
     };
     match text {
         Some((path, t)) => parse(&t).map_err(|e| ConfigError::File { path, source: Box::new(e) }),
-        None => Ok(parse("").unwrap_or_else(|_| unreachable_defaults())),
+        None => Ok(parse("").unwrap_or_default()),
     }
 }
 
@@ -195,10 +189,6 @@ pub fn template() -> String {
         out.push_str(&["# ", k.name, " = ", &k.default, "\n"].concat());
     }
     out
-}
-
-fn unreachable_defaults() -> Loaded {
-    Loaded { config: Config::default(), sources: BTreeMap::new(), warnings: Vec::new() }
 }
 
 /// Parses config text. Unknown keys become warnings.

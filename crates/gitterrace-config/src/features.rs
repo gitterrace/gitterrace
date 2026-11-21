@@ -16,71 +16,64 @@ pub const INSIGHT_PAGES: [&str; 8] = [
     "patterns",
 ];
 
-/// One switchable feature. Its key in `[features]` is [`Feature::key`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Feature {
-    Blame,
-    Search,
-    Raw,
-    History,
-    Compare,
-    Worktree,
-    Insights,
-    Live,
-    Actions,
-    RepoAdmin,
-    Settings,
-    Picker,
-    FrontMatter,
-    Mermaid,
-    MarkdownPreview,
-    Credit,
-    Api,
+/// The feature table: each variant with its `[features]` field, written once. It makes the
+/// enum, [`Feature::ALL`], [`Feature::key`] and what the file says. `Api` is a tri-state
+/// field and is the last row, spelled apart in [`Config::file_says`].
+macro_rules! features {
+    ($($v:ident => $k:ident,)* ; $last:ident => $lk:ident) => {
+        /// One switchable feature. Its key in `[features]` is [`Feature::key`].
+        #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        pub enum Feature {
+            $($v,)* $last,
+        }
+
+        impl Feature {
+            pub const ALL: [Self; [$(stringify!($v),)* stringify!($last)].len()] =
+                [$(Self::$v,)* Self::$last];
+
+            pub const fn key(self) -> &'static str {
+                match self {
+                    $(Self::$v => stringify!($k),)*
+                    Self::$last => stringify!($lk),
+                }
+            }
+        }
+
+        impl Config {
+            /// What `[features]` says for `f`, before any policy. `api_enabled` unset means on.
+            fn file_says(&self, f: Feature) -> bool {
+                let s = &self.features;
+                match f {
+                    $(Feature::$v => s.$k,)*
+                    // Public by choice only: a public server serves the API when the file says so.
+                    Feature::$last => s.$lk.unwrap_or(!self.server.is_public),
+                }
+            }
+        }
+    };
+}
+
+features! {
+    Blame => blame_enabled,
+    Search => search_enabled,
+    Raw => raw_enabled,
+    History => history_enabled,
+    Compare => compare_enabled,
+    Worktree => worktree_enabled,
+    Insights => insights_enabled,
+    Live => live_enabled,
+    Actions => actions_enabled,
+    RepoAdmin => repo_admin_enabled,
+    Settings => settings_enabled,
+    Picker => picker_enabled,
+    FrontMatter => front_matter_enabled,
+    Mermaid => mermaid_enabled,
+    MarkdownPreview => markdown_preview_enabled,
+    Credit => credit_enabled,
+    ; Api => api_enabled
 }
 
 impl Feature {
-    pub const ALL: [Self; 17] = [
-        Self::Blame,
-        Self::Search,
-        Self::Raw,
-        Self::History,
-        Self::Compare,
-        Self::Worktree,
-        Self::Insights,
-        Self::Live,
-        Self::Actions,
-        Self::RepoAdmin,
-        Self::Settings,
-        Self::Picker,
-        Self::FrontMatter,
-        Self::Mermaid,
-        Self::MarkdownPreview,
-        Self::Credit,
-        Self::Api,
-    ];
-
-    pub const fn key(self) -> &'static str {
-        match self {
-            Self::Blame => "blame_enabled",
-            Self::Search => "search_enabled",
-            Self::Raw => "raw_enabled",
-            Self::History => "history_enabled",
-            Self::Compare => "compare_enabled",
-            Self::Worktree => "worktree_enabled",
-            Self::Insights => "insights_enabled",
-            Self::Live => "live_enabled",
-            Self::Actions => "actions_enabled",
-            Self::RepoAdmin => "repo_admin_enabled",
-            Self::Settings => "settings_enabled",
-            Self::Picker => "picker_enabled",
-            Self::FrontMatter => "front_matter_enabled",
-            Self::Mermaid => "mermaid_enabled",
-            Self::MarkdownPreview => "markdown_preview_enabled",
-            Self::Credit => "credit_enabled",
-            Self::Api => "api_enabled",
-        }
-    }
-
     pub fn from_key(key: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|f| f.key() == key)
     }
@@ -100,31 +93,6 @@ impl Feature {
 }
 
 impl Config {
-    /// What `[features]` says for `f`, before any policy. `api_enabled` unset means on.
-    fn file_says(&self, f: Feature) -> bool {
-        let s = &self.features;
-        match f {
-            Feature::Blame => s.blame_enabled,
-            Feature::Search => s.search_enabled,
-            Feature::Raw => s.raw_enabled,
-            Feature::History => s.history_enabled,
-            Feature::Compare => s.compare_enabled,
-            Feature::Worktree => s.worktree_enabled,
-            Feature::Insights => s.insights_enabled,
-            Feature::Live => s.live_enabled,
-            Feature::Actions => s.actions_enabled,
-            Feature::RepoAdmin => s.repo_admin_enabled,
-            Feature::Settings => s.settings_enabled,
-            Feature::Picker => s.picker_enabled,
-            Feature::FrontMatter => s.front_matter_enabled,
-            Feature::Mermaid => s.mermaid_enabled,
-            Feature::MarkdownPreview => s.markdown_preview_enabled,
-            Feature::Credit => s.credit_enabled,
-            // Public by choice only: a public server serves the API when the file says so.
-            Feature::Api => s.api_enabled.unwrap_or(!self.server.is_public),
-        }
-    }
-
     /// Whether `f` is on for the repository named `repo` (`None`: the server as a whole).
     /// The file, the repository override and the public policy must all allow it.
     pub fn feature_on(&self, f: Feature, repo: Option<&str>) -> bool {
