@@ -59,7 +59,7 @@ const MARKDOWN_CSS: &str = "crates/gitterrace-web/static/markdown.css";
 #[cfg(test)]
 pub(crate) const SUPPORT_EMAIL: &str = "support@gitterrace.dev";
 pub(crate) const SECURITY_EMAIL: &str = "security@gitterrace.dev";
-const SECURITY_TXT_EXPIRES: &str = "2027-11-15T23:00:00Z";
+const SECURITY_TXT_EXPIRES: &str = "2027-11-20T23:00:00Z";
 
 /// The site's own rules, after the app's tokens in `site.css`.
 const PAGE_CSS: &str = include_str!("../templates/site.css");
