@@ -74,7 +74,7 @@ fn overview_totals_are_computed_once_per_tip() {
 
 #[test]
 fn racing_callers_share_one_source() {
-    let (_dir, app, head) = one_commit_app();
+    let (_dir, app, head) = crate::tests::one_commit_app();
     let sets: Vec<_> = (0..8)
         .map(|_| {
             let (a, h) = (Arc::clone(&app), head.clone());
@@ -116,7 +116,7 @@ fn alternating_selected_commits_each_read_the_segment_set() {
 /// own `Arc` and the next page opens the set again.
 #[test]
 fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
-    let (_dir, app, head) = one_commit_app();
+    let (_dir, app, head) = crate::tests::one_commit_app();
     // Everything the pages build over the source, as the warm-up does.
     let src = crate::tests::unchecked_src(&app, &head);
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
@@ -138,25 +138,12 @@ fn an_idle_app_lets_go_of_its_source_and_opens_it_again_on_use() {
     assert_eq!(again.len(), 1);
 }
 
-fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path();
-    git(path, &["init", "-q", "-b", "main"]);
-    std::fs::write(path.join("a.rs"), "fn a() {}\n").expect("write");
-    std::fs::write(path.join(".gitignore"), "target/\n").expect("write");
-    git(path, &["add", "."]);
-    git(path, &["commit", "-q", "-m", "feat: one"]);
-    let app = crate::tests::ready_app(path);
-    let head = app.repo.resolve("HEAD").expect("head");
-    (dir, app, head)
-}
-
 /// A page rendered while a read was failing (another request's sidebar, built just before its
 /// own read failed) is never served once the rebuild starts. The rebuilt cache gets the same
 /// index generation, so a memo entry would match it and show the broken page again.
 #[test]
 fn an_unreadable_cache_drops_every_memoized_page() {
-    let (_dir, app, _head) = one_commit_app();
+    let (_dir, app, _head) = crate::tests::one_commit_app();
     let page = app.memo_key("overview", None);
     app.memo_put(page.clone(), "built over a failing read");
     assert!(app.memo_get(&page).is_some());
@@ -169,7 +156,7 @@ fn an_unreadable_cache_drops_every_memoized_page() {
 /// out; this checks the release reaches that clear and that each filled cache empties.
 #[test]
 fn an_idle_release_empties_every_cache() {
-    let (_dir, app, head) = one_commit_app();
+    let (_dir, app, head) = crate::tests::one_commit_app();
     let src = crate::tests::unchecked_src(&app, &head);
     app.chain(&head, &*src, &crate::languages::path_filter(&app, &head));
     let _ = app.file_paths(&head).expect("files");
@@ -190,7 +177,7 @@ fn an_idle_release_empties_every_cache() {
 /// The code memo is shared with other tests, so only its state after the release is checked.
 #[test]
 fn an_idle_release_empties_blame_and_highlighted_code() {
-    let (_dir, app, head) = one_commit_app();
+    let (_dir, app, head) = crate::tests::one_commit_app();
     let _ = app.repo.blame(&head, "a.rs").expect("blame");
     assert!(app.repo.blame_is_cached(&head, "a.rs"), "the blame was kept");
     let r = crate::views::Render::test(1 << 20);
@@ -210,7 +197,7 @@ fn an_idle_release_empties_blame_and_highlighted_code() {
 #[test]
 fn warm_up_reads_do_not_delay_the_release() {
     const IDLE: Duration = Duration::from_secs(3600);
-    let (_dir, app, head) = one_commit_app();
+    let (_dir, app, head) = crate::tests::one_commit_app();
     let set_back = || {
         let past =
             Instant::now().checked_sub(Duration::from_hours(24)).expect("a clock past one day");

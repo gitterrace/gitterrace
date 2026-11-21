@@ -482,3 +482,38 @@ pub(crate) fn links(html: &str) -> Vec<String> {
     }
     out
 }
+
+/// A repository with one commit, as a ready app, and its head.
+pub(crate) fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path();
+    git(path, &["init", "-q", "-b", "main"]);
+    std::fs::write(path.join("a.rs"), "fn a() {}\n").expect("write");
+    std::fs::write(path.join(".gitignore"), "target/\n").expect("write");
+    git(path, &["add", "."]);
+    git(path, &["commit", "-q", "-m", "feat: one"]);
+    let app = crate::tests::ready_app(path);
+    let head = app.repo.resolve("HEAD").expect("head");
+    (dir, app, head)
+}
+
+/// Zeroes every block byte of each segment and chain file in `cache`. Same length, so the
+/// set still opens; a read of any block fails its check.
+pub(crate) fn zero_blocks(cache: &std::path::Path) {
+    for e in std::fs::read_dir(cache).expect("ls").flatten() {
+        let seg = e.path();
+        let name = e.file_name().to_string_lossy().into_owned();
+        let is_seg = seg.extension().is_some_and(|x| x == "gts");
+        if !((name.starts_with("seg-") || name.starts_with("chain-")) && is_seg) {
+            continue;
+        }
+        let mut bytes = std::fs::read(&seg).expect("read");
+        let end = bytes.len() - 64;
+        let toc = usize::try_from(u64::from_le_bytes(
+            bytes[end + 16..end + 24].try_into().expect("8 bytes"),
+        ))
+        .expect("toc");
+        bytes[16..toc].fill(0);
+        std::fs::write(&seg, &bytes).expect("corrupt");
+    }
+}
