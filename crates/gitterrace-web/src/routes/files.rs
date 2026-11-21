@@ -11,7 +11,6 @@ use axum::{
 use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
-use crate::dochead::DocHead;
 use crate::pagehead::{Action, FileView, PageHead, Tagline};
 use crate::routes::{DocQuery, Shared, page};
 use crate::{
@@ -165,8 +164,6 @@ struct BlobPage {
     rendered: Option<String>,
     /// "On this page" as the rail: the document's headings, or a source file's symbols.
     outline_rail: String,
-    /// The header of the Markdown card; `None` for any other file.
-    head: Option<DocHead>,
 }
 
 fn is_markdown(path: &str) -> bool {
@@ -317,27 +314,25 @@ fn blob_page(
         }
     };
     let page_head = PageHead {
-        // A source file's path stays in view while its lines scroll; a document's own card
-        // head pins instead.
-        pin: doc.is_none() && media.is_none() && table.is_none(),
-        tools: if doc.is_none() { markdown::outline_menu(&symbols, false) } else { String::new() },
+        // Every file type keeps its path and tabs in view while the body scrolls. A rendered
+        // body adds Preview/Code to the title row (a row of its own would stand alone); a
+        // workbook has no text to switch to.
+        pin: true,
+        tools: {
+            let switch = if (doc.is_some() || table.is_some()) && text.is_some() {
+                crate::seg::Seg::preview_code().to_string()
+            } else {
+                String::new()
+            };
+            switch + &markdown::outline_menu(doc.as_ref().map_or(&symbols, |d| &d.outline), false)
+        },
         ..base_head
     };
-    let head = (doc.is_some() || table.is_some()).then(|| DocHead {
-        title: path.rsplit('/').next().unwrap_or(&path).to_owned(),
-        // A workbook has no text source to switch to.
-        views: text.is_some(),
-        outline: doc
-            .as_ref()
-            .map_or_else(String::new, |d| markdown::outline_menu(&d.outline, true)),
-        ..DocHead::default()
-    });
     let rendered = doc.map(|d| d.html).or(table);
     BlobPage {
         c: Chrome { md: rendered.is_some(), ..chrome },
         rendered,
         outline_rail,
-        head,
         page_head,
         size: fmt::size(b.size),
         raw_href,

@@ -393,7 +393,11 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .paned:has(input[value=source]:checked) [data-pane=rendered],
 .paned:has(input[value=sides]:checked) [data-pane=overlay],
 .paned:has(input[value=overlay]:checked) [data-pane=sides],
-.paned:has(input[value=source]:checked) .outline.menu{display:none}
+.paned:has(input[value=source]:checked) .outline.menu,
+main:has(>.ph input[value=source]:checked) .ph .outline.menu{display:none}
+/* A file's Preview/Code radios sit in the page head, outside the card whose panes they switch. */
+main:has(>.ph input[value=rendered]:checked) [data-md-view] [data-pane=source],
+main:has(>.ph input[value=source]:checked) [data-md-view] [data-pane=rendered]{display:none}
 [data-seg-select] .segsel,[data-seg-select].narrow .segs{display:none}
 [data-seg-select].narrow .segsel{display:inline-block}
 .md-pane[hidden]{display:none}

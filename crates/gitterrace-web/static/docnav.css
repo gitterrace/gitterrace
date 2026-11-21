@@ -15,6 +15,8 @@ section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 [id^="L"]{scroll-margin-top:var(--space-2)}
 @media (min-width:601px){
   main:has(>.ph.pin) [id^="L"]{scroll-margin-top:calc(var(--ph-pin-h,150px) + var(--space-2))}
+  main:has(>.ph.pin) .markdown-body :is(h1,h2,h3,h4,h5,h6,.anchor){
+    scroll-margin-top:calc(var(--ph-pin-h,150px) + var(--space-2))}
   /* A source file's symbol rail pins below the pinned page head. */
   .code-cols>.outline.rail{top:calc(var(--ph-pin-h,150px) + var(--space-4));
     max-height:calc(100vh - var(--ph-pin-h,150px) - 2 * var(--space-4))}
@@ -46,6 +48,9 @@ section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 .markdown-body :is(h1,h2,h3,h4,h5,h6,.anchor){scroll-margin-top:var(--space-4)}
 /* The Code view has no headings: it takes the rail's column too, the full content width. */
 .outline-cols:has(input[value=source]:checked){grid-template-columns:minmax(0,1fr)}.outline-cols:has(input[value=source]:checked)>.outline.rail{display:none}
+/* A file's Preview/Code radios sit in the page head, outside the grid. */
+main:has(>.ph input[value=source]:checked) .outline-cols{grid-template-columns:minmax(0,1fr)}
+main:has(>.ph input[value=source]:checked) .outline-cols>.outline.rail{display:none}
 @media (max-width:999px){.outline-cols{grid-template-columns:minmax(0,1fr)}.outline.rail{display:none}.outline-cols .outline.menu,main>.ph .outline.menu{display:block}}
 @media (min-width:1000px){.outline-cols .outline.menu{display:none}}
 @media print{.outline{display:none!important}}

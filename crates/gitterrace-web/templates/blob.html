@@ -2,8 +2,7 @@
 {% block title %}{{ title }} · {{ c.name }}{% endblock %}
 {% block content %}
 {{ page_head }}
-{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols"{% endif %}><div class="card doccard paned" data-md-view>
-{% if let Some(h) = head %}{{ h }}{% endif %}
+{% if let Some(m) = rendered %}<div{% if !outline_rail.is_empty() %} class="cols outline-cols code-cols"{% endif %}><div class="card" data-md-view>
 <div class="markdown-body md-pane" data-pane="rendered" data-src="{{ title }}">{{ m|safe }}</div>
 <div class="scroll md-pane" data-pane="source">
 {% if let Some(h) = html %}{{ h|safe }}{% endif %}

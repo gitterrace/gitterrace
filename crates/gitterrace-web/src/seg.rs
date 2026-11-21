@@ -44,6 +44,19 @@ impl Seg {
         Self { caption: name.to_owned(), name: name.to_owned(), choices, ..Self::default() }
     }
 
+    /// The Preview/Code switch of a rendered document: radios, so CSS shows the checked pane.
+    pub(crate) fn preview_code() -> Self {
+        Self {
+            name: "View".to_owned(),
+            panes: "view".to_owned(),
+            choices: vec![
+                Choice::new("Preview", "rendered", true),
+                Choice::new("Code", "source", false),
+            ],
+            ..Self::default()
+        }
+    }
+
     /// Hides the caption; the group keeps its accessible name.
     #[must_use]
     pub(crate) fn no_caption(mut self) -> Self {

@@ -15,30 +15,33 @@ export function checks({ srv, r, browsers, context }) {
   }
 
   async function pageHeads() {
-    // A Markdown file: the page head holds the path and the File, Blame and History tabs; the
-    // document card's one head row holds the Preview/Code switch and is the sticky one. No
+    // A Markdown file: the same pinned page head as any file holds the path, the File, Blame
+    // and History tabs and, in its toolbar, the Preview/Code switch. No
     // Copy permalink anywhere in either (it is in the page menu).
-    await each('markdown blob', '/blob/HEAD/README.md', (p) => p.evaluate(() => {
+    await each('markdown blob', '/blob/HEAD/README.md', (p, width) => p.evaluate((w) => {
       const bad = [];
       const ph = document.querySelector('main>.ph');
-      const cards = [...document.querySelectorAll('[data-md-view] [data-dochead]')]
-        .filter((e) => e.getClientRects().length);
       if (!ph || !ph.querySelector('h1.crumbs')) bad.push('no path in the page head');
       const tabs = ph ? [...ph.querySelectorAll('.tabs a')].map((a) => a.textContent.trim()) : [];
       if (!tabs.includes('File') || !tabs.includes('History')) {
         bad.push(`file tabs ${tabs.join(',') || 'missing'}`);
       }
-      if (cards.length !== 1) bad.push(`${cards.length} card head rows, want 1`);
-      const h = cards[0];
-      if (h) {
-        const both = h.querySelector('[data-show=rendered]') && h.querySelector('[data-show=source]');
-        if (!both) bad.push('no Preview/Code in the card head');
-        if (getComputedStyle(h).position !== 'sticky') bad.push('the card head is not sticky');
+      if (document.querySelector('[data-md-view] [data-dochead]')) {
+        bad.push('a card head row under the page head');
       }
-      const text = (ph?.textContent || '') + (h?.textContent || '');
+      if (ph) {
+        const both = ph.querySelector('[data-show=rendered]')
+          && ph.querySelector('[data-show=source]');
+        if (!both) bad.push('no Preview/Code in the page head');
+        // The pin is for wide screens only (pagehead.css), as for every file.
+        if (w > 600 && getComputedStyle(ph).position !== 'sticky') {
+          bad.push('the page head is not sticky');
+        }
+      }
+      const text = ph?.textContent || '';
       if (/Copy permalink/.test(text)) bad.push('Copy permalink is still shown');
       return bad;
-    }));
+    }, width));
   }
   /** Rows of controls: how many direct rows of `root`'s children hold only `n` controls. */
   const CTL = 'a[href], button, input:not([type=hidden]), select, summary';

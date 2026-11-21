@@ -8,7 +8,7 @@ use std::fmt;
 use askama::Template;
 use askama::filters::HtmlSafe;
 
-use crate::seg::{Choice, Seg};
+use crate::seg::Seg;
 
 /// A tab of the about documents (README, LICENSE and so on).
 #[derive(Debug)]
@@ -63,15 +63,7 @@ struct DocHeadMarkup<'a> {
 
 impl fmt::Display for DocHead {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let views = (self.switch.is_none() && self.views).then(|| Seg {
-            name: "View".to_owned(),
-            panes: "view".to_owned(),
-            choices: vec![
-                Choice::new("Preview", "rendered", true),
-                Choice::new("Code", "source", false),
-            ],
-            ..Seg::default()
-        });
+        let views = (self.switch.is_none() && self.views).then(Seg::preview_code);
         DocHeadMarkup { h: self, views }.render_into(f).map_err(|_| fmt::Error)
     }
 }
@@ -81,6 +73,7 @@ impl HtmlSafe for DocHead {}
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::seg::Choice;
 
     #[test]
     fn escapes_and_marks_the_active_tab() {

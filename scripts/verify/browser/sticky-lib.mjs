@@ -9,8 +9,10 @@ import { join } from 'node:path';
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [
   { name: 'overview README', path: '/', head: '#about [data-dochead]', box: '#about' },
-  { name: 'Markdown preview', path: '/blob/HEAD/guide/GUIDE.md', head: '[data-md-view] [data-dochead]', box: '[data-md-view]' },
-  { name: 'Markdown code', path: '/blob/HEAD/guide/GUIDE.md', head: '[data-md-view] [data-dochead]', box: '[data-md-view]', code: true },
+  { name: 'Markdown preview', path: '/blob/HEAD/guide/GUIDE.md', head: 'main>.ph.pin', box: 'main',
+    md: true },
+  { name: 'Markdown code', path: '/blob/HEAD/guide/GUIDE.md', head: 'main>.ph.pin', box: 'main',
+    md: true, code: true },
   { name: 'blob', path: '/blob/HEAD/guide/long.txt', head: 'main>.ph.pin', box: 'main' },
   { name: 'blame', path: '/blame/HEAD/guide/long.txt', head: 'main>.ph.pin', box: 'main' },
   { name: 'diff file', path: '/commit/HEAD', head: 'section.file>header', box: 'section.file' },
@@ -106,7 +108,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           if (!m.inBar) bad.push('outline button leaves the bar');
           if (v.code && Math.abs(m.codeW - m.mainW) > 1) bad.push(`Code ${m.codeW} px wide, content ${m.mainW} px`);
         }
-        if (v.box === '[data-md-view]') {
+        if (v.md) {
           // Clipping the card must not stop the wide parts from scrolling sideways in their pane.
           const sideways = await p.evaluate((code) => {
             const el = document.querySelector(code ? '[data-pane=source]' : '.markdown-body pre');
@@ -121,7 +123,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           if (v.code) { await p.click('[data-show=source]'); await p.evaluate(() => document.querySelector('#L40')?.scrollIntoView()); }
           await p.waitForTimeout(150);
           const under = await p.evaluate((t) => {
-            const h = document.querySelector('[data-md-view] [data-dochead]'), el = document.querySelector(t);
+            const h = document.querySelector('main>.ph.pin'), el = document.querySelector(t);
             if (!h || !el) return 'no target';
             return el.getBoundingClientRect().top >= h.getBoundingClientRect().bottom - 1 ? '' : `${t} lands under the head`;
           }, target);

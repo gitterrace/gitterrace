@@ -62,7 +62,8 @@ fn bad_cards(body: &str) -> Vec<String> {
             continue;
         };
         let first = card[open_end + 1..].trim_start().split('>').next().unwrap_or_default();
-        let is_doc = card.contains("class=\"markdown-body") || card.contains("data-md-view");
+        // A file's card has the page head above it, not a card head.
+        let is_doc = card.contains("class=\"markdown-body") && !card.contains("data-md-view");
         let headlike = first.starts_with("<div")
             && first.split("class=\"").nth(1).is_some_and(|c| {
                 let c = c.split('"').next().unwrap_or_default();
@@ -200,7 +201,7 @@ async fn document_cards_and_styled_pages_render_the_shared_components() {
         heads += body.matches("data-dochead").count();
         fails.extend(bad_cards(&body).into_iter().map(|b| format!("{p}: {b}")));
     }
-    if heads < 7 {
+    if heads < 5 {
         fails.push(format!("only {heads} shared document headers"));
     }
 
