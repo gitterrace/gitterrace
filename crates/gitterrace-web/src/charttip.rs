@@ -28,7 +28,7 @@ pub(crate) fn percent(f: f64) -> String {
 }
 
 /// "mark: 12 commits", for a single-series mark whose value is its column total.
-pub(crate) fn value(mark: &str, n: u64, u: Unit) -> String {
+fn value(mark: &str, n: u64, u: Unit) -> String {
     format!("{mark}: {}", count(n, u.0, u.1))
 }
 

@@ -61,11 +61,7 @@ impl CommitRow {
             author: c.author.name.clone(),
             author_href: author_href(&c.author.email),
             when: ago_at(c.author.time, c.author.offset, now),
-            lead: None,
-            note: String::new(),
-            counts: Vec::new(),
-            graph: None,
-            refs: Vec::new(),
+            ..Self::default()
         }
     }
 

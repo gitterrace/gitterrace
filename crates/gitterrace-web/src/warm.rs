@@ -37,7 +37,8 @@ const HOTSPOT_PERIODS: &[&str] = &["/stats/hotspots?period=1y", "/stats/hotspots
 /// Every warmer, in the order they run. The shared tables come first: every per-file page
 /// after them slices the tables instead of building its own.
 pub(crate) const WARMERS: &[Warmer] = &[
-    Warmer { name: "repo_id", routes: &[], run: Run::Blocking(repo_id) },
+    // Every page's chrome shows the repo id, which walks the whole history once per process.
+    Warmer { name: "repo_id", routes: &[], run: Run::Blocking(|a, _| drop(a.repo.id())) },
     Warmer {
         name: "shared_tables",
         routes: &["/stats/hotspots", "/stats/ownership", "/stats/languages"],
@@ -56,6 +57,8 @@ pub(crate) const WARMERS: &[Warmer] = &[
 /// builds what it would have.
 pub(crate) async fn run(app: &Arc<App>, head: &str) {
     let _warm = app.warming();
+    // Built here, not kept on the app: the router holds the app.
+    let router = crate::routes::router(Arc::clone(app));
     for w in WARMERS {
         tracing::debug!("{}: warming {} for {:?}", app.name, w.name, w.routes);
         match w.run {
@@ -65,14 +68,14 @@ pub(crate) async fn run(app: &Arc<App>, head: &str) {
                     tracing::debug!("{}: warmer {} stopped: {e}", app.name, w.name);
                 }
             }
-            Run::Pages => pages(app, crate::features::warm(&app.cfg(), Some(&app.name))).await,
+            Run::Pages => pages(&router, crate::features::warm(&app.cfg(), Some(&app.name))).await,
             Run::Paths(paths) => {
                 let cfg = app.cfg();
                 let on = paths.iter().copied().filter(|p| {
                     let route = p.split_once('?').map_or(*p, |(r, _)| r);
                     crate::features::route_on(&cfg, Some(&app.name), route)
                 });
-                pages(app, on.collect()).await;
+                pages(&router, on.collect()).await;
             }
             Run::Blame => {
                 if app.cfg().feature_on(gitterrace_config::Feature::Blame, Some(&app.name)) {
@@ -83,15 +86,8 @@ pub(crate) async fn run(app: &Arc<App>, head: &str) {
     }
 }
 
-/// Every page's chrome shows the repo id, which walks the whole history once per process.
-fn repo_id(a: &App, _head: &str) {
-    a.repo.id();
-}
-
-/// Renders `paths` through a router of the app's own pages, so each lands in the memo. Built
-/// here, not kept on the app: the router holds the app.
-async fn pages(app: &Arc<App>, paths: Vec<&str>) {
-    let router = crate::routes::router(Arc::clone(app));
+/// Renders `paths` through `router`, so each lands in the memo.
+async fn pages(router: &axum::Router, paths: Vec<&str>) {
     for path in paths {
         // Internal requests skip the Host and cross-site guard, which wraps the outer router.
         if let Ok(req) = axum::http::Request::get(path).body(axum::body::Body::empty()) {
