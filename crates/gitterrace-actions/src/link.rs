@@ -132,18 +132,8 @@ pub(crate) fn tail(sha: &str, path: Option<&str>, lines: Option<Lines>) -> Strin
         s.push('/');
         s.push_str(&percent_encode_path(p));
     }
-    match lines {
-        Some(l) if l.start == l.end => {
-            s += "#L";
-            s += &l.start.to_string();
-        }
-        Some(l) => {
-            s += "#L";
-            s += &l.start.to_string();
-            s += "-L";
-            s += &l.end.to_string();
-        }
-        None => {}
+    if let Some(l) = lines {
+        s += &l.fragment();
     }
     s
 }

@@ -71,7 +71,7 @@ impl Target {
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct RawSend {
-    id: String,
+    pub(crate) id: String,
     label: String,
     url: String,
     /// Optional template that searches the destination for a commit: `{sha}`, `{short}` and
@@ -80,7 +80,7 @@ pub(crate) struct RawSend {
     lookup: Option<String>,
     /// `false` keeps the block checked but not offered: how the shipped starter file lists
     /// targets that need settings of yours.
-    #[serde(default = "yes")]
+    #[serde(default = "crate::config::yes")]
     pub(crate) enabled: bool,
     #[serde(default)]
     vars: BTreeMap<String, String>,
@@ -96,16 +96,6 @@ pub fn fill(parts: &[Part], values: &BTreeMap<String, String>) -> String {
             Part::Ph(n) => percent_encode_segment(values.get(n).map_or("", String::as_str)),
         })
         .collect()
-}
-
-const fn yes() -> bool {
-    true
-}
-
-impl RawSend {
-    pub(crate) fn id(&self) -> &str {
-        &self.id
-    }
 }
 
 /// Why a `[[send]]` block is refused. The text is the reason, without the id.
@@ -141,7 +131,7 @@ pub(crate) fn compile(raw: RawSend) -> Result<Target, SendError> {
         }
     }
     let label = raw.label.as_str();
-    if label.trim().is_empty() || label.chars().count() > 80 {
+    if !crate::config::valid_label(label) {
         return Err(SendError::Label);
     }
     let parts = template_parts(&raw.vars, "url", &raw.url, &SEND_FIELDS)?;

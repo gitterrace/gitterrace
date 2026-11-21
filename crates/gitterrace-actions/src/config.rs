@@ -215,7 +215,7 @@ struct RawAction {
     vars: BTreeMap<String, String>,
 }
 
-const fn yes() -> bool {
+pub(crate) const fn yes() -> bool {
     true
 }
 
@@ -245,7 +245,7 @@ impl Config {
         let mut scripts = BTreeMap::new();
         for sc in raw.script {
             if !valid_id(&sc.id) {
-                return Err(script_err(&sc.id, "id must match [a-z0-9-]{1,32}"));
+                return Err(script_err(&sc.id, ID_RULE));
             }
             if scripts.contains_key(&sc.id) {
                 return Err(script_err(&sc.id, "duplicate id"));
@@ -283,12 +283,12 @@ impl Config {
         let mut seen_sends = HashSet::new();
         let mut sends = Vec::with_capacity(raw.send.len());
         for raw_send in raw.send {
-            let id = raw_send.id().to_owned();
+            let id = raw_send.id.clone();
             let enabled = raw_send.enabled;
             let target =
                 crate::send::compile(raw_send).map_err(|why| send_err(&id, why.to_string()))?;
             if !valid_id(&id) {
-                return Err(send_err(&id, "id must match [a-z0-9-]{1,32}"));
+                return Err(send_err(&id, ID_RULE));
             }
             if !seen_sends.insert(id.clone()) {
                 return Err(send_err(&id, "duplicate id"));
@@ -344,6 +344,13 @@ fn send_err(id: &str, why: impl Into<String>) -> ConfigError {
     ConfigError::Send { id, why }
 }
 
+const ID_RULE: &str = "id must match [a-z0-9-]{1,32}";
+
+/// A menu or Send label: 1 to 80 characters, not blank.
+pub(crate) fn valid_label(label: &str) -> bool {
+    !label.trim().is_empty() && label.chars().count() <= 80
+}
+
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 32
@@ -357,9 +364,9 @@ fn validate(
 ) -> Result<Action, ConfigError> {
     let id = a.id;
     if !valid_id(&id) {
-        return Err(invalid(&id, "id must match [a-z0-9-]{1,32}"));
+        return Err(invalid(&id, ID_RULE));
     }
-    if a.label.trim().is_empty() || a.label.chars().count() > 80 {
+    if !valid_label(&a.label) {
         return Err(invalid(&id, "label must be 1 to 80 characters"));
     }
     if a.kinds.is_empty() {
@@ -430,7 +437,8 @@ fn validate(
             return Err(invalid(&id, format!("env name {name:?} is not allowed")));
         }
     }
-    let vars = validate_vars(&id, a.vars)?;
+    check_vars(&a.vars).map_err(|why| invalid(&id, why))?;
+    let vars = a.vars;
     Ok(Action {
         id,
         label: a.label,
@@ -480,14 +488,6 @@ fn parse_stdin(value: Option<&str>) -> Result<Stdin, StdinError> {
         Some("none") => Ok(Stdin::None),
         Some(other) => Err(StdinError(other.to_owned())),
     }
-}
-
-fn validate_vars(
-    id: &str,
-    vars: BTreeMap<String, String>,
-) -> Result<BTreeMap<String, String>, ConfigError> {
-    check_vars(&vars).map_err(|why| invalid(id, why))?;
-    Ok(vars)
 }
 
 /// The rules `[action.vars]` is loaded under, so the settings form refuses what the loader

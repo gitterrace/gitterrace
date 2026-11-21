@@ -4,7 +4,7 @@
 //! exact place without parsing the prose. `static/send.js` builds the same line, and
 //! `testdata/source-vectors.json` holds both to it.
 
-use crate::payload::Lines;
+use crate::payload::{Lines, flat};
 
 /// The prefix that starts the line.
 pub const SOURCE_PREFIX: &str = "source: ";
@@ -22,18 +22,13 @@ pub struct Source {
 #[must_use]
 pub fn source_line(repo: &str, sha: &str, path: Option<&str>, lines: Option<Lines>) -> String {
     // A line break in a name would end the line early, so control characters become spaces.
-    let flat =
-        |s: &str| -> String { s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect() };
     let mut out = format!("{SOURCE_PREFIX}{}@{sha}", flat(repo));
     if let Some(p) = path {
         out.push(':');
         // `%` and `#` encoded, so the only `#` on the line is the one before the range.
         out.push_str(&flat(p).replace('%', "%25").replace('#', "%23"));
         if let Some(l) = lines {
-            out.push_str("#L");
-            out.push_str(&l.start.to_string());
-            out.push_str("-L");
-            out.push_str(&l.end.to_string());
+            out.push_str(&["#L", &l.start.to_string(), "-L", &l.end.to_string()].concat());
         }
     }
     out

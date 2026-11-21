@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use gitterrace_git::percent_encode_segment;
 
 use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
-use crate::payload::Payload;
+use crate::payload::{Payload, flat};
 
 /// The first output line returned to the browser. Full output never leaves the server.
 /// Not configurable: it is the size of a toast, part of the page contract.
@@ -432,9 +432,7 @@ fn capture(mut r: impl Read + Send + 'static, keep: usize) -> mpsc::Receiver<Vec
 fn first_line(bytes: &[u8]) -> Option<String> {
     let text = String::from_utf8_lossy(bytes);
     let line = text.lines().map(str::trim).find(|l| !l.is_empty())?;
-    let line: String =
-        line.chars().map(|c| if c.is_control() { ' ' } else { c }).take(MAX_FIRST_LINE).collect();
-    Some(line)
+    Some(flat(line).chars().take(MAX_FIRST_LINE).collect())
 }
 
 // The fixtures use /bin/sh, chmod modes and symlinks, so they run on unix only.

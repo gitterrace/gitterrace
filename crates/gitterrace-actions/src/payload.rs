@@ -53,6 +53,17 @@ pub struct Lines {
     pub end: u32,
 }
 
+impl Lines {
+    /// `#L<a>` for one line, `#L<a>-L<b>` for a span.
+    pub(crate) fn fragment(self) -> String {
+        if self.start == self.end {
+            format!("#L{}", self.start)
+        } else {
+            format!("#L{}-L{}", self.start, self.end)
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RepoInfo {
     pub name: String,
@@ -312,10 +323,14 @@ fn cap(s: &str, max: usize) -> (String, bool) {
     (s[..end].to_string(), true)
 }
 
+/// `s` with every control character (newlines included) turned into a space.
+pub(crate) fn flat(s: &str) -> String {
+    s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect()
+}
+
 /// One line: control characters (newlines included) become spaces, then capped.
 fn lossy_line(s: &str, max: usize) -> String {
-    let flat: String = s.chars().map(|c| if c.is_control() { ' ' } else { c }).collect();
-    cap(&flat, max).0
+    cap(&flat(s), max).0
 }
 
 /// `/go/<id>/<sha>[/<path>][#L<a>[-L<b>]]`.
@@ -341,11 +356,7 @@ pub fn permalink(
         url.push_str(&percent_encode_path(p));
     }
     if let Some(l) = lines {
-        url = if l.start == l.end {
-            format!("{url}#L{}", l.start)
-        } else {
-            format!("{url}#L{}-L{}", l.start, l.end)
-        };
+        url.push_str(&l.fragment());
     }
     url
 }
