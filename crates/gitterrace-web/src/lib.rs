@@ -123,7 +123,7 @@ pub fn app_router(repo_path: impl AsRef<Path>) -> io::Result<axum::Router> {
 
 /// [`app_router`] with the settings in force.
 pub fn app_router_with(repo_path: impl AsRef<Path>, cfg: Config) -> io::Result<axum::Router> {
-    Ok(build(repo_path.as_ref(), None, None, &Env::new(cfg))?.0)
+    Ok(build_multi(vec![repo_path.as_ref().to_path_buf()], None, None, &Env::new(cfg))?.0)
 }
 
 /// Router for one or more repositories, each under `/r/NAME`; `/` forwards to a lone one and
@@ -262,15 +262,6 @@ fn guarded(router: axum::Router, gate: guard::Gate) -> axum::Router {
         .layer(axum::middleware::from_fn_with_state(Arc::new(gate), guard::guard))
 }
 
-fn build(
-    repo_path: &Path,
-    extra: Option<IpAddr>,
-    actions_file: Option<&Path>,
-    env: &Env,
-) -> io::Result<(axum::Router, String)> {
-    build_server(vec![repo_path.to_path_buf()], extra, actions_file, env, None, None)
-}
-
 fn build_multi(
     paths: Vec<PathBuf>,
     extra: Option<IpAddr>,
@@ -387,6 +378,11 @@ fn remember(dir: Option<&Path>, paths: &[PathBuf]) {
     }
 }
 
+async fn bind(addr: SocketAddr, cfg: &Config) -> io::Result<tokio::net::TcpListener> {
+    refuse_lan(addr, cfg)?;
+    tokio::net::TcpListener::bind(addr).await.map_err(|e| bind_error(addr, &e))
+}
+
 /// Starts serving until ctrl-c.
 ///
 /// `actions` is the user's `actions.toml`; `None` (no config
@@ -402,8 +398,7 @@ pub async fn serve(
     watched: Option<Watched>,
     cli_paths: &[PathBuf],
 ) -> io::Result<()> {
-    refuse_lan(addr, &cfg)?;
-    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| bind_error(addr, &e))?;
+    let listener = bind(addr, &cfg).await?;
     let state = registry::state_dir();
     serve_on(listener, repo_paths, actions, cfg, watched, state, cli_paths).await
 }
@@ -417,8 +412,7 @@ pub async fn serve_in(
     watched: Option<Watched>,
     state: Option<PathBuf>,
 ) -> io::Result<()> {
-    refuse_lan(addr, &cfg)?;
-    let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| bind_error(addr, &e))?;
+    let listener = bind(addr, &cfg).await?;
     serve_on(listener, repo_paths, actions, cfg, watched, state, &[]).await
 }
 

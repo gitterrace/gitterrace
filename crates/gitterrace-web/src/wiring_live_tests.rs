@@ -268,7 +268,7 @@ async fn a_refused_actions_file_is_in_the_first_paint() {
     .expect("write");
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
     let env = Env::new(Config::default());
-    let (r, _) = crate::build(&p, None, Some(&file), &env).expect("build");
+    let (r, _) = crate::build_multi(vec![p.clone()], None, Some(&file), &env).expect("build");
     let (code, html) = get(&r, "/").await;
     assert_eq!(code, 200);
     let strip = html
@@ -317,7 +317,7 @@ async fn action_chords_are_wired_and_listed_in_the_help_sheet() {
     .expect("write");
     std::fs::set_permissions(&file, std::fs::Permissions::from_mode(0o600)).expect("chmod");
     let env = Env::new(Config::default());
-    let (r, _) = crate::build(&p, None, Some(&file), &env).expect("build");
+    let (r, _) = crate::build_multi(vec![p.clone()], None, Some(&file), &env).expect("build");
     let (_, html) = get(&r, "/").await;
     assert!(
         html.contains("&#34;key&#34;:&#34;x&#34;") || html.contains("\"key\":\"x\""),
@@ -341,7 +341,8 @@ async fn commit_page_links_only_the_targets_with_a_lookup() {
     )
     .expect("write");
     let (app, _) =
-        crate::build(&p, None, Some(&file), &Env::new(Config::default())).expect("build");
+        crate::build_multi(vec![p.clone()], None, Some(&file), &Env::new(Config::default()))
+            .expect("build");
     let (_, log) = get(&app, "/log/HEAD").await;
     let id = log
         .split("/commit/")

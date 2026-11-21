@@ -234,7 +234,7 @@ pub(crate) fn spark_times(
 
 pub(crate) fn path_filter(a: &App, head: &str) -> gitterrace_index::PathFilter {
     let opts = a.defaults().into_options();
-    let ignore = opts.respect_ignore.then(|| a.ignore_set(head)).flatten();
+    let ignore = crate::insights::ignore_for(a, opts.respect_ignore, head);
     gitterrace_index::PathFilter::new(&opts, ignore)
 }
 

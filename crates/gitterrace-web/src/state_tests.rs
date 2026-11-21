@@ -244,7 +244,9 @@ async fn public_server_shows_committed_history_only() {
     let cfg = actions_tests::config_dir(actions_tests::ECHO);
     let env = crate::app::Env::new(public_cfg());
     let router =
-        crate::build(&p, None, Some(&cfg.path().join("actions.toml")), &env).expect("router").0;
+        crate::build_multi(vec![p.clone()], None, Some(&cfg.path().join("actions.toml")), &env)
+            .expect("router")
+            .0;
     let root = std::fs::canonicalize(&p).expect("canon");
     let leaks = [
         root.to_string_lossy().into_owned(),

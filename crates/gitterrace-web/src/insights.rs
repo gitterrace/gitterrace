@@ -220,20 +220,19 @@ pub(crate) type CheckedSrc = gitterrace_index::feed::Checked<dyn InsightsSource>
 pub(crate) fn insights<'a>(a: &App, src: &'a Src, o: Options) -> Insights<'a> {
     let head = a.repo.resolve(&crate::fmt::selected()).unwrap_or_default();
     let respect = o.respect_ignore;
-    let ignore = |a: &App| respect.then(|| a.ignore_set(&head)).flatten();
     // The full record set of the tip is what every unfiltered page reads: its derived tables
     // (path filter decisions, rename-followed touches, per-commit lines) are built once per
     // tip, index generation and options, not once per page. Filtered sets stay per request.
     let full = a.source(&head).ok().flatten().is_some_and(|tip| tip.holds(src));
-    if full { shared_at(a, src, &head, o) } else { Insights::from_source(&**src, o, ignore(a)) }
+    if full {
+        shared_on(a, &**src, &head, o)
+    } else {
+        Insights::from_source(&**src, o, ignore_for(a, respect, &head))
+    }
 }
 
-/// The shared tables of the full set of `head`, see [`insights`].
-fn shared_at<'a>(a: &App, src: &'a Src, head: &str, o: Options) -> Insights<'a> {
-    shared_on(a, &**src, head, o)
-}
-
-/// [`shared_at`] over any source of `head`'s full set: the overview's totals read it too.
+/// The shared tables of the full set of `head`, see [`insights`]. Any source of that set
+/// will do: the overview's totals read it too.
 pub(crate) fn shared_on<'a>(
     a: &App,
     src: &'a dyn gitterrace_index::feed::InsightsSource,
@@ -242,9 +241,12 @@ pub(crate) fn shared_on<'a>(
 ) -> Insights<'a> {
     let respect = o.respect_ignore;
     let key = tables_key(a, head);
-    Insights::shared_source(&a.caches.tables, src, o, &key, || {
-        respect.then(|| a.ignore_set(head)).flatten()
-    })
+    Insights::shared_source(&a.caches.tables, src, o, &key, || ignore_for(a, respect, head))
+}
+
+/// The ignore rules at `head`, when the options respect them.
+pub(crate) fn ignore_for(a: &App, respect: bool, head: &str) -> Option<gitterrace_git::IgnoreSet> {
+    respect.then(|| a.ignore_set(head)).flatten()
 }
 
 /// The key the full set of `head` keeps its shared tables under, the API's too.
@@ -262,7 +264,7 @@ pub(crate) fn warm_shared(a: &App, head: &str) {
     };
     let files = a.head_lines(head);
     drop(src.run(|s| {
-        let ins = shared_at(a, s, head, a.defaults().into_options());
+        let ins = shared_on(a, &**s, head, a.defaults().into_options());
         ins.warm_files();
         ins.warm_paths(files.iter().map(|f| &*f.path));
         // The languages chain reads the whole first-parent chain once per head. What it
