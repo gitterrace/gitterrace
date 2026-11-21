@@ -24,9 +24,6 @@ cpu_secs = bl.cpu_secs
 QUIET_SECS = 20
 # A published run uses these. Anything less is a smoke run, written to the cache.
 FULL_RUNS, FULL_IDLE_SECS = 5, 60
-# Cold metrics (index, cold page, export) per repo: fresh server and empty cache each time.
-# corpus.toml lowers it per repo (cold_samples = 1) where a cold index takes too long.
-COLD_SAMPLES = 3
 
 
 def max_load():

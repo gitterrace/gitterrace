@@ -396,12 +396,12 @@ def footprint(run: Json) -> list[str]:
 
 def cold_samples(run: Json) -> list[str]:
     """Cold metrics need COLD_SAMPLES samples, or the count corpus.toml allows for the repo."""
-    allowed = {r["name"]: int(r.get("cold_samples", bc.COLD_SAMPLES)) for r in bc.corpus_repos()}
+    allowed = {r["name"]: int(r.get("cold_samples", bl.COLD_SAMPLES)) for r in bc.corpus_repos()}
     return [
         f"{bc.run_name(run)}: {n} has {r.get('cold_samples', 1)} cold sample(s), "
-        f"needs {allowed.get(n, bc.COLD_SAMPLES)}"
+        f"needs {allowed.get(n, bl.COLD_SAMPLES)}"
         for n, r in run["repos"].items()
-        if r.get("cold_samples", 1) < allowed.get(n, bc.COLD_SAMPLES)
+        if r.get("cold_samples", 1) < allowed.get(n, bl.COLD_SAMPLES)
     ]
 
 

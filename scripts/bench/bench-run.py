@@ -517,7 +517,7 @@ def main():
             logdir,
             base,
             not a.synthetic,
-            int(repo.get("cold_samples", bq.COLD_SAMPLES)) if full else 1,
+            int(repo.get("cold_samples", bl.COLD_SAMPLES)) if full else 1,
         )
         res["budget"] = judge(res, budgets(corpus))
         fails += bl.index_over(repo["name"], res["budget"])

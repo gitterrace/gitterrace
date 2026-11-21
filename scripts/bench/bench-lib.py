@@ -532,6 +532,11 @@ def phase_cpu_test() -> None:
         sys.exit(f"bench self-test failed: phase table {rows}")
 
 
+# Cold metrics (index, cold page, export) per repo: fresh server and empty cache each time.
+# corpus.toml lowers it per repo (cold_samples = 1) where a cold index takes too long.
+COLD_SAMPLES = 3
+
+
 def slowest_page(pages: Json) -> str:
     """The page with the highest warm median. The page budget is a ceiling, so this page sets
     it, and which page that is differs per repo (a big blame on one, a big diff on another)."""

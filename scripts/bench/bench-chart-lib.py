@@ -27,8 +27,6 @@ BEGIN, END = "<!-- BEGIN GENERATED: results -->", "<!-- END GENERATED: results -
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.json")
 # The newest run and its baseline. Older runs live in git history.
 KEEP = 2
-# Cold samples per repo, matching bench-run.py. corpus.toml lowers it per repo.
-COLD_SAMPLES = 3
 # Floats are rounded to this many decimals, so diffs between runs stay readable.
 DECIMALS = 2
 
