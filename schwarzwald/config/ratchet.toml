@@ -35,12 +35,20 @@ path = "super_paths"
 web_format_html = 17
 # The heaviest served page (home, a file, a commit, the log, statistics) of the web test
 # page_weight, in raw bytes. Lower it when a cut lands, never raise it.
-web_page_bytes = 51119
+web_page_bytes = 50657
 # The heaviest built page of each kind in raw bytes (xtask site guard 9). Lower it when a cut
 # lands, never raise it. The changelog page grows with every release, so it is not measured.
 site_bytes_landing = 23892
 site_bytes_docs = 50929
 site_bytes_other = 17978
+# The most files a page of each kind fetches on load: stylesheets, scripts and images not marked
+# lazy (xtask site guard 10). Lower it when a cut lands, never raise it.
+site_requests_landing = 2
+site_requests_docs = 1
+site_requests_other = 1
+# The same for the served app's main pages (web test page_weight): stylesheets, scripts and
+# font preloads.
+web_requests = 10
 
 [retired]
 # The Rust-only wide-line count moved to the kit's file-length lint, which counts code lines

@@ -233,7 +233,7 @@ pub fn check(root: &Path, site: &Path, outs: &[Out], repo: &str) -> Result<Vec<S
     let registry = std::fs::read_to_string(root.join("schwarzwald/config/ratchet.toml"))
         .context("reading the ratchet registry")?;
     let Some(budgets) = guards::Budgets::parse(&registry) else {
-        bail!("schwarzwald/config/ratchet.toml has no site_bytes_landing, _docs and _other");
+        bail!("schwarzwald/config/ratchet.toml has no site_bytes_* or site_requests_* counts");
     };
     let facts = guards::Facts { repo, published, docs, budgets };
     bad.extend(guards::problems(&tree.pages, &facts));

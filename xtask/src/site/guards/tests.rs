@@ -46,7 +46,14 @@ fn site() -> (BTreeMap<String, String>, Facts<'static>) {
         repo: REPO,
         published: ["docs/a.md".to_owned(), "docs/b.md".to_owned()].into(),
         docs: vec!["docs/a/".to_owned(), "docs/b/".to_owned()],
-        budgets: Budgets { landing: 10_000, docs: 10_000, other: 10_000 },
+        budgets: Budgets {
+            landing: 10_000,
+            docs: 10_000,
+            other: 10_000,
+            req_landing: 10,
+            req_docs: 10,
+            req_other: 10,
+        },
     };
     (pages, facts)
 }
@@ -207,6 +214,28 @@ fn guard_8_a_page_left_out_of_the_index_the_list_or_the_chain_is_red() {
     assert!(broken.contains("the previous and next chain"), "{broken}");
 }
 
+/// The class: a page that fetches one more file than its kind may, whatever its size. The second
+/// defect it catches: an image added without `loading="lazy"`, which the byte budget misses when
+/// the file is not inlined.
+#[test]
+fn a_page_over_its_request_budget_is_reported() {
+    let got = plant(|p| {
+        let links = "<link rel=\"stylesheet\" href=\"/a.css\">".repeat(11);
+        edit_page(p, "docs/a/index.html", "</main>", &format!("{links}</main>"));
+    });
+    assert!(got.contains("docs/a/index.html") && got.contains("docs budget"), "{got}");
+    let img = plant(|p| {
+        let imgs = "<img src=\"/x.webp\" alt=\"\">".repeat(11);
+        edit_page(p, "docs/a/index.html", "</main>", &format!("{imgs}</main>"));
+    });
+    assert!(img.contains("requests"), "{img}");
+    let lazy = plant(|p| {
+        let imgs = "<img src=\"/x.webp\" alt=\"\" loading=\"lazy\">".repeat(11);
+        edit_page(p, "docs/a/index.html", "</main>", &format!("{imgs}</main>"));
+    });
+    assert!(!lazy.contains("requests"), "{lazy}");
+}
+
 /// The class: a page that grows past its kind, such as one shipping an unminified inline SVG.
 #[test]
 fn a_page_over_its_byte_budget_is_reported() {
@@ -224,7 +253,13 @@ fn a_page_over_its_byte_budget_is_reported() {
 
 #[test]
 fn budgets_are_read_from_the_registry_counts() {
-    let b = Budgets::parse("site_bytes_landing = 3\nsite_bytes_docs = 2\nsite_bytes_other = 1\n");
-    assert_eq!(b.map(|b| (b.landing, b.docs, b.other)), Some((3, 2, 1)));
+    let b = Budgets::parse(concat!(
+        "site_bytes_landing = 3\nsite_bytes_docs = 2\nsite_bytes_other = 1\n",
+        "site_requests_landing = 6\nsite_requests_docs = 5\nsite_requests_other = 4\n"
+    ));
+    assert_eq!(
+        b.map(|b| (b.landing, b.docs, b.other, b.req_landing, b.req_docs, b.req_other)),
+        Some((3, 2, 1, 6, 5, 4))
+    );
     assert!(Budgets::parse("site_bytes_docs = 2").is_none());
 }

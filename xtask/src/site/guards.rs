@@ -15,6 +15,10 @@
 //! 9. a page over its kind's byte budget (landing, docs, other), the budgets in the `[counts]`
 //!    of `ratchet.toml` that only fall, so an unminified inline SVG or a pasted blob fails.
 //!
+//! 10. a page over its kind's request budget (`site_requests_*`): the stylesheets, scripts and
+//!     images it loads at once. A byte budget lets a page add a second stylesheet or an eager
+//!     image so long as it is small; this one does not.
+//!
 //! Guard 2 (a dead internal link or anchor) is `disk::dead_links`, and guard 5 (sideways scroll
 //! at 390 px) is the `site-bar` browser check, which measures it in a real browser.
 
@@ -47,6 +51,9 @@ pub(super) struct Budgets {
     pub landing: usize,
     pub docs: usize,
     pub other: usize,
+    pub req_landing: usize,
+    pub req_docs: usize,
+    pub req_other: usize,
 }
 
 impl Budgets {
@@ -61,6 +68,9 @@ impl Budgets {
             landing: get("site_bytes_landing")?,
             docs: get("site_bytes_docs")?,
             other: get("site_bytes_other")?,
+            req_landing: get("site_requests_landing")?,
+            req_docs: get("site_requests_docs")?,
+            req_other: get("site_requests_other")?,
         })
     }
 }
@@ -82,6 +92,7 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
     bad.extend(missing_head_or_frame(pages));
     bad.extend(orphan_docs(pages, facts));
     bad.extend(over_budget(pages, &facts.budgets));
+    bad.extend(over_requests(pages, &facts.budgets));
     bad
 }
 
@@ -292,6 +303,39 @@ fn over_budget(pages: &BTreeMap<String, String>, budgets: &Budgets) -> Vec<Strin
         let size = html.len();
         if size > max {
             bad.push(format!("{path}: {size} bytes, over the {kind} budget of {max}"));
+        }
+    }
+    bad
+}
+
+/// The files a page fetches on load: stylesheets, scripts and images not marked lazy.
+fn requests(html: &str) -> usize {
+    let tag = |open: &str| html.matches(open).count();
+    let eager = html
+        .split("<img ")
+        .skip(1)
+        .filter(|t| !t.split('>').next().unwrap_or("").contains("loading=\"lazy\""))
+        .count();
+    tag("<link rel=\"stylesheet\"") + tag("<script src=") + eager
+}
+
+/// Guard 10: a page over its kind's request budget.
+fn over_requests(pages: &BTreeMap<String, String>, budgets: &Budgets) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        if path.starts_with("changelog/") {
+            continue;
+        }
+        let (kind, max) = if path == "index.html" {
+            ("landing", budgets.req_landing)
+        } else if path.starts_with("docs/") {
+            ("docs", budgets.req_docs)
+        } else {
+            ("other", budgets.req_other)
+        };
+        let n = requests(&html.replace("\n ", " "));
+        if n > max {
+            bad.push(format!("{path}: {n} requests, over the {kind} budget of {max}"));
         }
     }
     bad
