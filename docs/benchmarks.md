@@ -92,11 +92,16 @@ runs:
 | Hotspots  | 1 year | 230 ms | 144 ms   | met    |
 | Ownership | all    | 115 ms | 79 ms    | met    |
 | Ownership | 1 year | 115 ms | 35 ms    | met    |
-| Languages | -      | 66 ms  | 589 ms   | missed |
+| Languages | -      | 66 ms  | 3 ms     | met    |
 
-Languages is over its goal, and the cause is not yet known. The server renders
-these pages right after the index is ready, so most visitors get them from
-memory in a few milliseconds. `make speed-check` measures them on the rust and
+Languages was 589 ms when its chain walk (every first-parent commit of the
+history) ran in the first visitor's request. The warm-up now builds the chain
+and renders the page before the repository turns ready, so that request is a
+memo hit. The walk's cost moved into the warm-up (about 5 s from the index
+holding HEAD to ready on rust, with every page), and `the_first_page_after_ready_is_served_from_the_warm_up`
+fails on a render or a chain walk after ready. The server renders these pages
+right after the index is ready, so most visitors get them from memory in a few
+milliseconds. `make speed-check` measures them on the rust and
 linux clones and fails on a page over its target. The overview, statistics,
 contributors and hotspot period pages are rendered before the repository turns
 ready, so their target is a memory hit's, 300 ms.
