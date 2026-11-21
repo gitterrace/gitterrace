@@ -1,0 +1,13 @@
+<div class="media">{% if let Some(el) = element
+%}<div class="media-stage{% if checker
+%} checker{% endif
+%}">{{ el
+}}</div><p class="media-facts muted">{{ facts
+}} · <a href="{{ url
+}}">Raw</a> · <a href="{{ url
+}}" download>Download</a></p>{% else
+%}<p class="media-facts muted">{{ facts }}</p>{% endif
+%}</div>{% if let Some(src) = svg_src
+%}<details class="media-src"><summary>Code</summary><pre class="body">{{ src
+}}</pre></details>{% endif
+%}

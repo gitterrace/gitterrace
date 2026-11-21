@@ -32,7 +32,7 @@ path = "super_paths"
 
 [counts]
 # Markup built with format!/write! in crates/gitterrace-web/src instead of a template.
-web_format_html = 17
+web_format_html = 6
 # The heaviest served page (home, a file, a commit, the log, statistics) of the web test
 # page_weight, in raw bytes. Lower it when a cut lands, never raise it.
 web_page_bytes = 50657

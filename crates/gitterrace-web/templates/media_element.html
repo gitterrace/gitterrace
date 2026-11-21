@@ -1,0 +1,9 @@
+{% match kind
+%}{% when Kind::Image | Kind::Svg
+%}<img class="media-img" src="{{ url }}" alt="{{ name }}"{% if let Some((w, h)) = dims
+%} width="{{ w }}" height="{{ h }}"{% endif
+%} loading="lazy">{% when Kind::Pdf
+%}<a class="media-file" href="{{ url }}" download>Download {{ name }}</a>{% when Kind::Audio
+%}<audio class="media-av" src="{{ url }}" controls preload="metadata"></audio>{% when Kind::Video
+%}<video class="media-av" src="{{ url }}" controls preload="metadata"></video>{% endmatch
+%}

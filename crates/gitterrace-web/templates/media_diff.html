@@ -1,0 +1,24 @@
+{% if let Some(o) = overlay %}<div class="media-view paned" data-media-view>
+{#- -#}
+<div class="media-bar">{{ o.view }}</div>{% endif %}
+{#- -#}
+<div class="media-diff"{% if overlay.is_some() %} data-pane="sides"{% endif %}>
+{#- -#}
+{% for (label, el) in sides %}<figure class="media-side">
+{#- -#}
+<figcaption class="muted">{{ label }}</figcaption>
+{#- -#}
+<div class="media-stage checker">{{ el }}</div></figure>{% endfor %}</div>
+{#- -#}
+{% if let Some(o) = overlay %}<div class="media-overlay" data-pane="overlay">
+{#- -#}
+<div class="media-stage checker"><div class="media-stack">
+{#- -#}
+<div class="media-before">{{ o.before }}</div><div class="media-after">{{ o.after }}</div>
+{#- -#}
+</div></div>
+{#- -#}
+<label class="media-cut muted">Before<input type="range" min="0" max="100" value="50" {#
+#}aria-label="Before and after split" data-media-cut>After</label>
+{#- -#}
+</div></div>{% endif %}

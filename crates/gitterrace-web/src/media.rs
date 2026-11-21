@@ -1,7 +1,11 @@
 //! Images, audio, video and PDFs: what the blob view and commit diffs show for them, and the
 //! content types `/raw` serves. Pure functions over a path and bytes, so they are testable.
 
-use crate::fmt::{enc_path, enc_seg, esc, href, size};
+use askama::Template;
+use askama::filters::HtmlSafe;
+
+use crate::fmt::{enc_path, enc_seg, href, size};
+use crate::seg::{Choice, Seg};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -155,32 +159,34 @@ impl<'a> Side<'a> {
     }
 }
 
-/// One `<img>` (or media element) at `url`. A known pixel size reserves the box before load.
-fn element_at(k: Kind, url: &str, path: &str, dims: Option<(u32, u32)>) -> String {
-    let name = esc(path.rsplit('/').next().unwrap_or(path));
-    match k {
-        Kind::Image | Kind::Svg => {
-            let size =
-                dims.map_or_else(String::new, |(w, h)| format!(r#" width="{w}" height="{h}""#));
-            format!(r#"<img class="media-img" src="{url}" alt="{name}"{size} loading="lazy">"#)
-        }
-        // No embedded viewer: a crafted PDF would run in the app's origin.
-        Kind::Pdf => format!(r#"<a class="media-file" href="{url}" download>Download {name}</a>"#),
-        Kind::Audio => {
-            format!(r#"<audio class="media-av" src="{url}" controls preload="metadata"></audio>"#)
-        }
-        Kind::Video => {
-            format!(r#"<video class="media-av" src="{url}" controls preload="metadata"></video>"#)
-        }
+#[derive(Template)]
+#[template(path = "media_element.html")]
+struct Element {
+    kind: Kind,
+    url: String,
+    name: String,
+    dims: Option<(u32, u32)>,
+}
+
+impl HtmlSafe for Element {}
+
+impl Element {
+    /// One `<img>` (or media element) at `url`. A known pixel size reserves the box before
+    /// load. A PDF is a download link, never an embed: a crafted one would run in our origin.
+    fn at(kind: Kind, url: String, path: &str, dims: Option<(u32, u32)>) -> Self {
+        let name = path.rsplit('/').next().unwrap_or(path).to_owned();
+        Self { kind, url, name, dims }
     }
 }
 
-fn source_details(src: &str) -> String {
-    format!(
-        "<details class=\"media-src\"><summary>Code</summary>\
-            <pre class=\"body\">{}</pre></details>",
-        esc(src)
-    )
+#[derive(Template)]
+#[template(path = "media_blob.html")]
+struct Blob<'a> {
+    element: Option<Element>,
+    checker: bool,
+    facts: String,
+    url: String,
+    svg_src: Option<&'a str>,
 }
 
 /// The blob view body for a media file: the preview on a checkerboard, a facts line and links.
@@ -196,28 +202,16 @@ pub(crate) fn blob_html(
     let px = dimensions(path, bytes);
     let dims = px.map_or_else(String::new, |(w, h)| format!("{w} x {h} · "));
     // Without `/raw` there is no byte to show or download, only the facts.
-    if !crate::features::on(gitterrace_config::Feature::Raw) {
-        let mut out = format!(
-            r#"<div class="media"><p class="media-facts muted">{dims}{}</p></div>"#,
-            size(len)
-        );
-        if let Some(src) = svg_src {
-            out.push_str(&source_details(src));
-        }
-        return out;
+    let raw = crate::features::on(gitterrace_config::Feature::Raw);
+    Blob {
+        element: raw.then(|| Element::at(k, url.clone(), path, px)),
+        checker: matches!(k, Kind::Image | Kind::Svg),
+        facts: format!("{dims}{}", size(len)),
+        url,
+        svg_src,
     }
-    let mut out = format!(
-        "<div class=\"media\"><div class=\"media-stage{}\">{}</div>\
-            <p class=\"media-facts muted\">{dims}{} · <a href=\"{url}\">Raw</a> · \
-            <a href=\"{url}\" download>Download</a></p></div>",
-        if matches!(k, Kind::Image | Kind::Svg) { " checker" } else { "" },
-        element_at(k, &url, path, px),
-        size(len),
-    );
-    if let Some(src) = svg_src {
-        out.push_str(&source_details(src));
-    }
-    out
+    .render()
+    .unwrap_or_default()
 }
 
 /// What one side of a changed image weighs: its size in bytes and its pixel size when the
@@ -232,6 +226,12 @@ impl Facts {
     pub(crate) fn of(path: &str, bytes: &[u8]) -> Self {
         Self { len: bytes.len() as u64, dims: dimensions(path, bytes) }
     }
+}
+
+#[derive(Template)]
+#[template(path = "media_counts.html")]
+struct Counts {
+    line: String,
 }
 
 /// The header line of a changed image in place of `+0 -0`, which says nothing about a picture:
@@ -256,65 +256,51 @@ pub(crate) fn diff_counts(old: Option<Facts>, new: Option<Facts>) -> String {
         (Some(o), None) => format!("removed, {}", size(o.len)),
         (None, None) => return String::new(),
     };
-    format!("<span class=\"counts media-counts muted\">{}</span>", esc(&line))
+    Counts { line }.render().unwrap_or_default()
 }
 
 /// One side of an image diff: where it loads from and its pixel size when known.
 pub(crate) type Pic<'a> = (Side<'a>, Option<(u32, u32)>);
 
+struct Overlay {
+    view: Seg,
+    before: Element,
+    after: Element,
+}
+
+#[derive(Template)]
+#[template(path = "media_diff.html")]
+struct Diff {
+    sides: Vec<(&'static str, Element)>,
+    overlay: Option<Overlay>,
+}
+
 /// Before and after of one changed image, side by side; one side for added or deleted files.
+/// With both sides it also offers one over the other with a slider, where a small change
+/// between two near-identical pictures is easier to find.
 pub(crate) fn diff_html(old: Option<Pic<'_>>, new: Option<Pic<'_>>) -> String {
     let img = |(at, dims): Pic<'_>| {
         let path = at.file();
-        element_at(kind(path).unwrap_or(Kind::Image), &at.url(), path, dims)
+        Element::at(kind(path).unwrap_or(Kind::Image), at.url(), path, dims)
     };
-    let side = |label: &str, at: Option<Pic<'_>>| {
-        at.map_or_else(String::new, |at| {
-            format!(
-                "<figure class=\"media-side\">\
-                    <figcaption class=\"muted\">{label}</figcaption>\
-                    <div class=\"media-stage checker\">{}</div></figure>",
-                img(at)
-            )
-        })
-    };
-    let (Some(o), Some(n)) = (old, new) else {
-        return format!(
-            r#"<div class="media-diff">{}{}</div>"#,
-            side("Before", old),
-            side("After", new)
-        );
-    };
-    // Both sides: side by side, or one over the other with a slider, where a small change
-    // between two near-identical pictures is easier to find.
-    let view = crate::seg::Seg {
-        name: "Image view".to_owned(),
-        panes: format!("view-{}", n.0.file()),
-        choices: vec![
-            crate::seg::Choice::new("Side by side", "sides", true),
-            crate::seg::Choice::new("Overlay", "overlay", false),
-        ],
-        ..crate::seg::Seg::default()
-    };
-    format!(
-        concat!(
-            r#"<div class="media-view paned" data-media-view>"#,
-            r#"<div class="media-bar">{view}</div>"#,
-            r#"<div class="media-diff" data-pane="sides">{}{}</div>"#,
-            r#"<div class="media-overlay" data-pane="overlay">"#,
-            r#"<div class="media-stage checker"><div class="media-stack">"#,
-            r#"<div class="media-before">{}</div><div class="media-after">{}</div>"#,
-            r#"</div></div><label class="media-cut muted">Before"#,
-            r#"<input type="range" min="0" max="100" value="50""#,
-            r#" aria-label="Before and after split" data-media-cut>After</label>"#,
-            r#"</div></div>"#,
-        ),
-        side("Before", old),
-        side("After", new),
-        img(o),
-        img(n),
-        view = view,
-    )
+    let sides = [("Before", old), ("After", new)]
+        .into_iter()
+        .filter_map(|(label, p)| p.map(|p| (label, img(p))))
+        .collect();
+    let overlay = old.zip(new).map(|(o, n)| Overlay {
+        view: Seg {
+            name: "Image view".to_owned(),
+            panes: format!("view-{}", n.0.file()),
+            choices: vec![
+                Choice::new("Side by side", "sides", true),
+                Choice::new("Overlay", "overlay", false),
+            ],
+            ..Seg::default()
+        },
+        before: img(o),
+        after: img(n),
+    });
+    Diff { sides, overlay }.render().unwrap_or_default()
 }
 
 #[cfg(test)]
