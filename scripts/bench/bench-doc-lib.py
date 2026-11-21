@@ -198,6 +198,7 @@ def load_note(run: Json) -> str:
 
 
 def change(key: str, old: float, new: float) -> str:
+    """The change against an earlier run, in words."""
     if not old:
         return "no baseline"
     pct = (new - old) / old * 100
@@ -207,34 +208,48 @@ def change(key: str, old: float, new: float) -> str:
     return f"{abs(pct):.0f}% {lower if pct < 0 else higher}"
 
 
-def comparison(cur: Json, old: Json) -> list[str]:
+def versus(key: str, name: str, repo: Json, earlier: list[Json]) -> tuple[str, str, str]:
+    """The earlier value, the run it comes from and the change, for one repo's metric. The base
+    is the newest earlier run that measured the repo, and a metric whose definition changed in
+    between is a new measure, never a percentage."""
+    for run in reversed(earlier):
+        r = run["repos"].get(name)
+        if not r or key not in r["budget"]:
+            continue
+        when, p = run["when"][:10], r["budget"][key]
+        if not bc.comparable(key, r, repo):
+            return bc.fmt(key, p["value"]), when, f"new measure (was {when})"
+        return (
+            bc.fmt(key, p["value"]),
+            when,
+            f"{change(key, p['value'], repo['budget'][key]['value'])} (vs {when})",
+        )
+    return "not run", "", "new in this run"
+
+
+def comparison(cur: Json, earlier: list[Json]) -> list[str]:
+    old = earlier[-1]
+    dates = ", ".join(r["when"][:10] for r in earlier)
     L = [
-        f"### Compared with {old['when'][:10]}",
+        f"### Compared with earlier runs ({dates})",
         "",
-        f"The previous run, on {machine_line(old['machine'])}. "
+        "Each repo is compared with the newest earlier run that measured it, named in the change "
+        f"column. The latest earlier run, {old['when'][:10]}, was on "
+        f"{machine_line(old['machine'])}. "
         + load_note(old)
-        + " Its charts stay beside its result file. On the charts above, a hollow marker shows its"
-        " value.",
+        + " Its charts stay beside its result file. On the charts above, a hollow marker shows "
+        "the value of that run. Peak memory counts the index child since the run that records "
+        "`peak_child_footprint_mb`, so a run before it is a new measure, not a change.",
         "",
-        f"| Repo | Metric | {old['when'][:10]} | {cur['when'][:10]} | Change |",
+        f"| Repo | Metric | Earlier | {cur['when'][:10]} | Change |",
         "| --- | --- | --- | --- | --- |",
     ]
     for n, r in cur["repos"].items():
-        prev = old["repos"].get(n)
         for k, b in r["budget"].items():
             if k not in bc.METRICS:
                 continue
-            p = prev["budget"].get(k) if prev else None
-            if p is None:
-                L.append(
-                    f"| {n} | {bc.SHORT[k]} | not run | {bc.fmt(k, b['value'])} | new in this run |"
-                )
-                continue
-            ch = change(k, p["value"], b["value"])
-            L.append(
-                f"| {n} | {bc.SHORT[k]} | {bc.fmt(k, p['value'])} | "
-                f"{bc.fmt(k, b['value'])} | {ch} |"
-            )
+            was, _, ch = versus(k, n, r, earlier)
+            L.append(f"| {n} | {bc.SHORT[k]} | {was} | {bc.fmt(k, b['value'])} | {ch} |")
     return [*L, ""]
 
 
@@ -258,7 +273,7 @@ def idle_footprint(r: Json) -> str:
     return "not measured" if fp is None else f"{fp:.0f} MB"
 
 
-def block(cur: Json, old: Json | None, d: str) -> str:
+def block(cur: Json, earlier: list[Json], d: str) -> str:
     """The full run: per repo summary, the table, charts (d: their folder), comparison, pages."""
     L = [f"{cur['runs']} warm runs per page, {cur['idle_secs']} s idle windows.", ""]
     for n, r in cur["repos"].items():
@@ -286,14 +301,14 @@ def block(cur: Json, old: Json | None, d: str) -> str:
     L.append("")
     L += bc.by_page(cur)
     L += idle_cause(cur)
-    names = bc.charts(cur, old)
+    names = bc.charts(cur, earlier)
     for key in bc.METRICS:
         if f"{key}.svg" in names:
             L += bc.picture(cur, key, d)
-    if old:
-        L += comparison(cur, old)
+    if earlier:
+        L += comparison(cur, earlier)
     for n, r in cur["repos"].items():
-        prev = (old or {}).get("repos", {}).get(n)
+        prev = earlier[-1]["repos"].get(n) if earlier else None
         head = "| Page | Cold | Warm TTFB | Warm full (median) | min | max | Bytes |" + (
             " Previous warm |" if prev else ""
         )
@@ -380,7 +395,7 @@ def expected() -> dict[Path, str]:
     for i, run in enumerate(kept):
         name = bc.run_name(run)
         out[bc.RESULTS / f"{name}.json"] = bc.dumps(raw[i])
-        for f, svg in bc.charts(run, kept[i - 1] if i else None).items():
+        for f, svg in bc.charts(run, kept[:i]).items():
             out[bc.RESULTS / name / f] = svg
         out[bc.RESULTS / name / "README.md"] = folder_readme(run)
     out[bc.RESULTS / "README.md"] = results_readme(kept)
@@ -417,16 +432,16 @@ def folder_readme(run: Json) -> str:
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
-def results_table(cur: Json, old: Json | None) -> list[str]:
+def results_table(cur: Json, earlier: list[Json]) -> list[str]:
     """The newest run's headline numbers against their budgets, one row per repo and metric,
-    with the change against the previous run when there is one."""
+    with the change against the newest earlier run that measured the repo."""
+    old = bool(earlier)
     L = [
         "| Repo | Metric | Value | Budget | Status |"
-        + (" Change against previous |" if old else ""),
+        + (" Change against an earlier run |" if old else ""),
         "| --- | --- | --- | --- | --- |" + (" --- |" if old else ""),
     ]
     for n, r in cur["repos"].items():
-        prev = (old or {}).get("repos", {}).get(n, {}).get("budget", {})
         for k in HEADLINE:
             b = r["budget"].get(k)
             if not b:
@@ -437,8 +452,7 @@ def results_table(cur: Json, old: Json | None) -> list[str]:
                         f"| {n} | {bc.SHORT[k]} | {why} | - | {status} |" + (" - |" if old else "")
                     )
                 continue
-            p = prev.get(k)
-            ch = change(k, p["value"], b["value"]) if p else "new in this run"
+            ch = versus(k, n, r, earlier)[2] if old else ""
             L.append(
                 f"| {n} | {bc.SHORT[k]} | {bc.fmt(k, b['value'])}{spread(k, b)} | "
                 f"{b['limit']} {bc.METRICS[k][1]} | {b['status']} |" + (f" {ch} |" if old else "")
@@ -452,7 +466,7 @@ def results_table(cur: Json, old: Json | None) -> list[str]:
 def results_readme(kept: list[Json]) -> str:
     """The landing page of tests/bench/results: every kept run, the newest headline, its charts."""
     cur = kept[-1]
-    old = kept[-2] if len(kept) > 1 else None
+    earlier = kept[:-1]
     L = [
         "# Benchmark results",
         "",
@@ -479,9 +493,9 @@ def results_readme(kept: list[Json]) -> str:
         header(cur),
         "",
         *[x + "\n" for x in withheld_lines(cur)],
-        *results_table(cur, old),
+        *results_table(cur, earlier),
     ]
-    L += ["", block(cur, old, bc.run_name(cur))]
+    L += ["", block(cur, earlier, bc.run_name(cur))]
     return wrap("\n".join(L).rstrip("\n") + "\n")
 
 
@@ -490,12 +504,12 @@ def render() -> str:
     the budgets. The charts and every page are drawn into tests/bench/results, untracked."""
     runs = published()
     cur = shown(runs[-1])
-    old = shown(runs[-2]) if len(runs) > 1 else None
+    earlier = [shown(r) for r in runs[:-1]]
     L = [
         header(cur),
         "",
         *[x + "\n" for x in withheld_lines(cur)],
-        *results_table(cur, old),
+        *results_table(cur, earlier),
     ]
     return wrap("\n".join(L).strip("\n") + "\n")
 

@@ -3,9 +3,10 @@
 
 One run is tests/bench/results/<date>-<machine>.json plus its charts in
 tests/bench/results/<date>-<machine>/ (<metric>.svg and <metric>-dark.svg), drawn from the JSON
-and untracked. The newest two runs are kept: the newest in full, the one before it as the
-baseline of the comparison table. The machine label comes from the CPU, never
-the hostname. Stdlib only, no PNG, no JS, no fonts. The charts are files, not inline SVG, since a
+and untracked. The newest runs are kept (KEEP): the newest in full, the ones before it as the
+baselines of the comparison table, each repo against the newest of them that measured it.
+The machine label comes from the CPU, never the hostname. Stdlib only, no PNG, no JS, no
+fonts. The charts are files, not inline SVG, since a
 markdown sanitizer strips inline <svg> and <style>, and the doc links them through <picture>.
 
   scripts/bench/bench-report.py                  normalize, render charts, prune, rewrite the doc
@@ -62,7 +63,12 @@ def gate_test() -> None:
             res: Json = {
                 "class": "c",
                 "pages": {"p": pages},
-                "index": {"secs": 1, "peak_rss_mb": 1, "peak_footprint_mb": 1},
+                "index": {
+                    "secs": 1,
+                    "peak_rss_mb": 1,
+                    "peak_footprint_mb": 1,
+                    "peak_child_footprint_mb": 1,
+                },
                 "idle": {"cpu_pct": 0.1, "cpu_pct_events_client": 0.1},
                 "memory": {"rss_after_pages_mb": 1, "footprint_after_pages_mb": 1},
             }
@@ -203,11 +209,12 @@ def commit_test() -> None:
 def page_test() -> None:
     """The pages show every measured repo (a withheld one as withheld) and name nothing that is
     not kept, nor any tracker id."""
-    raw = bd.published()[-1]
-    kept = bd.shown(raw)
+    runs = bd.published()
+    raw = runs[-1]
     names = [n for n in raw["repos"]]
-    files, dates = {f"{bc.run_name(raw)}.json"}, {raw["when"][:10]}
-    text = bd.results_readme([kept]) + bd.render()
+    files = {f"{bc.run_name(r)}.json" for r in runs}
+    dates = {r["when"][:10] for r in runs}
+    text = bd.results_readme([bd.shown(r) for r in runs]) + bd.render()
     if got := page_problems(text, names, files, dates):
         sys.exit(f"bench-report self-test failed: a clean page was flagged: {got}")
     # Built at run time so no id-shaped token sits in the source.
@@ -224,9 +231,45 @@ def page_test() -> None:
     ]:
         if not any(want in e for e in page_problems(tweak, names, files, dates)):
             sys.exit(f"bench-report self-test failed: {label} passed the page guard")
+    compare_test()
     withheld = bd.shown({**raw, "repos": {n: _loud(r) for n, r in raw["repos"].items()}})
     if not withheld["held"] or any(n not in bd.results_readme([withheld]) for n in names):
         sys.exit("bench-report self-test failed: a withheld repo vanished from the table")
+
+
+def compare_test() -> None:
+    """A repo is compared with the newest earlier run that measured it, named by date, and a
+    peak memory taken before the index child was recorded is a new measure, not a percentage."""
+
+    def run(when: str, repos: dict[str, int], child: bool) -> Json:
+        idx = {"peak_child_footprint_mb": 1.0} if child else {}
+        return {
+            "when": when,
+            "repos": {
+                n: {"index": idx, "budget": {"rss_mb": {"value": v}, "index_secs": {"value": v}}}
+                for n, v in repos.items()
+            },
+        }
+
+    older = run("2026-01-01", {"a": 100, "b": 100}, False)
+    mid = run("2026-01-02", {"a": 100}, True)
+    cur = run("2026-01-03", {"a": 150, "b": 200, "c": 5}, True)
+    earlier = [older, mid]
+    got = {
+        (n, k): bd.versus(k, n, cur["repos"][n], earlier)[2]
+        for n in cur["repos"]
+        for k in ("index_secs", "rss_mb")
+    }
+    want = {
+        ("a", "index_secs"): "50% slower (vs 2026-01-02)",
+        ("a", "rss_mb"): "50% more memory (vs 2026-01-02)",
+        ("b", "index_secs"): "100% slower (vs 2026-01-01)",
+        ("b", "rss_mb"): "new measure (was 2026-01-01)",
+        ("c", "index_secs"): "new in this run",
+        ("c", "rss_mb"): "new in this run",
+    }
+    if got != want:
+        sys.exit(f"bench-report self-test failed: comparison {got}")
 
 
 def _loud(r: Json) -> Json:

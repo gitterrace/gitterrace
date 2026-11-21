@@ -53,12 +53,20 @@ CPU and the huge index in 600 s. The time to ready holds the index budget until
 a run calibrates it. An index time, time to ready or memory over budget fails
 the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
-The memory budget (`rss_mb`) gates physical footprint, not RSS: macOS
-`phys_footprint`, on Linux the larger of `RssAnon` and private dirty pages. RSS
-is recorded beside it. The server's footprint includes the warm-up, which runs
-before the repository turns ready. The index build runs in a child process, so
-its peak footprint is recorded on its own (`peak_child_footprint_mb` in the
-index result).
+The memory budget (`rss_mb`, shown as peak memory) gates physical footprint,
+not RSS: macOS `phys_footprint`, on Linux the larger of `RssAnon` and private
+dirty pages. RSS is recorded beside it. Peak memory is the largest of the
+server's footprint during the index build, the index child's footprint
+(`peak_child_footprint_mb` in the index result) and the server's footprint after
+the pages. The index build runs in a child process, so a measure without the
+child leaves the build out. The server's own footprint includes the warm-up,
+which runs before the repository turns ready. A run from before the child was
+recorded measured something else, so the comparison table calls its peak memory
+a new measure and never puts a percentage on it.
+
+The comparison table sets each repo against the newest earlier kept run that
+measured it, and names that run in the change column. The newest three runs are
+kept.
 
 Serving memory does not grow with the history: once the index is ready, idle
 footprint stays at most 48 MB above a just-started server (`footprint_idle_mb`,
@@ -135,21 +143,21 @@ Run 2026-11-21 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
 26.6.2 (arm64). gitterrace v0.2.0-a4d90d9, git version 2.54.0 (Apple Git-157).
 Measured on a quiet machine.
 
-| Repo | Metric | Value | Budget | Status | Change against previous |
+| Repo | Metric | Value | Budget | Status | Change against an earlier run |
 | --- | --- | --- | --- | --- | --- |
-| control | index build | 0.4 s (0.4 to 0.4) | 30 s | pass | 22% faster |
-| control | warm page | 2 ms | 300 ms | pass | 28% faster |
-| control | cold page | 25 ms (24 to 28) | 1500 ms | pass | 17% faster |
-| control | peak memory | 35 MB | 500 MB | pass | 133% more memory |
-| control | export | 29.8 s (28.4 to 30.1) | 60 s | pass | 24% slower |
-| git | index build | 10.8 s (10.5 to 10.8) | 300 s | pass | 2% faster |
-| git | warm page | 13 ms | 300 ms | pass | 3% slower |
-| git | cold page | 2381 ms (2379 to 2388) | 3000 ms | pass | unchanged |
-| git | peak memory | 175 MB | 1500 MB | pass | 465% more memory |
-| git | export | 26.0 s (26.0 to 26.2) | 300 s | pass | unchanged |
-| rust | index build | 212.4 s (212.3 to 213.0) | 2400 s | pass | new in this run |
-| rust | warm page | 30 ms | 300 ms | pass | new in this run |
-| rust | cold page | 1402 ms (1 to 1412) | 10000 ms | pass | new in this run |
-| rust | peak memory | 572 MB | 6000 MB | pass | new in this run |
+| control | index build | 0.4 s (0.4 to 0.4) | 30 s | pass | 22% faster (vs 2026-11-18) |
+| control | warm page | 2 ms | 300 ms | pass | 28% faster (vs 2026-11-18) |
+| control | cold page | 25 ms (24 to 28) | 1500 ms | pass | 17% faster (vs 2026-11-18) |
+| control | peak memory | 96 MB | 500 MB | pass | new measure (was 2026-11-18) |
+| control | export | 29.8 s (28.4 to 30.1) | 60 s | pass | 24% slower (vs 2026-11-18) |
+| git | index build | 10.8 s (10.5 to 10.8) | 300 s | pass | 2% faster (vs 2026-11-18) |
+| git | warm page | 13 ms | 300 ms | pass | 3% slower (vs 2026-11-18) |
+| git | cold page | 2381 ms (2379 to 2388) | 3000 ms | pass | unchanged (vs 2026-11-18) |
+| git | peak memory | 385 MB | 1500 MB | pass | new measure (was 2026-11-18) |
+| git | export | 26.0 s (26.0 to 26.2) | 300 s | pass | unchanged (vs 2026-11-18) |
+| rust | index build | 212.4 s (212.3 to 213.0) | 2400 s | pass | 238% slower (vs 2026-11-17) |
+| rust | warm page | 30 ms | 300 ms | pass | 7% slower (vs 2026-11-17) |
+| rust | cold page | 1402 ms (1 to 1412) | 10000 ms | pass | 64% slower (vs 2026-11-17) |
+| rust | peak memory | 984 MB | 6000 MB | pass | new measure (was 2026-11-17) |
 
 <!-- END GENERATED: results -->

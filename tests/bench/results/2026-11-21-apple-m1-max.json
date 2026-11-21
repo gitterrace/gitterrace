@@ -24,7 +24,7 @@
     "page_cold_ms": {"limit": 1500, "max": 28.25, "min": 23.64, "status": "pass", "value": 25.43},
     "page_warm_ms": {"limit": 300, "page": "diff-fragment", "status": "pass", "value": 2.33},
     "ready_secs": {"limit": 30, "max": 1.51, "min": 1.23, "phase": "stream", "status": "pass", "value": 1.5},
-    "rss_mb": {"limit": 500, "phase": "unknown", "status": "pass", "value": 35.0}
+    "rss_mb": {"limit": 500, "phase": "unknown", "status": "pass", "value": 96.0}
    },
    "class": "small",
    "cold_samples": 3,
@@ -100,7 +100,7 @@
     "page_cold_ms": {"limit": 3000, "max": 2388.45, "min": 2378.87, "status": "pass", "value": 2380.98},
     "page_warm_ms": {"limit": 300, "page": "blob-largest", "status": "pass", "value": 12.62},
     "ready_secs": {"limit": 300, "max": 14.0, "min": 13.66, "phase": "stream", "status": "pass", "value": 13.94},
-    "rss_mb": {"limit": 1500, "phase": "unknown", "status": "pass", "value": 175.0}
+    "rss_mb": {"limit": 1500, "phase": "unknown", "status": "pass", "value": 385.0}
    },
    "class": "medium",
    "cold_samples": 3,
@@ -175,7 +175,7 @@
     "page_cold_ms": {"limit": 10000, "max": 1411.84, "min": 1.38, "status": "pass", "value": 1402.16},
     "page_warm_ms": {"limit": 300, "page": "diff-fragment", "status": "pass", "value": 29.63},
     "ready_secs": {"limit": 2400, "max": 218.06, "min": 217.68, "phase": "stream", "status": "pass", "value": 217.71},
-    "rss_mb": {"limit": 6000, "phase": "unknown", "status": "pass", "value": 572.0}
+    "rss_mb": {"limit": 6000, "phase": "unknown", "status": "pass", "value": 984.0}
    },
    "class": "large",
    "cold_samples": 3,

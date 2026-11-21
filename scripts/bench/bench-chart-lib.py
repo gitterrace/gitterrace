@@ -25,8 +25,10 @@ RESULTS = ROOT / "tests/bench/results"
 BEGIN, END = "<!-- BEGIN GENERATED: results -->", "<!-- END GENERATED: results -->"
 # Result files are <date>-<machine label>.json. The label comes from the CPU, never the host.
 NAME = re.compile(r"\d{4}-\d{2}-\d{2}-[a-z0-9-]+\.json")
-# The newest run and its baseline. Older runs live in git history.
-KEEP = 2
+# The newest run and the runs it is compared with. Each repo is compared with the newest kept
+# earlier run that measured it, so a repo missing from the run before keeps a baseline here.
+# Older runs live in git history.
+KEEP = 3
 # Floats are rounded to this many decimals, so diffs between runs stay readable.
 DECIMALS = 2
 
@@ -37,7 +39,7 @@ METRICS = {
     "index_secs": ("Index build", "s", "{:.1f}"),
     "ready_secs": ("Add to ready", "s", "{:.1f}"),
     "idle_cpu_pct": ("Idle CPU, worse of plain and /events client", "%", "{:.2f}"),
-    "rss_mb": ("Peak physical footprint (index peak or after pages)", "MB", "{:.0f}"),
+    "rss_mb": ("Peak memory (server or index child, physical footprint)", "MB", "{:.0f}"),
     "footprint_idle_mb": ("Idle footprint above a fresh server", "MB", "{:.0f}"),
     "export_secs": ("Export", "s", "{:.1f}"),
 }
@@ -46,9 +48,17 @@ METRICS = {
 SOURCES = {
     "idle_cpu_pct": ("idle.cpu_pct", "idle.cpu_pct_events_client"),
     # Physical footprint, not RSS: clean mapped pack files are left out, the system can take
-    # them back. RSS is still recorded beside it (index.peak_rss_mb).
-    "rss_mb": ("index.peak_footprint_mb", "memory.footprint_after_pages_mb"),
+    # them back. RSS is still recorded beside it (index.peak_rss_mb). The index build runs in a
+    # child process, so its peak counts as well.
+    "rss_mb": (
+        "index.peak_footprint_mb",
+        "index.peak_child_footprint_mb",
+        "memory.footprint_after_pages_mb",
+    ),
 }
+# A run recorded the index child's footprint when index.<this> is present. Peak memory of a run
+# without it is a different measure and is never compared with one that has it.
+CHILD_FIELD = "peak_child_footprint_mb"
 SHORT = {
     "page_warm_ms": "warm page",
     "page_cold_ms": "cold page",
@@ -141,7 +151,23 @@ def normalize(run: Json) -> Json:
     run["repos"] = {
         n: repos[n] for n in sorted(repos, key=lambda n: (order.index(n) if n in order else 99, n))
     }
+    for r in run["repos"].values():
+        peak_memory(r)
     return rounded(run)
+
+
+def peak_memory(r: Json) -> None:
+    """Peak memory is the largest of the recorded SOURCES fields, so a run recorded before the
+    index child was a source reads the same as one judged after."""
+    b = r.get("budget", {}).get("rss_mb")
+    seen = []
+    for dotted in SOURCES["rss_mb"]:
+        top, leaf = dotted.split(".")
+        if (v := r.get(top, {}).get(leaf)) is not None:
+            seen.append(v)
+    if b and seen:
+        b["value"] = max(seen)
+        b["status"] = "pass" if b["value"] <= b["limit"] else "over"
 
 
 def dumps(run: Json) -> str:
@@ -190,17 +216,37 @@ DIRECTION = {
 }
 
 
-def chart(key: str, repos: Json, scheme: str, prev: Json | None = None) -> str | None:
-    """Bars against the budget line. With prev, a hollow marker shows the previous run's value."""
+def comparable(key: str, old: Json, new: Json) -> bool:
+    """Whether a repo's metric in two runs is the same measure."""
+    if key != "rss_mb":
+        return True
+    return (CHILD_FIELD in old["index"]) == (CHILD_FIELD in new["index"])
+
+
+def previous(earlier: list[Json], name: str, key: str, repo: Json) -> tuple[Json, Json] | None:
+    """The newest earlier run (oldest first in the list) that measured the repo's metric the
+    same way, with its budget entry."""
+    for run in reversed(earlier):
+        r = run["repos"].get(name)
+        if r and key in r["budget"] and comparable(key, r, repo):
+            return run, r["budget"][key]
+    return None
+
+
+def chart(key: str, repos: Json, scheme: str, earlier: list[Json] | None = None) -> str | None:
+    """Bars against the budget line. With earlier runs, a hollow marker shows the value of the
+    newest one that measured the repo."""
     title, unit, _ = METRICS[key]
     ok, over, ink = PALETTE[scheme]
     rows = [(n, r["budget"][key]) for n, r in repos.items() if key in r["budget"]]
     if not rows:
         return None
-    before = {
-        n: r["budget"][key]["value"] for n, r in (prev or {}).items() if key in r.get("budget", {})
-    }
-    top = max(max(b["value"], b["limit"], before.get(n, 0)) for n, b in rows) * 1.08 or 1
+    before: dict[str, tuple[str, float]] = {}
+    for n, r in repos.items():
+        if got := previous(earlier or [], n, key, r):
+            before[n] = (got[0]["when"][:10], got[1]["value"])
+    top = max(max(b["value"], b["limit"], before.get(n, ("", 0))[1]) for n, b in rows) * 1.08
+    top = top or 1
     lx, bx, bw, rh, pad = 8, 84, 380, 34, 30
     w, h = 640, pad + rh * len(rows) + 22
     font = f'fill="{ink}" font-family="sans-serif"'
@@ -233,29 +279,28 @@ def chart(key: str, repos: Json, scheme: str, prev: Json | None = None) -> str |
                 f"<title>spread {num(key, b['min'])} to {num(key, b['max'])}</title></path>"
             )
         if n in before:
-            x = bx + bw * before[n] / top
+            x = bx + bw * before[n][1] / top
             s.append(
                 f'<rect x="{x - 2:.1f}" y="{y + 1}" width="4" height="24" fill="none" '
-                f'stroke="{ink}" stroke-width="1.5"><title>previous run: '
-                f"{num(key, before[n])}</title></rect>"
+                f'stroke="{ink}" stroke-width="1.5"><title>run of '
+                f"{before[n][0]}: {num(key, before[n][1])}</title></rect>"
             )
     s.append(
         f'<text x="{bx}" y="{h - 6}" {font} font-size="11" opacity="0.7">'
         "dashed line: budget"
         + ("    whisker: min to max" if any("min" in b for _, b in rows) else "")
-        + ("    hollow marker: previous run" if before else "")
+        + ("    hollow marker: earlier run" if before else "")
         + "</text></svg>"
     )
     return "\n".join(s) + "\n"
 
 
-def charts(run: Json, prev: Json | None = None) -> dict[str, str]:
-    """File name -> SVG for one run, light and dark per metric, marking prev's values."""
+def charts(run: Json, earlier: list[Json] | None = None) -> dict[str, str]:
+    """File name -> SVG for one run, light and dark per metric, marking the earlier runs' values."""
     out: dict[str, str] = {}
-    before = prev["repos"] if prev else None
     for key in METRICS:
         for scheme, suffix in (("light", ""), ("dark", "-dark")):
-            svg = chart(key, run["repos"], scheme, before)
+            svg = chart(key, run["repos"], scheme, earlier)
             if svg:
                 out[f"{key}{suffix}.svg"] = svg
     return out
@@ -303,7 +348,12 @@ def slowest_page_test(br: Any) -> None:
     res: Json = {
         "class": "c",
         "pages": {"blame": pg(90), "diff": pg(10)},
-        "index": {"secs": 1, "peak_rss_mb": 1, "peak_footprint_mb": 1},
+        "index": {
+            "secs": 1,
+            "peak_rss_mb": 1,
+            "peak_footprint_mb": 1,
+            "peak_child_footprint_mb": 1,
+        },
         "idle": {"cpu_pct": 0.1, "cpu_pct_events_client": 0.1},
         "memory": {"rss_after_pages_mb": 1, "footprint_after_pages_mb": 1},
     }
