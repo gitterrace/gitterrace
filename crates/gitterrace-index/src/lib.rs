@@ -31,7 +31,7 @@ pub use conventional::parse_subject;
 pub use gitterrace_git::{civil_from_days, days_from_civil};
 pub use insights::*;
 #[cfg(any(test, feature = "oracle"))]
-pub use oracle::{reference_time, reference_time_at};
+pub use oracle::reference_time;
 pub use phases::PhaseTime;
 pub use select::Selected;
 pub use source::CommitSource;

@@ -2,21 +2,16 @@
 
 use std::io;
 
-use crate::{CommitRecord, CommitSource, feed};
+use crate::{CommitRecord, CommitSource, wall_clock};
 
-/// "Now" for period windows over records, the oracle's twin of [`feed::reference_time`]: the
-/// newest author time not after this machine's clock.
+/// "Now" for period windows over records, the oracle's twin of
+/// [`crate::feed::reference_time`]: the newest author time not after this machine's clock.
 ///
 /// So an old repository still shows its last active stretch and a commit dated in the future
 /// (one [`crate::plausible_time`] pinned to the edge, or a skewed clock) never empties every
 /// window. Every surface that cuts a period uses this one value.
 pub fn reference_time(records: &[CommitRecord]) -> i64 {
-    reference_time_at(records, &feed::SystemClock)
-}
-
-/// [`reference_time`] with the clock given.
-pub fn reference_time_at(records: &[CommitRecord], clock: &dyn feed::Clock) -> i64 {
-    let wall = clock.now();
+    let wall = wall_clock();
     records.iter().map(|r| r.time).filter(|t| *t <= wall).max().unwrap_or(0)
 }
 
