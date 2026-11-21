@@ -144,29 +144,22 @@ impl BlobReader {
 
     /// Content of a text blob, or `None` when it is larger than `max` bytes or binary.
     pub fn text(&self, id: BlobId, max: u64) -> Option<String> {
+        String::from_utf8(self.data(id, max)?).ok()
+    }
+
+    /// The bytes of a blob no larger than `max` that is not binary.
+    fn data(&self, id: BlobId, max: u64) -> Option<Vec<u8>> {
         if self.repo.find_header(id.0).ok()?.size() > max {
             return None;
         }
         let data = self.repo.find_object(id.0).ok()?.detach().data;
-        if crate::diff::is_binary(&data) {
-            return None;
-        }
-        String::from_utf8(data).ok()
+        (!crate::diff::is_binary(&data)).then_some(data)
     }
-}
 
-impl BlobReader {
     /// Number of lines (a last line without newline counts), or `None` for binary content or
     /// blobs larger than `max` bytes.
     pub fn line_count(&self, id: BlobId, max: u64) -> Option<u32> {
-        if self.repo.find_header(id.0).ok()?.size() > max {
-            return None;
-        }
-        let data = self.repo.find_object(id.0).ok()?.detach().data;
-        if crate::diff::is_binary(&data) {
-            return None;
-        }
-        Some(crate::diff::line_count(&data))
+        Some(crate::diff::line_count(&self.data(id, max)?))
     }
 }
 

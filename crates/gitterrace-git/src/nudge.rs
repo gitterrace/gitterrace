@@ -109,7 +109,7 @@ impl Nudger {
                 if capped {
                     on_nudge(Nudge::Degraded);
                 }
-                run(&cfg, watch, watched, &rx, &on_nudge);
+                run_decided(&cfg, watch, watched, &rx, &|n, _| on_nudge(n));
             })
             .map_err(|e| NudgeError::Os(e.to_string()))?;
         Ok(Self { tx, thread: Some(thread) })
@@ -192,17 +192,7 @@ fn add_tree(
 }
 
 /// The debounce loop. Owns the OS watcher so new directories can be registered as they appear.
-fn run<W: Watcher>(
-    cfg: &NudgeConfig,
-    watch: Option<W>,
-    watched: usize,
-    rx: &Receiver<Msg>,
-    on_nudge: &impl Fn(Nudge),
-) {
-    run_decided(cfg, watch, watched, rx, &|n, _| on_nudge(n));
-}
-
-/// [`run`], telling the callback when each nudge was decided. A test reads the spacing from
+/// Tells the callback when each nudge was decided. A test reads the spacing from
 /// these instants: a callback stamping its own clock measures thread scheduling, not the rule.
 fn run_decided<W: Watcher>(
     cfg: &NudgeConfig,

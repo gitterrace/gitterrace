@@ -279,10 +279,7 @@ fn sides(
 /// so an ignored file, anything under `.git` or a path with `..` is never read. Also `None` for
 /// a deleted file and one over `max` bytes, which is never read.
 pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8>>> {
-    let plain = path
-        .split('/')
-        .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"));
-    if !plain {
+    if !is_plain(path) {
         return Ok(None);
     }
     let r = open(repo)?;
@@ -309,6 +306,12 @@ pub fn worktree_blob(repo: &Repo, path: &str, max: u64) -> Result<Option<(Blob, 
 
 /// One uncommitted file against HEAD: the body a folded file of the working tree page loads.
 ///
+/// Whether every component of `path` is a real name: no empty, `.`, `..` or `.git` part.
+fn is_plain(path: &str) -> bool {
+    path.split('/')
+        .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"))
+}
+
 /// `None` unless `path` is one of the page's changed files, so an ignored file, anything
 /// under `.git` or a path with `..` is never read, whatever the URL asks for.
 pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
@@ -321,10 +324,7 @@ pub fn worktree_file_diff_scoped(
     path: &str,
     scope: Scope,
 ) -> Result<Option<FileDiff>> {
-    let plain = path
-        .split('/')
-        .all(|c| !c.is_empty() && c != "." && c != ".." && !c.eq_ignore_ascii_case(".git"));
-    if !plain {
+    if !is_plain(path) {
         return Ok(None);
     }
     let r = open(repo)?;

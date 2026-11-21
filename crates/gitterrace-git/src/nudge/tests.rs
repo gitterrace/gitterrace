@@ -180,8 +180,9 @@ fn a_burst_of_writes_is_one_or_a_few_nudges() {
     let (root, debounce, max_delay) = (conf.roots[0].clone(), conf.debounce, conf.max_delay);
     let (nudges, on_nudge) = counting();
     let (tx, rx) = mpsc::channel();
-    let worker =
-        std::thread::spawn(move || run::<notify::NullWatcher>(&conf, None, 0, &rx, &on_nudge));
+    let worker = std::thread::spawn(move || {
+        run_decided::<notify::NullWatcher>(&conf, None, 0, &rx, &|n, _| on_nudge(n));
+    });
     let write = EventKind::Modify(notify::event::ModifyKind::Any);
     let t0 = Instant::now();
     for i in 0..5000 {
