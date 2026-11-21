@@ -174,13 +174,9 @@ impl<B: InsightsSource> SegmentSource<B> {
 
     /// A store error inside a stream: logged with its file and offset (design 6), remembered
     /// for [`SegmentSource::unreadable`], then the stream is empty.
-    #[expect(
-        clippy::print_stderr,
-        reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-    )]
     fn or_log<T>(&self, r: SegResult<Vec<T>>) -> Vec<T> {
         r.unwrap_or_else(|e| {
-            eprintln!("gitterrace: {e}");
+            crate::warn(format_args!("{e}"));
             if let Ok(mut b) = self.broken.lock() {
                 b.get_or_insert_with(|| e.to_string());
             }

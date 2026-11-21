@@ -145,12 +145,8 @@ pub(super) fn hash32(s: &str) -> u32 {
     gitterrace_git::fnv1a32(s.bytes())
 }
 
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache error goes to the user's stderr"
-)]
 pub(super) fn report(e: &SegError) {
-    eprintln!("gitterrace: {e}");
+    crate::warn(format_args!("{e}"));
 }
 
 impl DiskSource {

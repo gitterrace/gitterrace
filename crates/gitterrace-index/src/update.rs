@@ -158,24 +158,21 @@ impl Index {
     /// Folds the segments into one once there are more than 8, off the caller's thread, so a
     /// request never waits on it. Records come from the set itself, raw as stored. The merge
     /// takes the writer lock itself.
-    #[expect(
-        clippy::print_stderr,
-        reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-    )]
     fn merge_in_background(&self, order: Vec<String>, shallow: Vec<String>) {
         let dir = self.dir.clone();
         let run = move || store::merge_stored(&dir, &order, &shallow);
         if self.merge_inline.load(std::sync::atomic::Ordering::Relaxed) {
-            return run().map_or_else(|e| eprintln!("gitterrace: segment merge failed: {e}"), drop);
+            return run()
+                .map_or_else(|e| crate::warn(format_args!("segment merge failed: {e}")), drop);
         }
         let spawned =
             std::thread::Builder::new().name("gitterrace-merge".into()).spawn(move || {
                 if let Err(e) = run() {
-                    eprintln!("gitterrace: segment merge failed: {e}");
+                    crate::warn(format_args!("segment merge failed: {e}"));
                 }
             });
         if let Err(e) = spawned {
-            eprintln!("gitterrace: segment merge not started: {e}");
+            crate::warn(format_args!("segment merge not started: {e}"));
         }
     }
 }

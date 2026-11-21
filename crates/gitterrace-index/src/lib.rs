@@ -463,12 +463,15 @@ fn todo<'a>(order: &'a [String], held: &HashSet<seg::Oid>) -> Vec<&'a String> {
 }
 
 /// Tells the user that `n` commits could not be read and stay pending.
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-)]
 fn skipped(n: usize, dir: &std::path::Path) {
-    eprintln!("gitterrace: {n} commits could not be read and stay pending in {}", dir.display());
+    warn(format_args!("{n} commits could not be read and stay pending in {}", dir.display()));
+}
+
+/// The one place the index writes to stderr: it has no logging facade, so a cache warning goes
+/// to the user's terminal, prefixed.
+#[expect(clippy::print_stderr, reason = "the index crate has no logging facade")]
+pub(crate) fn warn(message: std::fmt::Arguments<'_>) {
+    eprintln!("gitterrace: {message}");
 }
 
 /// Seconds since the epoch on this machine's clock, frozen by `GITTERRACE_TEST_NOW`. The one

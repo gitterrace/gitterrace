@@ -12,18 +12,14 @@ use std::path::{Path, PathBuf};
 use gitterrace_git::refused;
 
 /// Makes `dir` a real directory, replacing a symlink or other non-directory entry.
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-)]
 pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
     match fs::symlink_metadata(dir) {
         Ok(m) if m.is_dir() => return Ok(()),
         Ok(_) => {
-            eprintln!(
-                "gitterrace: {} is not a directory, replacing it with a fresh cache",
+            crate::warn(format_args!(
+                "{} is not a directory, replacing it with a fresh cache",
                 dir.display()
-            );
+            ));
             fs::remove_file(dir)?;
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
@@ -57,10 +53,6 @@ pub(crate) fn cache_dir(dir: &Path) -> io::Result<()> {
 /// Path of `name` in the cache `dir`, after checking that neither is a link and that the
 /// file, when present, is a regular file. A link or special file is removed so the caller
 /// sees it as missing.
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-)]
 pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
     if !fs::symlink_metadata(dir)?.is_dir() {
         return Err(refused(dir));
@@ -70,7 +62,7 @@ pub(crate) fn cache_file(dir: &Path, name: &str) -> io::Result<PathBuf> {
         Ok(m) if m.is_file() => {}
         Ok(m) if m.is_dir() => return Err(refused(&path)),
         Ok(_) => {
-            eprintln!("gitterrace: {} is not a regular file, discarding it", path.display());
+            crate::warn(format_args!("{} is not a regular file, discarding it", path.display()));
             fs::remove_file(&path)?;
         }
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}

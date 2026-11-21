@@ -121,14 +121,10 @@ pub(crate) fn check_writable(dir: &Path) -> io::Result<()> {
 
 /// Creates `dir` and resets it when its format version differs from ours. A newer version is
 /// left alone and returned, so the caller can refuse to use it.
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-)]
 pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
     cache::cache_dir(dir)?;
     if let Some(found) = newer_version(dir)? {
-        eprintln!("gitterrace: {}", newer_message(&found));
+        crate::warn(format_args!("{}", newer_message(&found)));
         return Ok(Some(found));
     }
     if needs_reset(dir)? {
@@ -158,10 +154,6 @@ pub(crate) fn wipe(dir: &Path) -> io::Result<()> {
 /// special files go through `cache::remove`, which never follows them. A file that cannot be
 /// removed now (open elsewhere, on Windows) is left for the next sweep, so this never fails on
 /// it. Directories are left alone: the cache never makes one.
-#[expect(
-    clippy::print_stderr,
-    reason = "the index crate has no logging facade: a cache warning goes to the user's stderr"
-)]
 pub(crate) fn sweep(dir: &Path, live: &[String]) -> io::Result<()> {
     let mut names: Vec<String> = Vec::new();
     for entry in std::fs::read_dir(dir)? {
@@ -179,7 +171,9 @@ pub(crate) fn sweep(dir: &Path, live: &[String]) -> io::Result<()> {
             continue;
         }
         if let Err(e) = cache::remove(dir, &name) {
-            eprintln!("gitterrace: could not remove {name} from the cache, retrying later: {e}");
+            crate::warn(format_args!(
+                "could not remove {name} from the cache, retrying later: {e}"
+            ));
         }
     }
     Ok(())
