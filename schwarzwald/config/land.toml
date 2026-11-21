@@ -33,7 +33,7 @@ gate = [
   # Unformatted Rust never lands. The cheapest check runs first.
   "make fmt",
   "bash scripts/lib/python-run.sh vendor/schwarzwald/kit/tools/golden.py run",
-  "make lines names theme actions send-vectors",
+  "make lines names theme actions send-vectors diff-order",
   # Generated docs, README blocks and site pages match their sources, and the generators'
   # own unit tests pass (xtask check runs the binary, not its tests).
   "cargo xtask check",

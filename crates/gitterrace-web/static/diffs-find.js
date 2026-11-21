@@ -22,7 +22,10 @@
     out.setAttribute("role", "status");
     box.appendChild(input);
     box.appendChild(out);
-    first.parentNode.insertBefore(box, first);
+    // The box always sits above the viewed count, whichever script ran first.
+    var count = document.querySelector("p.viewed-count");
+    var at = count && count.parentNode === first.parentNode ? count : first;
+    first.parentNode.insertBefore(box, at);
     var seq = 0, timer = 0;
     function show(r) {
       out.textContent = "";
