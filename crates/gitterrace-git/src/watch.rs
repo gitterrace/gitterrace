@@ -230,7 +230,7 @@ impl Watcher {
 
     /// Walks the ref directories, listing a directory only when its stamp moved or is racy.
     fn hash_tree(&mut self, root: &Path, now: SystemTime, h: &mut impl Hasher) {
-        let mut seen = Vec::new();
+        let mut seen = std::collections::HashSet::new();
         let mut stack = vec![root.to_path_buf()];
         while let Some(dir) = stack.pop() {
             let stamp = self.stamp(&dir);
@@ -238,7 +238,7 @@ impl Watcher {
             if !stamp.present {
                 continue;
             }
-            seen.push(dir.clone());
+            seen.insert(dir.clone());
             let racy = is_racy(stamp, now, self.racy);
             let fresh = self.dirs.get(&dir).is_some_and(|l| l.stamp == stamp) && !racy;
             if !fresh {

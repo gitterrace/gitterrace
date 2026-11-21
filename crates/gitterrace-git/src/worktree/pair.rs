@@ -28,6 +28,7 @@ pub(super) fn exact_moves(
         return Moves::default();
     };
     let mut gone: HashMap<ObjectId, VecDeque<&str>> = HashMap::new();
+    let mut sizes = BTreeSet::new();
     let mut added = Vec::new();
     for path in paths {
         let on_disk = std::fs::symlink_metadata(root.join(path));
@@ -38,6 +39,7 @@ pub(super) fn exact_moves(
                 let size = r.find_header(id).map_or(0, |h| h.size());
                 if e.mode().is_blob() && size > 0 {
                     gone.entry(id).or_default().push_back(path);
+                    sizes.insert(size);
                 }
             }
             (None, Ok(m)) if m.is_file() && m.len() > 0 => added.push((path, m.len())),
@@ -48,8 +50,6 @@ pub(super) fn exact_moves(
     if gone.is_empty() {
         return out;
     }
-    let sizes: BTreeSet<u64> =
-        gone.keys().filter_map(|id| r.find_header(*id).ok().map(|h| h.size())).collect();
     for (path, len) in added {
         // Only a file of a deleted file's exact size can be its copy: no read for the rest.
         if !sizes.contains(&len) || len > big {

@@ -391,8 +391,9 @@ fn commit_node(
     parents: &mut Vec<gix::ObjectId>,
 ) -> Result<(i64, gix::ObjectId)> {
     parents.clear();
-    if let Some(commit) = graph.and_then(|g| g.commit_by_id(id)) {
-        let g = graph.ok_or_else(|| git("commit-graph vanished"))?;
+    if let Some(g) = graph
+        && let Some(commit) = g.commit_by_id(id)
+    {
         for pos in commit.iter_parents() {
             parents.push(g.id_at(pos.map_err(git)?).to_owned());
         }

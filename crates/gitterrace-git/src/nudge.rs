@@ -286,7 +286,7 @@ fn relevant<W: Watcher>(
     let mut watch = watch;
     for p in &e.paths {
         let is_dir = std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir());
-        if skipped(cfg, p) {
+        if skipped(cfg, p, is_dir) {
             continue;
         }
         hit = true;
@@ -306,12 +306,11 @@ fn relevant<W: Watcher>(
 }
 
 /// True when the path or a directory between it and its root is skipped.
-fn skipped(cfg: &NudgeConfig, p: &Path) -> bool {
+fn skipped(cfg: &NudgeConfig, p: &Path, mut is_dir: bool) -> bool {
     let Some(root) = cfg.roots.iter().find(|r| p.starts_with(r)) else {
         return true;
     };
     let mut at = p;
-    let mut is_dir = std::fs::symlink_metadata(p).is_ok_and(|m| m.is_dir());
     while at != root.as_path() {
         if (cfg.skip)(at, is_dir) {
             return true;
