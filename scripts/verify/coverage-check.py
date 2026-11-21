@@ -8,7 +8,12 @@ Fails when, for product code (crates/*/src above each file's first #[cfg(test)])
   - a line covered before is not covered after (the set, not the percentage),
   - a crate's branch coverage percentage drops,
   - a mutant caught before (caught.txt or timeout.txt) is missed after.
-Lines compare by number, so the product source must be the same on both sides: a commit that
+A run holds lcov.info or several lcov-N.info, the same tree measured again. A line that one
+run covers and another does not is unstable (a race, a thread that ends after the test): it
+counts as covered on the AFTER side when any run hit it and as covered on the BEFORE side only
+when every run did, so only a line no run of AFTER reaches can read as lost. The same holds for a
+crate's branch percentage (lowest before, highest after). One run per side keeps the old, noisy
+reading. Lines compare by number, so the product source must be the same on both sides: a commit that
 also edits product code needs its own proof. Missing mutant output on one side is an error,
 never a pass.
 """
@@ -34,12 +39,16 @@ def tests_start(run: Path) -> dict[str, int]:
     return out
 
 
-def read_lcov(run: Path):
+def lcov_files(run: Path) -> list[Path]:
+    files = sorted(run.glob("lcov-*.info")) or [run / "lcov.info"]
+    for f in files:
+        if not f.exists():
+            raise SystemExit(f"coverage-check: {f} is missing")
+    return files
+
+
+def read_one(lcov: Path, starts: dict[str, int]):
     """Covered lines per file, and (hit, total) branches per crate, product code only."""
-    lcov = run / "lcov.info"
-    if not lcov.exists():
-        raise SystemExit(f"coverage-check: {lcov} is missing")
-    starts = tests_start(run)
     covered: dict[str, set[int]] = defaultdict(set)
     branches: dict[str, list[int]] = defaultdict(lambda: [0, 0])
     path = None
@@ -68,6 +77,22 @@ def read_lcov(run: Path):
     return covered, branches
 
 
+def read_lcov(run: Path):
+    """(stable, any, low, high): lines every run / some run covered, branch ratio per crate."""
+    starts = tests_start(run)
+    runs = [read_one(f, starts) for f in lcov_files(run)]
+    paths = {p for cov, _ in runs for p in cov}
+    stable = {p: set.intersection(*(cov.get(p, set()) for cov, _ in runs)) for p in paths}
+    union = {p: set.union(*(cov.get(p, set()) for cov, _ in runs)) for p in paths}
+    ratios: dict[str, list[float]] = defaultdict(list)
+    for _, br in runs:
+        for crate, (h, t) in br.items():
+            ratios[crate].append(h / t if t else 1.0)
+    low = {c: min(v) for c, v in ratios.items()}
+    high = {c: max(v) for c, v in ratios.items()}
+    return stable, union, low, high
+
+
 def caught(run: Path) -> set[str] | None:
     """Caught mutants by description, None when this run did not mutate."""
     dirs = [d for d in (run / "mutants.out", run) if (d / "caught.txt").exists()]
@@ -83,16 +108,14 @@ def caught(run: Path) -> set[str] | None:
 
 def compare(before: Path, after: Path) -> list[str]:
     errors = []
-    cov_b, br_b = read_lcov(before)
-    cov_a, br_a = read_lcov(after)
-    for path in sorted(cov_b):
-        lost = sorted(cov_b[path] - cov_a.get(path, set()))
+    stable_b, _, low_b, _ = read_lcov(before)
+    _, any_a, _, high_a = read_lcov(after)
+    for path in sorted(stable_b):
+        lost = sorted(stable_b[path] - any_a.get(path, set()))
         if lost:
             errors.append(f"{path}: {len(lost)} line(s) no longer covered: {lost[:20]}")
-    for crate in sorted(br_b):
-        hb, tb = br_b[crate]
-        ha, ta = br_a.get(crate, [0, 0])
-        pb, pa = hb / tb if tb else 1.0, ha / ta if ta else 1.0
+    for crate in sorted(low_b):
+        pb, pa = low_b[crate], high_a.get(crate, 0.0)
         if pa < pb:
             errors.append(f"{crate}: branch coverage {pb:.2%} -> {pa:.2%}")
     mb, ma = caught(before), caught(after)
@@ -109,9 +132,13 @@ def report(before: Path, after: Path) -> int:
     for e in errors:
         print(f"coverage-check: {e}", file=sys.stderr)
     if not errors:
-        cov, _ = read_lcov(after)
-        lines = sum(len(v) for v in cov.values())
-        print(f"coverage-check: ok, {lines} covered lines kept, branches per crate not lower")
+        stable, union, _, _ = read_lcov(after)
+        lines = sum(len(v) for v in stable.values())
+        flaky = sum(len(union[p] - stable[p]) for p in union)
+        print(
+            f"coverage-check: ok, {lines} covered lines kept, branches per crate not lower, "
+            f"{flaky} unstable line(s) in AFTER"
+        )
     return 1 if errors else 0
 
 
@@ -120,24 +147,45 @@ def self_test() -> int:
         "SF:crates/gitterrace-web/src/a.rs\nDA:1,3\nDA:2,1\nDA:9,1\n"
         "BRDA:1,0,0,1\nBRDA:1,0,1,1\nend_of_record\n"
     )
+    lost = base.replace("DA:2,1", "DA:2,0")
+    # Each side is the list of runs of one tree, as lcov texts, then the mutant file it wrote.
     cases = {
-        "equal": (base, "caught.txt", 0),
-        "line lost": (base.replace("DA:2,1", "DA:2,0"), "caught.txt", 1),
-        "branch drop": (base.replace("BRDA:1,0,1,1", "BRDA:1,0,1,0"), "caught.txt", 1),
-        "mutant missed": (base, "missed.txt", 1),
-        "test line only": (base.replace("DA:9,1", "DA:9,0"), "caught.txt", 0),
+        "equal": ([base], "caught.txt", [base], "caught.txt", 0),
+        "line lost": ([base], "caught.txt", [lost], "caught.txt", 1),
+        "line lost in every run": ([base] * 3, "caught.txt", [lost] * 3, "caught.txt", 1),
+        "line lost after one lucky run": (
+            [base] * 3,
+            "caught.txt",
+            [lost, base, lost],
+            "caught.txt",
+            0,
+        ),
+        "line unstable before": ([base, lost, base], "caught.txt", [lost] * 3, "caught.txt", 0),
+        "branch drop": (
+            [base],
+            "caught.txt",
+            [base.replace("BRDA:1,0,1,1", "BRDA:1,0,1,0")],
+            "caught.txt",
+            1,
+        ),
+        "mutant missed": ([base], "caught.txt", [base], "missed.txt", 1),
+        "test line only": (
+            [base],
+            "caught.txt",
+            [base.replace("DA:9,1", "DA:9,0")],
+            "caught.txt",
+            0,
+        ),
     }
     failed = 0
     with tempfile.TemporaryDirectory() as tmp:
-        for name, (lcov, mfile, want) in cases.items():
+        for name, (runs_b, mf_b, runs_a, mf_a, want) in cases.items():
             sides = []
-            for side, (text, mf) in {
-                "b": (base, "caught.txt"),
-                "a": (lcov, mfile),
-            }.items():
+            for side, runs, mf in (("b", runs_b, mf_b), ("a", runs_a, mf_a)):
                 d = Path(tmp, name, side)
                 (d / "mutants.out").mkdir(parents=True)
-                (d / "lcov.info").write_text(text)
+                for i, text in enumerate(runs):
+                    (d / f"lcov-{i + 1}.info").write_text(text)
                 (d / "tests-start.tsv").write_text("crates/gitterrace-web/src/a.rs\t5\n")
                 (d / "mutants.out" / "caught.txt").write_text("")
                 (d / "mutants.out" / mf).write_text("src/a.rs:1:1: replace f -> bool with true\n")

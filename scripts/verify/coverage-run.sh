@@ -8,8 +8,14 @@
 # touched. Branch coverage needs a nightly compiler (`-Z coverage-options=branch` is refused on
 # the pinned stable), so both sides of a proof run on the same NIGHTLY. cargo-mutants runs on the
 # pinned toolchain. The release-only tests (memory budget, latency) are not in this run: their
-# own release gates keep them.
+# own release gates keep them. Property tests run on a fixed seed, so the same tree draws the
+# same cases: a random draw reaches a branch in one run and not the next.
 #
+#   RUNS           times the tests run on the same tree (default 5): lcov-1.info .. lcov-N.info.
+#                  Some lines are hit only by a race (a thread ending after its test), so
+#                  coverage-check.py reads a line as kept when any run of AFTER hit it and as
+#                  covered before only when every run of BEFORE did. Builds are shared, so the
+#                  second run onward costs the tests only.
 #   NIGHTLY        toolchain for llvm-cov (default nightly)
 #   MUTANTS_PKG    crate to mutate, e.g. gitterrace-web
 #   MUTANTS_FILES  space-separated globs of the src files whose tests moved
@@ -30,14 +36,20 @@ git -C "$src" checkout --quiet --detach "$rev"
 
 # One target dir for both revisions: dependencies build once.
 export CARGO_TARGET_DIR=$root/target
+export PROPTEST_RNG_SEED=${PROPTEST_RNG_SEED:-1}
 (
   cd "$src"
-  cargo "+$nightly" llvm-cov clean --workspace
-  cargo "+$nightly" llvm-cov --workspace --all-features --branch --no-fail-fast \
-    --lcov --output-path "$out/lcov.info"
+  rm -f "$out"/lcov*.info
+  for n in $(seq 1 "${RUNS:-5}"); do
+    cargo "+$nightly" llvm-cov clean --workspace
+    cargo "+$nightly" llvm-cov --workspace --all-features --branch --no-fail-fast \
+      --lcov --output-path "$out/lcov-$n.info"
+  done
 )
 # Paths in the report name this clone: strip it so two revisions compare file by file.
-sed -i.bak "s|^SF:$src/|SF:|" "$out/lcov.info" && mv "$out/lcov.info.bak" "$root/"
+for f in "$out"/lcov-*.info; do
+  sed -i.bak "s|^SF:$src/|SF:|" "$f" && mv "$f.bak" "$root/"
+done
 git -C "$src" rev-parse HEAD >"$out/rev"
 # Where each src file's inline tests start: the compare counts only the lines above, so a moved
 # test never reads as lost product coverage.
