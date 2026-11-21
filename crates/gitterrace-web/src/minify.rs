@@ -1,10 +1,10 @@
-//! The site's stylesheet with the bytes a browser never reads taken out: comments, runs of
+//! A stylesheet with the bytes a browser never reads taken out: comments, runs of
 //! white space, the space around braces, semicolons and commas, and the last `;` of a block.
 //! Strings are copied whole, and white space next to `:`, `+`, `-` and `>` stays, since it
 //! can change what a selector or a `calc()` means.
 
 /// `css` without comments and with the least white space that parses to the same rules.
-pub(super) fn css(css: &str) -> String {
+pub fn css(css: &str) -> String {
     let mut out = String::with_capacity(css.len() / 2);
     let (mut depth, mut space) = (0_usize, false);
     let mut chars = css.chars().peekable();

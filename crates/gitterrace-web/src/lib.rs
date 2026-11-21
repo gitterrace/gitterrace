@@ -41,6 +41,7 @@ mod lost;
 mod markdown;
 mod mcp_scope;
 mod media;
+mod minify;
 mod multi;
 #[cfg(test)]
 mod multi_tests;
@@ -100,6 +101,7 @@ pub use guard::CSP as PAGE_CSP;
 pub use highlight::{block as highlight_block, languages as highlighted_languages};
 pub use mcp_scope::mcp_scope;
 pub use media::plain_media;
+pub use minify::css as minify_css;
 pub use multi::{discover_repos, search_roots};
 pub use registry::{
     Entry as RegistryEntry, add_token, candidates as registry_candidates, state_dir,

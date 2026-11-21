@@ -88,18 +88,30 @@ pub fn asset_url(name: &str) -> String {
     format!("/static/{name}?v={}", asset_version())
 }
 
-/// The stylesheet as served: its font URLs carry the version too, so a new font is fetched.
-fn served(name: &str, body: &'static str) -> &'static str {
-    static TOKENS: std::sync::LazyLock<String> = std::sync::LazyLock::new(|| {
-        let v = asset_version();
-        let (_, _, body) =
-            TABLE.iter().find(|(n, _, _)| *n == "tokens.css").copied().unwrap_or_default();
-        body.replace(".woff2)", &format!(".woff2?v={v})"))
-    });
-    if name != "tokens.css" {
+/// The assets as served, built once: every stylesheet minified, and `tokens.css` with its font
+/// URLs carrying the version too, so a new font is fetched.
+fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
+    static SERVED: std::sync::LazyLock<std::collections::HashMap<&'static str, &'static str>> =
+        std::sync::LazyLock::new(|| {
+            let v = asset_version();
+            TABLE
+                .iter()
+                .filter(|(_, kind, _)| *kind == CSS)
+                .map(|(name, _, body)| {
+                    let body = if *name == "tokens.css" {
+                        body.replace(".woff2)", &format!(".woff2?v={v})"))
+                    } else {
+                        (*body).to_owned()
+                    };
+                    let min: &'static str = Box::leak(crate::minify::css(&body).into_boxed_str());
+                    (*name, min)
+                })
+                .collect()
+        });
+    if kind != CSS {
         return body;
     }
-    &TOKENS
+    SERVED.get(name).copied().unwrap_or(body)
 }
 
 /// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.
@@ -107,7 +119,7 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     TABLE
         .into_iter()
         .fold(Router::new(), |r, (name, kind, body)| {
-            r.route(&format!("/static/{name}"), static_asset(kind, served(name, body)))
+            r.route(&format!("/static/{name}"), static_asset(kind, served(name, kind, body)))
         })
         .route(crate::MERMAID_JS, get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
