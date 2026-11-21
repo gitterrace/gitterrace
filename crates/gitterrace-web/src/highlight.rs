@@ -66,13 +66,10 @@ fn alias(token: &str) -> &str {
     match token {
         "sh" | "shell" | "zsh" | "console" | "shell-session" | "bash" | "ksh" | "dash" => "sh",
         "yml" => "yaml",
-        "rs" => "rs",
         "py" | "python3" | "python" => "py",
         "kt" | "kotlin" | "kts" => "kt",
         "ts" | "typescript" => "ts",
-        "tsx" => "tsx",
         "js" | "javascript" | "node" | "mjs" | "cjs" => "js",
-        "jsx" => "jsx",
         "rb" | "ruby" => "rb",
         "pl" | "perl" => "pl",
         "golang" => "go",
@@ -113,33 +110,28 @@ fn syntax_for_shebang(first: &str) -> Option<&'static SyntaxReference> {
 fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxReference> {
     let set = syntaxes();
     let name = path.rsplit('/').next().unwrap_or(path);
-    let by_name = match name {
-        "Justfile" | "justfile" | ".justfile" => set.find_syntax_by_token("Makefile"),
-        "CMakeLists.txt" => set.find_syntax_by_token("CMake"),
-        "Cargo.lock" | "uv.lock" | "poetry.lock" | "Pipfile.lock" => {
-            set.find_syntax_by_token("toml")
-        }
-        "go.mod" | "go.sum" => set.find_syntax_by_token("go"),
-        "Podfile" | "Gemfile" | "Rakefile" | "Fastfile" | "Brewfile" => {
-            set.find_syntax_by_token("rb")
-        }
-        "Package.swift" => set.find_syntax_by_token("swift"),
+    let token = match name {
+        "Justfile" | "justfile" | ".justfile" => Some("Makefile"),
+        "CMakeLists.txt" => Some("CMake"),
+        "Cargo.lock" | "uv.lock" | "poetry.lock" | "Pipfile.lock" => Some("toml"),
+        "go.mod" | "go.sum" => Some("go"),
+        "Podfile" | "Gemfile" | "Rakefile" | "Fastfile" | "Brewfile" => Some("rb"),
+        "Package.swift" => Some("swift"),
         // Autoconf is shell under m4 macros, and the set has no m4 grammar.
-        "configure.in" => set.find_syntax_by_token("sh"),
+        "configure.in" | ".bashrc" | ".zshrc" | ".bash_profile" | ".zprofile" | ".profile"
+        | ".zshenv" => Some("sh"),
         _ if name
             .rsplit_once('.')
             .is_some_and(|(_, e)| e.eq_ignore_ascii_case("ac") || e.eq_ignore_ascii_case("m4")) =>
         {
-            set.find_syntax_by_token("sh")
-        }
-        ".bashrc" | ".zshrc" | ".bash_profile" | ".zprofile" | ".profile" | ".zshenv" => {
-            set.find_syntax_by_token("sh")
+            Some("sh")
         }
         _ if name.starts_with("Dockerfile") || name.starts_with("Containerfile") => {
-            set.find_syntax_by_token("Dockerfile")
+            Some("Dockerfile")
         }
         _ => None,
     };
+    let by_name = token.and_then(|t| set.find_syntax_by_token(t));
     by_name
         .or_else(|| set.find_syntax_by_extension(name))
         .or_else(|| {
@@ -216,10 +208,7 @@ impl Highlighter {
             let to = i.min(body.len());
             if to > prev {
                 let class = self.class();
-                match merged.last_mut() {
-                    Some(last) if last.0 == class => last.2 = to,
-                    _ => merged.push((class, prev, to)),
-                }
+                push_span(&mut merged, class, prev, to);
                 prev = to;
             }
             if let Some(c) = self.symbols.as_mut() {
@@ -237,10 +226,7 @@ impl Highlighter {
         }
         if body.len() > prev {
             let class = self.class();
-            match merged.last_mut() {
-                Some(last) if last.0 == class => last.2 = body.len(),
-                _ => merged.push((class, prev, body.len())),
-            }
+            push_span(&mut merged, class, prev, body.len());
         }
         for (class, a, b) in merged {
             if let Some(c) = class {
@@ -254,6 +240,19 @@ impl Highlighter {
             }
         }
         out
+    }
+}
+
+/// Appends `from..to` as a span of `class`, growing the last one when the class is the same.
+fn push_span(
+    merged: &mut Vec<(Option<&'static str>, usize, usize)>,
+    class: Option<&'static str>,
+    from: usize,
+    to: usize,
+) {
+    match merged.last_mut() {
+        Some(last) if last.0 == class => last.2 = to,
+        _ => merged.push((class, from, to)),
     }
 }
 
