@@ -2,7 +2,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::Duration;
 
-use super::{Scheduler, share, tier};
+use super::{Scheduler, percent, share, tier};
 
 /// Long enough to never be the wait a test depends on.
 const LONG: Duration = Duration::from_secs(3600);
@@ -81,4 +81,24 @@ fn the_sampler_exits_when_idle_and_starts_again_with_the_next_build() {
     let (start, _lease, _rx) = s.enter();
     assert_eq!(start, 12);
     assert!(sampling(&s), "a new build restarts the sampler");
+}
+
+/// Guard class: a build reads the load others make, not its own. Twelve workers on ten cores
+/// are 120% of the load average a minute on, which tiered a lone build down to one worker
+/// (cold rust index 63 s then 212 s). Red when the budget is read off the raw load.
+#[test]
+fn a_lone_build_is_not_throttled_by_the_load_its_own_workers_make() {
+    let own = percent(12.0, 10);
+    assert_eq!(own, 120);
+    let load = Arc::new(AtomicU32::new(own));
+    let s = sched(&load, LONG, LONG);
+    // Settled: the average has caught up with the workers granted.
+    s.lock().own = 12.0;
+    let (first, _a, _rx) = s.enter();
+    s.lock().own = 12.0;
+    let (_, _b, _rx2) = s.enter();
+    let mut st = s.lock();
+    let each = share(tier(Some(own.saturating_sub(st.own_percent()))), st.builds.len());
+    assert_eq!(first, 12);
+    assert_eq!(each, 6, "the own load is subtracted, so two builds still split twelve");
 }

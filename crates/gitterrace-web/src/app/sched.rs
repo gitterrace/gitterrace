@@ -11,7 +11,7 @@
 
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Condvar, Mutex, MutexGuard};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Workers while the load is under [`BUSY`].
 const FULL: usize = 12;
@@ -23,6 +23,9 @@ const BUSY: u32 = 60;
 const FLOOR: usize = 1;
 /// Load, in percent of the cores, above which only the [`FLOOR`] runs.
 const SATURATED: u32 = 100;
+/// The time constant of the system's 1-minute load average, which the builds' own share is
+/// smoothed with to match.
+const LOAD_WINDOW: f64 = 60.0;
 const POLL: Duration = Duration::from_secs(5);
 const IDLE: Duration = Duration::from_secs(30);
 
@@ -44,6 +47,14 @@ const fn tier(load: Option<u32>) -> usize {
     }
 }
 
+/// `workers` running flat out, in percent of `cores`.
+fn percent(workers: f64, cores: usize) -> u32 {
+    // Saturating float to int: a share of the cores is small and never negative.
+    #[expect(clippy::cast_possible_truncation, clippy::cast_sign_loss, reason = "a percent")]
+    let pct = (workers / cores.max(1) as f64 * 100.0).max(0.0) as u32;
+    pct
+}
+
 /// One build's part of `total` workers among `builds`: even, and at least one while any
 /// worker may run, so a build never idles beside another that has them.
 const fn share(total: usize, builds: usize) -> usize {
@@ -59,6 +70,11 @@ struct Build {
 #[derive(Default)]
 struct State {
     builds: Vec<Build>,
+    /// The workers the builds themselves put on the load average, smoothed over
+    /// [`LOAD_WINDOW`] as the average is, and when it was last updated. A build must not
+    /// throttle itself for the load its own workers make.
+    own: f64,
+    own_at: Option<Instant>,
     next: u64,
     sampling: bool,
 }
@@ -75,6 +91,19 @@ pub(crate) struct Scheduler {
 pub(crate) struct Lease {
     id: u64,
     sched: Arc<Scheduler>,
+}
+
+impl State {
+    /// Smooths the workers granted so far into [`State::own`] and returns them as a percent of
+    /// the cores.
+    fn own_percent(&mut self) -> u32 {
+        let now = Instant::now();
+        let granted: usize = self.builds.iter().map(|b| b.last).sum();
+        let dt = self.own_at.map_or(0.0, |t| now.duration_since(t).as_secs_f64());
+        self.own = (granted as f64 - self.own).mul_add(1.0 - (-dt / LOAD_WINDOW).exp(), self.own);
+        self.own_at = Some(now);
+        percent(self.own, std::thread::available_parallelism().map_or(1, usize::from))
+    }
 }
 
 impl Scheduler {
@@ -112,7 +141,8 @@ impl Scheduler {
     /// Gives every build its share of the current budget, and returns the share of `quiet`,
     /// which is told nothing: it is the build just entering and learns it from the return.
     fn rebalance(&self, s: &mut State, quiet: Option<u64>) -> usize {
-        let each = share(tier((self.load)()), s.builds.len());
+        let load = (self.load)().map(|l| l.saturating_sub(s.own_percent()));
+        let each = share(tier(load), s.builds.len());
         for b in &mut s.builds {
             if b.last != each || Some(b.id) == quiet {
                 b.last = each;
