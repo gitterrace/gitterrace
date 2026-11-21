@@ -19,7 +19,6 @@ pub(crate) fn lead_tagline(lead: &str) -> Tagline {
 pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> PageHead {
     PageHead {
         tabs: crate::views::stats_tabs(active)
-            .primary
             .into_iter()
             .map(|n| Tab { label: n.label.to_owned(), href: n.href, on: n.on })
             .collect(),

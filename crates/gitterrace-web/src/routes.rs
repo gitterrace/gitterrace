@@ -474,12 +474,7 @@ async fn worktree(
             .iter()
             .enumerate()
             .map(|(i, f)| WorktreeFileRow {
-                stat: FileStatRow {
-                    anchor: format!("f{i}"),
-                    label: views::file_label(f),
-                    additions: fmt::thousands(f.additions),
-                    deletions: fmt::thousands(f.deletions),
-                },
+                stat: views::file_stat(i, f),
                 blob: if f.kind == gitterrace_git::ChangeKind::Deleted {
                     String::new()
                 } else {

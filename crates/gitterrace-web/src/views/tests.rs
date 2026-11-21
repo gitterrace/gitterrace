@@ -99,9 +99,9 @@ fn code_lines_carry_their_number() {
 #[test]
 fn every_insights_tab_is_in_the_row_and_the_open_one_is_marked() {
     let t = crate::views::stats_tabs("ow");
-    let on: Vec<_> = t.primary.iter().filter(|n| n.on).map(|n| n.label).collect();
+    let on: Vec<_> = t.iter().filter(|n| n.on).map(|n| n.label).collect();
     assert_eq!(on, ["Ownership"]);
-    assert!(t.primary.len() <= 6, "{} tabs", t.primary.len());
+    assert!(t.len() <= 6, "{} tabs", t.len());
 }
 
 #[test]

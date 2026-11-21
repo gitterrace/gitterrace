@@ -32,7 +32,7 @@ pub(crate) fn why(read: usize) -> String {
 pub(crate) fn render(c: Chrome, tab: &'static str, read: usize) -> askama::Result<String> {
     let indexed = fmt::with_rev("HEAD", || {
         let t = views::stats_tabs(tab);
-        t.primary.into_iter().find(|n| n.on).map(|n| n.href)
+        t.into_iter().find(|n| n.on).map(|n| n.href)
     });
     FarPage {
         c,

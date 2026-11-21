@@ -12,11 +12,9 @@ use gitterrace_types::ColorScheme;
 pub(crate) use crate::commit_line::{CommitRow, Count, Lead};
 use crate::fmt::{enc_path, enc_seg, esc_text, href};
 #[cfg(test)]
-pub(crate) use crate::views::code::code_html_first;
-#[cfg(test)]
-pub(crate) use crate::views::code::code_is_cached;
-#[cfg(test)]
-pub(crate) use crate::views::code::{CodeMemo, code_html, code_memo_has, code_memo_put};
+pub(crate) use crate::views::code::{
+    CodeMemo, code_html, code_html_first, code_is_cached, code_memo_has, code_memo_put,
+};
 pub(crate) use crate::views::code::{
     blame_first, blame_rows, clear_code_memo, code, code_first, code_tail_html,
 };
@@ -365,19 +363,14 @@ pub fn stats_tab_labels() -> Vec<&'static str> {
 }
 
 /// The insights tab row, every tab visible.
-pub(crate) struct Tabs {
-    pub(crate) primary: Vec<Nav>,
-}
-
-pub(crate) fn stats_tabs(active: &str) -> Tabs {
+pub(crate) fn stats_tabs(active: &str) -> Vec<Nav> {
     // `insights.pages` orders the tabs.
-    let all: Vec<Nav> = crate::features::pages()
+    crate::features::pages()
         .iter()
         .filter_map(|p| crate::features::page_route(p))
         .filter_map(|r| STATS_TABS.iter().find(|t| t.0 == r).copied())
         .map(|(path, label, key)| Nav { href: href(path), label, key, on: key == active })
-        .collect();
-    Tabs { primary: all }
+        .collect()
 }
 
 /// Avatar letters: the first letter of the first and of the last word of the name. One word
@@ -533,17 +526,18 @@ pub(crate) fn file_label(f: &FileDiff) -> String {
     }
 }
 
+/// The diffstat row of the `i`th changed file, anchored to its diff.
+pub(crate) fn file_stat(i: usize, f: &FileDiff) -> FileStatRow {
+    FileStatRow {
+        anchor: format!("f{i}"),
+        label: file_label(f),
+        additions: crate::fmt::thousands(f.additions),
+        deletions: crate::fmt::thousands(f.deletions),
+    }
+}
+
 pub(crate) fn file_stats(d: &CommitDetail) -> Vec<FileStatRow> {
-    d.files
-        .iter()
-        .enumerate()
-        .map(|(i, f)| FileStatRow {
-            anchor: format!("f{i}"),
-            label: file_label(f),
-            additions: crate::fmt::thousands(f.additions),
-            deletions: crate::fmt::thousands(f.deletions),
-        })
-        .collect()
+    d.files.iter().enumerate().map(|(i, f)| file_stat(i, f)).collect()
 }
 
 #[cfg(test)]

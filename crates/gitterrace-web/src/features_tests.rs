@@ -307,7 +307,7 @@ async fn defaults_add_nothing_to_a_page() {
     assert!(html.contains("id=\"reposwitch\""));
     let all = crate::features::Effective::of(&Config::default(), None);
     let tabs = crate::features::with(all, || crate::views::stats_tabs("a"));
-    let labels: Vec<&str> = tabs.primary.iter().map(|n| n.label).collect();
+    let labels: Vec<&str> = tabs.iter().map(|n| n.label).collect();
     assert_eq!(labels, crate::views::stats_tab_labels());
     assert_eq!(warm(&Config::default(), None), crate::WARM_PAGES);
 }
@@ -321,7 +321,7 @@ fn insights_pages_order_the_tabs() {
     let e = crate::features::Effective::of(&cfg, None);
     let (labels, home) = crate::features::with(e, || {
         let t = crate::views::stats_tabs("ho");
-        let l: Vec<&str> = t.primary.iter().map(|n| n.label).collect();
+        let l: Vec<&str> = t.iter().map(|n| n.label).collect();
         (l, crate::features::insights_home())
     });
     // A section name orders nothing: it lives on its page and adds no tab.
