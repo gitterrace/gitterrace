@@ -256,6 +256,10 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
                 }))
             }
             (_, "id") => Some(Cow::Owned(ids::doc_id(value))),
+            // Only the task-list checkbox: a text or password field would be a spoofed form.
+            ("input", "type") => {
+                value.eq_ignore_ascii_case("checkbox").then_some(Cow::Borrowed(value))
+            }
             (_, "class") => {
                 let kept: Vec<&str> = value
                     .split_whitespace()
@@ -347,6 +351,13 @@ mod tests {
         assert!(!out.contains("<script"));
         assert!(!out.contains("onerror"));
         assert!(!out.contains("alert"));
+    }
+
+    #[test]
+    fn only_checkbox_inputs_survive() {
+        let out = render("<input type=\"password\" name=\"p\">\n\n- [x] done\n");
+        assert!(!out.contains("password"), "{out}");
+        assert!(out.contains("type=\"checkbox\""), "{out}");
     }
 
     #[test]
