@@ -251,7 +251,10 @@ async fn crawl(
                 let stamp = site.map_or("", |s| s.stamp.as_str());
                 let credit = site.and_then(|s| s.credit).map(|i| &scope.projects[i]);
                 let marked = mark_snapshot(&body, stamp, credit);
-                site.map_or_else(|| marked.clone(), |s| add_footer(&marked, &s.footer))
+                match site {
+                    Some(s) => add_footer(&marked, &s.footer),
+                    None => marked,
+                }
             } else {
                 body
             };
