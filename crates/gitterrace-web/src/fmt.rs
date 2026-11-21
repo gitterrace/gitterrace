@@ -219,6 +219,11 @@ pub(crate) fn with_base<T>(base: &str, f: impl FnOnce() -> T) -> T {
 
 pub(crate) use gitterrace_index::{count, thousands};
 
+/// `abs` with its sign spelled out: `+1,234` when `up`, else `-1,234`.
+pub(crate) fn signed(up: bool, abs: u64) -> String {
+    format!("{}{}", if up { '+' } else { '-' }, thousands(abs))
+}
+
 /// The counted noun for `n`: `commit` for 1, `commits` otherwise. Spelled out, never `+s`.
 pub(crate) fn noun(
     n: impl std::fmt::Display,

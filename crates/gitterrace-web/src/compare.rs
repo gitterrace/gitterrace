@@ -50,7 +50,6 @@ struct Result2 {
     commits: Vec<views::CommitRow>,
     more: usize,
     diff_href: String,
-    /// The head commit's short id, the link to it.
     /// The head commit as the shared sha chip.
     head_sha: String,
 }
@@ -195,6 +194,11 @@ pub(crate) async fn page(
     .await
 }
 
+/// What stands in for a comparison whose repository read failed.
+fn unreadable() -> Empty {
+    Empty::new("The repository could not be read for this comparison. Try again shortly.")
+}
+
 /// Where the range starts: `base` itself, or with `merge` the commit `head` left it from.
 fn start_of(a: &App, base: &str, head: &str, merge: bool) -> std::result::Result<String, Empty> {
     if !merge {
@@ -207,9 +211,7 @@ fn start_of(a: &App, base: &str, head: &str, merge: bool) -> std::result::Result
         )),
         Err(e) => {
             tracing::warn!("compare merge base: {e}");
-            Err(Empty::new(
-                "The repository could not be read for this comparison. Try again shortly.",
-            ))
+            Err(unreadable())
         }
     }
 }
@@ -222,7 +224,7 @@ fn outcome(
     (b2, h2): (&str, &str),
     (bi, hi): (&str, &str),
 ) -> std::result::Result<Result2, Empty> {
-    let cmp = match comparison(a, r, bi, hi) {
+    let cmp = match lookup(a, r, bi, hi).unwrap_or_else(Range::Failed) {
         Range::Counted(c) => c,
         Range::TooLarge => {
             return Err(Empty::new(format!(
@@ -238,9 +240,7 @@ fn outcome(
         }
         Range::Failed(e) => {
             tracing::warn!("compare {b2}..{h2}: {e}");
-            return Err(Empty::new(
-                "The repository could not be read for this comparison. Try again shortly.",
-            ));
+            return Err(unreadable());
         }
     };
     let net = cmp.added.abs_diff(cmp.removed);
@@ -250,10 +250,7 @@ fn outcome(
         Kpi("Files changed", fmt::thousands(cmp.files_changed)),
         Kpi("Lines added", fmt::thousands(cmp.added)),
         Kpi("Lines removed", fmt::thousands(cmp.removed)),
-        Kpi(
-            "Net",
-            format!("{}{}", if cmp.added >= cmp.removed { "+" } else { "-" }, fmt::thousands(net)),
-        ),
+        Kpi("Net", fmt::signed(cmp.added >= cmp.removed, net)),
     ];
     let langs = cmp
         .languages
@@ -262,11 +259,7 @@ fn outcome(
             language: l.language.clone(),
             added: fmt::thousands(l.added),
             removed: fmt::thousands(l.removed),
-            net: format!(
-                "{}{}",
-                if l.net >= 0 { "+" } else { "-" },
-                fmt::thousands(l.net.unsigned_abs())
-            ),
+            net: fmt::signed(l.net >= 0, l.net.unsigned_abs()),
             tone: if l.net >= 0 { "add" } else { "del" },
         })
         .collect();
@@ -276,9 +269,7 @@ fn outcome(
         Ok(s) => s.iter().map(|s| views::CommitRow::of(s, now)).collect(),
         Err(e) => {
             tracing::warn!("compare {b2}..{h2} summaries: {e}");
-            return Err(Empty::new(
-                "The repository could not be read for this comparison. Try again shortly.",
-            ));
+            return Err(unreadable());
         }
     };
     Ok(Result2 {
@@ -305,12 +296,8 @@ fn outcome(
 
 /// `base..head` from the index when it holds the head (then it holds the whole range), else
 /// read from git: the index holds what the served head reaches, so another branch's own
-/// commits are only in git. The git read is bounded and left to local servers.
-fn comparison(a: &App, r: &Src, base: &str, head: &str) -> Range {
-    lookup(a, r, base, head).unwrap_or_else(Range::Failed)
-}
-
-/// [`comparison`] with each read's failure propagated.
+/// commits are only in git. The git read is bounded and left to local servers. Each read's
+/// failure propagates.
 fn lookup(a: &App, r: &Src, base: &str, head: &str) -> std::result::Result<Range, String> {
     if r.find_commit(head).map_err(|e| e.to_string())?.is_some() {
         let ins = insights(a, r, a.defaults().into_options());

@@ -40,14 +40,7 @@ pub(crate) fn section(fold: &ActivityFold) -> String {
             kpis: vec![
                 Kpi("Lines added", fmt::thousands(add)),
                 Kpi("Lines removed", fmt::thousands(del)),
-                Kpi(
-                    "Net",
-                    format!(
-                        "{}{}",
-                        if add >= del { "+" } else { "-" },
-                        fmt::thousands(add.abs_diff(del))
-                    ),
-                ),
+                Kpi("Net", fmt::signed(add >= del, add.abs_diff(del))),
                 Kpi(
                     "Rework overall",
                     rework_share(add, del, rew)
