@@ -54,10 +54,9 @@ async fn main() -> anyhow::Result<()> {
     match cli.command.unwrap_or(Command::Serve) {
         Command::Config => print!("{}", loaded.describe()),
         Command::Serve => {
-            let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
+            let addr = server_addr(&loaded.config)?;
             let actions = dir.clone().filter(|_| !cli.no_actions).map(|d| d.join("actions.toml"));
-            let m = &loaded.config.multi;
-            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            let repos = repos_of(&cli.paths, &loaded.config);
             if !loaded.config.server.is_public
                 && open::join_running(addr, &repos, gitterrace_web::state_dir().as_deref())?
             {
@@ -70,8 +69,7 @@ async fn main() -> anyhow::Result<()> {
             gitterrace_web::serve(repos, addr, actions, loaded.config, watched, &cli.paths).await?;
         }
         Command::Mcp { served } => {
-            let m = &loaded.config.multi;
-            let repos = gitterrace_web::discover_repos(&cli.paths, m.depth, &m.skip_dirs);
+            let repos = repos_of(&cli.paths, &loaded.config);
             if served || repos.len() > 1 {
                 let (scope, list) = gitterrace_web::mcp_scope(&repos, served);
                 gitterrace_api::serve_mcp_repos(&scope, list, &loaded.config).await?;
@@ -92,16 +90,43 @@ async fn main() -> anyhow::Result<()> {
             }
         }
         Command::Remove { target } => {
-            let addr: SocketAddr = loaded.config.server.addr.parse().context("server.addr")?;
+            let addr = server_addr(&loaded.config)?;
             tokio::task::block_in_place(|| open::remove_cmd(addr, target.as_deref()))?;
         }
         Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
-        cmd @ Command::Export { .. } => {
-            export_cmd(&cli.paths, &path, cmd, &loaded.config).await?;
+        Command::Export { out, force, commits, file_kb, export_pages, quiet, project } => {
+            let scope = export::Scope {
+                commits,
+                max_file: file_kb * 1024,
+                force,
+                projects: project
+                    .iter()
+                    .map(|p| export::Project::parse(p))
+                    .collect::<anyhow::Result<_>>()?,
+                config: loaded.config.clone(),
+            };
+            let pages = export::budget(export_pages, &loaded.config);
+            let repos = repos_of(&cli.paths, &loaded.config);
+            if repos.is_empty() {
+                anyhow::bail!("no git repository found in {}", path.display());
+            }
+            let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
+            export_cmd(&repos, &out, &scope, pages, quiet).await?;
         }
     }
     Ok(())
+}
+
+/// The address `server.addr` names.
+fn server_addr(config: &gitterrace_config::Config) -> anyhow::Result<SocketAddr> {
+    config.server.addr.parse().context("server.addr")
+}
+
+/// The repositories `serve` shows for `paths`, found as `[multi]` says.
+fn repos_of(paths: &[PathBuf], config: &gitterrace_config::Config) -> Vec<PathBuf> {
+    let m = &config.multi;
+    gitterrace_web::discover_repos(paths, m.depth, &m.skip_dirs)
 }
 
 #[expect(
@@ -195,34 +220,15 @@ impl Flags {
     reason = "the command's result line and its hosting note"
 )]
 async fn export_cmd(
-    paths: &[PathBuf],
-    path: &Path,
-    cmd: Command,
-    config: &gitterrace_config::Config,
+    repos: &[PathBuf],
+    out: &Path,
+    scope: &export::Scope,
+    pages: Option<usize>,
+    quiet: bool,
 ) -> anyhow::Result<()> {
-    let Command::Export { out, force, commits, file_kb, export_pages, quiet, project } = cmd else {
-        anyhow::bail!("export_cmd runs the export command only");
-    };
-    let scope = &export::Scope {
-        commits,
-        max_file: file_kb * 1024,
-        force,
-        projects: project
-            .iter()
-            .map(|p| export::Project::parse(p))
-            .collect::<anyhow::Result<_>>()?,
-        config: config.clone(),
-    };
-    let pages = export::budget(export_pages, config);
     let mut progress =
         export::Progress::new(export::Mode::detect(quiet), Box::new(std::io::stderr()));
-    let out = out.unwrap_or_else(|| PathBuf::from(export::DEFAULT_OUT));
-    let m = &config.multi;
-    let repos = gitterrace_web::discover_repos(paths, m.depth, &m.skip_dirs);
-    if repos.is_empty() {
-        anyhow::bail!("no git repository found in {}", path.display());
-    }
-    let n = export::export_with(&repos, &out, scope, pages, &mut progress).await?;
+    let n = export::export_with(repos, out, scope, pages, &mut progress).await?;
     println!("wrote {n} files to {}", out.display());
     if !quiet {
         eprintln!(
