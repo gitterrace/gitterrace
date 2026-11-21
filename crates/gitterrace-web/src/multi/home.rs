@@ -138,7 +138,7 @@ pub(super) async fn index(
         let live = follows_list(&table).then(|| table.env.home_version());
         let served = table.snapshot();
         let reads = in_order(&served, |s| {
-            (s.recent(now), show_tree.then(|| s.known_dirty()), s.insights_state())
+            (s.recent(now), show_tree.then(|| s.dirty.get()), s.insights_state())
         });
         let rows: Vec<IndexRow> = served
             .iter()

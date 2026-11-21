@@ -53,7 +53,7 @@ pub(crate) struct Served {
     /// opens a repository once per HEAD move or new local day instead of once per hit.
     recent: Mutex<Option<(String, Arc<Recent>)>>,
     /// The working tree's dirty answer and when it was measured, reused for `DIRTY_TTL`.
-    dirty: Mutex<Option<(std::time::Instant, bool)>>,
+    dirty: crate::app::DirtyMemo,
 }
 
 pub(crate) type Built = (Router, Vec<tokio::task::AbortHandle>, Weak<App>);
@@ -321,7 +321,7 @@ impl Repos {
             tasks: Mutex::new(Some(Vec::new())),
             app: Mutex::new(Weak::new()),
             recent: Mutex::new(None),
-            dirty: Mutex::new(None),
+            dirty: crate::app::DirtyMemo::default(),
         });
         self.peers.add(&name, served.path.clone());
         self.by_name.insert(name, Arc::clone(&served));
@@ -377,13 +377,11 @@ impl Served {
     /// own chip: the home page then scans each tree at most once per bound, however often it
     /// is reloaded, and a change shows within the bound.
     fn dirty(&self) -> bool {
-        if let Some(v) = self.known_dirty() {
+        if let Some(v) = self.dirty.get() {
             return v;
         }
         let v = Repo::discover(&self.path).is_ok_and(|r| gitterrace_git::is_dirty(&r));
-        if let Ok(mut g) = self.dirty.lock() {
-            *g = Some((std::time::Instant::now(), v));
-        }
+        self.dirty.put(v);
         v
     }
 
@@ -398,14 +396,6 @@ impl Served {
 
     fn opening(&self) -> bool {
         self.opening.load(Ordering::Acquire) && self.router.get().is_none()
-    }
-
-    /// The dirty answer when one inside the bound is at hand, without scanning: what the home
-    /// page renders at once, leaving the rest to `/_dirty`.
-    fn known_dirty(&self) -> Option<bool> {
-        let g = self.dirty.lock().ok()?;
-        let (at, v) = (*g)?;
-        (at.elapsed() < crate::app::DIRTY_TTL).then_some(v)
     }
 }
 

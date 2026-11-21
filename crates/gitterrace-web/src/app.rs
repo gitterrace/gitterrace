@@ -49,8 +49,7 @@ pub(crate) struct Env {
     cfg: Arc<RwLock<Arc<Config>>>,
     /// Every repository app built so far, so a reload reaches them.
     apps: Arc<Mutex<Vec<Weak<App>>>>,
-    jobs: Arc<Semaphore>,
-    jobs_cap: Arc<Mutex<usize>>,
+    jobs: Slots,
     stop: Arc<watch::Sender<bool>>,
     /// Why `actions.toml` is not in force; rendered into every page so the note is there
     /// at first paint instead of arriving with a poll and pushing the page down.
@@ -76,14 +75,12 @@ pub(crate) struct Env {
     /// Counts the list changes, so a home page that reconnects can tell it missed one.
     home_v: Arc<AtomicU64>,
     /// Open home streams, capped by `server.live_streams` as each repository's are.
-    pub(crate) home_streams: Arc<Semaphore>,
+    pub(crate) home_streams: Slots,
     /// The served repositories, for the log's related links. Empty for a lone repository.
     pub(crate) related: crate::related::Peers,
-    home_streams_cap: Arc<Mutex<usize>>,
     /// MiB of raw file bytes in memory at once, `limits.raw_concurrent_mb`: a `/raw` request
     /// holds its share until the body is sent.
-    pub(crate) raw_budget: Arc<Semaphore>,
-    raw_budget_cap: Arc<Mutex<usize>>,
+    pub(crate) raw_budget: Slots,
     /// The worker budget of the index builds, from the machine's load.
     sched: Arc<sched::Scheduler>,
 }
@@ -109,15 +106,62 @@ pub(crate) fn repo_limits(cfg: &Config) -> (u64, usize) {
     (cfg.limits.text_kb << 10, cfg.cache_bytes(Cache::Blame))
 }
 
-/// Moves a semaphore to `new` slots. Slots in use are not taken back, so a lower cap settles as
-/// they are released; `cap` then keeps the number actually in force.
-fn resize(sem: &Semaphore, cap: &Mutex<usize>, new: usize) {
-    let Ok(mut cap) = cap.lock() else { return };
-    if new >= *cap {
-        sem.add_permits(new - *cap);
-        *cap = new;
-    } else {
-        *cap -= sem.forget_permits(*cap - new);
+/// A semaphore with the number of slots in force beside it, so a resize cannot drift from it.
+/// Clones share both.
+#[derive(Clone)]
+pub(crate) struct Slots {
+    sem: Arc<Semaphore>,
+    cap: Arc<Mutex<usize>>,
+}
+
+impl Slots {
+    fn new(n: usize) -> Self {
+        Self { sem: Arc::new(Semaphore::new(n)), cap: Arc::new(Mutex::new(n)) }
+    }
+
+    /// Moves to `new` slots. Slots in use are not taken back, so a lower cap settles as they
+    /// are released; `cap` then keeps the number actually in force.
+    fn resize(&self, new: usize) {
+        let Ok(mut cap) = self.cap.lock() else { return };
+        if new >= *cap {
+            self.sem.add_permits(new - *cap);
+            *cap = new;
+        } else {
+            *cap -= self.sem.forget_permits(*cap - new);
+        }
+    }
+}
+
+impl std::ops::Deref for Slots {
+    type Target = Arc<Semaphore>;
+
+    fn deref(&self) -> &Arc<Semaphore> {
+        &self.sem
+    }
+}
+
+/// The worktree's dirty answer and when it was measured, reused for [`DIRTY_TTL`].
+#[derive(Default)]
+pub(crate) struct DirtyMemo(Mutex<Option<(Instant, bool)>>);
+
+impl DirtyMemo {
+    /// The answer when one inside the bound is at hand.
+    pub(crate) fn get(&self) -> Option<bool> {
+        let g = self.0.lock().ok()?;
+        let (at, v) = (*g)?;
+        (at.elapsed() < DIRTY_TTL).then_some(v)
+    }
+
+    pub(crate) fn put(&self, v: bool) {
+        if let Ok(mut g) = self.0.lock() {
+            *g = Some((Instant::now(), v));
+        }
+    }
+
+    pub(crate) fn clear(&self) {
+        if let Ok(mut g) = self.0.lock() {
+            *g = None;
+        }
     }
 }
 
@@ -141,8 +185,7 @@ impl Env {
             public,
             cfg: Arc::new(RwLock::new(Arc::new(cfg))),
             apps: Arc::new(Mutex::new(Vec::new())),
-            jobs: Arc::new(Semaphore::new(jobs)),
-            jobs_cap: Arc::new(Mutex::new(jobs)),
+            jobs: Slots::new(jobs),
             stop: Arc::new(watch::channel(false).0),
             actions_note: Arc::default(),
             sends: Arc::default(),
@@ -152,11 +195,9 @@ impl Env {
             settings_on: Arc::default(),
             home: broadcast::channel(16).0,
             home_v: Arc::default(),
-            home_streams: Arc::new(Semaphore::new(live_streams)),
-            home_streams_cap: Arc::new(Mutex::new(live_streams)),
+            home_streams: Slots::new(live_streams),
             related: crate::related::Peers::default(),
-            raw_budget: Arc::new(Semaphore::new(raw)),
-            raw_budget_cap: Arc::new(Mutex::new(raw)),
+            raw_budget: Slots::new(raw),
             sched: sched::Scheduler::system(),
         }
     }
@@ -210,18 +251,18 @@ impl Env {
         self.actions_note.read().ok()?.as_ref()?.note()
     }
 
+    /// Every live app built on this environment.
+    pub(crate) fn apps(&self) -> Vec<Arc<App>> {
+        self.apps.lock().map(|g| g.iter().filter_map(Weak::upgrade).collect()).unwrap_or_default()
+    }
+
     /// Tells every open tab that the set of served repositories changed, so the switcher shows
     /// a repository that joined without a reload and an open home lists it.
     pub(crate) fn repos_changed(&self) {
         let v = self.home_v.fetch_add(1, Ordering::AcqRel) + 1;
         // An error only says no home page is open.
         self.home.send(Arc::new(Change::repos(v))).ok();
-        let apps: Vec<Arc<App>> = self
-            .apps
-            .lock()
-            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
-            .unwrap_or_default();
-        for app in apps {
+        for app in self.apps() {
             // A log page links the related repositories: a joined or gone one changes it.
             if let Ok(mut g) = app.memo.lock() {
                 g.clear();
@@ -281,16 +322,10 @@ impl Env {
             Ok(mut g) => *g = Arc::clone(&new),
             Err(e) => *e.into_inner() = Arc::clone(&new),
         }
-        resize(&self.jobs, &self.jobs_cap, job_slots(&new));
-        let streams = new.server.live_streams;
-        resize(&self.home_streams, &self.home_streams_cap, streams);
-        resize(&self.raw_budget, &self.raw_budget_cap, raw_slots(&new));
-        let apps: Vec<Arc<App>> = self
-            .apps
-            .lock()
-            .map(|g| g.iter().filter_map(Weak::upgrade).collect())
-            .unwrap_or_default();
-        for app in apps {
+        self.jobs.resize(job_slots(&new));
+        self.home_streams.resize(new.server.live_streams);
+        self.raw_budget.resize(raw_slots(&new));
+        for app in self.apps() {
             app.reconfigure(&new);
         }
         restart
@@ -306,8 +341,7 @@ pub(crate) struct App {
     pub(crate) repo: Repo,
     pub(crate) env: Env,
     /// Open `/events` streams, capped by `server.live_streams`.
-    pub(crate) streams: Arc<Semaphore>,
-    streams_cap: Mutex<usize>,
+    pub(crate) streams: Slots,
     /// Change notices for the open streams. Nothing is sent while nobody listens.
     pub(crate) changes: broadcast::Sender<Arc<Change>>,
     pub(crate) stop: watch::Receiver<bool>,
@@ -347,7 +381,7 @@ pub(crate) struct App {
     memo: Mutex<crate::bounded::Bounded<(Instant, Arc<memo::Packed>)>>,
     /// One lock per memo key being rendered, see [`App::render_lock`].
     pub(crate) rendering: Mutex<std::collections::HashMap<String, Arc<tokio::sync::Mutex<()>>>>,
-    dirty: Mutex<Option<(Instant, bool)>>,
+    dirty: DirtyMemo,
     /// Open streams on a page that shows the working tree. Zero means no scan runs.
     pub(crate) wt_watchers: std::sync::atomic::AtomicUsize,
     /// Working tree scans finished so far, counted once the result is recorded: a test that
@@ -382,8 +416,7 @@ impl App {
 
     pub(crate) fn configured(repo: Repo, index: Index, env: &Env) -> Self {
         let name = repo.name();
-        let live_streams = env.cfg().server.live_streams;
-        let streams = Arc::new(Semaphore::new(live_streams));
+        let streams = Slots::new(env.cfg().server.live_streams);
         let cfg = env.cfg();
         index.set_message_index(cfg.index.has_messages);
         Self {
@@ -391,7 +424,6 @@ impl App {
             index,
             env: env.clone(),
             streams,
-            streams_cap: Mutex::new(live_streams),
             changes: broadcast::channel(16).0,
             stop: env.stop.subscribe(),
             _stop_tx: Arc::clone(&env.stop),
@@ -413,7 +445,7 @@ impl App {
             git_ranges: AtomicU64::new(0),
             memo: Mutex::new(crate::bounded::Bounded::new(cfg.cache_bytes(Cache::Pages))),
             rendering: Mutex::new(std::collections::HashMap::new()),
-            dirty: Mutex::new(None),
+            dirty: DirtyMemo::default(),
             wt_watchers: std::sync::atomic::AtomicUsize::new(0),
             wt_scans: AtomicU64::new(0),
             #[cfg(test)]
@@ -490,7 +522,7 @@ impl App {
             cfg.limits.worktree_files,
             (cfg.limits.worktree_diff_kb as u64) << 10,
         );
-        resize(&self.streams, &self.streams_cap, cfg.server.live_streams);
+        self.streams.resize(cfg.server.live_streams);
         if let Ok(mut g) = self.memo.lock() {
             g.clear();
             g.set_budget(cfg.cache_bytes(Cache::Pages));
@@ -507,24 +539,17 @@ impl App {
         if self.public() {
             return false;
         }
-        if let Ok(g) = self.dirty.lock()
-            && let Some((at, v)) = *g
-            && at.elapsed() < DIRTY_TTL
-        {
+        if let Some(v) = self.dirty.get() {
             return v;
         }
         let v = gitterrace_git::is_dirty(&self.repo);
-        if let Ok(mut g) = self.dirty.lock() {
-            *g = Some((Instant::now(), v));
-        }
+        self.dirty.put(v);
         v
     }
 
     /// Records a freshly measured answer so the next event carries it.
     fn set_dirty(&self, v: bool) {
-        if let Ok(mut g) = self.dirty.lock() {
-            *g = Some((Instant::now(), v));
-        }
+        self.dirty.put(v);
     }
 
     /// Drops what a change in the repository can make stale: rendered pages and the dirty chip.
@@ -536,10 +561,8 @@ impl App {
         {
             g.clear();
         }
-        if (moved("head") || moved("refs") || moved("index") || moved("worktree"))
-            && let Ok(mut g) = self.dirty.lock()
-        {
-            *g = None;
+        if moved("head") || moved("refs") || moved("index") || moved("worktree") {
+            self.dirty.clear();
         }
     }
 
