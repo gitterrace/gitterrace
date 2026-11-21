@@ -11,8 +11,8 @@ use crate::{
     error::Result,
     filter::FilterBar,
     fmt::{self},
-    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights, page_scope, period_of},
-    pagehead::{self, PageHead},
+    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights},
+    pagehead::PageHead,
     routes::Shared,
     views::Chrome,
 };
@@ -55,8 +55,7 @@ pub(crate) async fn page(
     cached(&app, "ho", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
-        let period = period_of(&q, &d, Period::All);
-        let scope = page_scope(&q, &d, period);
+        let (period, scope) = q.scoped(&d, Period::All);
         let ins = insights(a, r, scope.options().clone());
         let set = counted(&ins, &scope, r);
         let files = head_lines(a);
@@ -102,11 +101,7 @@ pub(crate) async fn page(
                 pct: if max > 0.0 { (h.score / max * 100.0).max(1.0) as u32 } else { 0 },
             })
             .collect();
-        let patterns = if crate::features::pages().contains(&"patterns") {
-            crate::patterns::section(a, r, &q)
-        } else {
-            String::new()
-        };
+        let patterns = crate::features::section("patterns", || crate::patterns::section(a, r, &q));
         let empty = set.stream().next().is_none();
         let jump = crate::markdown::outline_menu(
             &crate::markdown::section_jumps(&[
@@ -122,10 +117,9 @@ pub(crate) async fn page(
         let mut fb = f.bar("/stats/hotspots", &**r, period);
         fb.jump = jump;
         let lead = crate::lead::hotspots(rep.files.len(), rep.concentration);
-        let toolbar = fb.toolbar(&q.row(&d, "/stats/hotspots"));
         HotspotsPage {
             c,
-            head: pagehead::insights_head("ho", pagehead::lead_tagline(&lead), toolbar),
+            head: fb.head("ho", &lead, &q, &d, "/stats/hotspots"),
             fb,
             empty,
             kpis: vec![

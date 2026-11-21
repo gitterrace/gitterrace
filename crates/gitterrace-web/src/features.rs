@@ -196,6 +196,12 @@ pub(crate) fn pages() -> Vec<&'static str> {
     now(|e| e.map_or_else(|| INSIGHT_PAGES.to_vec(), |e| e.pages.clone()))
 }
 
+/// `html()` when the insights page `name` is served, else empty: a page section left out of
+/// `insights.pages` is not built.
+pub(crate) fn section(name: &str, html: impl FnOnce() -> String) -> String {
+    if pages().contains(&name) { html() } else { String::new() }
+}
+
 pub(crate) fn page_route(page: &str) -> Option<&'static str> {
     INSIGHT_ROUTES.iter().find(|(p, r)| *p == page && !r.starts_with(API)).map(|(_, r)| *r)
 }

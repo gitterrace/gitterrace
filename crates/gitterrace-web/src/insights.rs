@@ -93,6 +93,13 @@ impl InsightsQuery {
         self.opts.own_exclude()
     }
 
+    /// The period in force (`default` when neither the query nor the config names one) and the
+    /// scope it makes with this query's selection and options.
+    pub(crate) fn scoped(&self, d: &Defaults, default: Period) -> (Period, Scope) {
+        let period = period_of(self, d, default);
+        (period, page_scope(self, d, period))
+    }
+
     pub(crate) fn metric(&self) -> Metric {
         self.metric.as_deref().map_or(Metric::Commits, Metric::parse)
     }
@@ -394,12 +401,11 @@ pub(crate) async fn contributors(
     cached(&app, "co", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
-        let period = period_of(&q, &d, Period::All);
+        let (period, scope) = q.scoped(&d, Period::All);
         let mut fb = f.bar("/stats/contributors", &**r, period);
         fb.extra = Some(q.metric_switch(&d));
         // The period is applied by Insights so first-time contributors are judged against all
         // history that the options keep, whatever the selection.
-        let scope = page_scope(&q, &d, period);
         let ins = insights(a, r, scope.options().clone());
         let metric = q.metric();
         let report = counted(&ins, &scope, r).contributors(metric);
@@ -450,10 +456,12 @@ pub(crate) async fn contributors(
         ContributorsPage {
             unit: report.unit.noun(),
             c,
-            head: crate::pagehead::insights_head(
+            head: fb.head(
                 "co",
-                crate::pagehead::lead_tagline(&crate::lead::contributors(total, new_total)),
-                fb.toolbar(&q.row(&d, "/stats/contributors")),
+                &crate::lead::contributors(total, new_total),
+                &q,
+                &d,
+                "/stats/contributors",
             ),
             fb,
             kpis: vec![

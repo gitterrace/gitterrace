@@ -9,7 +9,7 @@ use crate::{
     error::Result,
     filter::{Dim, FilterBar},
     fmt::{self},
-    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights, page_scope, period_of},
+    insights::{InsightsQuery, Kpi, cached, counted, head_lines, insights},
     pagehead::PageHead,
     routes::Shared,
     views::Chrome,
@@ -64,7 +64,7 @@ pub(crate) async fn page(
     cached(&app, "ow", raw, move |a, r, c| {
         let f = &q.filter;
         let d = a.defaults();
-        let scope = page_scope(&q, &d, period_of(&q, &d, Period::All));
+        let (period, scope) = q.scoped(&d, Period::All);
         let ins = insights(a, r, scope.options().clone());
         let files = head_lines(a);
         let rep =
@@ -86,18 +86,20 @@ pub(crate) async fn page(
         let mut rows = vec![row(&rep.overall, "(whole repository)".to_owned())];
         rows.extend(rep.dirs.iter().take(TOP_DIRS).map(|d| row(d, dir_label(&d.path))));
         let solo = sole_owner(&rows);
-        let fb = f.bar("/stats/ownership", &**r, period_of(&q, &d, Period::All));
+        let fb = f.bar("/stats/ownership", &**r, period);
         OwnershipPage {
             solo,
             c,
-            head: crate::pagehead::insights_head(
+            head: fb.head(
                 "ow",
-                crate::pagehead::lead_tagline(&crate::lead::ownership(
+                &crate::lead::ownership(
                     rep.overall.bus_factor,
                     rep.overall.owners.iter().filter(|o| shown(o)).count(),
                     rep.dirs_with_bus_factor_one,
-                )),
-                fb.toolbar(&q.row(&d, "/stats/ownership")),
+                ),
+                &q,
+                &d,
+                "/stats/ownership",
             ),
             fb,
             kpis: vec![

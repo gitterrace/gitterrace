@@ -8,7 +8,7 @@ use crate::{
     charts,
     empty::Empty,
     fmt::{self, enc_seg, href},
-    insights::{InsightsQuery, Src, counted, head_lines, insights, page_scope, period_of},
+    insights::{InsightsQuery, Src, counted, head_lines, insights, page_scope},
 };
 
 const TOP_PAIRS: usize = 30;
@@ -45,8 +45,7 @@ struct PatternsSection {
 pub(crate) fn section(a: &crate::app::App, r: &Src, q: &InsightsQuery) -> String {
     {
         let defaults = a.defaults();
-        let period = period_of(q, &defaults, Period::All);
-        let scope = page_scope(q, &defaults, period);
+        let (_, scope) = q.scoped(&defaults, Period::All);
         let whole = insights(a, r, scope.options().clone());
         let set = counted(&whole, &scope, r);
         let files = head_lines(a);

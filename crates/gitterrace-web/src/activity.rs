@@ -244,16 +244,11 @@ pub(crate) async fn page(
             let (from, to) = (gitterrace_git::ymd(from), gitterrace_git::ymd(to));
             range_card(&from, &to, &rhythm.by_weekday)
         });
-        let types_html = if crate::features::pages().contains(&"types") {
+        let types_html = crate::features::section("types", || {
             crate::commit_types::section(a, &q, lp.page.as_deref(), sec_set, sec_fold)
-        } else {
-            String::new()
-        };
-        let frequency_html = if crate::features::pages().contains(&"frequency") {
-            crate::frequency::section(sec_fold)
-        } else {
-            String::new()
-        };
+        });
+        let frequency_html =
+            crate::features::section("frequency", || crate::frequency::section(sec_fold));
         fb.jump = crate::markdown::outline_menu(
             &crate::markdown::section_jumps(&[
                 ("activity-counts", "Counts", true),
@@ -270,11 +265,7 @@ pub(crate) async fn page(
             types: types_html,
             frequency: frequency_html,
             c,
-            head: crate::pagehead::insights_head(
-                "a",
-                crate::pagehead::lead_tagline(&lead),
-                fb.toolbar(&q.row(&d, "/stats")),
-            ),
+            head: fb.head("a", &lead, &q, &d, "/stats"),
             fb,
             rows,
             span,

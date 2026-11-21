@@ -385,6 +385,22 @@ struct ToolbarMarkup<'a> {
 impl FilterBar {
     /// The page head's toolbar: the period, the page's own choice, the options line and
     /// "On this page", as markup.
+    /// The page head of insights tab `tab` with `lead` as its finding, this bar as the toolbar.
+    pub(crate) fn head(
+        &self,
+        tab: &str,
+        lead: &str,
+        q: &crate::insights::InsightsQuery,
+        d: &crate::insights::Defaults,
+        base: &str,
+    ) -> crate::pagehead::PageHead {
+        crate::pagehead::insights_head(
+            tab,
+            crate::pagehead::lead_tagline(lead),
+            self.toolbar(&q.row(d, base)),
+        )
+    }
+
     pub(crate) fn toolbar(&self, opts: &[OptLink]) -> String {
         ToolbarMarkup { fb: self, opts }.render().unwrap_or_default()
     }
