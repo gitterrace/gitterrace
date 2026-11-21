@@ -55,7 +55,13 @@ async fn default_is_commits_and_unchanged() {
     assert!(!page.contains("tsb\""), "no bar by default");
     assert!(page.contains("metric=added"), "the switch shows by default");
     let junk = ready(&r, "/stats/contributors?metric=bogus").await;
-    assert_eq!(page, junk, "an unknown metric is the default");
+    // The repo switcher's target repeats the query as typed, so compare without it.
+    let plain = |p: &str| {
+        p.split("data-switch=\"")
+            .map(|s| s.split_once('"').map_or(s, |x| x.1).to_owned())
+            .collect::<String>()
+    };
+    assert_eq!(plain(&page), plain(&junk), "an unknown metric is the default");
 }
 
 #[tokio::test(flavor = "multi_thread")]

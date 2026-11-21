@@ -78,6 +78,8 @@
     x.addEventListener("click", closeOverlay);
     head.appendChild(x);
     box.appendChild(head);
+    var sw = document.getElementById("reposwitch");
+    box.dataset.switch = sw ? sw.dataset.switch || "" : "";
     var here = STATIC ? location.href : B.replace(/\/$/, "") + "/";
     var p = listPicker(box, "Filter repositories", function (q) {
       return (repos || []).filter(function (x) {
@@ -92,7 +94,11 @@
       txt.appendChild(el("span", "name", it.name));
       txt.appendChild(whenEl(it.when, "dir"));
       li.appendChild(txt);
-    }, function (it) { location.href = it.href; }, "Enter to open", "No repositories match");
+    }, function (it) {
+      // The server computed where this view lives in another repository (data-switch).
+      var to = STATIC ? "" : (box.dataset.switch || "");
+      location.href = it.href + (to.charAt(0) === "/" ? to.slice(1) : "");
+    }, "Enter to open", "No repositories match");
     n.ov.place(box, btn);
     if (repos) p.refresh();
     else load(function (l) { repos = l; p.refresh(); });

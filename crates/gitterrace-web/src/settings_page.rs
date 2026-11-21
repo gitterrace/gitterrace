@@ -273,6 +273,7 @@ fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::C
             search: first.is_some() && crate::features::on(Feature::Search),
             picker: crate::features::on(Feature::Picker),
             many: env.served() > 1,
+            switch: "/".to_owned(),
         },
         search_base: first,
         off: crate::features::scripted_off(),

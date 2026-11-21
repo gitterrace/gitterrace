@@ -71,6 +71,7 @@ pub fn markdown_options() -> pulldown_cmark::Options {
 mod spark;
 #[cfg(test)]
 mod state_tests;
+mod switch;
 mod symbols;
 #[cfg(test)]
 mod symbols_wiring_tests;

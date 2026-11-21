@@ -143,7 +143,15 @@ thread_local! {
     static REV: std::cell::RefCell<String> = std::cell::RefCell::new("HEAD".to_owned());
 }
 
+thread_local! {
+    /// Repository-relative target the repo switcher links to, for the request on this thread.
+    static SWITCH: std::cell::RefCell<String> = std::cell::RefCell::new("/".to_owned());
+}
+
 tokio::task_local! {
+    /// Where the switcher sends the request served, copied into [`SWITCH`] by `app::blocking`.
+    pub(crate) static REQUEST_SWITCH: String;
+
     /// `?rev=` of the request being served, copied into [`REV`] by `app::blocking`.
     pub(crate) static REQUEST_REV: String;
 }
@@ -215,6 +223,16 @@ pub(crate) fn rev_param(query: Option<&str>) -> String {
         })
         .filter(|v| !v.is_empty())
         .unwrap_or_else(|| "HEAD".to_owned())
+}
+
+/// Where the repo switcher goes from this page, relative to the other repository's base.
+pub(crate) fn switch_target() -> String {
+    SWITCH.with(|s| s.borrow().clone())
+}
+
+/// Runs `f` with [`switch_target`] answering `target`.
+pub(crate) fn with_switch<T>(target: &str, f: impl FnOnce() -> T) -> T {
+    scoped(&SWITCH, target.to_owned(), f)
 }
 
 /// Prefix `href` adds on this thread, for templates and the JS meta tag.

@@ -115,7 +115,8 @@ async fn a_single_repository_lives_under_its_name() {
     let (_, body) = fetch(&router, "/r/solo/", "localhost").await;
     assert!(body.contains("href=\"/r/solo/log/HEAD\""));
     assert!(body.contains("<meta name=\"gt-base\" content=\"/r/solo\">"));
-    assert!(body.contains("id=\"reposwitch\" hidden"), "one repository, no switcher");
+    let hidden = "id=\"reposwitch\" data-switch=\"/\" hidden";
+    assert!(body.contains(hidden), "one repository, no switcher");
     assert_eq!(fetch(&router, "/log/HEAD", "localhost").await.0, 404, "no unprefixed pages");
 }
 
@@ -165,4 +166,17 @@ async fn the_repositories_home_filters_by_name_on_the_server() {
     let (_, zero) = fetch(&router, "/?q=zzz", "localhost").await;
     assert!(zero.contains(">0 of 2<"), "{zero}");
     assert!(!zero.contains("repos-none\" hidden"), "{zero}");
+}
+
+#[tokio::test]
+async fn the_repo_switcher_keeps_the_view_unless_it_is_pinned_to_a_revision() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let a = fixture("alpha", dir.path());
+    let b = fixture("beta", dir.path());
+    let router = crate::multi_router(vec![a, b]).expect("router");
+    let (s, body) = fetch(&router, "/r/alpha/stats/hotspots?period=1m", "localhost").await;
+    assert_eq!(s, 200);
+    assert!(body.contains(r#"data-switch="/stats/hotspots?period=1m""#), "{body}");
+    let (_, body) = fetch(&router, "/r/alpha/commit/HEAD", "localhost").await;
+    assert!(body.contains(r#"data-switch="/""#));
 }

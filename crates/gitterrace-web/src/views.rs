@@ -150,7 +150,7 @@ pub(crate) enum Owner {
 }
 
 /// The top bar's tools a `[features]` switch can take away.
-#[derive(Clone, Copy, Default)]
+#[derive(Clone, Default)]
 pub(crate) struct Tools {
     /// `features.search_enabled`: the search button and the field it opens.
     pub(crate) search: bool,
@@ -158,6 +158,8 @@ pub(crate) struct Tools {
     pub(crate) picker: bool,
     /// The server serves more than one repository, so the switcher shows from the first paint.
     pub(crate) many: bool,
+    /// Where the switcher goes in another repository: this page's view when it can have it.
+    pub(crate) switch: String,
 }
 
 #[derive(Debug, Clone)]
@@ -266,6 +268,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             search: crate::features::on(Feature::Search),
             picker: crate::features::on(Feature::Picker),
             many: app.env.served() > 1,
+            switch: crate::fmt::switch_target(),
         },
         off: crate::features::scripted_off(),
         settings: app.settings_on() && crate::features::on(Feature::Settings),

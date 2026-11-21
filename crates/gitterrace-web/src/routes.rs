@@ -98,7 +98,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
 /// Makes `?rev=` the selected ref for everything the request renders.
 async fn selected_rev(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let rev = fmt::rev_param(req.uri().query());
-    fmt::REQUEST_REV.scope(rev, next.run(req)).await
+    let switch = crate::switch::target(req.uri().path(), req.uri().query());
+    fmt::REQUEST_SWITCH.scope(switch, fmt::REQUEST_REV.scope(rev, next.run(req))).await
 }
 
 fn page<T: Template>(t: &T) -> Result<Html<String>> {

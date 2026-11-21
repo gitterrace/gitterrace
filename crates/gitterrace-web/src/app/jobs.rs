@@ -12,6 +12,8 @@ pub(crate) async fn blocking<T: Send + 'static>(
 ) -> Result<T> {
     let app = Arc::clone(app);
     let rev = crate::fmt::REQUEST_REV.try_with(Clone::clone).unwrap_or_else(|_| "HEAD".to_owned());
+    let switch =
+        crate::fmt::REQUEST_SWITCH.try_with(Clone::clone).unwrap_or_else(|_| "/".to_owned());
     // Moved into the job, so a cancelled request cannot free the slot while git still runs.
     let slot = Arc::clone(&app.env.jobs)
         .acquire_owned()
@@ -25,7 +27,9 @@ pub(crate) async fn blocking<T: Send + 'static>(
         let _slot = slot;
         crate::features::with(on, || {
             crate::fmt::with_dates(absolute, || {
-                crate::fmt::with_base(&app.base, || crate::fmt::with_rev(&rev, || f(&app)))
+                crate::fmt::with_base(&app.base, || {
+                    crate::fmt::with_rev(&rev, || crate::fmt::with_switch(&switch, || f(&app)))
+                })
             })
         })
     })
