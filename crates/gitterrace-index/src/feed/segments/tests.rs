@@ -243,7 +243,7 @@ fn near_max(s: &mut Strings, recs: &[&CommitRecord], k: usize) -> (Aggregates, P
 }
 
 /// Two segments whose stored counters each sit near `u64::MAX`: summing them (the read of an
-/// unmerged set, and the merge) is an unreadable cache, never a panic, a wrapped number or a
+/// unmerged set) is an unreadable cache, never a panic, a wrapped number or a
 /// saturated one. Every counter field of every aggregate table is tried in turn, so a new
 /// sum written with a plain `+=` fails here.
 #[test]
@@ -255,7 +255,6 @@ fn counters_near_max_in_two_segments_are_unreadable() -> SegResult<()> {
         let dir = tempfile::tempdir()?;
         let mut s = Strings::default();
         let mut segs = Vec::new();
-        let mut parts = Vec::new();
         for n in 0..2 {
             let (a, p) = near_max(&mut s, &all, k);
             let name = format!("seg-1-{n}.gts");
@@ -266,7 +265,6 @@ fn counters_near_max_in_two_segments_are_unreadable() -> SegResult<()> {
             })?;
             w.finish()?;
             segs.push(Container::open(dir.path(), &name, Kind::Segment)?);
-            parts.push((a, p));
         }
         let got = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             let src = SegmentSource::new(MemorySource::new(&recs), segs);
@@ -278,20 +276,6 @@ fn counters_near_max_in_two_segments_are_unreadable() -> SegResult<()> {
         let failure =
             failure.unwrap_or_else(|| panic!("counter {k}: a summed-past-u64 read was served"));
         assert!(failure.0.contains(crate::seg::agg::SUM_OVER), "counter {k}: {failure}");
-        // The merge of the same two parts.
-        let n = crate::seg::merge::Renumber::new(&s, std::iter::empty());
-        let merge_parts: Vec<crate::seg::merge::Part<'_>> = parts
-            .iter()
-            .map(|(a, p)| crate::seg::merge::Part { agg: a, postings: p, rank: &ranks })
-            .collect();
-        let merged = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            crate::seg::merge::aggregates(&merge_parts, &n).map(|_| ())
-        }))
-        .unwrap_or_else(|_| panic!("counter {k}: the merge panicked"));
-        assert!(
-            merged.as_ref().is_err_and(crate::seg::SegError::is_unreadable),
-            "counter {k}: the merge gave {merged:?}"
-        );
     }
     Ok(())
 }

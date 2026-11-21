@@ -35,7 +35,8 @@ pub(crate) struct Postings {
 }
 
 impl Postings {
-    /// Tables already in canonical numbering (a merge result).
+    /// Tables already in canonical numbering.
+    #[cfg(test)]
     pub(crate) fn from_parts(
         by_path: Vec<Vec<Hit>>,
         by_author: Vec<Vec<u32>>,
@@ -47,13 +48,7 @@ impl Postings {
 
     /// Folds the next record of the canonical order. `who` and `paths` come from
     /// [`Strings::ids`].
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the build spills path hits, the whole-table push serves merge tests"
-        )
-    )]
+    #[cfg(test)]
     pub(crate) fn push(&mut self, strings: &Strings, r: &CommitRecord, who: u32, paths: &[u32]) {
         self.fold(strings, r, who, paths, true);
     }

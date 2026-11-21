@@ -9,14 +9,6 @@ pub mod canon;
 pub mod format;
 pub(crate) mod io;
 pub mod manifest;
-#[cfg_attr(
-    not(test),
-    expect(
-        dead_code,
-        reason = "every update writes one fresh segment, so nothing merges yet (step 2)"
-    )
-)]
-pub(crate) mod merge;
 pub(crate) mod postings;
 pub mod read;
 pub(crate) mod spill;
