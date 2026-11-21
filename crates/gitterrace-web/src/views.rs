@@ -124,6 +124,8 @@ pub(crate) struct Chrome {
     pub(crate) actions: Option<(String, String)>,
     /// Which of the top bar's switchable tools the page shows.
     pub(crate) tools: Tools,
+    /// The running release, shown small at the foot of the menu.
+    pub(crate) release: &'static str,
     /// Where the search form points when the page has no repository of its own (the settings
     /// page): the first served repository's prefix. `None` means the page's own `base`.
     pub(crate) search_base: Option<String>,
@@ -282,6 +284,7 @@ impl Chrome {
             },
             has_line_hover: cfg.display.has_line_hover,
             diff: DiffLook::of(&cfg.display),
+            release: env!("CARGO_PKG_VERSION"),
             ..Self::default()
         }
     }

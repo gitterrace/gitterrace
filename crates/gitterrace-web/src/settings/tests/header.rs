@@ -27,8 +27,9 @@ async fn two_repos(root: &Path, dir: &Path) -> axum::Router {
 }
 
 /// Every page kind carries the shared top bar: brand, repository switcher with several
-/// repositories, theme button and tab row; repository pages add the branch switcher, the server's own page
-/// leaves out only what needs a repository. A page with a header of its own fails here.
+/// repositories, theme button and tab row; repository pages add the branch switcher, the
+/// server's own page leaves out only what needs a repository. A page with a header of its own
+/// fails here.
 #[tokio::test]
 async fn every_page_kind_renders_the_shared_header() {
     let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
@@ -86,4 +87,15 @@ async fn the_settings_page_searches_the_first_served_repository() {
     assert!(html.contains("class=\"topsearch\" action=\"/r/"), "{html}");
     assert!(html.contains("/search\""));
     assert!(html.contains("id=\"searchbtn\""));
+}
+
+#[tokio::test]
+async fn every_page_carries_the_release_for_the_menu() {
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
+    let app = two_repos(root.path(), dir.path()).await;
+    let want = format!("name=\"gt-release\" content=\"{}\"", env!("CARGO_PKG_VERSION"));
+    for uri in ["/r/r/", "/_settings"] {
+        let (_, html) = page(&app, uri).await;
+        assert!(html.contains(&want), "{uri}: no release meta");
+    }
 }

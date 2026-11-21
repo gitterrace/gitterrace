@@ -146,6 +146,9 @@ an add.
    second.
 
 Good to know: Settings is never on a public server or in an export.
+The actions menu (`.`) ends with the running version, small and muted.
+Search works on the Settings page too: it looks through the first
+repository served and stays off with `features.search_enabled = false`.
 `features.settings_enabled = false` removes it. `display.diff_palette = "colorblind"` marks diff additions blue and
 removals orange instead of green and red.
 `display.has_diff_wrap`, `display.diff_tab_chars` and `display.diff_font_px` wrap diff

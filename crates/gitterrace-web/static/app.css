@@ -1,6 +1,5 @@
 /* gitterrace app styles. Colors, sizes and timings come from tokens.css only. */
-*{box-sizing:border-box}
-html{scrollbar-gutter:stable;-webkit-text-size-adjust:100%}
+*{box-sizing:border-box}html{scrollbar-gutter:stable;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-base)/var(--leading) var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--accent-fg);text-decoration:none;text-underline-offset:3px}a:hover{text-decoration:underline}
 /* --focus is opaque (3:1 on every surface, `cargo xtask check`); --ring is a tint for fills. */
@@ -540,8 +539,9 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.off{opacity:.5;cursor:default}
 .actmenu .ov-list li.busy .name::after{content:" \2026"}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
-.actmenu .ov-list li.keynote{cursor:default;font-size:var(--text-xs);
-  color:var(--muted);border-top:var(--border);margin-top:var(--space-1);padding-top:var(--space-2)}
+.actmenu .ov-list li.keynote{cursor:default;font-size:var(--text-xs);color:var(--muted);
+  border-top:var(--border);margin-top:var(--space-1);padding-top:var(--space-2)}
+.actmenu .ov-list .version{cursor:auto;font-size:var(--text-2xs);color:var(--faint);padding-top:0}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
 .actmenu .ov-list li.hint a{color:var(--muted)}
 .actmenu .ov-list li.grp{cursor:default;padding:6px var(--space-3) 2px;font:var(--weight-semibold) var(--text-2xs)/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}

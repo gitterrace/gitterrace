@@ -347,6 +347,12 @@
     var note = el("li", "keynote", "Keys work while this menu is open");
     note.setAttribute("role", "presentation");
     list.appendChild(note);
+    var rel = document.querySelector('meta[name="gt-release"]');
+    if (rel && rel.content) {
+      var ver = el("li", "version", "gitterrace v" + rel.content);
+      ver.setAttribute("role", "presentation");
+      list.appendChild(ver);
+    }
     var sel = 0;
     function focus(i) {
       sel = Math.max(0, Math.min(items.length - 1, i));
