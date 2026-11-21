@@ -15,6 +15,7 @@ pub(crate) mod spill;
 pub mod strings;
 pub mod write;
 
+use std::borrow::Cow;
 use std::fmt;
 
 /// A commit id, raw bytes.
@@ -53,7 +54,7 @@ pub enum SegError {
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
     #[error("unreadable cache file {file} at offset {offset}: {what}")]
-    Unreadable { file: String, offset: u64, what: &'static str },
+    Unreadable { file: String, offset: u64, what: Cow<'static, str> },
     #[error("{kind} of {len} bytes exceeds the {max} byte limit")]
     TooLong { kind: &'static str, len: usize, max: usize },
     #[error("invalid cache file name {0:?}")]
@@ -61,8 +62,12 @@ pub enum SegError {
 }
 
 impl SegError {
-    pub(crate) fn unreadable(file: impl fmt::Display, offset: u64, what: &'static str) -> Self {
-        Self::Unreadable { file: file.to_string(), offset, what }
+    pub(crate) fn unreadable(
+        file: impl fmt::Display,
+        offset: u64,
+        what: impl Into<Cow<'static, str>>,
+    ) -> Self {
+        Self::Unreadable { file: file.to_string(), offset, what: what.into() }
     }
 
     /// True when the cache must be deleted and rebuilt.

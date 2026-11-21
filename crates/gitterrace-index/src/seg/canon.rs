@@ -12,6 +12,8 @@
 //! the last life the name had with `HOLDS` set while it still holds it, then one per life,
 //! its last name with `HOLDS` set while that name still holds it (the life is live).
 
+use rustc_hash::FxHashSet as FastSet;
+
 use crate::CommitRecord;
 #[cfg(any(test, feature = "oracle"))]
 use crate::seg::agg::add_count;
@@ -33,6 +35,58 @@ pub(crate) struct Lives {
     name: Vec<u32>,
 }
 
+/// Ids met so far in one commit: a short list scanned linearly, a set past `SMALL`, so a
+/// commit of n files costs O(n) and not O(n^2).
+#[derive(Debug, Default)]
+pub(crate) struct Seen {
+    small: Vec<u32>,
+    set: FastSet<u32>,
+}
+
+const SMALL: usize = 16;
+
+#[cfg(test)]
+thread_local! {
+    /// Linear comparisons made, the counted work the quadratic regression test bounds.
+    static SCANNED: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Test hook: comparisons made since the last call.
+#[cfg(test)]
+pub(crate) fn take_scanned() -> usize {
+    SCANNED.with(|c| c.replace(0))
+}
+
+impl Seen {
+    pub(crate) fn new() -> Self {
+        Self::default()
+    }
+
+    pub(crate) fn contains(&self, v: u32) -> bool {
+        if self.set.is_empty() {
+            #[cfg(test)]
+            SCANNED.with(|c| c.set(c.get() + self.small.len()));
+            self.small.contains(&v)
+        } else {
+            self.set.contains(&v)
+        }
+    }
+
+    /// True when `v` was not there before.
+    pub(crate) fn insert(&mut self, v: u32) -> bool {
+        if self.contains(v) {
+            return false;
+        }
+        if self.set.is_empty() && self.small.len() < SMALL {
+            self.small.push(v);
+        } else {
+            self.set.extend(self.small.drain(..));
+            self.set.insert(v);
+        }
+        true
+    }
+}
+
 impl Lives {
     /// Life of every row of one record (`paths` from `Strings::ids`, `olds` the old-name ids),
     /// then the state after it. Merges change nothing and get no lives.
@@ -51,16 +105,17 @@ impl Lives {
         }
         let held = |v: u32| (v != NONE && v & HOLDS != 0).then_some(v & !HOLDS);
         let mut out = Vec::with_capacity(paths.len());
-        let mut claimed: Vec<u32> = Vec::new();
+        // Lives handed out in this commit: the rows' lives are exactly what was claimed.
+        let mut claimed = Seen::new();
         for (row, &p) in paths.iter().enumerate() {
             let from = olds.get(row).copied().flatten().unwrap_or(p);
             let life = match held(self.by_name[from as usize]) {
-                Some(l) if !claimed.contains(&l) => l,
+                Some(l) if !claimed.contains(l) => l,
                 // Same name twice in one commit: one touch, one life.
-                Some(l) if from == p && out.contains(&l) => l,
+                Some(l) if from == p => l,
                 _ => self.start(p),
             };
-            claimed.push(life);
+            claimed.insert(life);
             out.push(life);
         }
         // Releases first, so a swap or a rename onto a freed name ends held.

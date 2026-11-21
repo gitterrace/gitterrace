@@ -1,0 +1,17 @@
+id: no-box-leak
+language: rust
+severity: error
+message: '`Box::leak` outside tests: the memory is never freed.'
+note: >-
+  Carry the text in an owned or `Cow` field instead of leaking it to get a `&'static`.
+files: [crates/**/*.rs, xtask/**/*.rs]
+ignores: [crates/**/tests/**, crates/**/tests.rs, crates/**/*_tests.rs]
+rule:
+  any:
+    - pattern: Box::leak($$$A)
+    # Macro bodies are bare tokens, invisible to the pattern above.
+    - kind: token_tree
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
+      regex: '\bBox::leak\s*\('
+  not:
+    inside: {stopBy: end, kind: mod_item, has: {kind: identifier, regex: '^tests$'}}

@@ -12,6 +12,7 @@ use rustc_hash::FxHashMap as FastMap;
 use crate::CommitRecord;
 use crate::seg::bounds::{Cursor, MAX_BLOCK, put_varint, unzigzag, zigzag};
 use crate::seg::canon::Lives;
+use crate::seg::canon::Seen;
 use crate::seg::format::section;
 use crate::seg::{SegError, SegResult, Sink};
 
@@ -128,23 +129,17 @@ impl Aggregates {
         let lives = self.lives.push(r, paths, olds);
         let month = local_month(day);
         // A commit touches a path, and a life, once even if a rename lists it twice.
-        let mut seen: Vec<u32> = Vec::with_capacity(paths.len());
-        let mut seen_life: Vec<u32> = Vec::with_capacity(paths.len());
+        let mut seen = Seen::new();
+        let mut seen_life = Seen::new();
         for ((f, &p), &l) in r.files.iter().zip(paths).zip(&lives) {
             ad.lines.add_file(f);
-            let first = !seen.contains(&p);
-            if first {
-                seen.push(p);
-            }
+            let first = seen.insert(p);
             let pa = self.path_author.entry((p, who)).or_default();
             pa.lines.add_file(f);
             if first {
                 pa.touches += 1;
             }
-            let first = !seen_life.contains(&l);
-            if first {
-                seen_life.push(l);
-            }
+            let first = seen_life.insert(l);
             let lm = self.life_month.entry((l, month)).or_default();
             let la = self.life_author.entry((l, who)).or_default();
             lm.lines.add_file(f);

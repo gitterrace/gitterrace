@@ -131,3 +131,22 @@ fn aggregates_round_trip_through_blocks() {
     let mut c = Cursor::new(&b[..b.len() - 1], "t", 0);
     assert!(super::decode_author_day(&mut c, *n, |_, _, _| Some(())).is_err(), "{s}");
 }
+
+#[test]
+fn a_20k_file_commit_dedupes_in_linear_work_and_matches_the_per_row_result() {
+    let files: Vec<_> = (0..20_000).map(|i| file(&format!("d/f{i}.rs"), 1, 0, 1)).collect();
+    let mut twice = files.clone();
+    twice.extend(files[..50].iter().cloned());
+    let r = rec("a", "Ann", 0, twice);
+    let mut s = crate::seg::agg::Strings::default();
+    let (who, paths) = s.ids(&r);
+    let olds = vec![None; r.files.len()];
+    let mut agg = Aggregates::default();
+    crate::seg::canon::take_scanned();
+    agg.push(&r, who, &paths, &olds);
+    // Quadratic dedupe would compare ~4e8 ids. A few per row is the linear bound.
+    assert!(crate::seg::canon::take_scanned() < 20 * r.files.len());
+    assert_eq!(agg.path_author.len(), 20_000);
+    assert_eq!(agg.path_author[&(0, who)].touches, 1);
+    assert_eq!(agg.path_author[&(0, who)].lines.add, 2);
+}

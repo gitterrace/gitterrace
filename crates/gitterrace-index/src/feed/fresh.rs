@@ -16,7 +16,7 @@ pub const FRESH_CAP: usize = 2000;
 pub(crate) enum Walk {
     /// The unindexed commits (canonical order among themselves) and the indexed ranks where
     /// the walk met the set.
-    Done(Fresh, Vec<Rank>),
+    Done(Box<Fresh>, Vec<Rank>),
     /// More than the cap: how many were read before stopping.
     TooFar(usize),
 }
@@ -36,6 +36,8 @@ pub(crate) struct Fresh {
     pub(crate) paths: Vec<Arc<str>>,
     pub(crate) idents: Vec<(Arc<str>, Arc<str>)>,
     pub(crate) labels: Vec<Arc<str>>,
+    path_at: HashMap<Arc<str>, usize>,
+    label_at: HashMap<Arc<str>, usize>,
 }
 
 /// Reads `tip` and its ancestors from git until each path meets the set of `base`, at most
@@ -119,7 +121,7 @@ pub(crate) fn walk(
         let parents = r.parents.iter().map(|p| p.as_str().into()).collect();
         f.rows.push(FreshRow { row, id, parents, files });
     }
-    Ok(Walk::Done(f, met))
+    Ok(Walk::Done(Box::new(f), met))
 }
 
 /// Labels have no count on the seam, so new ones start past the last id the set names.
@@ -140,10 +142,12 @@ impl Fresh {
         if let Some(id) = base.path_id(p) {
             return id;
         }
-        if let Some(i) = self.paths.iter().position(|q| &**q == p) {
+        if let Some(&i) = self.path_at.get(p) {
             return PathId(next_id(base.paths(), i));
         }
-        self.paths.push(p.into());
+        let a: Arc<str> = p.into();
+        self.path_at.insert(a.clone(), self.paths.len());
+        self.paths.push(a);
         PathId(next_id(base.paths(), self.paths.len() - 1))
     }
 
@@ -151,10 +155,12 @@ impl Fresh {
         if let Some(id) = base.label_id(l) {
             return id;
         }
-        if let Some(i) = self.labels.iter().position(|q| &**q == l) {
+        if let Some(&i) = self.label_at.get(l) {
             return LabelId(next_id(label_count(base), i));
         }
-        self.labels.push(l.into());
+        let a: Arc<str> = l.into();
+        self.label_at.insert(a.clone(), self.labels.len());
+        self.labels.push(a);
         LabelId(next_id(label_count(base), self.labels.len() - 1))
     }
 
@@ -172,5 +178,30 @@ impl Fresh {
         }
         self.idents.push((shown.0.as_str().into(), shown.1.as_str().into()));
         IdentId(next_id(n, self.idents.len() - 1))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Fresh;
+    use crate::feed::{InsightsSource, MemorySource};
+
+    #[test]
+    fn fresh_ids_of_2000_distinct_paths_come_from_the_map_in_first_use_order() {
+        let base = MemorySource::new(&[]);
+        let mut f = Fresh::default();
+        for round in 0..2 {
+            for i in 0..2000u32 {
+                let id = f.path_id(&base, &format!("dir/f{i}.rs"));
+                assert_eq!(id.0, i + u32::try_from(base.paths()).unwrap_or(0), "round {round}");
+            }
+        }
+        assert_eq!((f.paths.len(), f.path_at.len()), (2000, 2000));
+        for i in 0..2000u32 {
+            let id = f.label_id(&base, &format!("l{i}"));
+            assert_eq!(f.label_at.len(), f.labels.len());
+            let at = (id.0 as usize) - super::label_count(&base);
+            assert_eq!(f.labels[at].as_ref(), format!("l{i}"));
+        }
     }
 }

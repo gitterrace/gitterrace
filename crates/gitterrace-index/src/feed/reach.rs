@@ -60,7 +60,7 @@ pub fn rev_view<S: InsightsSource>(
     let (fresh, seeds) = match base.find_commit(tip).map_err(SourceError::io)? {
         Some(r) => (Fresh::default(), vec![r]),
         None => match fresh::walk(&base, src, rev, tip, cap)? {
-            Walk::Done(f, met) => (f, met),
+            Walk::Done(f, met) => (*f, met),
             Walk::TooFar(read) => return Ok(RevView::NeedsReindex { read }),
         },
     };

@@ -80,18 +80,12 @@ pub(crate) fn stage(dir: &Path, m: &mut Manifest) -> SegResult<()> {
     let name = format!("tip-{}.gts", m.generation);
     let entry = write(dir, &name, &src, old.as_ref(), m)?;
     if let Some(e) = src.failure() {
-        return Err(SegError::unreadable(&name, 0, leak(e.0)));
+        return Err(SegError::unreadable(&name, 0, e.0));
     }
     let msg = Kind::Messages as u8;
     let at = m.live.iter().position(|f| f.kind == msg).unwrap_or(m.live.len());
     m.live.insert(at, entry);
     Ok(())
-}
-
-/// A source error's text as the static reason [`SegError::unreadable`] takes. Only reached when
-/// a build met a broken cache, which then is deleted and rebuilt, so the leak is once per wipe.
-fn leak(s: String) -> &'static str {
-    Box::leak(s.into_boxed_str())
 }
 
 /// The newest retired tip file of `m` that covers a prefix of `oids`, with its commit count.

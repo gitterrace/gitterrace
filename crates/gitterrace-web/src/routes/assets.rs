@@ -102,22 +102,21 @@ fn served_source(name: &str, body: &str) -> String {
 /// The assets as served, built once: every stylesheet minified, and `tokens.css` with its font
 /// URLs carrying the version too, so a new font is fetched.
 fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
-    static SERVED: std::sync::LazyLock<std::collections::HashMap<&'static str, &'static str>> =
+    static SERVED: std::sync::LazyLock<std::collections::HashMap<&'static str, String>> =
         std::sync::LazyLock::new(|| {
             TABLE
                 .iter()
                 .filter(|(_, kind, _)| *kind == CSS)
                 .map(|(name, _, body)| {
                     let body = served_source(name, body);
-                    let min: &'static str = Box::leak(crate::minify::css(&body).into_boxed_str());
-                    (*name, min)
+                    (*name, crate::minify::css(&body))
                 })
                 .collect()
         });
     if kind != CSS {
         return body;
     }
-    SERVED.get(name).copied().unwrap_or(body)
+    SERVED.get(name).map_or(body, String::as_str)
 }
 
 /// The stylesheets every page loads, joined in cascade order into one request each: `base.css`
@@ -135,7 +134,7 @@ const BUNDLES: [(&str, &[&str]); 3] = [
 
 /// The bundle `name` as served, minified, or `None` for a name that is no bundle.
 fn bundled(name: &str) -> Option<&'static str> {
-    static BUILT: std::sync::LazyLock<Vec<(&'static str, &'static str)>> =
+    static BUILT: std::sync::LazyLock<Vec<(&'static str, String)>> =
         std::sync::LazyLock::new(|| {
             BUNDLES
                 .iter()
@@ -146,12 +145,11 @@ fn bundled(name: &str) -> Option<&'static str> {
                         .map(|(n, _, b)| served_source(n, b))
                         .collect::<Vec<_>>()
                         .join("\n");
-                    let min: &'static str = Box::leak(crate::minify::css(&all).into_boxed_str());
-                    (*name, min)
+                    (*name, crate::minify::css(&all))
                 })
                 .collect()
         });
-    BUILT.iter().find(|(n, _)| *n == name).map(|(_, b)| *b)
+    BUILT.iter().find(|(n, _)| *n == name).map(|(_, b)| b.as_str())
 }
 
 /// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.

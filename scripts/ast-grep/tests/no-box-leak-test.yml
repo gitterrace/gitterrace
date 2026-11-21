@@ -1,0 +1,5 @@
+id: no-box-leak
+valid:
+  - 'fn f(s: String) -> String { s }'
+invalid:
+  - 'fn f(s: String) -> &''static str { Box::leak(s.into_boxed_str()) }'

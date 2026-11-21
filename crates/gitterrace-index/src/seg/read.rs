@@ -128,21 +128,18 @@ impl Container {
             starts.push(first);
             first = first.saturating_add(e.items);
         }
-        let mut loaded: Option<(usize, Vec<u8>)> = None;
+        let mut buf = Vec::new();
+        let mut loaded: Option<usize> = None;
         let mut out = Vec::with_capacity(ordinals.len());
         for &o in ordinals {
             let i = starts.partition_point(|&s| s <= o).checked_sub(1);
             let Some(i) = i.filter(|&i| o < starts[i].saturating_add(blocks[i].items)) else {
                 return Err(SegError::unreadable(&self.name, 0, "record index past the section"));
             };
-            if loaded.as_ref().is_none_or(|(at, _)| *at != i) {
-                let mut buf = Vec::new();
+            if loaded != Some(i) {
                 self.read_block(&blocks[i], &mut buf)?;
-                loaded = Some((i, buf));
+                loaded = Some(i);
             }
-            let Some((_, buf)) = loaded.as_ref() else {
-                return Err(SegError::unreadable(&self.name, 0, "rank block"));
-            };
             let at = (o - starts[i]) as usize * 4;
             let b: [u8; 4] = buf
                 .get(at..at + 4)
