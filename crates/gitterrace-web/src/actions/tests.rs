@@ -48,19 +48,7 @@ fn router(repo: &Path, cfg: Option<&Path>, bound: Option<std::net::IpAddr>) -> a
 async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
     let server = ["/go/", "/_"].iter().any(|p| uri.starts_with(p));
     let uri = if server { uri.to_owned() } else { format!("/r/evil{uri}") };
-    let res = r
-        .clone()
-        .oneshot(
-            Request::get(uri)
-                .header("host", gitterrace_testkit::on_port("localhost"))
-                .body(Body::empty())
-                .expect("req"),
-        )
-        .await
-        .expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
+    gitterrace_testkit::get_as(r, &uri, &gitterrace_testkit::on_port("localhost")).await
 }
 
 fn token(html: &str) -> String {

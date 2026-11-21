@@ -2,11 +2,9 @@
 //! HEAD reaches it: a stash or a dangling commit stays dark through every page, redirect and
 //! API route that takes a revision, while reachable history stays readable by its id.
 
-use axum::{Router, body::Body, http::Request};
+use axum::Router;
 use gitterrace_config::{Feature, parse};
 use gitterrace_testkit::{Fixture, git};
-use http_body_util::BodyExt;
-use tower::ServiceExt;
 
 const HOST: &str = "git.example.com";
 /// Committed only in the stash and the dangling commit.
@@ -44,11 +42,7 @@ fn site() -> Site {
 }
 
 async fn send(r: &Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri).header("host", HOST).body(Body::empty()).expect("req");
-    let res = r.clone().oneshot(req).await.expect("res");
-    let status = res.status().as_u16();
-    let bytes = res.into_body().collect().await.expect("body").to_bytes();
-    (status, String::from_utf8_lossy(&bytes).into_owned())
+    gitterrace_testkit::get_as(r, uri, HOST).await
 }
 
 /// Every public route that takes a revision, with `rev` in its revision slot, and whether a

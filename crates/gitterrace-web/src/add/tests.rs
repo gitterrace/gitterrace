@@ -24,10 +24,7 @@ pub(super) async fn send(
     req: axum::http::request::Builder,
     body: String,
 ) -> (u16, String) {
-    let res = r.clone().oneshot(req.body(Body::from(body)).expect("req")).await.expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
+    gitterrace_testkit::send(r, req.body(Body::from(body)).expect("req")).await
 }
 
 fn post(token: Option<&str>) -> axum::http::request::Builder {

@@ -25,7 +25,7 @@ pub use fixture::{Adversarial, FAR_FUTURE, Fixture};
 pub use gitterrace_config::DEFAULT_ADDR;
 pub use renames::{MergeWithAuthor, RenameChain};
 pub use shared::Shared;
-pub use web::{base, duplicate_ids, get, page, repeated_header_destinations};
+pub use web::{base, duplicate_ids, get, get_as, page, repeated_header_destinations, send};
 
 /// The port of [`DEFAULT_ADDR`], for tests that build a `Host` or `Origin` from it.
 #[must_use]

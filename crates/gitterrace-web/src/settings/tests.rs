@@ -5,8 +5,6 @@
 use std::path::{Path, PathBuf};
 
 use axum::{body::Body, http::Request};
-use http_body_util::BodyExt;
-use tower::ServiceExt;
 
 use crate::app::Env;
 
@@ -62,10 +60,7 @@ async fn send(r: &axum::Router, q: Req<'_>) -> (u16, String) {
     if let Some(t) = q.token {
         b = b.header("x-gitterrace-token", t);
     }
-    let res = r.clone().oneshot(b.body(Body::from(q.body)).expect("req")).await.expect("res");
-    let s = res.status().as_u16();
-    let bytes = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&bytes).into_owned())
+    gitterrace_testkit::send(r, b.body(Body::from(q.body)).expect("req")).await
 }
 
 /// The token the last server built on this thread hands its pages.

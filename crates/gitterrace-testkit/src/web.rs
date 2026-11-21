@@ -4,7 +4,16 @@ use tower::ServiceExt;
 
 /// GETs `uri` from a copy of `router` as a request for `localhost`; returns status and body.
 pub async fn get(router: &Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri).header("host", "localhost").body(Body::empty()).expect("request");
+    get_as(router, uri, "localhost").await
+}
+
+/// [`get`] as a request for `host`.
+pub async fn get_as(router: &Router, uri: &str, host: &str) -> (u16, String) {
+    send(router, Request::get(uri).header("host", host).body(Body::empty()).expect("request")).await
+}
+
+/// Sends `req` to a copy of `router`; returns status and body.
+pub async fn send(router: &Router, req: Request<Body>) -> (u16, String) {
     let res = router.clone().oneshot(req).await.expect("response");
     let status = res.status().as_u16();
     let bytes = res.into_body().collect().await.expect("body").to_bytes();
@@ -63,6 +72,18 @@ pub fn duplicate_ids(body: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
+    #[tokio::test]
+    async fn get_as_sends_the_host_it_is_given() {
+        let router = axum::Router::new().route(
+            "/h",
+            axum::routing::get(|h: axum::http::HeaderMap| async move {
+                h["host"].to_str().unwrap_or_default().to_owned()
+            }),
+        );
+        assert_eq!(super::get_as(&router, "/h", "x.test:80").await, (200, "x.test:80".to_owned()));
+        assert_eq!(super::get(&router, "/h").await, (200, "localhost".to_owned()));
+    }
+
     #[test]
     fn a_settings_link_beside_the_settings_meta_is_a_repeat() {
         let gear = concat!(

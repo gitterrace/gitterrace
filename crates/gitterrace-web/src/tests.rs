@@ -6,7 +6,6 @@ use gitterrace_testkit::{Fixture, git};
 use std::sync::Arc;
 
 use axum::{body::Body, http::Request};
-use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use crate::{app::App, routes};
@@ -467,16 +466,7 @@ pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf 
     Fixture::standard(&root.join(name)).path().to_owned()
 }
 
-pub(crate) async fn fetch(router: &axum::Router, uri: &str, host: &str) -> (u16, String) {
-    let res = router
-        .clone()
-        .oneshot(Request::get(uri).header("host", host).body(Body::empty()).expect("req"))
-        .await
-        .expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
-}
+pub(crate) use gitterrace_testkit::get_as as fetch;
 
 /// Same-origin `href`, `src`, `action` and `data-last` values in a page.
 pub(crate) fn links(html: &str) -> Vec<String> {

@@ -3,10 +3,7 @@
 
 use std::path::Path;
 
-use axum::{body::Body, http::Request};
 use gitterrace_testkit::git;
-use http_body_util::BodyExt;
-use tower::ServiceExt;
 
 use crate::actions::actions_tests::config_dir;
 
@@ -68,19 +65,14 @@ fn repo(root: &Path) -> (std::path::PathBuf, String) {
 }
 
 async fn html(r: &axum::Router, uri: &str) -> String {
-    let res = r
-        .clone()
-        .oneshot(
-            Request::get(format!("/r/menu{uri}"))
-                .header("host", gitterrace_testkit::on_port("localhost"))
-                .body(Body::empty())
-                .expect("req"),
-        )
-        .await
-        .expect("res");
-    assert_eq!(res.status().as_u16(), 200, "{uri}");
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    String::from_utf8_lossy(&b).into_owned()
+    let (status, body) = gitterrace_testkit::get_as(
+        r,
+        &format!("/r/menu{uri}"),
+        &gitterrace_testkit::on_port("localhost"),
+    )
+    .await;
+    assert_eq!(status, 200, "{uri}");
+    body
 }
 
 /// The entries `actions.js` builds from the page's `data-menu`, for a selection of `kind`:
