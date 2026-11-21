@@ -78,10 +78,8 @@ pub fn state_dir() -> Option<PathBuf> {
 /// A missing file is empty. A corrupt one is an error, so a writer refuses and the file stays
 /// on disk for the user instead of being reset to empty.
 pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
-    match gitterrace_git::read_no_follow_bounded(dir, FILE, MAX_FILE)? {
-        Some(b) => serde_json::from_slice(&b).map_err(io::Error::other),
-        None => Ok(Vec::new()),
-    }
+    gitterrace_git::read_no_follow_bounded(dir, FILE, MAX_FILE)?
+        .map_or_else(|| Ok(Vec::new()), |b| serde_json::from_slice(&b).map_err(io::Error::other))
 }
 
 /// Records `repos` as served now. A repository without commits has no id and is skipped.

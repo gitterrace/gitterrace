@@ -85,7 +85,7 @@ impl Live {
                 why: why_off(&a.kinds),
             })
             .collect();
-        serde_json::to_string(&items).unwrap_or_default()
+        serde_json::to_string(&items).unwrap_or_else(|_| "[]".to_owned())
     }
 }
 
@@ -321,21 +321,14 @@ pub(crate) fn router(site: Arc<Site>) -> Router {
 
 /// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus, show.
 async fn status(State(site): State<Arc<Site>>) -> Response {
-    let body = serde_json::to_string(&StatusBody { note: site.status.note() }).unwrap_or_default();
-    no_store(([(header::CONTENT_TYPE, "application/json")], body).into_response())
+    no_store(axum::Json(StatusBody { note: site.status.note() }).into_response())
 }
 
 /// `GET /_send/targets`: `[{"id","label","parts":[{"lit"}|{"ph"}]}]`, `[]` with none.
 /// The same list under every repository prefix, since targets are not per repository.
 async fn send_targets(State(site): State<Arc<Site>>) -> Response {
     let config = site.sends.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c));
-    no_store(
-        (
-            [(header::CONTENT_TYPE, "application/json")],
-            serde_json::to_string(&config.sends).unwrap_or_else(|_| "[]".to_owned()),
-        )
-            .into_response(),
-    )
+    no_store(axum::Json(&config.sends).into_response())
 }
 
 async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Response {

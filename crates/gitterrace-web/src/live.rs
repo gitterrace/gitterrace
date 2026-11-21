@@ -116,7 +116,8 @@ struct Full<'a> {
 
 fn change_event<T: Serialize>(body: &T) -> Event {
     // Both bodies are plain strings and bools, which always serialize.
-    Event::default().event("change").data(serde_json::to_string(body).unwrap_or_default())
+    let data = serde_json::to_string(body).unwrap_or_else(|_| "{}".to_owned());
+    Event::default().event("change").data(data)
 }
 
 fn event(c: &Change) -> Event {

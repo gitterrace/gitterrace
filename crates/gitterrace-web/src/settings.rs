@@ -161,6 +161,17 @@ fn json<T: serde::Serialize>(status: StatusCode, body: &T) -> Response {
     crate::guard::no_store((status, axum::Json(body)).into_response())
 }
 
+/// The text of `path` as the settings routes see it: empty for a missing file, a symlink, a
+/// non-file or one past the size bound, so a planted or runaway file is never read whole.
+pub(crate) fn current(path: &std::path::Path) -> String {
+    match std::fs::symlink_metadata(path) {
+        Ok(m) if m.file_type().is_file() && m.len() <= MAX_FILE_BYTES as u64 => {
+            std::fs::read_to_string(path).unwrap_or_default()
+        }
+        _ => String::new(),
+    }
+}
+
 fn plain(status: StatusCode, why: &'static str) -> Response {
     (status, why).into_response()
 }
@@ -223,7 +234,7 @@ fn resulting_text(path: &std::path::Path, e: &Edit) -> Result<String, Located> {
     if let Some(t) = &e.text {
         return Ok(t.clone());
     }
-    let current = std::fs::read_to_string(path).unwrap_or_default();
+    let current = current(path);
     let mut changes = Vec::new();
     for c in &e.changes {
         let value = match (&c.input, e.f) {
@@ -290,7 +301,7 @@ async fn check(State(s): State<Arc<Settings>>, req: Request) -> Response {
     let env = s.env.clone();
     let r = tokio::task::spawn_blocking(move || match resulting_text(&path, &e) {
         Ok(text) => {
-            let before = std::fs::read_to_string(&path).unwrap_or_default();
+            let before = current(&path);
             let mut reply = validate(e.f, &text, &before, &env);
             s.note_restart(e.f, &text, &mut reply);
             reply.text = Some(text);
@@ -321,7 +332,7 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
     let env = s.env.clone();
     let r = tokio::task::spawn_blocking(move || {
         let text = resulting_text(&path, &e).map_err(SaveError::Invalid)?;
-        let before = std::fs::read_to_string(&path).unwrap_or_default();
+        let before = current(&path);
         let mut reply = validate(e.f, &text, &before, &env);
         s.note_restart(e.f, &text, &mut reply);
         let saved = gitterrace_config::save(&path, &text, expect, |t| match e.f {

@@ -108,9 +108,8 @@ async fn prove(
     headers: HeaderMap,
     axum::extract::Query(c): axum::extract::Query<Challenge>,
 ) -> Response {
-    if headers.contains_key(header::ORIGIN) || headers.contains_key("sec-fetch-site") {
-        return (StatusCode::FORBIDDEN, "forbidden: browsers cannot add repositories\n")
-            .into_response();
+    if let Some(why) = browser(&headers) {
+        return (StatusCode::FORBIDDEN, why).into_response();
     }
     if c.nonce.is_empty() || c.nonce.len() > 128 {
         return bad("nonce must be 1 to 128 bytes");
@@ -118,12 +117,17 @@ async fn prove(
     reply(StatusCode::OK, &AddReply { proof: Some(&adder.token.prove(&c.nonce)), ..AddReply::NONE })
 }
 
-/// Why a request is refused before its body is read. Any browser marker refuses: a fetch from
-/// a page always carries `Sec-Fetch-Site` (and a cross-origin one `Origin`), a local program
-/// sends neither.
+/// Any browser marker refuses: a fetch from a page always carries `Sec-Fetch-Site` (and a
+/// cross-origin one `Origin`), a local program sends neither.
+fn browser(h: &HeaderMap) -> Option<&'static str> {
+    (h.contains_key(header::ORIGIN) || h.contains_key("sec-fetch-site"))
+        .then_some("forbidden: browsers cannot add repositories\n")
+}
+
+/// Why a request is refused before its body is read.
 fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
-    if h.contains_key(header::ORIGIN) || h.contains_key("sec-fetch-site") {
-        return Some("forbidden: browsers cannot add repositories\n");
+    if let Some(why) = browser(h) {
+        return Some(why);
     }
     let offered = h.get(TOKEN_HEADER).and_then(|v| v.to_str().ok());
     if !offered.is_some_and(|t| token.verify(t)) {

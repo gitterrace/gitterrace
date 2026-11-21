@@ -198,10 +198,7 @@ pub(crate) async fn page(
     let env = settings.env.clone();
     let r = tokio::task::spawn_blocking(move || {
         let stamp = gitterrace_config::Stamp::of(&path).ok().flatten();
-        let text = match std::fs::symlink_metadata(&path) {
-            Ok(m) if m.file_type().is_file() => std::fs::read_to_string(&path).unwrap_or_default(),
-            _ => String::new(),
-        };
+        let text = crate::settings::current(&path);
         // An actions.toml not written yet is the empty form, not a broken file: it starts from
         // the one line the loader requires, so a save from either view writes a file that loads.
         let text = match f {
