@@ -120,6 +120,16 @@ pub fn indexed(body: &str) -> bool {
     !body.contains("data-progress")
 }
 
+/// A page body whose chrome already shows the repo id.
+///
+/// The id is computed once in the background, so a page rendered before it is known has
+/// `data-id=""` and differs byte for byte from the same page a moment later. Wait for this
+/// before comparing two whole pages.
+#[must_use]
+pub fn identified(body: &str) -> bool {
+    !body.contains("data-id=\"\" data-link")
+}
+
 /// The blocking twin of [`until`], for tests without a runtime.
 pub fn until_blocking(what: &str, mut cond: impl FnMut() -> bool) {
     let limit = deadline();

@@ -25,7 +25,10 @@ fn router() -> (tempfile::TempDir, axum::Router) {
 }
 
 async fn body(r: &axum::Router, uri: &str) -> String {
-    gitterrace_testkit::wait::page_until(r, uri, |b| b.contains("Commits per")).await
+    gitterrace_testkit::wait::page_until(r, uri, |b| {
+        b.contains("Commits per") && gitterrace_testkit::wait::identified(b)
+    })
+    .await
 }
 
 /// The `href` of the bar link whose label says `needle`.
