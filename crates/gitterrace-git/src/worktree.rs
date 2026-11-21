@@ -49,11 +49,6 @@ pub struct ScopeCounts {
     pub unstaged: usize,
 }
 
-/// Paths that differ between HEAD, the index and the worktree, sorted.
-fn changed_paths(repo: &gix::Repository, limit: usize) -> Result<BTreeSet<String>> {
-    scoped_paths(repo, Scope::All, limit)
-}
-
 /// The paths of one scope, sorted, stopping at `limit`.
 fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BTreeSet<String>> {
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
@@ -208,7 +203,7 @@ pub fn worktree_signature(repo: &Repo) -> Result<u64> {
 /// True when anything differs from HEAD. Stops at the first difference.
 #[must_use]
 pub fn is_dirty(repo: &Repo) -> bool {
-    open(repo).and_then(|r| changed_paths(&r, 1)).is_ok_and(|p| !p.is_empty())
+    open(repo).and_then(|r| scoped_paths(&r, Scope::All, 1)).is_ok_and(|p| !p.is_empty())
 }
 
 /// Every uncommitted file as a diff against HEAD.
@@ -283,7 +278,7 @@ pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8
         return Ok(None);
     }
     let r = open(repo)?;
-    if !changed_paths(&r, repo.worktree_files())?.contains(path) {
+    if !scoped_paths(&r, Scope::All, repo.worktree_files())?.contains(path) {
         return Ok(None);
     }
     let Some(root) = r.workdir().and_then(|w| w.canonicalize().ok()) else {

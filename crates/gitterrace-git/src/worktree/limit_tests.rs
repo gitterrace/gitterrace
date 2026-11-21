@@ -28,8 +28,8 @@ fn worktree_files_caps_staged_files_too() {
     // Staged and unchanged since, so only the tree-to-index pass sees them.
     git(dir.path(), &["add", "."]);
     let r = super::open(&repo).expect("open");
-    assert_eq!(super::changed_paths(&r, 100).expect("paths").len(), 5);
-    assert_eq!(super::changed_paths(&r, 2).expect("paths").len(), 2);
+    assert_eq!(super::scoped_paths(&r, crate::Scope::All, 100).expect("paths").len(), 5);
+    assert_eq!(super::scoped_paths(&r, crate::Scope::All, 2).expect("paths").len(), 2);
     assert!(super::is_dirty(&repo), "one staged file is dirty");
 }
 
