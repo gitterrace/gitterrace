@@ -48,7 +48,7 @@ site_requests_docs = 1
 site_requests_other = 1
 # The same for the served app's main pages (web test page_weight): stylesheets, scripts and
 # font preloads.
-web_requests = 10
+web_requests = 9
 
 [retired]
 # The Rust-only wide-line count moved to the kit's file-length lint, which counts code lines
