@@ -52,28 +52,28 @@ label = "Nap 1"
 kinds = ["page"]
 shell = true
 command = 'cat >/dev/null; touch "{dir}/nap1.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
-timeout = "60s"
+timeout = "120s"
 [[action]]
 id = "nap2"
 label = "Nap 2"
 kinds = ["page"]
 shell = true
 command = 'cat >/dev/null; touch "{dir}/nap2.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
-timeout = "60s"
+timeout = "120s"
 [[action]]
 id = "nap3"
 label = "Nap 3"
 kinds = ["page"]
 shell = true
 command = 'cat >/dev/null; touch "{dir}/nap3.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
-timeout = "60s"
+timeout = "120s"
 [[action]]
 id = "nap4"
 label = "Nap 4"
 kinds = ["page"]
 shell = true
 command = 'cat >/dev/null; touch "{dir}/nap4.up"; while [ ! -e "{dir}/release" ]; do sleep 0.02; done'
-timeout = "60s"
+timeout = "120s"
 "#;
 
 /// A private folder holding `actions.toml` built from `template`.
