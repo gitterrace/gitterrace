@@ -487,8 +487,9 @@ impl Config {
         if self.limits.text_kb == 0 || self.limits.raw_mb == 0 {
             return bad("limits", "text_kb and raw_mb must be at least 1");
         }
+        let all = keys();
         for (k, lo, hi) in BOUNDS {
-            let shown = keys().iter().find(|x| x.id == *k).map(|x| self.show(x));
+            let shown = all.iter().find(|x| x.id == *k).map(|x| self.show(x));
             // An optional cap left unset has no value to bound.
             if shown.as_deref() == Some("unset") {
                 continue;

@@ -180,6 +180,7 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
     })?;
     let mut warnings = Vec::new();
     let mut sources = BTreeMap::new();
+    let known = keys();
     for (section, v) in &table {
         let Some(sub) = v.as_table() else {
             warnings.push(format!("unknown key `{section}` ignored"));
@@ -189,7 +190,7 @@ pub fn parse(text: &str) -> Result<Loaded, ConfigError> {
             continue;
         }
         for name in sub.keys() {
-            match keys().iter().find(|k| k.section == section && k.name == name) {
+            match known.iter().find(|k| k.section == section && k.name == name) {
                 Some(k) => {
                     sources.insert(k.id, Source::File);
                 }
