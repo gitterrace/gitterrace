@@ -88,21 +88,26 @@ pub fn asset_url(name: &str) -> String {
     format!("/static/{name}?v={}", asset_version())
 }
 
+/// A stylesheet before minifying: `tokens.css` has its font URLs carry the version, so a new
+/// font is fetched.
+fn served_source(name: &str, _kind: &str, body: &str) -> String {
+    if name == "tokens.css" {
+        body.replace(".woff2)", &format!(".woff2?v={})", asset_version()))
+    } else {
+        body.to_owned()
+    }
+}
+
 /// The assets as served, built once: every stylesheet minified, and `tokens.css` with its font
 /// URLs carrying the version too, so a new font is fetched.
 fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
     static SERVED: std::sync::LazyLock<std::collections::HashMap<&'static str, &'static str>> =
         std::sync::LazyLock::new(|| {
-            let v = asset_version();
             TABLE
                 .iter()
                 .filter(|(_, kind, _)| *kind == CSS)
-                .map(|(name, _, body)| {
-                    let body = if *name == "tokens.css" {
-                        body.replace(".woff2)", &format!(".woff2?v={v})"))
-                    } else {
-                        (*body).to_owned()
-                    };
+                .map(|(name, kind, body)| {
+                    let body = served_source(name, kind, body);
                     let min: &'static str = Box::leak(crate::minify::css(&body).into_boxed_str());
                     (*name, min)
                 })
@@ -114,6 +119,35 @@ fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
     SERVED.get(name).copied().unwrap_or(body)
 }
 
+/// The stylesheets every page loads, joined in cascade order into one request each: `base.css`
+/// before the page's own sheet, `late.css` after it. A bundle is its parts back to back, so no
+/// rule moves relative to another.
+const BUNDLES: [(&str, &[&str]); 2] = [
+    ("base.css", &["tokens.css", "buttons.css", "app.css", "pagehead.css", "charts.css"]),
+    ("late.css", &["markdown.css", "media.css", "docnav.css", "diffview.css"]),
+];
+
+/// The bundle `name` as served, minified, or `None` for a name that is no bundle.
+fn bundled(name: &str) -> Option<&'static str> {
+    static BUILT: std::sync::LazyLock<Vec<(&'static str, &'static str)>> =
+        std::sync::LazyLock::new(|| {
+            BUNDLES
+                .iter()
+                .map(|(name, parts)| {
+                    let all: String = parts
+                        .iter()
+                        .filter_map(|p| TABLE.iter().find(|(n, _, _)| n == p))
+                        .map(|(n, k, b)| served_source(n, k, b))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    let min: &'static str = Box::leak(crate::minify::css(&all).into_boxed_str());
+                    (*name, min)
+                })
+                .collect()
+        });
+    BUILT.iter().find(|(n, _)| *n == name).map(|(_, b)| *b)
+}
+
 /// Embedded stylesheets, scripts and fonts; stateless, so the multi-repo index serves them too.
 pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
     TABLE
@@ -121,6 +155,8 @@ pub(crate) fn assets<S: Clone + Send + Sync + 'static>() -> Router<S> {
         .fold(Router::new(), |r, (name, kind, body)| {
             r.route(&format!("/static/{name}"), static_asset(kind, served(name, kind, body)))
         })
+        .route("/static/base.css", static_asset(CSS, bundled("base.css").unwrap_or_default()))
+        .route("/static/late.css", static_asset(CSS, bundled("late.css").unwrap_or_default()))
         .route(crate::MERMAID_JS, get(mermaid_js))
         .route("/static/fonts/{name}", get(font))
 }

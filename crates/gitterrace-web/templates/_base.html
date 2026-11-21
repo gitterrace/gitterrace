@@ -16,15 +16,8 @@
  type="font/woff2" crossorigin>
 <link rel="preload" href="{{ crate::asset_url("fonts/jetbrains-mono.woff2") }}" as="font"
  type="font/woff2" crossorigin>
-<link rel="stylesheet" href="{{ crate::asset_url("tokens.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("buttons.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("app.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("pagehead.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("charts.css") }}">{% block head %}{% endblock %}
-<link rel="stylesheet" href="{{ crate::asset_url("markdown.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("media.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("docnav.css") }}">
-<link rel="stylesheet" href="{{ crate::asset_url("diffview.css") }}">
+<link rel="stylesheet" href="{{ crate::asset_url("base.css") }}">{% block head %}{% endblock %}
+<link rel="stylesheet" href="{{ crate::asset_url("late.css") }}">
 </head>
 <body{% if c.diff.tab != 4 %} data-diff-tab="{{ c.diff.tab }}"{% endif %}{% if c.diff.font != 13 %} data-diff-font="{{ c.diff.font }}"{% endif %}{% if c.diff.wrap %} data-diff-wrap{% endif %}{% if !c.diff.palette.is_empty() %} data-diff-palette="{{ c.diff.palette }}"{% endif %}{% if c.has_line_hover %} data-line-hover{% endif %} data-rev="{{ c.rev }}" data-commit="{{ c.commit }}"{% if c.live %} data-live="{{ c.live_how }}" data-live-on="{{ c.live_on }}" data-live-v="{{ c.version }}"{% endif %}>
 <a class="skip" href="#gt-main">Skip to content</a>
