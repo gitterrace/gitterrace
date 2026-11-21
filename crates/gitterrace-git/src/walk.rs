@@ -163,14 +163,6 @@ impl BlobReader {
     }
 }
 
-/// Object id of the tree at `path` in `rev`, a cheap cache key for directory listings.
-pub fn tree_id(repo: &Repo, rev: &str, path: &str) -> Result<String> {
-    let id = oid(&repo.resolve(rev)?)?;
-    let r = open(repo)?;
-    let commit = r.find_commit(id).map_err(git)?;
-    Ok(dir_oid(&commit, path.trim_matches('/'))?.map(|o| o.to_string()).unwrap_or_default())
-}
-
 /// Work done by one [`scan_commits`]: commits walked, and summaries built for the visitor.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct CommitScan {

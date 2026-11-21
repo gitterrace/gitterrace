@@ -167,8 +167,10 @@ impl Repo {
         Ok((out, first))
     }
 
-    /// Commit ids reachable from `rev`, oldest first. Used by the indexer.
-    pub fn rev_list(&self, rev: &str) -> Result<Vec<String>> {
+    /// Commit ids reachable from `rev`, oldest first. The indexer uses [`crate::canonical_order`];
+    /// this is the plain walk its tests compare against.
+    #[cfg(test)]
+    pub(crate) fn rev_list(&self, rev: &str) -> Result<Vec<String>> {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
         let walk = crate::walk::newest_first(&repo, [tip])?;
@@ -330,16 +332,12 @@ impl Repo {
         ids: &[String],
         emit: impl FnMut(usize, Option<(CommitSummary, Vec<crate::FileDiff>)>) -> Result<()>,
     ) -> Result<()> {
-        let workers = match self.workers {
-            0 => std::thread::available_parallelism().map_or(1, usize::from),
-            n => n,
-        };
         let none = gix::mailmap::Snapshot::default();
         let memo = crate::diff::CountMemo::new(NUMSTAT_MEMO_PAIRS);
         let merges = merge_positions(&self.repo(), ids);
         crate::diff::stream(
             ids,
-            workers,
+            self.worker_count(),
             crate::diff::Window { first: &merges, budget: self.budget.as_ref(), ..NUMSTAT_WINDOW },
             || {
                 let mut repo = self.repo();

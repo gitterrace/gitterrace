@@ -45,13 +45,9 @@ impl Repo {
         ids: &[String],
         mut emit: impl FnMut(CommitText) -> Result<()>,
     ) -> Result<()> {
-        let workers = match self.workers() {
-            0 => std::thread::available_parallelism().map_or(1, usize::from),
-            n => n,
-        };
         crate::diff::stream(
             ids,
-            workers,
+            self.worker_count(),
             NUMSTAT_WINDOW,
             || {
                 let mut repo = self.repo();

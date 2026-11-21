@@ -44,6 +44,9 @@ const NUMSTAT_MEMO_PAIRS: usize = 1 << 18;
 /// Rev syntax that searches history (`:/text`, `^{/text}`) or reads reflogs (`@{...}`).
 /// Every caller passes URL input here, so the refusal lives at the one choke point.
 pub const REJECTED_REV: [&str; 3] = [":/", "^{/", "@{"];
+/// Ref prefixes a public handle shows: what `committed_rev` resolves, what the visible set and
+/// the root commits start from. One list, so no reader of "public history" can drift.
+pub(crate) const PUBLIC_PREFIXES: [&str; 3] = ["refs/heads/", "refs/tags/", "refs/remotes/"];
 /// Most `~N` / `^N` steps one committed-only rev may take, summed over the whole expression,
 /// so a URL cannot make one request read thousands of commits. Past it the rev is not found,
 /// as it is when N runs past the root. Not configurable: no page links a rev this far back.
@@ -186,9 +189,12 @@ impl Repo {
         self.worktree_diff_bytes.store(diff_bytes, Ordering::Relaxed);
     }
 
-    /// The thread count set by [`Repo::with_workers`], 0 for one per core.
-    pub(crate) const fn workers(&self) -> usize {
-        self.workers
+    /// The threads a parallel read uses: [`Repo::with_workers`], or one per core when it is 0.
+    pub(crate) fn worker_count(&self) -> usize {
+        match self.workers {
+            0 => std::thread::available_parallelism().map_or(1, usize::from),
+            n => n,
+        }
     }
 
     pub(crate) fn worktree_files(&self) -> usize {
@@ -250,18 +256,14 @@ impl Repo {
     /// one to its commit is not, so the peeled list is kept for one key: every ref name with
     /// its raw target. A new, moved or deleted ref changes the key and the list is rebuilt.
     pub fn refs(&self) -> Result<Vec<RefInfo>> {
-        use std::hash::{Hash, Hasher};
+        use std::hash::Hasher;
         let repo = self.repo();
         let platform = repo.references().map_err(git)?;
         let mut raw = Vec::new();
         let mut h = std::collections::hash_map::DefaultHasher::new();
         for reference in platform.all().map_err(git)? {
             let reference = reference.map_err(git)?;
-            reference.name().as_bstr().hash(&mut h);
-            match reference.target() {
-                gix::refs::TargetRef::Object(id) => id.as_bytes().hash(&mut h),
-                gix::refs::TargetRef::Symbolic(n) => n.as_bstr().hash(&mut h),
-            }
+            hash_ref(&reference, &mut h);
             raw.push(reference);
         }
         let key = h.finish();
@@ -357,6 +359,22 @@ impl Repo {
     }
 }
 
+/// Feeds a ref's name and raw target (nothing peeled) into `h`: the key the ref-keyed caches
+/// compare to know that no ref moved.
+pub(crate) fn hash_ref(reference: &gix::Reference<'_>, h: &mut impl std::hash::Hasher) {
+    use std::hash::Hash;
+    reference.name().as_bstr().hash(h);
+    match reference.target() {
+        gix::refs::TargetRef::Object(id) => id.as_bytes().hash(h),
+        gix::refs::TargetRef::Symbolic(n) => n.as_bstr().hash(h),
+    }
+}
+
+/// Whether a full ref name is under one of [`PUBLIC_PREFIXES`].
+pub(crate) fn is_public_ref(name: &[u8]) -> bool {
+    PUBLIC_PREFIXES.iter().any(|p| name.starts_with(p.as_bytes()))
+}
+
 /// [`Repo::committed_only`]'s resolver: a base (`HEAD`, a full id, a branch, tag or remote ref,
 /// short or full name) then `~N` / `^N` steps. Ref names cannot hold `~` or `^`, so the first
 /// one ends the base. `None` for anything else.
@@ -368,11 +386,10 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
     } else if base.len() == 40 {
         gix::ObjectId::from_hex(base.as_bytes()).ok()?
     } else {
-        let mut reference =
-            ["refs/heads/", "refs/tags/", "refs/remotes/"].iter().find_map(|p| {
-                let full = if base.starts_with(p) { base.to_owned() } else { format!("{p}{base}") };
-                repo.try_find_reference(full.as_str()).ok().flatten()
-            })?;
+        let mut reference = PUBLIC_PREFIXES.iter().find_map(|p| {
+            let full = if base.starts_with(p) { base.to_owned() } else { format!("{p}{base}") };
+            repo.try_find_reference(full.as_str()).ok().flatten()
+        })?;
         reference.peel_to_id().ok()?.detach()
     };
     let mut budget = MAX_REV_STEPS;

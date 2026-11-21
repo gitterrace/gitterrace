@@ -70,7 +70,7 @@ pub use types::{
 pub use url::{percent_decode, percent_encode_path, percent_encode_segment};
 pub use walk::{
     BlobId, BlobReader, CommitScan, FileRef, LastCommit, canonical_order, files, last_commits,
-    last_commits_among, scan_commits, topo_sort, tree_id,
+    last_commits_among, scan_commits, topo_sort,
 };
 pub use watch::{Parts, Watcher};
 pub use worker_hook::{WorkerTime, set_worker_hook};

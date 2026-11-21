@@ -16,9 +16,7 @@ use std::hash::{Hash, Hasher};
 
 use crate::Result;
 use crate::error::git;
-
-/// Ref prefixes whose targets are public roots, the same ones `committed_rev` resolves.
-const PUBLIC_PREFIXES: [&str; 3] = ["refs/heads/", "refs/tags/", "refs/remotes/"];
+use crate::repo::{hash_ref, is_public_ref};
 
 /// The reachable set of one root key. Empty and unbuilt until a raw id asks.
 #[derive(Default)]
@@ -117,14 +115,8 @@ fn root_key(repo: &gix::Repository) -> Result<u64> {
     }
     for reference in repo.references().map_err(git)?.all().map_err(git)? {
         let reference = reference.map_err(git)?;
-        let name = reference.name().as_bstr();
-        if !PUBLIC_PREFIXES.iter().any(|p| name.starts_with(p.as_bytes())) {
-            continue;
-        }
-        name.hash(&mut h);
-        match reference.target() {
-            gix::refs::TargetRef::Object(id) => id.as_bytes().hash(&mut h),
-            gix::refs::TargetRef::Symbolic(n) => n.as_bstr().hash(&mut h),
+        if is_public_ref(reference.name().as_bstr()) {
+            hash_ref(&reference, &mut h);
         }
     }
     Ok(h.finish())
@@ -144,8 +136,7 @@ fn public_roots(repo: &gix::Repository) -> HashSet<gix::ObjectId> {
         return out;
     };
     for mut reference in all.flatten() {
-        let name = reference.name().as_bstr();
-        if PUBLIC_PREFIXES.iter().any(|p| name.starts_with(p.as_bytes()))
+        if is_public_ref(reference.name().as_bstr())
             && let Ok(c) = reference.peel_to_commit()
         {
             out.insert(c.id);

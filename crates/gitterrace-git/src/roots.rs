@@ -11,6 +11,7 @@ use std::collections::{BTreeSet, HashSet};
 use std::hash::{Hash, Hasher};
 
 use crate::error::git;
+use crate::repo::{hash_ref, is_public_ref};
 use crate::{Repo, Result};
 
 /// The root commits of one repository, refreshed with [`Roots::update`].
@@ -39,34 +40,33 @@ impl Roots {
     pub fn update(&mut self, repo: &Repo) -> Result<bool> {
         let r = repo.repo();
         let mut h = std::collections::hash_map::DefaultHasher::new();
-        let mut names = HashSet::new();
-        let mut tips = HashSet::new();
+        let mut public = Vec::new();
         let platform = r.references().map_err(git)?;
         for reference in platform.all().map_err(git)? {
-            let mut reference = reference.map_err(git)?;
-            let name = reference.name().as_bstr().to_string();
+            let reference = reference.map_err(git)?;
             // Branches, tags and remote branches: what the log lists. Stashes and notes are
             // not the project's history.
-            if !["refs/heads/", "refs/tags/", "refs/remotes/"].iter().any(|p| name.starts_with(p)) {
-                continue;
+            if is_public_ref(reference.name().as_bstr()) {
+                hash_ref(&reference, &mut h);
+                public.push(reference);
             }
-            name.hash(&mut h);
-            match reference.target() {
-                gix::refs::TargetRef::Object(id) => id.as_bytes().hash(&mut h),
-                gix::refs::TargetRef::Symbolic(n) => n.as_bstr().hash(&mut h),
-            }
-            if let Ok(c) = reference.peel_to_commit() {
-                tips.insert(c.id);
-            }
-            names.insert(name);
         }
-        if let Ok(head) = r.head_id() {
-            head.detach().as_bytes().hash(&mut h);
-            tips.insert(head.detach());
+        let head = r.head_id().ok().map(gix::Id::detach);
+        if let Some(head) = head {
+            head.as_bytes().hash(&mut h);
         }
+        // Peeling a ref reads its object: only a changed key pays for it.
         let key = h.finish();
         if self.key == Some(key) {
             return Ok(false);
+        }
+        let mut names = HashSet::new();
+        let mut tips: HashSet<gix::ObjectId> = head.into_iter().collect();
+        for mut reference in public {
+            if let Ok(c) = reference.peel_to_commit() {
+                tips.insert(c.id);
+            }
+            names.insert(reference.name().as_bstr().to_string());
         }
         let dropped = self.names.iter().any(|n| !names.contains(n));
         if dropped {
