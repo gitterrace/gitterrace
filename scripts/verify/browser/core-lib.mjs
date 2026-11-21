@@ -3,7 +3,7 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh, sweep } from '../../lib/browser-lib.mjs';
+import { sh, sweep, commitFiles } from '../../lib/browser-lib.mjs';
 import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
@@ -293,21 +293,13 @@ async function periodSteady() {
 // fully below the pinned path bar; at 375 px the site header never pins. The commit is made
 // with a private index on a side ref, so HEAD and the work tree the other checks use stay put.
 async function stickyHeads() {
-  const { execFileSync } = await import('node:child_process');
-  const env = { ...process.env, GIT_INDEX_FILE: join(cfg, 'sticky-index') };
-  const git = (...a) => execFileSync('git', a, { cwd: dir, env, encoding: 'utf8' }).trim();
-  git('read-tree', 'HEAD');
+  const files = {};
   for (const n of ['one', 'two', 'three']) {
-    const body = Array.from({ length: 300 }, (_, i) => `${n} line ${i + 1}`).join('\n') + '\n';
-    const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], {
-      cwd: dir,
-      input: body,
-      encoding: 'utf8',
-    }).trim();
-    git('update-index', '--add', '--cacheinfo', `100644,${blob},sticky/${n}.txt`);
+    const lines = Array.from({ length: 300 }, (_, i) => `${n} line ${i + 1}`);
+    files[`sticky/${n}.txt`] = lines.join('\n') + '\n';
   }
-  const sha = git('commit-tree', git('write-tree'), '-p', 'HEAD', '-m', 'Three long files');
-  git('update-ref', 'refs/heads/sticky-check', sha);
+  const index = join(cfg, 'sticky-index');
+  const sha = commitFiles(dir, index, files, 'refs/heads/sticky-check', 'Three long files');
   const sw = { browsers, context, widths: [1440, 375], height: 700 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     await p.goto(`${srv.base}/commit/${sha}`, { waitUntil: 'load' });

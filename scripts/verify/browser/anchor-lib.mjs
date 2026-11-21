@@ -1,9 +1,8 @@
 // The md-anchor check: a cross-file Markdown link with #heading lands on the heading.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { execFileSync } from 'node:child_process';
 import { deflateSync } from 'node:zlib';
 import { join } from 'node:path';
-import { launch } from '../../lib/browser-lib.mjs';
+import { launch, commitFiles } from '../../lib/browser-lib.mjs';
 
 /** A valid w x h grey PNG, as bytes. */
 function png(w, h) {
@@ -41,9 +40,6 @@ export function checks(env) {
   // commit goes on a side ref through a private index, so HEAD and the work tree the other checks
   // use stay put.
   async function mdAnchor() {
-    const gitEnv = { ...process.env, GIT_INDEX_FILE: join(cfg, 'anchor-index') };
-    const git = (input, ...a) => execFileSync('git', a, { cwd: dir, env: gitEnv, input, encoding: 'utf8' }).trim();
-    git(undefined, 'read-tree', 'HEAD');
     const filler = Array.from({ length: 80 }, (_, i) => `Paragraph ${i + 1} of filler text.\n`).join('\n');
     const files = {
       'anchor/index.md': '# Index\n\n[main](guide.md#main) [syntax](guide.md#syntax-highlighting) [lines](guide.md#L2)\n',
@@ -55,25 +51,17 @@ export function checks(env) {
       // The folder's own README, long enough that its card can always scroll to the top.
       'anchor/README.md': `# Anchor folder\n\n${filler}`,
     };
-    for (const [path, body] of Object.entries(files)) {
-      git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${git(body, 'hash-object', '-w', '--stdin')},${path}`);
-    }
-    const sha = git(undefined, 'commit-tree', git(undefined, 'write-tree'), '-p', 'HEAD', '-m', 'Anchor fixtures');
-    git(undefined, 'update-ref', 'refs/heads/anchor-check', sha);
-    const add = (blob, path) =>
-      git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
+    const index = join(cfg, 'anchor-index');
+    const sha = commitFiles(dir, index, files, 'refs/heads/anchor-check', 'Anchor fixtures');
     // A commit of tall pictures above one text file: lazy images with no reserved box would
     // grow above #fN after the jump and push it down the screen.
+    const pictures = {};
     for (let i = 0; i < 12; i++) {
-      const input = png(300, 400 + i);
-      const blob = execFileSync('git', ['hash-object', '-w', '--stdin'], { cwd: dir, input });
-      add(blob.toString().trim(), `anchor/img${String(i).padStart(2, '0')}.png`);
+      pictures[`anchor/img${String(i).padStart(2, '0')}.png`] = png(300, 400 + i);
     }
-    const tail = Array.from({ length: 300 }, (_, i) => `after the pictures ${i}`).join('\n') + '\n';
-    add(git(tail, 'hash-object', '-w', '--stdin'), 'anchor/zz.txt');
-    const tree = git(undefined, 'write-tree');
-    const pics = git(undefined, 'commit-tree', tree, '-p', sha, '-m', 'Pictures');
-    git(undefined, 'update-ref', 'refs/heads/anchor-pics', pics);
+    const tail = Array.from({ length: 300 }, (_, i) => `after the pictures ${i}`);
+    pictures['anchor/zz.txt'] = tail.join('\n') + '\n';
+    const pics = commitFiles(dir, index, pictures, 'refs/heads/anchor-pics', 'Pictures', sha);
     const seen = async (p, id = 'syntax-highlighting') => p.evaluate((id) => {
       const h = document.getElementById(id);
       if (!h) return null;

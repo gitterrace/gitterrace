@@ -1,6 +1,7 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { readFileSync, readdirSync, existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -87,7 +88,6 @@ async function aboutPlace() {
 }
 
 async function siteTheme() {
-  const { createServer } = await import('node:http');
   const siteDir = join(root, 'target/site');
   const csp = /Content-Security-Policy:\s*(.+)/.exec(readFileSync(join(siteDir, '_headers'), 'utf8'))[1].trim();
   const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png' };
@@ -268,7 +268,6 @@ async function exportFromDisk() {
 // The landing page's install tabs: the selected tab merges into its panel (no line at the seam,
 // the panel's colour), an unselected tab keeps the line so it reads as behind. Pixels at the seam.
 async function installTabs() {
-  const { createServer } = await import('node:http');
   const siteDir = join(root, 'target/site');
   const types = {
     html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png',

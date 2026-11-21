@@ -82,6 +82,25 @@ export function sh(cwd, ...a) {
   return execFileSync(a[0], a.slice(1), { cwd, stdio: 'pipe', env: { ...process.env, ...ident } }).toString().trim();
 }
 
+/**
+ * Commits `files` (path to string or Buffer) on top of `parent` onto the side ref `ref`, through
+ * the private index file `indexFile`, so HEAD and the work tree stay put. Returns the commit.
+ */
+export function commitFiles(dir, indexFile, files, ref, subject, parent = 'HEAD') {
+  const env = { ...process.env, ...ident, GIT_INDEX_FILE: indexFile };
+  const git = (input, ...a) =>
+    execFileSync('git', a, { cwd: dir, env, input, encoding: 'utf8' }).trim();
+  git(undefined, 'read-tree', parent);
+  for (const [path, body] of Object.entries(files)) {
+    const blob = git(body, 'hash-object', '-w', '--stdin');
+    git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
+  }
+  const tree = git(undefined, 'write-tree');
+  const sha = git(undefined, 'commit-tree', tree, '-p', parent, '-m', subject);
+  git(undefined, 'update-ref', ref, sha);
+  return sha;
+}
+
 /** Stages everything in `dir` and commits it with `subject`. */
 export function commitAll(dir, subject) {
   sh(dir, 'git', 'add', '-A');

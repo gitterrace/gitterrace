@@ -1,7 +1,9 @@
 // Reading and keyboard checks: highlighted text, the skip link and tab stops, the shortcut
 // sheet and the overview sidebar order. Each runs in every browser, light and dark, at 1400
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { sweep } from '../../lib/browser-lib.mjs';
+import { createRequire } from 'node:module';
+import { writeFileSync } from 'node:fs';
+import { root, sh, sweep } from '../../lib/browser-lib.mjs';
 
 const SCHEMES = ['light', 'dark'];
 const WIDTHS = [1400, 900];
@@ -154,7 +156,6 @@ export function checks({ dir, srv, r, browsers, context }) {
   // On the overview the sidebar reads Now, Loose ends, Recent: what is left open comes before
   // the activity numbers.
   async function sideOrder() {
-    const { sh } = await import('../../lib/browser-lib.mjs');
     sh(dir, 'git', 'checkout', '-q', '-b', 'side-order');
     sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'Work left on a branch');
     sh(dir, 'git', 'checkout', '-q', 'main');
@@ -176,14 +177,10 @@ export function checks({ dir, srv, r, browsers, context }) {
   // AXE_REPORT=1 it prints the counts per page and rule and fails nothing, to size the work.
   // The shipped theme is the one the stylesheet carries; its light and dark are both walked.
   async function axeAll() {
-    const { createRequire } = await import('node:module');
-    const { root } = await import('../../lib/browser-lib.mjs');
     const axePath = createRequire(`${root}/package.json`).resolve('axe-core');
     const report = process.env.AXE_REPORT === '1';
     // The pages walked carry their crowded state whatever ran before: a search with numbered
     // hits and a branch ahead of main, so /refs shows its compare-count links.
-    const { sh } = await import('../../lib/browser-lib.mjs');
-    const { writeFileSync } = await import('node:fs');
     writeFileSync(`${dir}/axe-hits.txt`, 'one\ntwo one\n');
     sh(dir, 'git', 'add', 'axe-hits.txt');
     sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'test: lines that match a search');

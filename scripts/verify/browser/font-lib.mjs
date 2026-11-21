@@ -2,10 +2,9 @@
 // from /raw, a sample set in that face; a file that is not a font shows neither. The commit
 // goes on a side ref through a private index, so HEAD and the work tree stay put.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { root, launch } from '../../lib/browser-lib.mjs';
+import { root, launch, commitFiles } from '../../lib/browser-lib.mjs';
 
 const FONT = join(
   root, 'vendor/schwarzwald/kit/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2',
@@ -15,19 +14,10 @@ const FONT = join(
 export function checks(env) {
   const { dir, srv, r, browsers, cfg } = env;
   async function fontSample() {
-    const gitEnv = { ...process.env, GIT_INDEX_FILE: join(cfg, 'font-index') };
-    const git = (input, ...a) =>
-      execFileSync('git', a, { cwd: dir, env: gitEnv, input, encoding: 'utf8' }).trim();
-    git(undefined, 'read-tree', 'HEAD');
-    const add = (body, path) => {
-      const blob = git(body, 'hash-object', '-w', '--stdin');
-      git(undefined, 'update-index', '--add', '--cacheinfo', `100644,${blob},${path}`);
-    };
-    add(readFileSync(FONT), 'fonts/mono.woff2');
-    add('\0\x01\0\0not a font', 'fonts/bad.ttf');
-    const tree = git(undefined, 'write-tree');
-    const sha = git(undefined, 'commit-tree', tree, '-p', 'HEAD', '-m', 'Fonts');
-    git(undefined, 'update-ref', 'refs/heads/font-check', sha);
+    const sha = commitFiles(dir, join(cfg, 'font-index'), {
+      'fonts/mono.woff2': readFileSync(FONT),
+      'fonts/bad.ttf': '\0\x01\0\0not a font',
+    }, 'refs/heads/font-check', 'Fonts');
     for (const name of browsers) {
       const b = await launch(env.pw, name);
       const p = await (await b.newContext()).newPage();

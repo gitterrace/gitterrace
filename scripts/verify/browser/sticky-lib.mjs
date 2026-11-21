@@ -2,6 +2,9 @@
 // head at the top of the window, closed by a line under it as wide as the card's content box,
 // the outline button sits inside the bar, and the Markdown Code view spans the content width.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
+import { execFileSync } from 'node:child_process';
+import { writeFileSync, mkdirSync } from 'node:fs';
+import { join } from 'node:path';
 
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [
@@ -16,7 +19,7 @@ const VIEWS = [
 ];
 
 /** Adds the files the views need as one commit on the served branch. */
-function addFiles(dir, execFileSync) {
+function addFiles(dir) {
   const sh = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8' }).trim();
   const md = '# Guide\n\n' + Array.from({ length: 10 }, (_, i) => `## Part ${i}\n\n` + 'Words in a paragraph. '.repeat(30) + '\n\n| a | b |\n| --- | --- |\n| ' + 'wide cell '.repeat(40) + ' | x |\n\n```\n' + 'wide_code_'.repeat(40) + '\n```\n').join('\n');
   const long = Array.from({ length: 300 }, (_, i) => `line ${i + 1} ` + 'x'.repeat(i % 7 === 0 ? 400 : 10)).join('\n') + '\n';
@@ -25,10 +28,7 @@ function addFiles(dir, execFileSync) {
 
 export function checks({ pw, dir, srv, r, browsers, context }) {
   async function seed() {
-    const { execFileSync } = await import('node:child_process');
-    const { writeFileSync, mkdirSync } = await import('node:fs');
-    const { join } = await import('node:path');
-    const { md, long, sh } = addFiles(dir, execFileSync);
+    const { md, long, sh } = addFiles(dir);
     mkdirSync(join(dir, 'guide'), { recursive: true });
     writeFileSync(join(dir, 'guide/GUIDE.md'), md);
     writeFileSync(join(dir, 'guide/long.txt'), long);
