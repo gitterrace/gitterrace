@@ -64,24 +64,23 @@ enum Cmd {
 
 /// Every generator. A new one is checked by being listed here. `refresh` is false for
 /// `check`, where a block made from the commits keeps its text (see `changelog_md`).
-fn generators(root: &Path, refresh: bool) -> Result<Vec<Out>> {
-    let ws = facts::load(root)?;
+fn generators(root: &Path, ws: &facts::Workspace, refresh: bool) -> Result<Vec<Out>> {
     let scripts = action_scripts::load(root)?;
     let mut outs = vec![
         api_md::render(),
         cli_md::render(),
         config_md::render(),
         docs_index::render(),
-        openapi_json::render(&ws),
+        openapi_json::render(ws),
         notices_md::render(root)?,
     ];
-    outs.extend(readme_agents_md::render(&ws, &scripts));
-    outs.extend(docs_md::render(root, &ws, &scripts)?);
+    outs.extend(readme_agents_md::render(ws, &scripts));
+    outs.extend(docs_md::render(root, ws, &scripts)?);
     outs.extend(plate::outs(root, plate::PLATE_COLOR)?);
     outs.push(theme::render(root)?);
     outs.extend(logo::outs(root)?);
     outs.extend(changelog_md::render(root, refresh)?);
-    outs.extend(site::render(root, &ws)?);
+    outs.extend(site::render(root, ws)?);
     Ok(outs)
 }
 
@@ -89,6 +88,7 @@ fn main() -> Result<()> {
     let root = repo_root();
     match Cli::parse().cmd {
         Cmd::Generate => {
+            let ws = facts::load(&root)?;
             main_guard::refuse_main(
                 &root,
                 std::env::var(main_guard::ALLOW).is_ok_and(|v| v == "1"),
@@ -96,7 +96,7 @@ fn main() -> Result<()> {
             // The site reads the documents from disk, so a block written in this pass shows
             // on its page in the next. Two passes settle it; a third change is a bug.
             for pass in 0..3 {
-                let wrote = apply(&root, tracked(generators(&root, true)?), Mode::Write)?;
+                let wrote = apply(&root, tracked(generators(&root, &ws, true)?), Mode::Write)?;
                 for path in &wrote {
                     println!("  wrote {path}");
                 }
@@ -105,23 +105,23 @@ fn main() -> Result<()> {
                 }
                 anyhow::ensure!(pass < 2, "generate does not settle: {}", wrote.join(", "));
             }
-            site::build(&root, generators(&root, true)?)?;
+            site::build(&root, generators(&root, &ws, true)?)?;
             println!("generate: done, the site is in {}", site::SITE_DIR);
         }
         Cmd::Check => {
-            let outs = generators(&root, false)?;
+            let ws = facts::load(&root)?;
+            let outs = generators(&root, &ws, false)?;
             let unmarked = marks::check(&root, &outs)?;
             fail_if(&unmarked, "generated files are not marked:\n  ", "\n  ");
             let orphans = unowned_blocks(&root, &outs)?;
             fail_if(&orphans, "generated blocks nobody fills: ", ", ");
-            let ws = facts::load(&root)?;
             let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
             let (site_outs, outs): (Vec<Out>, Vec<Out>) = outs.into_iter().partition(site::is_site);
             let stale = apply(&root, outs, Mode::Check)?;
             fail_if(&stale, "generated output is stale, run `make docs-gen`: ", ", ");
             println!("generated output: up to date");
             // A fresh build, so the guards never see a site older than its sources.
-            let dir = site::build(&root, generators(&root, false)?)?;
+            let dir = site::build(&root, generators(&root, &ws, false)?)?;
             let site_bad = site::disk::check(&root, &dir, &site_outs, repo)?;
             fail_if(
                 &site_bad,
@@ -145,11 +145,13 @@ fn main() -> Result<()> {
             }
         }
         Cmd::Site => {
+            let ws = facts::load(&root)?;
             // `refresh` false: the changelog's Unreleased block is read, not rewritten.
-            let dir = site::build(&root, generators(&root, false)?)?;
+            let dir = site::build(&root, generators(&root, &ws, false)?)?;
             println!("site: built into {}", dir.display());
         }
         Cmd::DeployCheck => {
+            let ws = facts::load(&root)?;
             let bad = site::legal::deploy_check(&root)?;
             fail_if(
                 &bad,
@@ -157,10 +159,9 @@ fn main() -> Result<()> {
                 "\n  ",
             );
             // The files `make site` wrote, the ones wrangler uploads, not a fresh build.
-            let ws = facts::load(&root)?;
             let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
             let site_outs: Vec<Out> =
-                generators(&root, false)?.into_iter().filter(site::is_site).collect();
+                generators(&root, &ws, false)?.into_iter().filter(site::is_site).collect();
             let site_bad = site::disk::check(&root, &root.join(site::SITE_DIR), &site_outs, repo)?;
             fail_if(
                 &site_bad,

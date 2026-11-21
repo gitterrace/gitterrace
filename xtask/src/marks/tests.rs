@@ -56,7 +56,8 @@ fn a_comment_is_not_a_mark() {
 #[test]
 fn the_tree_marks_every_generated_doc() {
     let root = crate::repo_root();
-    let outs = crate::generators(&root, false).expect("generators");
+    let outs = crate::generators(&root, &crate::facts::load(&root).expect("facts"), false)
+        .expect("generators");
     let bad = check(&root, &outs).expect("check");
     assert!(bad.is_empty(), "{bad:?}");
 }
