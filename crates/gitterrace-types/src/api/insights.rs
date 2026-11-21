@@ -200,6 +200,24 @@ pub struct InsightOwnership {
     pub untracked_lines: u64,
 }
 
+/// One language of `languages`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightLanguage {
+    pub files: usize,
+    pub language: String,
+    pub lines: u64,
+}
+
+/// `languages`: every line of the text files of the tree at `rev`, per language.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightLanguages {
+    pub files: usize,
+    /// Most lines first, ties by name.
+    pub languages: Vec<InsightLanguage>,
+    /// The sum of `languages`, the size of the project.
+    pub total_lines: u64,
+}
+
 /// The `data` of an insight answer. Which variant it is follows from `insight`.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 #[serde(untagged)]
@@ -214,6 +232,7 @@ pub enum InsightData {
     Frequency(Vec<InsightFrequency>),
     Hotspots(InsightHotspots),
     Ownership(InsightOwnership),
+    Languages(InsightLanguages),
 }
 
 /// `GET /insights/{name}`. The fields keep the order the answer was always written in.

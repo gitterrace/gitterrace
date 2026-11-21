@@ -22,6 +22,7 @@ mod filter_chips;
 mod format_html_count;
 mod gitlink_paths;
 mod hint_rule_links;
+mod languages_agree;
 mod languages_empty_period;
 mod leads_match_the_numbers;
 mod log_graph;

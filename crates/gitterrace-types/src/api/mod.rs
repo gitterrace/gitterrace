@@ -24,8 +24,9 @@ pub use commit::{
 pub use insights::{
     InsightContributor, InsightContributors, InsightData, InsightDirChurn, InsightDirOwnership,
     InsightFileChurn, InsightFrequency, InsightHotspot, InsightHotspots, InsightLabelBucket,
-    InsightLabelCount, InsightOwner, InsightOwnership, InsightPeriod, InsightPeriodStats,
-    InsightPeriodSummary, InsightResponse, InsightRhythm, InsightSeriesPoint, InsightUnit,
+    InsightLabelCount, InsightLanguage, InsightLanguages, InsightOwner, InsightOwnership,
+    InsightPeriod, InsightPeriodStats, InsightPeriodSummary, InsightResponse, InsightRhythm,
+    InsightSeriesPoint, InsightUnit,
 };
 
 /// Who did something and when.

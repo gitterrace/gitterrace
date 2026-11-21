@@ -198,6 +198,23 @@ pub struct HotspotReport {
     pub single_author_files: usize,
 }
 
+/// Lines of one language in the head tree.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LanguageLines {
+    pub files: usize,
+    pub language: String,
+    pub lines: u64,
+}
+
+/// Lines per language in the head tree, the numbers the Languages page lists for now.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+pub struct LanguageReport {
+    pub files: usize,
+    /// Most lines first, ties by name.
+    pub languages: Vec<LanguageLines>,
+    pub total_lines: u64,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Owner {
     pub name: String,

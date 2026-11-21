@@ -8,7 +8,7 @@ use rustc_hash::FxHashMap as FastMap;
 use crate::feed::{PathId, local_day_of};
 use crate::insights::files::{
     AgeBucket, AgeReport, COUPLING_MAX_FILES, Coupling, DirOwnership, Hotspot, HotspotReport,
-    Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,
+    LanguageLines, LanguageReport, Owner, OwnershipReport, SOLO_SHARE, STALE_SECS,
 };
 use crate::insights::{Counted, HeadFile, Insights, Period};
 
@@ -404,6 +404,28 @@ impl Insights<'_> {
                 .collect(),
             total_lines: total,
         }
+    }
+}
+
+impl Insights<'_> {
+    /// Lines per language among the head files the selection keeps and the path rules leave in:
+    /// the files and lines the Languages page's "now" column counts.
+    pub fn languages_in(&self, files: &[HeadFile], counted: &Counted<'_>) -> LanguageReport {
+        let mut by: FastMap<String, (usize, u64)> = FastMap::default();
+        let mut total = 0;
+        let shown = self.shown(files, counted);
+        for f in &shown {
+            let e = by.entry(crate::insights::lang::language(&f.path)).or_default();
+            e.0 += 1;
+            e.1 += u64::from(f.lines);
+            total += u64::from(f.lines);
+        }
+        let mut languages: Vec<LanguageLines> = by
+            .into_iter()
+            .map(|(language, (files, lines))| LanguageLines { files, language, lines })
+            .collect();
+        languages.sort_by(|a, b| b.lines.cmp(&a.lines).then_with(|| a.language.cmp(&b.language)));
+        LanguageReport { files: shown.len(), languages, total_lines: total }
     }
 }
 

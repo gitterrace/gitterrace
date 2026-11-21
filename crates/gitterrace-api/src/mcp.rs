@@ -43,6 +43,8 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("hotspots", &[Feature::Insights], None),
     ("contributors", &[Feature::Insights], Some("contributors")),
     ("activity", &[Feature::Insights], None),
+    ("languages", &[Feature::Insights], None),
+    ("ownership", &[Feature::Insights], None),
 ];
 
 /// Whether MCP tool `tool` is served for `repo` under `cfg`: `[features]` (`api_enabled`
@@ -224,6 +226,16 @@ args! {
         query: Option<String>,
         /// Files to return. Defaults to 20.
         limit: Option<usize>,
+    }
+    OwnershipArgs {
+        rev: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
+    }
+    LanguagesArgs {
+        rev: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
     }
     ActivityArgs {
         rev: Option<String>,
@@ -423,6 +435,31 @@ impl McpServer {
             s.contributors(a.rev.as_deref(), &crate::insights::Params::default())
         })
         .await
+    }
+
+    /// Lines and files per language in the head tree plus `total_lines`, the web Languages page's
+    /// numbers and the one measure of project size. Use for "how big is this project" and "what
+    /// is it written in".
+    #[tool(name = "languages", annotations(read_only_hint = true))]
+    async fn languages(
+        &self,
+        Parameters(a): Parameters<LanguagesArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let p = Params { select: gitterrace_index::Selection { q: a.query }, ..Params::default() };
+        self.run("languages", a.repo.clone(), move |s| s.insight("languages", a.rev.as_deref(), &p))
+            .await
+    }
+
+    /// Knowledge share and bus factor per directory two levels deep, weighted by size now, the
+    /// web Ownership page's numbers. Use to find directories one person holds alone.
+    #[tool(name = "ownership", annotations(read_only_hint = true))]
+    async fn ownership(
+        &self,
+        Parameters(a): Parameters<OwnershipArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let p = Params { select: gitterrace_index::Selection { q: a.query }, ..Params::default() };
+        self.run("ownership", a.repo.clone(), move |s| s.insight("ownership", a.rev.as_deref(), &p))
+            .await
     }
 
     /// Commits and lines changed per bucket (day, week, month, quarter or year, chosen by

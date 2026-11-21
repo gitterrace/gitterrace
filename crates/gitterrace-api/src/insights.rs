@@ -103,6 +103,11 @@ pub const HEAD_INSIGHTS: &[(&str, &str)] = &[
         "Files of the head tree by changes times the square root of their size. Takes `limit`.",
     ),
     (
+        "languages",
+        "Lines and files per language in the head tree, and their total: the project's size, as \
+         the web Languages page counts it.",
+    ),
+    (
         "ownership",
         "Knowledge share and bus factor per directory two levels deep, weighted by size now.",
     ),
@@ -153,6 +158,7 @@ pub fn compute(
             r.files.truncate(params.limit.unwrap_or(20));
             val(&r)
         }
+        "languages" => val(&ins.languages_in(&head(), c)),
         "ownership" => val(&ins.ownership_in(&head(), c, OWNERSHIP_DEPTH)),
         _ => {
             let insight = INSIGHTS
@@ -181,6 +187,7 @@ pub(crate) fn typed(name: &str, data: Value) -> Result<InsightData, ApiError> {
         "frequency" => InsightData::Frequency(read(data)?),
         "hotspots" => InsightData::Hotspots(read(data)?),
         "ownership" => InsightData::Ownership(read(data)?),
+        "languages" => InsightData::Languages(read(data)?),
         other => return Err(ApiError::BadRequest(format!("unknown insight: {other}"))),
     })
 }

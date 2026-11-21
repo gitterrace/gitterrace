@@ -713,6 +713,9 @@
           },
           {
             "$ref": "#/components/schemas/InsightOwnership"
+          },
+          {
+            "$ref": "#/components/schemas/InsightLanguages"
           }
         ],
         "description": "The `data` of an insight answer. Which variant it is follows from `insight`."
@@ -1015,6 +1018,59 @@
         "required": [
           "commits",
           "label"
+        ],
+        "type": "object"
+      },
+      "InsightLanguage": {
+        "description": "One language of `languages`.",
+        "properties": {
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "language": {
+            "type": "string"
+          },
+          "lines": {
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "files",
+          "language",
+          "lines"
+        ],
+        "type": "object"
+      },
+      "InsightLanguages": {
+        "description": "`languages`: every line of the text files of the tree at `rev`, per language.",
+        "properties": {
+          "files": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "languages": {
+            "description": "Most lines first, ties by name.",
+            "items": {
+              "$ref": "#/components/schemas/InsightLanguage"
+            },
+            "type": "array"
+          },
+          "total_lines": {
+            "description": "The sum of `languages`, the size of the project.",
+            "format": "uint64",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "files",
+          "languages",
+          "total_lines"
         ],
         "type": "object"
       },
@@ -2266,7 +2322,7 @@
         "operationId": "insights_name",
         "parameters": [
           {
-            "description": "Insight name, one of: summary, activity, contributors, file_churn, dir_churn, label_breakdown, label_over_time, frequency, hotspots, ownership.",
+            "description": "Insight name, one of: summary, activity, contributors, file_churn, dir_churn, label_breakdown, label_over_time, frequency, hotspots, languages, ownership.",
             "in": "path",
             "name": "name",
             "required": true,

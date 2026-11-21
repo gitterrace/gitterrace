@@ -165,6 +165,7 @@ summary names any other it takes.
 | `label_over_time` | Type or scope counts per bucket, empty ones included. Takes `label`. |
 | `frequency` | Lines added, removed and rewritten per bucket. |
 | `hotspots` | Files of the head tree by changes times the square root of their size. Takes `limit`. |
+| `languages` | Lines and files per language in the head tree, and their total: the project's size, as the web Languages page counts it. |
 | `ownership` | Knowledge share and bus factor per directory two levels deep, weighted by size now. |
 
 ## MCP (stdio)
@@ -202,6 +203,10 @@ so to the model.
   the web Hotspots page's numbers. Use to find risky or central code and where
   to look first. Parameters: `limit?` (integer), `period?` (string), `query`
   (string), `repo?` (string), `rev?` (string).
+- `languages`: Lines and files per language in the head tree plus `total_lines`,
+  the web Languages page's numbers and the one measure of project size. Use for
+  "how big is this project" and "what is it written in". Parameters: `query`
+  (string), `repo?` (string), `rev?` (string).
 - `list_repos`: The repositories this server may read and which scope it was
   started with: name (pass it as `repo` to every other tool), HEAD, branch and
   newest commit. One that cannot be read shows `available: false` and why. Call
@@ -215,6 +220,10 @@ so to the model.
   id, parents, author, committer and subject per commit plus `has_more`. For one
   commit's diff use `show_commit`. Parameters: `page?` (integer), `path?`
   (string), `per_page?` (integer), `repo?` (string), `rev?` (string).
+- `ownership`: Knowledge share and bus factor per directory two levels deep,
+  weighted by size now, the web Ownership page's numbers. Use to find
+  directories one person holds alone. Parameters: `query` (string), `repo?`
+  (string), `rev?` (string).
 - `read_file`: File content at a revision, read from git (not the working tree).
   Returns text, total line count and whether it was cut. Binary files return
   `binary: true` and no text. Use `start_line` and `limit` for large files. Not

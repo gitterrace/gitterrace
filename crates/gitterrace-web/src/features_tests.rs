@@ -392,6 +392,8 @@ const TOOL_ROUTES: &[(&str, &str)] = &[
     ("hotspots", "/api/v1/insights/{name}"),
     ("contributors", "/api/v1/contributors"),
     ("activity", "/api/v1/insights/{name}"),
+    ("languages", "/api/v1/insights/{name}"),
+    ("ownership", "/api/v1/insights/{name}"),
 ];
 
 /// Class guard: every surface honors the switches. Each MCP tool is on exactly when the web
@@ -415,6 +417,23 @@ fn mcp_tools_follow_the_switches_of_the_web_api() {
                 "{tool} and {route} disagree with {off:?} off"
             );
         }
+    }
+}
+
+/// Class guard: every insights page the web serves has the same numbers over the API
+/// (`/insights/{name}`) and over MCP, under the page's own name. A page added without either
+/// fails here, so the three surfaces cannot drift apart by omission.
+#[test]
+fn every_insights_page_has_an_api_insight_and_an_mcp_tool() {
+    let insights: Vec<&str> = gitterrace_api::insight_list().map(|(n, _)| n).collect();
+    let tools: Vec<String> =
+        gitterrace_api::McpServer::tool_docs().into_iter().map(|d| d.name).collect();
+    let pages: BTreeSet<&str> =
+        INSIGHT_ROUTES.iter().filter(|(_, r)| !r.starts_with("/api/")).map(|(p, _)| *p).collect();
+    assert!(!pages.is_empty(), "no insights page found");
+    for page in pages {
+        assert!(insights.contains(&page), "page {page} has no /api/v1/insights/{page}");
+        assert!(tools.iter().any(|t| t == page), "page {page} has no MCP tool");
     }
 }
 
