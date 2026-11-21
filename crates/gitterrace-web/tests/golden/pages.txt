@@ -1,3 +1,4 @@
+# languages chart JSON escapes & as \u0026; insights charts fit the selected range
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 3ef662cb1c74a0ed28b83f3bcd4eaadb 6e5c7608ee8a723d76bd573f22fdc58f [browse] /blame/HEAD/missing.rs

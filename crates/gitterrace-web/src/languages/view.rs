@@ -31,8 +31,6 @@ pub(super) struct Area {
     pub(super) ticks: Vec<Tick>,
     pub(super) bands: Vec<Band>,
     pub(super) dates: Vec<DateLabel>,
-    pub(super) sel: (P, P),
-    pub(super) none: bool,
     pub(super) ph: P,
     pub(super) xh_y2: P,
 }

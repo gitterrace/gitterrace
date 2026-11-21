@@ -43,9 +43,8 @@ fn shown(n: usize, view: View) -> Vec<usize> {
     if n == 0 {
         return Vec::new();
     }
-    let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
-    let mut v = sample(n, &keep);
     let (from, to) = view.range.unwrap_or((0, n - 1));
+    let mut v = sample(from, to);
     let shown = (to - from + 1).min(COMMIT_LIST);
     v.extend(to + 1 - shown..=to);
     v.sort_unstable();

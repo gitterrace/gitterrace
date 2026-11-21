@@ -12,12 +12,13 @@ fn range_is_clamped_and_ordered() {
 }
 
 #[test]
-fn sampling_keeps_ends_and_selection() {
-    let s = sample(10_000, &[1234, 5678]);
-    assert!(s.len() <= 702);
+fn sampling_keeps_the_ends_of_the_range() {
+    let s = sample(0, 9_999);
+    assert!(s.len() <= 700);
     assert_eq!((s[0], *s.last().unwrap_or(&0)), (0, 9_999));
-    assert!(s.contains(&1234) && s.contains(&5678));
-    assert_eq!(sample(5, &[]), vec![0, 1, 2, 3, 4]);
+    let r = sample(1234, 5678);
+    assert_eq!((r[0], *r.last().unwrap_or(&0)), (1234, 5678));
+    assert_eq!(sample(0, 4), vec![0, 1, 2, 3, 4]);
 }
 
 /// The page reads a bounded set of subjects whatever the history length, so a cold

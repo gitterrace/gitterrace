@@ -319,3 +319,78 @@ async fn a_page_request_during_a_slow_warmer_answers_with_the_pending_page() {
     let next = super::cached(&app, "slow", None, |_, _, _| Data).await.expect("next page");
     assert_eq!(next.0, "data", "the pending page was memoized");
 }
+
+/// Commits on four days of March 2024, the range being the middle two.
+fn dated(dir: &std::path::Path) -> std::path::PathBuf {
+    let mut f = gitterrace_testkit::Fixture::init(dir);
+    for (i, day) in ["01", "05", "06", "20"].iter().enumerate() {
+        f = f
+            .at(&format!("2024-03-{day}T12:00:00+00:00"))
+            .write("a.txt", &format!("{}\n", "x\n".repeat(i + 1)))
+            .commit(&format!("feat(core): change {i}"));
+    }
+    f.path().to_owned()
+}
+
+/// The x labels of the chart svg that follows the marker `at` in `html`.
+fn axis_after(html: &str, at: &str) -> Vec<String> {
+    let chart = html.split(at).nth(1).expect("section");
+    let chart = chart.split("<svg").nth(1).expect("chart").split("</svg>").next().unwrap_or("");
+    chart
+        .split("<text class=\"ax\"")
+        .skip(1)
+        .filter(|t| t.contains("text-anchor=\"middle\"") || t.contains("text-anchor=\"end\""))
+        .filter_map(|t| t.split('>').nth(1)?.split('<').next().map(str::to_owned))
+        .filter(|l| l.contains(' '))
+        .collect()
+}
+
+/// Every chart kind of the activity page draws only the selected days: bars, stacked,
+/// diverging bars and the rework line each run from the first selected day to the last.
+#[tokio::test]
+async fn a_selected_range_fits_every_activity_chart_to_its_days() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let app = crate::tests::ready_app(dated(dir.path()));
+    let (s, body) = crate::tests::get(&app, "/stats?from=2024-03-05&to=2024-03-06").await;
+    assert_eq!(s, 200);
+    for (kind, marker) in [
+        ("bars", "id=\"activity-series\""),
+        ("stacked", "id=\"types\""),
+        ("diverging", "id=\"frequency\""),
+    ] {
+        let axis = axis_after(&body, marker);
+        assert_eq!(axis.first().map(String::as_str), Some("Tue 5"), "{kind}: {axis:?}");
+        assert_eq!(axis.last().map(String::as_str), Some("Wed 6"), "{kind}: {axis:?}");
+    }
+    let freq = body.split("id=\"frequency\"").nth(1).expect("frequency");
+    assert!(!freq.contains("Fri 1") && !freq.contains("Wed 20"), "frequency draws other days");
+}
+
+/// The punch card counts only commits of the range: the hours of the other days are empty.
+#[tokio::test]
+async fn a_selected_range_limits_the_punch_card_to_its_days() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let app = crate::tests::ready_app(dated(dir.path()));
+    let (_, some) = crate::tests::get(&app, "/stats?from=2024-03-05&to=2024-03-06").await;
+    assert!(some.contains("2 commits"), "range total");
+}
+
+/// The language area chart draws only the selected positions: its date axis starts and ends
+/// at the range.
+#[tokio::test]
+async fn a_selected_range_fits_the_language_chart_to_its_commits() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let app = crate::tests::ready_app(dated(dir.path()));
+    let (s, body) = crate::tests::get(&app, "/stats/languages?from=1&to=2").await;
+    assert_eq!(s, 200);
+    let chart =
+        body.split("id=\"loc\"").nth(1).expect("chart").split("</svg>").next().unwrap_or("");
+    let labels: Vec<&str> = chart
+        .split("<text class=\"ax\"")
+        .filter_map(|t| t.split('>').nth(1)?.split('<').next())
+        .filter(|l| l.contains("2024"))
+        .collect();
+    assert_eq!(labels.first(), Some(&"2024-03-05"), "{labels:?}");
+    assert_eq!(labels.last(), Some(&"2024-03-06"), "{labels:?}");
+    assert!(!chart.contains("2024-03-01") && !chart.contains("2024-03-20"));
+}

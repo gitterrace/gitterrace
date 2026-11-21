@@ -42,26 +42,26 @@ fn cat_s(k: usize, n: usize) -> String {
     cat(k, n).replacen('c', "s", 1)
 }
 
-/// Sampled commit indices: evenly spread, always with first, last and `keep`.
-pub(super) fn sample(n: usize, keep: &[usize]) -> Vec<usize> {
-    let mut v: Vec<usize> = if n <= SAMPLES {
-        (0..n).collect()
+/// Sampled chain positions of `lo..=hi`: evenly spread, always with both ends.
+pub(super) fn sample(lo: usize, hi: usize) -> Vec<usize> {
+    let n = hi + 1 - lo;
+    if n <= SAMPLES {
+        (lo..=hi).collect()
     } else {
-        (0..SAMPLES).map(|k| k * (n - 1) / (SAMPLES - 1)).collect()
-    };
-    v.extend(keep.iter().filter(|k| **k < n));
-    v.sort_unstable();
-    v.dedup();
-    v
+        let mut v: Vec<usize> = (0..SAMPLES).map(|k| lo + k * (n - 1) / (SAMPLES - 1)).collect();
+        v.dedup();
+        v
+    }
 }
 
 const AREA_NAME: &str = "Lines of code by language over history";
 
 fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, String) {
     let n = ch.len();
-    let keep: Vec<usize> = view.range.map_or(vec![], |(a, b)| vec![a, b]);
-    let pts = sample(n, &keep);
-    let (t0, t1) = (ch.time(0), ch.time(n - 1).max(ch.time(0) + 1));
+    // The chart draws only the selected range, its axis fitted to it.
+    let (lo, hi) = view.range.unwrap_or((0, n - 1));
+    let pts = sample(lo, hi);
+    let (t0, t1) = (ch.time(lo), ch.time(hi).max(ch.time(lo) + 1));
     let pw = W - LEFT - RIGHT;
     let ph = H - TOP_PAD - BOTTOM;
     let mut xs: Vec<f64> = Vec::new();
@@ -69,7 +69,7 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         let frac = if view.time {
             (ch.time(i) - t0) as f64 / (t1 - t0) as f64
         } else {
-            i as f64 / (n - 1).max(1) as f64
+            (i - lo) as f64 / (hi - lo).max(1) as f64
         };
         let x = frac.clamp(0.0, 1.0).mul_add(pw, LEFT);
         xs.push(xs.last().map_or(x, |p: &f64| p.max(x)));
@@ -155,11 +155,6 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
             }
         })
         .collect();
-    let sel = view.range.map(|(a, b)| {
-        let ja = pts.iter().position(|p| *p == a).unwrap_or(0);
-        let jb = pts.iter().position(|p| *p == b).unwrap_or(pts.len() - 1);
-        (P(xs[ja]), P((xs[jb] - xs[ja]).max(2.0)))
-    });
     // One row per band, read where the bands' tips read: the first and the newest shown point.
     let last = pts.len() - 1;
     let row = |label: &str, first: i64, now: i64, total: i64| Row {
@@ -183,14 +178,15 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
             .collect(),
         total: Some(row("Total", totals[0], totals[last], totals[last])),
     };
-    let summary = if n == 1 {
-        format!("1 commit on {}. {lead}", fmt::day(ch.time(0)))
+    let count = hi - lo + 1;
+    let summary = if count == 1 {
+        format!("1 commit on {}. {lead}", fmt::day(ch.time(lo)))
     } else {
         format!(
             "{} from {} to {}. {lead}",
-            fmt::count(n, "commit", "commits"),
-            fmt::day(ch.time(0)),
-            fmt::day(ch.time(n - 1))
+            fmt::count(count, "commit", "commits"),
+            fmt::day(ch.time(lo)),
+            fmt::day(ch.time(hi))
         )
     };
     let area = Area {
@@ -199,8 +195,6 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         ticks: grid,
         bands,
         dates,
-        none: sel.is_none(),
-        sel: sel.unwrap_or((P(0.0), P(0.0))),
         ph: P(ph),
         xh_y2: P(TOP_PAD + ph),
     };

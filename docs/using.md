@@ -138,6 +138,13 @@ Open insights with `g i`. The languages page counts lines along the
 first-parent history, so a renamed and edited file may count as a delete plus
 an add.
 
+A range narrows the whole page, charts included. Pick a period, type
+`after:` and `before:` dates, or click a bar on the commits chart. Every chart
+then draws only those days, with its axis and buckets fitted to them. On the
+languages page, drag across the chart to select a stretch of commits: the page
+reloads with the chart drawn on just that stretch. The date axis starts at the
+first selected commit and ends at the last.
+
 ## Change a setting
 
 1. Press `.`, then `,` to open Settings on a local server.

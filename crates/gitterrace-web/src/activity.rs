@@ -213,14 +213,8 @@ pub(crate) async fn page(
         let scope = scope_of(&q, &d, period, sel);
         let ins = insights(a, r, scope.options().clone());
         let counted = crate::insights::counted(&ins, &scope, r);
-        // One walk feeds the page and both sections. The sections count the page's period
-        // without the range, so a selected range gives them a fold of their own.
+        // One walk feeds the page and both sections: a selected range bounds them all.
         let fold = counted.activity_fold();
-        let plain = scope_of(&q, &d, period, None);
-        let plain_set = crate::insights::counted(&ins, &plain, r);
-        let plain_fold = sel.map(|_| plain_set.activity_fold());
-        let (sec_set, sec_fold) =
-            plain_fold.as_ref().map_or((&counted, &fold), |f| (&plain_set, f));
         let (s, rhythm) = (&fold.summary, &fold.rhythm);
         let prev = s.previous.as_ref();
         let rows = pulse_rows(&s.current, prev, scope.options().include_merges);
@@ -245,10 +239,10 @@ pub(crate) async fn page(
             range_card(&from, &to, &rhythm.by_weekday)
         });
         let types_html = crate::features::section("types", || {
-            crate::commit_types::section(a, &q, lp.page.as_deref(), sec_set, sec_fold)
+            crate::commit_types::section(a, &q, lp.page.as_deref(), &counted, &fold)
         });
         let frequency_html =
-            crate::features::section("frequency", || crate::frequency::section(sec_fold));
+            crate::features::section("frequency", || crate::frequency::section(&fold));
         fb.jump = crate::markdown::outline_menu(
             &crate::markdown::section_jumps(&[
                 ("activity-counts", "Counts", true),

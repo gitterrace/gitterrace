@@ -3,5 +3,5 @@
 {%- for t in ticks %}<line class="grid" x1="72" x2="{{ right }}" y1="{{ t.y }}" y2="{{ t.y }}"/><text class="ax" x="64.0" y="{{ t.ty }}" text-anchor="end">{{ t.label }}</text>{% endfor -%}
 {%- for b in bands %}<path class="{{ b.class }}" d="{{ b.d }}Z" data-tip="{{ b.tip }}"/>{% endfor -%}
 {%- for l in dates %}<text class="ax" x="{{ l.x }}" y="272.0" text-anchor="{{ l.anchor }}">{{ l.text }}</text>{% endfor -%}
-{%- if none %}<rect class="sel" x="0" y="10" width="0" height="{{ ph }}"/>{% else %}<rect class="sel" x="{{ sel.0 }}" y="10" width="{{ sel.1 }}" height="{{ ph }}"/>{% endif -%}
-<line class="xh" x1="0" x2="0" y1="10" y2="{{ xh_y2 }}"/></svg>
+{#- The drag highlight: loc.js sizes it while a range is dragged. -#}
+<rect class="sel" x="0" y="10" width="0" height="{{ ph }}"/><line class="xh" x1="0" x2="0" y1="10" y2="{{ xh_y2 }}"/></svg>
