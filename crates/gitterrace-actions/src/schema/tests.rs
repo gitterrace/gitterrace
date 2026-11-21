@@ -5,7 +5,7 @@ use crate::config::{Config, Kind};
 use crate::payload::{CommitInfo, Lines, Payload, RepoInfo};
 use crate::schema::{
     ACTION_KEYS, ENV_VARS, FILE_KEYS, Item, KINDS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
-    SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
+    SEND_KEYS, SEND_PLACEHOLDERS,
 };
 
 fn names(items: &[Item]) -> BTreeSet<String> {
@@ -67,7 +67,8 @@ fn env_table_is_the_environment() {
 
 #[test]
 fn kinds_table_is_the_kind_enum() {
-    let doc: BTreeSet<String> = KINDS.iter().map(|(k, _)| kind_name(*k)).collect();
+    let doc: BTreeSet<String> =
+        KINDS.iter().map(|(k, _)| crate::payload::kind_name(*k).to_owned()).collect();
     let err = serde_json::from_str::<Kind>("\"nope\"").expect_err("unknown kind");
     assert_eq!(doc, expected(&err.to_string()));
     assert_eq!(doc.len(), KINDS.len(), "a kind is listed twice");

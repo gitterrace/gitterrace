@@ -2,16 +2,9 @@
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
-use std::path::{MAIN_SEPARATOR, Path, PathBuf};
+use std::path::{MAIN_SEPARATOR, Path};
 
-pub(super) fn expand_tilde(p: &str, home: &Path) -> PathBuf {
-    match p.strip_prefix("~/") {
-        Some(rest) => home.join(rest),
-        None if cfg!(windows) && p.starts_with("~\\") => home.join(&p[2..]),
-        None if p == "~" => home.to_path_buf(),
-        None => PathBuf::from(p),
-    }
-}
+use gitterrace_types::home::expand_tilde;
 
 /// argv[0] as an absolute executable: tilde-expanded, or looked up in `PATH` when it has no
 /// slash. A relative path with a slash is refused: it would resolve against the cwd.

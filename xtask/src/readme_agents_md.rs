@@ -5,7 +5,7 @@
 use std::fmt::Write as _;
 
 use clap::CommandFactory as _;
-use gitterrace_actions::schema::{KINDS, kind_name};
+use gitterrace_actions::{kind_name, schema::KINDS};
 
 use crate::action_scripts::Script;
 use crate::facts::Workspace;

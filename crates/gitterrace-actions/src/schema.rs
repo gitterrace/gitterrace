@@ -41,11 +41,6 @@ pub const KINDS: [(Kind, &str); 8] = [
     (Kind::Page, "The page being shown."),
 ];
 
-/// The kebab-case name of `kind`, as written in `actions.toml` and the payload.
-pub fn kind_name(kind: Kind) -> String {
-    serde_json::to_value(kind).ok().and_then(|v| v.as_str().map(str::to_owned)).unwrap_or_default()
-}
-
 /// Payload v1, the JSON a script reads on stdin. `required` means always present.
 pub const PAYLOAD_FIELDS: [Item; 16] = [
     item("v", "integer", true, "", "Payload version, `1`."),

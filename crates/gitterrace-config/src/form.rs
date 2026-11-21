@@ -56,8 +56,8 @@ fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
         source: loaded.sources.get(k.id).copied().unwrap_or(Source::Default),
         restart: k.reload == Reload::Restart,
         default: k.default,
-        control: k.control,
         bounds: bounds.filter(|_| k.control == Control::Number),
+        control: k.control,
     }
 }
 

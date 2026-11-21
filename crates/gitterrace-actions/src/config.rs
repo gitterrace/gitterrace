@@ -18,7 +18,7 @@ use serde::Deserialize;
 
 pub use crate::config::command::{PieceError, pieces};
 use crate::config::command::{StdinError, check_command};
-use crate::config::program::{expand_tilde, resolve_program};
+use crate::config::program::resolve_program;
 pub use crate::config::reload::Reloader;
 use crate::config::trust::check_file;
 
@@ -325,9 +325,8 @@ impl Config {
 
 /// The home folder, or the filesystem root when its variable is unset.
 pub(crate) fn home() -> PathBuf {
-    let var = if cfg!(windows) { "USERPROFILE" } else { "HOME" };
-    std::env::var_os(var)
-        .map_or_else(|| PathBuf::from(std::path::MAIN_SEPARATOR_STR), PathBuf::from)
+    gitterrace_types::home::home_dir()
+        .unwrap_or_else(|| PathBuf::from(std::path::MAIN_SEPARATOR_STR))
 }
 
 fn invalid(id: &str, why: impl Into<String>) -> ConfigError {
@@ -409,7 +408,7 @@ fn validate(
         None | Some("home") => Cwd::Home,
         Some("repo") => Cwd::Repo,
         Some(p) => {
-            let p = expand_tilde(p, home);
+            let p = gitterrace_types::home::expand_tilde(p, home);
             if !p.is_absolute() || !p.is_dir() {
                 return Err(invalid(&id, "cwd must be repo, home or an existing absolute dir"));
             }

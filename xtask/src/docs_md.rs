@@ -5,12 +5,12 @@ use std::fmt::Write as _;
 use std::path::Path;
 
 use anyhow::{Context as _, Result};
-use gitterrace_actions::Config;
 use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
-    SEND_KEYS, SEND_PLACEHOLDERS, kind_name,
+    SEND_KEYS, SEND_PLACEHOLDERS,
 };
 use gitterrace_actions::send::DENIED_SCHEMES;
+use gitterrace_actions::{Config, kind_name};
 
 use crate::action_scripts::Script;
 use crate::facts::Workspace;

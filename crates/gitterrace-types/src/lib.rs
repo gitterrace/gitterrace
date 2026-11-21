@@ -9,6 +9,7 @@ pub mod api;
 pub mod codec;
 pub mod config;
 pub mod git;
+pub mod home;
 pub mod markup;
 
 #[cfg(test)]

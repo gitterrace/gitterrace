@@ -268,7 +268,8 @@ impl Payload {
     }
 }
 
-const fn kind_name(k: Kind) -> &'static str {
+/// The kebab-case name of `k`, as written in `actions.toml` and the payload.
+pub const fn kind_name(k: Kind) -> &'static str {
     match k {
         Kind::Line => "line",
         Kind::File => "file",
