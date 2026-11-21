@@ -38,7 +38,9 @@ async fn the_main_pages_stay_within_the_request_budget() {
     let max = count("web_requests");
     let mut heavy = Vec::new();
     for uri in ["/", "/blob/HEAD/a.rs", &format!("/commit/{}", sha.trim()), "/log/HEAD", "/stats"] {
-        let page = gitterrace_testkit::wait::page_until(&router, uri, gitterrace_testkit::wait::indexed).await;
+        let page =
+            gitterrace_testkit::wait::page_until(&router, uri, gitterrace_testkit::wait::indexed)
+                .await;
         if requests(&page) > max {
             heavy.push(format!("{uri}: {} requests", requests(&page)));
         }
