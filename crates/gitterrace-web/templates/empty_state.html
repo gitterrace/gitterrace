@@ -1,1 +1,1 @@
-<div class="empty" role="status"><p>{{ e.message }}</p>{% if let Some((label, href)) = e.step %}<p class="next"><a href="{{ href }}">{{ label }}</a></p>{% endif %}</div>
+<div class="empty" role="status"><p>{{ self.message }}</p>{% if let Some((label, href)) = self.step %}<p class="next"><a href="{{ href }}">{{ label }}</a></p>{% endif %}</div>

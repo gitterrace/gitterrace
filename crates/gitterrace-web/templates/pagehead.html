@@ -1,34 +1,34 @@
 {#- The page head (pagehead.rs): the one template that writes an h1. Slots in a fixed order:
 eyebrow, title row, tagline, tab row or divider, toolbar. `tools` and `toolbar` are the crate's
 own escaped markup (Seg, outline menus, a filter form). -#}
-<header class="ph{% if h.pin %} pin{% endif %}" data-pagehead
-{%- if h.own %} data-seg-own{% endif %}>
-{%- if !h.eyebrow.is_empty() %}<p class="ph-eyebrow">{{ h.eyebrow }}</p>{% endif -%}
+<header class="ph{% if self.pin %} pin{% endif %}" data-pagehead
+{%- if self.own %} data-seg-own{% endif %}>
+{%- if !self.eyebrow.is_empty() %}<p class="ph-eyebrow">{{ self.eyebrow }}</p>{% endif -%}
 <div class="ph-row">
-{%- if !h.crumbs.is_empty() %}<h1 class="crumbs">
-{%- for k in h.crumbs %}{% if !loop.first %}<i>/</i>{% endif -%}
+{%- if !self.crumbs.is_empty() %}<h1 class="crumbs">
+{%- for k in self.crumbs %}{% if !loop.first %}<i>/</i>{% endif -%}
 <a href="{{ k.href }}">{{ k.name }}</a>{% endfor %}</h1>
-{%- else %}<h1>{{ h.title }}
-{%- if !h.qualifier.is_empty() %} <span class="ref">{{ h.qualifier }}</span>{% endif -%}
+{%- else %}<h1>{{ self.title }}
+{%- if !self.qualifier.is_empty() %} <span class="ref">{{ self.qualifier }}</span>{% endif -%}
 </h1>{% endif -%}
-{%- if !h.actions.is_empty() || !h.tools.is_empty() %}<span class="ph-acts">
-{%- for a in h.actions %}<a href="{{ a.href }}">{{ a.label }}</a>{% endfor -%}
-{{ h.tools|safe }}</span>{% endif -%}
+{%- if !self.actions.is_empty() || !self.tools.is_empty() %}<span class="ph-acts">
+{%- for a in self.actions %}<a href="{{ a.href }}">{{ a.label }}</a>{% endfor -%}
+{{ self.tools|safe }}</span>{% endif -%}
 </div>
-<p class="ph-tag"{% if h.tagline.lead %} data-lead{% endif %}>
-{%- for p in h.tagline.parts -%}
+<p class="ph-tag"{% if self.tagline.lead %} data-lead{% endif %}>
+{%- for p in self.tagline.parts -%}
 {%- if !p.href.is_empty() %}<a href="{{ p.href }}">{{ p.text }}</a>
 {%- else if p.num %}<b>{{ p.text }}</b>
 {%- else %}{{ p.text }}{% endif -%}
 {%- endfor %}</p>
-{%- if tabs %}
+{%- if self.tabs.len() > 1 %}
 <nav class="tabs">
-{%- for t in h.tabs %}<a href="{{ t.href }}"{% if t.on %} class="on" aria-current="page"{% endif -%}
+{%- for t in self.tabs %}<a href="{{ t.href }}"{% if t.on %} class="on" aria-current="page"{% endif -%}
 >{{ t.label }}</a>{% endfor %}</nav>
 {%- else %}
 <hr class="ph-sep">
 {%- endif %}
-{%- if !h.toolbar.is_empty() %}
-<div class="fbar">{{ h.toolbar|safe }}</div>
+{%- if !self.toolbar.is_empty() %}
+<div class="fbar">{{ self.toolbar|safe }}</div>
 {%- endif %}
 </header>

@@ -5,8 +5,6 @@
 //! by one rule for all. No template or other module writes the markup by hand, so the controls keep
 //! one size, spacing and focus.
 
-use std::fmt;
-
 use askama::Template;
 use askama::filters::HtmlSafe;
 
@@ -26,7 +24,8 @@ impl Choice {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Template)]
+#[template(path = "seg_control.html")]
 pub(crate) struct Seg {
     /// Visible caption before the choices and the group's accessible name. Empty hides the
     /// caption but `name` still names the group.
@@ -50,19 +49,6 @@ impl Seg {
     pub(crate) fn no_caption(mut self) -> Self {
         self.caption.clear();
         self
-    }
-}
-
-/// The markup, from `seg_control.html`: the only place that writes a segmented control.
-#[derive(Template)]
-#[template(path = "seg_control.html")]
-struct SegMarkup<'a> {
-    s: &'a Seg,
-}
-
-impl fmt::Display for Seg {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        SegMarkup { s: self }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 

@@ -4,8 +4,6 @@
 //! `pagehead.html`, styles in the "Page head" block of `app.css`. No other template writes an
 //! h1 or a page's head row, so every page starts at the same place with the same rhythm.
 
-use std::fmt;
-
 use askama::Template;
 use askama::filters::HtmlSafe;
 
@@ -114,7 +112,8 @@ impl Tagline {
 }
 
 /// A page's head, as shown. Only `title` (or `crumbs`) and `tagline` are always filled.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Template)]
+#[template(path = "pagehead.html")]
 pub(crate) struct PageHead {
     /// The group the page belongs to, above the title. Empty for most pages.
     pub(crate) eyebrow: String,
@@ -144,20 +143,6 @@ impl PageHead {
     /// A head with `title` and `tagline`, every other slot empty.
     pub(crate) fn new(title: impl Into<String>, tagline: Tagline) -> Self {
         Self { title: title.into(), tagline, ..Self::default() }
-    }
-}
-
-/// The markup, from `pagehead.html`: the only template that writes an h1.
-#[derive(Template)]
-#[template(path = "pagehead.html")]
-struct PageHeadMarkup<'a> {
-    h: &'a PageHead,
-    tabs: bool,
-}
-
-impl fmt::Display for PageHead {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        PageHeadMarkup { h: self, tabs: self.tabs.len() > 1 }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 

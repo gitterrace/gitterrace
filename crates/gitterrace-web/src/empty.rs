@@ -2,12 +2,11 @@
 //! there is one, offers the next step as a link. Markup in `empty_state.html`. No template or
 //! other module writes the markup by hand, so every empty list reads and spaces the same.
 
-use std::fmt;
-
 use askama::Template;
 use askama::filters::HtmlSafe;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Template)]
+#[template(path = "empty_state.html")]
 pub(crate) struct Empty {
     pub(crate) message: String,
     /// The next step: its label and link target. `None` when nothing leads anywhere better.
@@ -24,19 +23,6 @@ impl Empty {
     pub(crate) fn step(mut self, label: impl Into<String>, href: impl Into<String>) -> Self {
         self.step = Some((label.into(), href.into()));
         self
-    }
-}
-
-/// The markup, from `empty_state.html`: the only place that writes an empty state.
-#[derive(Template)]
-#[template(path = "empty_state.html")]
-struct EmptyMarkup<'a> {
-    e: &'a Empty,
-}
-
-impl fmt::Display for Empty {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        EmptyMarkup { e: self }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 

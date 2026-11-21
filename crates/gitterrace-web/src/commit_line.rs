@@ -3,8 +3,6 @@
 //! and tag pages, where a ref name leads the row. Markup in `commit_line.html`. No template or
 //! other module writes the row by hand, so a commit reads the same wherever it is listed.
 
-use std::fmt;
-
 use askama::Template;
 use askama::filters::HtmlSafe;
 use gitterrace_git::CommitSummary;
@@ -29,7 +27,8 @@ pub(crate) struct Count {
     pub(crate) tip: &'static str,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Template)]
+#[template(path = "commit_line.html")]
 pub(crate) struct CommitRow {
     /// The commit id as its link, finished HTML from `fmt::sha_link`.
     pub(crate) sha: String,
@@ -81,19 +80,6 @@ impl CommitRow {
     pub(crate) fn note(mut self, note: String) -> Self {
         self.note = note;
         self
-    }
-}
-
-/// The markup, from `commit_line.html`: the only place that writes a commit row.
-#[derive(Template)]
-#[template(path = "commit_line.html")]
-struct RowMarkup<'a> {
-    r: &'a CommitRow,
-}
-
-impl fmt::Display for CommitRow {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        RowMarkup { r: self }.render_into(f).map_err(|_| fmt::Error)
     }
 }
 
