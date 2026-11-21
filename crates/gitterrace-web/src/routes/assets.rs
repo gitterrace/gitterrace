@@ -91,7 +91,7 @@ pub fn asset_url(name: &str) -> String {
 
 /// A stylesheet before minifying: `tokens.css` has its font URLs carry the version, so a new
 /// font is fetched.
-fn served_source(name: &str, _kind: &str, body: &str) -> String {
+fn served_source(name: &str, body: &str) -> String {
     if name == "tokens.css" {
         body.replace(".woff2)", &format!(".woff2?v={})", asset_version()))
     } else {
@@ -107,8 +107,8 @@ fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
             TABLE
                 .iter()
                 .filter(|(_, kind, _)| *kind == CSS)
-                .map(|(name, kind, body)| {
-                    let body = served_source(name, kind, body);
+                .map(|(name, _, body)| {
+                    let body = served_source(name, body);
                     let min: &'static str = Box::leak(crate::minify::css(&body).into_boxed_str());
                     (*name, min)
                 })
@@ -143,7 +143,7 @@ fn bundled(name: &str) -> Option<&'static str> {
                     let all: String = parts
                         .iter()
                         .filter_map(|p| TABLE.iter().find(|(n, _, _)| n == p))
-                        .map(|(n, k, b)| served_source(n, k, b))
+                        .map(|(n, _, b)| served_source(n, b))
                         .collect::<Vec<_>>()
                         .join("\n");
                     let min: &'static str = Box::leak(crate::minify::css(&all).into_boxed_str());
@@ -243,7 +243,7 @@ fn static_asset<S: Clone + Send + Sync + 'static>(
     let tag = etag(body);
     get(move |uri: axum::http::Uri, headers: axum::http::HeaderMap| {
         let tag = tag.clone();
-        let current = uri.query() == Some(&format!("v={}", asset_version()));
+        let current = uri.query().and_then(|q| q.strip_prefix("v=")) == Some(asset_version());
         async move { asset(&headers, kind, body, tag, current) }
     })
 }

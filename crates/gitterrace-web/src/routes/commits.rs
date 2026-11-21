@@ -115,13 +115,12 @@ pub(super) async fn log(
         let id = a.repo.resolve(&rev)?;
         // The graph's lines: every branch tip, or only this ref's.
         let tips = if all { lane_tips(a, &id)? } else { vec![id.clone()] };
-        let (mut list, more, capped) = if all {
+        let (list, more, capped) = if all {
             let (l, more) = all_lanes_page(a, &tips, pg)?;
             (l, more, false)
         } else {
             filtered_page(a, &id, &f, pg)?
         };
-        list.shrink_to_fit();
         let now = fmt::now();
         let rev_enc = fmt::enc_seg(&rev);
         let base = format!("/log/{rev_enc}");

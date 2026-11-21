@@ -37,12 +37,14 @@ pub(crate) struct Work {
 /// Page `pg` of the commits from `id` that `m` keeps, newest first.
 pub(crate) fn page(a: &App, id: &str, m: &Matcher, pg: usize) -> Result<LogPage> {
     let from = pg.saturating_mul(PAGE);
-    if let Some((ranks, rows)) = a.accelerate(id, |s| indexed(&**s, m))? {
-        let ids: Vec<String> = a
-            .accelerate(id, |s| {
-                ranks.iter().rev().filter_map(|r| s.commit_id(*r).map(|x| x.to_string())).collect()
-            })?
-            .unwrap_or_default();
+    // One source run answers both the ranks and their commit ids.
+    let found = a.accelerate(id, |s| {
+        let (ranks, rows) = indexed(&**s, m);
+        let ids: Vec<String> =
+            ranks.iter().rev().filter_map(|r| s.commit_id(*r).map(|x| x.to_string())).collect();
+        (ids, rows)
+    })?;
+    if let Some((ids, rows)) = found {
         let (ids, walked) = with_words(a, m, ids, from + PAGE + 1)?;
         let more = ids.len() > from + PAGE;
         let slice: Vec<String> = ids.into_iter().skip(from).take(PAGE).collect();
