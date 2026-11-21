@@ -289,12 +289,7 @@ impl McpServer {
     #[tool(name = "log", annotations(read_only_hint = true))]
     async fn log(&self, Parameters(a): Parameters<LogArgs>) -> Result<CallToolResult, ErrorData> {
         self.run("log", a.repo.clone(), move |s| {
-            s.log(
-                a.rev.as_deref(),
-                a.path.as_deref(),
-                a.page.unwrap_or(1),
-                a.per_page.unwrap_or(crate::core::DEFAULT_PER_PAGE),
-            )
+            s.log(a.rev.as_deref(), a.path.as_deref(), a.page, a.per_page)
         })
         .await
     }
@@ -328,9 +323,9 @@ impl McpServer {
         self.run("compare", a.repo.clone(), move |s| {
             s.compare(
                 &a.base,
-                a.head.as_deref().filter(|h| !h.is_empty()).unwrap_or("HEAD"),
+                a.head.as_deref().filter(|h| !h.is_empty()),
                 a.path.as_deref(),
-                a.three_dot.unwrap_or(false),
+                a.three_dot,
                 Some(a.max_lines.unwrap_or(400)),
             )
         })
@@ -348,7 +343,7 @@ impl McpServer {
         Parameters(a): Parameters<WorktreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("worktree_diff", a.repo.clone(), move |s| {
-            s.worktree_diff(a.scope.as_deref().unwrap_or("all"), Some(a.max_lines.unwrap_or(400)))
+            s.worktree_diff(a.scope.as_deref(), Some(a.max_lines.unwrap_or(400)))
         })
         .await
     }

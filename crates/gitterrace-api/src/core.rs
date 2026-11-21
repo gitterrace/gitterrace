@@ -307,13 +307,13 @@ impl ApiState {
         &self,
         rev: Option<&str>,
         path: Option<&str>,
-        page: usize,
-        per_page: usize,
+        page: Option<usize>,
+        per_page: Option<usize>,
     ) -> Result<LogResponse, ApiError> {
         let rev = Self::rev(rev)?;
         let caps = self.settings().caps;
-        let per_page = per_page.clamp(1, caps.log_page_commits);
-        let page = page.max(1);
+        let per_page = per_page.unwrap_or(DEFAULT_PER_PAGE).clamp(1, caps.log_page_commits);
+        let page = page.unwrap_or(1).max(1);
         let skip = (page - 1).saturating_mul(per_page);
         if skip > caps.log_skip_commits {
             return Err(ApiError::BadRequest(format!(
@@ -351,9 +351,7 @@ impl ApiState {
     ) -> Result<CommitResponse, ApiError> {
         let id = self.repo.resolve(checked(id)?)?;
         let detail = self.repo.commit(&id)?;
-        let most = self.settings().caps.diff_lines;
-        let cap = max_lines.map_or(most, |m| m.min(most));
-        let (mut files, truncated) = wire::files(&detail.files, diff, cap);
+        let (mut files, truncated) = wire::files(&detail.files, diff, self.diff_cap(max_lines));
         for f in &mut files {
             (f.permalink, f.link) = self.links(&id, Some(&f.path), None);
         }

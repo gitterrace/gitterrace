@@ -162,15 +162,7 @@ pub(crate) async fn log(
     State(s): State<ApiState>,
     Query(q): Query<LogQuery>,
 ) -> Reply<LogResponse> {
-    blocking(&s, move |s| {
-        s.log(
-            q.rev.as_deref(),
-            q.path.as_deref(),
-            q.page.unwrap_or(1),
-            q.per_page.unwrap_or(crate::core::DEFAULT_PER_PAGE),
-        )
-    })
-    .await
+    blocking(&s, move |s| s.log(q.rev.as_deref(), q.path.as_deref(), q.page, q.per_page)).await
 }
 
 #[derive(Deserialize)]
@@ -204,9 +196,8 @@ pub(crate) async fn compare(
         .base
         .filter(|b| !b.is_empty())
         .ok_or_else(|| ApiError::BadRequest("missing query parameter: base".into()))?;
-    let head = q.head.unwrap_or_else(|| "HEAD".to_owned());
     blocking(&s, move |s| {
-        s.compare(&base, &head, q.path.as_deref(), q.three_dot.unwrap_or(false), q.max_lines)
+        s.compare(&base, q.head.as_deref(), q.path.as_deref(), q.three_dot, q.max_lines)
     })
     .await
 }
@@ -221,7 +212,7 @@ pub(crate) async fn worktree(
     State(s): State<ApiState>,
     Query(q): Query<WorktreeQuery>,
 ) -> Reply<WorktreeResponse> {
-    blocking(&s, move |s| s.worktree_diff(q.scope.as_deref().unwrap_or("all"), q.max_lines)).await
+    blocking(&s, move |s| s.worktree_diff(q.scope.as_deref(), q.max_lines)).await
 }
 
 #[derive(Deserialize)]

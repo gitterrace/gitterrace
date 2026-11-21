@@ -272,22 +272,22 @@ fn shallow_clone_indexes_and_answers() {
     let state = ApiState::open(&dir.path().join("c")).expect("open");
     state.refresh_index().expect("index");
     assert_eq!(state.records("HEAD").expect("records").len(), 1);
-    assert_eq!(state.log(None, None, 1, 10).expect("log").commits.len(), 1);
+    assert_eq!(state.log(None, None, Some(1), Some(10)).expect("log").commits.len(), 1);
 }
 
 #[test]
 fn hostile_paging_and_rev_syntax_are_refused() {
     let (_d, s) = fixture();
-    let huge = s.log(None, None, usize::MAX, 2);
+    let huge = s.log(None, None, Some(usize::MAX), Some(2));
     assert!(matches!(huge, Err(crate::ApiError::BadRequest(_))), "{huge:?}");
-    assert!(s.log(None, Some("a.txt"), 25_001, 2).is_ok());
-    assert!(s.log(None, Some("a.txt"), 25_002, 2).is_err());
+    assert!(s.log(None, Some("a.txt"), Some(25_001), Some(2)).is_ok());
+    assert!(s.log(None, Some("a.txt"), Some(25_002), Some(2)).is_err());
     for rev in [":/first", "HEAD^{/first}", "main@{1}"] {
-        let r = s.log(Some(rev), None, 1, 1);
+        let r = s.log(Some(rev), None, Some(1), Some(1));
         assert!(matches!(r, Err(crate::ApiError::BadRequest(_))), "{rev}");
         assert!(s.commit(rev, false, None).is_err(), "{rev}");
     }
-    assert!(s.log(Some("HEAD~1"), None, 1, 1).is_ok());
+    assert!(s.log(Some("HEAD~1"), None, Some(1), Some(1)).is_ok());
 }
 
 /// Every bounded answer stays bounded when the client asks for more, or asks nothing.
@@ -308,7 +308,7 @@ fn caller_cannot_lift_caps() {
         assert!(lines(&v) <= gitterrace_config::Api::default().diff_lines, "{asked:?}");
         assert_eq!(v["truncated"], true, "{asked:?}");
     }
-    let v = s.log(None, None, 1, usize::MAX).expect("log");
+    let v = s.log(None, None, Some(1), Some(usize::MAX)).expect("log");
     assert!(v.commits.len() <= gitterrace_config::Api::default().log_page_commits);
 }
 
