@@ -116,8 +116,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .entries :is(td,th):first-child{width:100%}
 .entries :is(td,th):has(>code){white-space:nowrap}.entries td.wrap{white-space:normal;overflow-wrap:anywhere}
 .entries :is(td,th) a{color:var(--fg)}.entries :is(td,th) a:hover{color:var(--accent-fg)}
-.ico{display:inline-block;width:16px;height:16px;margin-right:var(--space-2);vertical-align:-3px;background:var(--faint);-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat}
-.ico{--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z'/%3E%3C/svg%3E")}
+.ico{display:inline-block;width:16px;height:16px;margin-right:var(--space-2);vertical-align:-3px;background:var(--faint);-webkit-mask:var(--i) center/contain no-repeat;mask:var(--i) center/contain no-repeat;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 1.75C2 .784 2.784 0 3.75 0h6.586c.464 0 .909.184 1.237.513l2.914 2.914c.329.328.513.773.513 1.237v9.586A1.75 1.75 0 0 1 13.25 16h-9.5A1.75 1.75 0 0 1 2 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h9.5a.25.25 0 0 0 .25-.25V6h-2.75A1.75 1.75 0 0 1 9 4.25V1.5Zm6.75.062V4.25c0 .138.112.25.25.25h2.688l-.011-.013-2.914-2.914-.013-.011Z'/%3E%3C/svg%3E")}
 .ico.dir{background:var(--muted);--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 2.75C0 1.784.784 1 1.75 1H5c.55 0 1.07.26 1.4.7l.9 1.2a.25.25 0 0 0 .2.1h6.75c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Z'/%3E%3C/svg%3E")}
 .ico.module{background:var(--muted);--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 2.75C0 1.784.784 1 1.75 1H5c.55 0 1.07.26 1.4.7l.9 1.2a.25.25 0 0 0 .2.1h6.75c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 15H1.75A1.75 1.75 0 0 1 0 13.25Zm1.75-.25a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25v-8.5a.25.25 0 0 0-.25-.25H7.5c-.55 0-1.07-.26-1.4-.7l-.9-1.2a.25.25 0 0 0-.2-.1Z'/%3E%3C/svg%3E")}
 
@@ -196,8 +195,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 /* A file anchor scrolls the file to the top, its header where it pins. The file's own top
    border goes just above the window, so the header reads as already stuck. The app bar
    does not stick, so nothing covers it. */
-section.file{scroll-margin-top:-1px}
-section.file{border:var(--border);border-radius:var(--radius);margin-top:var(--space-4);overflow:hidden;background:var(--bg)}
+section.file{scroll-margin-top:-1px;border:var(--border);border-radius:var(--radius);margin-top:var(--space-4);overflow:hidden;background:var(--bg)}
 /* Files above an #fN target never anchor the scroll, so their growth cannot push it down. */
 section.file:has(~section.file:target){
   overflow-anchor:none}
@@ -593,5 +591,4 @@ svg.chart a:focus-visible .bar{fill:Highlight}}
 [data-tip]:focus-visible{outline-color:var(--focus)}
 /* A CSV or TSV blob as a table, and an archive's entries (filetype/). */
 .data-table{border-collapse:collapse;font:85%/1.45 var(--mono);margin:16px}
-.data-table :is(th,td){border:1px solid var(--line);padding:4px 8px;text-align:left}
-.data-table :is(th,td){vertical-align:top;white-space:pre-wrap}
+.data-table :is(th,td){border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top;white-space:pre-wrap}
