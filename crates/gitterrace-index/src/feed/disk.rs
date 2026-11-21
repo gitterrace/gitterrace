@@ -234,9 +234,7 @@ impl DiskSource {
         }
         let mapped = map(&raw).map_err(SegError::Io)?;
         if mapped.len() != raw.len() {
-            return Err(SegError::Io(std::io::Error::other(
-                "identity map returned the wrong number of pairs",
-            )));
+            return Err(SegError::Io(crate::source::wrong_pair_count()));
         }
         src.idents = mapped.into_iter().map(|(n, e)| (Arc::from(n), Arc::from(e))).collect();
         for id in 0..counts[2] {

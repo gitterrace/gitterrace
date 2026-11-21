@@ -1,6 +1,5 @@
 //! The equivalence oracle's helpers: records read back whole, as pages would see them.
 
-use std::collections::HashMap;
 use std::io;
 
 use crate::{CommitRecord, CommitSource, feed};
@@ -28,19 +27,7 @@ pub(crate) fn map_identities(
     rev: &str,
     records: &mut [CommitRecord],
 ) -> io::Result<()> {
-    let mut slot: HashMap<(String, String), usize> = HashMap::new();
-    let mut pairs = Vec::new();
-    for r in records.iter() {
-        let key = (r.author.clone(), r.email.clone());
-        if !slot.contains_key(&key) {
-            slot.insert(key.clone(), pairs.len());
-            pairs.push(key);
-        }
-    }
-    let mapped = source.map_identities(rev, &pairs)?;
-    if mapped.len() != pairs.len() {
-        return Err(io::Error::other("identity map returned the wrong number of pairs"));
-    }
+    let (mapped, slot) = crate::source::mapped_pairs(source, rev, records)?;
     for r in records.iter_mut() {
         let key = (std::mem::take(&mut r.author), std::mem::take(&mut r.email));
         let (name, email) = &mapped[slot[&key]];

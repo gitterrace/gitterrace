@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 
 use gitterrace_git::Repo;
@@ -72,6 +73,37 @@ pub trait CommitSource {
     ) -> io::Result<Vec<(String, String)>> {
         Ok(pairs.to_vec())
     }
+}
+
+/// The mapped pairs and each raw pair's position among them.
+pub(crate) type MappedPairs = (Vec<(String, String)>, HashMap<(String, String), usize>);
+
+/// The mapped form of every distinct (name, email) pair of `records`, asked of the source
+/// once, and each pair's position in that list.
+pub(crate) fn mapped_pairs(
+    source: &dyn CommitSource,
+    rev: &str,
+    records: &[CommitRecord],
+) -> io::Result<MappedPairs> {
+    let mut slot: HashMap<(String, String), usize> = HashMap::new();
+    let mut pairs = Vec::new();
+    for r in records {
+        let key = (r.author.clone(), r.email.clone());
+        if !slot.contains_key(&key) {
+            slot.insert(key.clone(), pairs.len());
+            pairs.push(key);
+        }
+    }
+    let mapped = source.map_identities(rev, &pairs)?;
+    if mapped.len() != pairs.len() {
+        return Err(wrong_pair_count());
+    }
+    Ok((mapped, slot))
+}
+
+/// The error for a source that answers an identity map with another number of pairs.
+pub(crate) fn wrong_pair_count() -> io::Error {
+    io::Error::other("identity map returned the wrong number of pairs")
 }
 
 fn file_stats(diffs: Vec<gitterrace_git::FileDiff>) -> Vec<FileStat> {

@@ -77,20 +77,8 @@ pub(crate) fn walk(
     let mut f = Fresh::default();
     let latest = crate::wall_clock().saturating_add(crate::insights::DAY);
     let first = u32::try_from(base.len()).unwrap_or(u32::MAX);
-    let mut raw: Vec<(String, String)> = Vec::new();
-    let mut raw_ix: HashMap<(String, String), usize> = HashMap::new();
-    for r in &recs {
-        let key = (r.author.clone(), r.email.clone());
-        if !raw_ix.contains_key(&key) {
-            raw_ix.insert(key.clone(), raw.len());
-            raw.push(key);
-        }
-    }
-    let shown = src.map_identities(rev, &raw)?;
-    if shown.len() != raw.len() {
-        return Err(io::Error::other("identity map returned the wrong number of pairs"));
-    }
-    let mut ident_of: Vec<Option<IdentId>> = vec![None; raw.len()];
+    let (shown, raw_ix) = crate::source::mapped_pairs(src, rev, &recs)?;
+    let mut ident_of: Vec<Option<IdentId>> = vec![None; shown.len()];
     for (k, i) in order.into_iter().enumerate() {
         let r = &recs[i];
         let rank = Rank(first.saturating_add(u32::try_from(k).unwrap_or(u32::MAX)));
