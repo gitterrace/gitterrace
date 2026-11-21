@@ -71,9 +71,7 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Guide,
         "Send a selection to another app, or run your own program on it",
     ),
-    ("docs/skills/review.md", Kind::Guide, "A skill to review a change"),
-    ("docs/skills/history.md", Kind::Guide, "A skill to explore history"),
-    ("docs/skills/hotspots.md", Kind::Guide, "A skill to find hotspots"),
+    ("docs/mcp.md", Kind::Guide, "One agent skill: review a change, history and hotspots over MCP"),
     (
         "docs/online.md",
         Kind::Guide,

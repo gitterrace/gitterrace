@@ -18,9 +18,7 @@ then read [why](why.md) it exists. Contributors start at
 | --- | --- |
 | [using](using.md) | Repositories, the log graph, outlines, keys, settings |
 | [actions](actions.md) | Send a selection to another app, or run your own program on it |
-| [review](skills/review.md) | A skill to review a change |
-| [history](skills/history.md) | A skill to explore history |
-| [hotspots](skills/hotspots.md) | A skill to find hotspots |
+| [mcp](mcp.md) | One agent skill: review a change, history and hotspots over MCP |
 | [online](online.md) | Publish a static export, public mode, Docker, a reverse proxy |
 
 ## Look up
