@@ -192,14 +192,15 @@ pub(crate) fn scatter(name: &str, x_title: &str, dots: &[(&str, u64, u64, u64)])
 /// The weekday by hour grid, with its totals by day and by hour.
 pub(crate) fn heatmap(name: &str, cells: &[[u32; 24]; 7]) -> Fig {
     let all: u64 = cells.iter().flatten().map(|v| u64::from(*v)).sum();
-    let mut busiest = (0, 0, 0u32);
-    for (d, row) in cells.iter().enumerate() {
-        for (hr, v) in row.iter().enumerate() {
-            if *v > busiest.2 {
-                busiest = (d, hr, *v);
-            }
-        }
-    }
+    // The first of equal maxima wins, so `max_by_key` (which keeps the last) runs reversed.
+    let busiest = cells
+        .iter()
+        .enumerate()
+        .flat_map(|(d, row)| row.iter().enumerate().map(move |(hr, v)| (d, hr, *v)))
+        .rev()
+        .max_by_key(|b| b.2)
+        .filter(|b| b.2 > 0)
+        .unwrap_or((0, 0, 0));
     let summary = if all == 0 {
         "No commits.".to_owned()
     } else {

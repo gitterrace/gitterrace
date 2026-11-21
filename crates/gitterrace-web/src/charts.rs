@@ -22,9 +22,29 @@ const LEFT: f64 = 58.0;
 const TOP_PAD: f64 = 10.0;
 const BOTTOM: f64 = 26.0;
 const LABEL_PX: f64 = 84.0;
+/// Height of the plot area between the top padding and the x labels.
+const PLOT: f64 = H - TOP_PAD - BOTTOM;
 /// Named series before folding into "other"; matches `--cat-1..7`.
 const SERIES: usize = 7;
 const DAYS: [&str; 7] = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/// The y of a value at `frac` of the plot's height, zero at the bottom.
+fn y_at(frac: f64) -> f64 {
+    frac.mul_add(-PLOT, TOP_PAD + PLOT)
+}
+
+/// The hover column's left edge and the bar's left edge for column `i` of width `sl` with a
+/// bar `bw` wide.
+fn col_x(i: usize, sl: f64, bw: f64) -> (P, P) {
+    let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
+    (P(x - (sl - bw) / 2.0), P(x))
+}
+
+/// The steps 1, 2, 5, 10, 20, 50, ... that nice axes count in, ending at the saturated top.
+fn nice_steps() -> impl Iterator<Item = u64> {
+    std::iter::successors(Some(1u64), |m| m.checked_mul(10))
+        .flat_map(|mag| [1, 2, 5].map(|m| m * mag))
+}
 
 /// Horizontal geometry shared by both bar charts: slot width for `n` columns.
 fn slot(n: usize) -> f64 {
@@ -33,13 +53,12 @@ fn slot(n: usize) -> f64 {
 }
 
 fn axis(max: u64) -> (Vec<Tick>, f64) {
-    let plot = H - TOP_PAD - BOTTOM;
     let (step, top_n) = ticks(max, MAX_TICKS);
     let top = top_n as f64;
     let mut out = Vec::new();
     let mut v = 0;
     while v <= top_n {
-        let y = (v as f64 / top).mul_add(-plot, TOP_PAD + plot);
+        let y = y_at(v as f64 / top);
         out.push(tick(y, fmt::thousands(v)));
         v += step;
     }
@@ -60,17 +79,10 @@ const MAX_TICKS: u64 = 5;
 pub(crate) fn ticks(max: u64, n: u64) -> (u64, u64) {
     let n = n.max(2);
     let max = max.max(1);
-    let mut mag = 1u64;
-    loop {
-        for m in [1, 2, 5] {
-            let step = m * mag;
-            let top = step * max.div_ceil(step);
-            if top / step < n {
-                return (step, top);
-            }
-        }
-        mag = mag.saturating_mul(10);
-    }
+    nice_steps()
+        .map(|step| (step, step * max.div_ceil(step)))
+        .find(|(step, top)| top / step < n)
+        .unwrap_or((u64::MAX, u64::MAX))
 }
 
 /// Ticks for a chart with values `0..=up` above zero and `0..=down` below it: one nice step
@@ -80,17 +92,10 @@ pub(crate) fn ticks(max: u64, n: u64) -> (u64, u64) {
 pub(crate) fn split_ticks(up: u64, down: u64, n: u64) -> (u64, u64, u64) {
     let n = n.max(3);
     let side = |v: u64, step: u64| step * v.max(1).div_ceil(step);
-    let mut mag = 1u64;
-    loop {
-        for m in [1, 2, 5] {
-            let step = m * mag;
-            let (a, d) = (side(up, step), side(down, step));
-            if a / step + d / step < n {
-                return (step, a, d);
-            }
-        }
-        mag = mag.saturating_mul(10);
-    }
+    nice_steps()
+        .map(|step| (step, side(up, step), side(down, step)))
+        .find(|(step, a, d)| a / step + d / step < n)
+        .unwrap_or((u64::MAX, u64::MAX, u64::MAX))
 }
 
 /// Bucket labels thinned so neighbours never collide, centred under their column. The plot
@@ -135,7 +140,7 @@ fn frame(fig: Fig, linked: bool, ticks: Vec<Tick>, keys: &[&str], bw: f64) -> Fr
         linked,
         sl: P(slot(keys.len())),
         bw: P(bw),
-        plot: P(H - TOP_PAD - BOTTOM),
+        plot: P(PLOT),
         ticks,
         labels: x_labels(keys),
     }
@@ -159,13 +164,12 @@ fn bars_with(name: &str, points: &[(String, u64)], links: Option<&[String]>, uni
     let (grid, top) = axis(max);
     let sl = slot(points.len());
     let bw = (sl * 0.62).min(48.0);
-    let plot = H - TOP_PAD - BOTTOM;
     let cols = points
         .iter()
         .enumerate()
         .map(|(i, (label, v))| {
-            let h = (*v as f64 / top * plot).max(if *v > 0 { 1.0 } else { 0.0 });
-            let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
+            let h = (*v as f64 / top * PLOT).max(if *v > 0 { 1.0 } else { 0.0 });
+            let (hx, x) = col_x(i, sl, bw);
             BarCol {
                 link: links.and_then(|l| l.get(i)).map(|href| {
                     let name = format!(
@@ -175,9 +179,9 @@ fn bars_with(name: &str, points: &[(String, u64)], links: Option<&[String]>, uni
                     (href.clone(), name)
                 }),
                 tip: charttip::part(label, *v, all, unit),
-                hx: P(x - (sl - bw) / 2.0),
-                x: P(x),
-                y: P(TOP_PAD + plot - h),
+                hx,
+                x,
+                y: P(TOP_PAD + PLOT - h),
                 h: P(h),
             }
         })
@@ -214,34 +218,28 @@ pub(crate) fn stacked(name: &str, buckets: &[gitterrace_index::LabelBucket]) -> 
     let (grid, top) = axis(max);
     let sl = slot(cols.len());
     let bw = (sl * 0.62).min(48.0);
-    let plot = H - TOP_PAD - BOTTOM;
     let marks = cols
         .iter()
         .enumerate()
         .map(|(i, col)| {
-            let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
+            let (hx, x) = col_x(i, sl, bw);
             let parts: Vec<(&str, u64)> = col
                 .iter()
                 .enumerate()
                 .map(|(k, v)| (names.get(k).copied().unwrap_or("other"), *v))
                 .collect();
-            let mut y = TOP_PAD + plot;
+            let mut y = TOP_PAD + PLOT;
             let segs = col
                 .iter()
                 .enumerate()
                 .filter(|(_, v)| **v > 0)
                 .map(|(k, v)| {
-                    let h = *v as f64 / top * plot;
+                    let h = *v as f64 / top * PLOT;
                     y -= h;
                     Seg { class: cat(k, names.len()), y: P(y), h: P(h) }
                 })
                 .collect();
-            StackCol {
-                tip: charttip::breakdown(&buckets[i].label, &parts, COMMITS),
-                hx: P(x - (sl - bw) / 2.0),
-                x: P(x),
-                segs,
-            }
+            StackCol { tip: charttip::breakdown(&buckets[i].label, &parts, COMMITS), hx, x, segs }
         })
         .collect();
     let keys: Vec<&str> = buckets.iter().map(|b| b.label.as_str()).collect();
@@ -267,8 +265,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging
     // Each side reaches its own maximum on one shared step, so the zero line sits where the
     // data puts it: a period of mostly additions gives the additions most of the height.
     let (step, top_up, top_dn) = split_ticks(up, down, MAX_TICKS);
-    let plot = H - TOP_PAD - BOTTOM;
-    let px = plot / (top_up + top_dn) as f64;
+    let px = PLOT / (top_up + top_dn) as f64;
     let mid = (top_up as f64).mul_add(px, TOP_PAD);
     let mut grid = Vec::new();
     for (sign, top, dir) in [("", top_up, -1.0), ("\u{2212}", top_dn, 1.0)] {
@@ -285,7 +282,7 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging
         .iter()
         .enumerate()
         .map(|(i, (label, a, d))| {
-            let x = (i as f64).mul_add(sl, LEFT) + (sl - bw) / 2.0;
+            let (hx, x) = col_x(i, sl, bw);
             let (ha, hd) = (*a as f64 * px, *d as f64 * px);
             DivCol {
                 tip: charttip::breakdown(
@@ -293,8 +290,8 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging
                     &[("added", *a), ("removed", *d)],
                     charttip::LINES,
                 ),
-                hx: P(x - (sl - bw) / 2.0),
-                x: P(x),
+                hx,
+                x,
                 up_y: P(mid - ha),
                 ha: P(ha),
                 hd: P(hd),
@@ -311,11 +308,10 @@ pub(crate) fn diverging(points: &[(String, u64, u64)], title: &str) -> Diverging
 
 /// A 0..100 percent line over buckets; `None` values break the line.
 pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> PercentLine {
-    let plot = H - TOP_PAD - BOTTOM;
     let grid = [0, 25, 50, 75, 100]
         .into_iter()
         .map(|p| {
-            let y = (f64::from(p) / 100.0).mul_add(-plot, TOP_PAD + plot);
+            let y = y_at(f64::from(p) / 100.0);
             tick(y, format!("{p}%"))
         })
         .collect();
@@ -331,7 +327,7 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> PercentLine {
                 tip: charttip::rate(label, v, "of changed lines replaced existing code"),
                 x: P(x),
                 cx: P(x + sl / 2.0),
-                cy: P(v.clamp(0.0, 1.0).mul_add(-plot, TOP_PAD + plot)),
+                cy: P(y_at(v.clamp(0.0, 1.0))),
             }
         })
         .collect();
@@ -343,7 +339,7 @@ pub(crate) fn percent_line(points: &[(String, Option<f64>)]) -> PercentLine {
             continue;
         };
         let x = (i as f64).mul_add(sl, LEFT) + sl / 2.0;
-        let y = v.clamp(0.0, 1.0).mul_add(-plot, TOP_PAD + plot);
+        let y = y_at(v.clamp(0.0, 1.0));
         let _ = write!(d, "{}{x:.1} {y:.1}", if pen { "L" } else { "M" });
         pen = true;
     }
@@ -389,7 +385,6 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
     let (grid, ytop) = axis(ymax);
     let (xstep, xtop_n) = ticks(xmax, 6);
     let xtop = xtop_n as f64;
-    let plot = H - TOP_PAD - BOTTOM;
     let mut xticks = Vec::new();
     let mut v = 0;
     while v <= xtop_n {
@@ -403,7 +398,7 @@ pub(crate) fn scatter(dots: &[Dot], x_title: &str) -> Scatter {
             href: d.href.clone(),
             title: d.title.clone(),
             cx: P((d.x as f64 / xtop).mul_add(W - LEFT - 6.0, LEFT)),
-            cy: P((d.y as f64 / ytop).min(1.0).mul_add(-plot, TOP_PAD + plot)),
+            cy: P(y_at((d.y as f64 / ytop).min(1.0))),
             r: P(5.0f64.mul_add((d.size as f64 / smax as f64).sqrt(), 3.0)),
         })
         .collect();
@@ -473,15 +468,7 @@ pub(crate) fn label_every(need: usize, quarters: bool) -> usize {
             n => 4 * n.div_ceil(4),
         };
     }
-    let mut mag = 1usize;
-    loop {
-        for m in [1, 2, 5] {
-            if m * mag >= need {
-                return m * mag;
-            }
-        }
-        mag *= 10;
-    }
+    nice_steps().find(|s| *s >= need as u64).map_or(usize::MAX, |s| s as usize)
 }
 
 /// Categorical class for series `k` of `named`; anything past the named ones is "other".
