@@ -10,7 +10,8 @@
 //! 4. a page with too little text, or no section, to be worth its link;
 //! 6. a fenced block in a language that is meant to be drawn, shown as source;
 //! 7. a page without a title, a meta description or the shared bar, main and footer;
-//! 8. a docs page missing from the docs index, the docs list or the previous and next chain.
+//! 8. a docs page missing from the docs index, the docs list or the previous and next chain;
+//! 11. a docs page that does not open with its title and then a lead paragraph.
 //!
 //! 9. a page over its kind's byte budget (landing, docs, other), the budgets in the `[counts]`
 //!    of `ratchet.toml` that only fall, so an unminified inline SVG or a pasted blob fails.
@@ -91,6 +92,7 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
     bad.extend(raw_drawings(pages));
     bad.extend(missing_head_or_frame(pages));
     bad.extend(orphan_docs(pages, facts));
+    bad.extend(docs_open_with_title_and_lead(pages));
     bad.extend(over_budget(pages, &facts.budgets));
     bad.extend(over_requests(pages, &facts.budgets));
     bad
@@ -427,6 +429,37 @@ fn orphan_docs(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<String> {
             "the previous and next chain is {walked:?}, not the docs index order {:?}",
             facts.docs
         ));
+    }
+    bad
+}
+
+/// Guard 11: a docs page whose main does not open with its title and then a lead paragraph.
+/// Catches a document whose source opens with something the site renders raw (a skill file's
+/// front matter as a rule and a heading of keys) and one that jumps from the title straight to
+/// a section or a generated block.
+pub(super) fn docs_open_with_title_and_lead(pages: &BTreeMap<String, String>) -> Vec<String> {
+    let mut bad = Vec::new();
+    for (path, html) in pages {
+        if !path.starts_with("docs/") || path == "docs/index.html" {
+            continue;
+        }
+        // The menus come first on a narrow screen: own_main drops them, then the title.
+        let main = own_main(html);
+        let Some((before, after)) = main.split_once("<h1") else {
+            bad.push(format!("{path}: no title in the main column"));
+            continue;
+        };
+        if before.contains("<hr") || before.contains("<h2") || before.contains("<p") {
+            bad.push(format!("{path}: something comes before the title"));
+            continue;
+        }
+        let mut lead = after.split_once("</h1>").map_or("", |(_, a)| a).trim_start();
+        while let Some(rest) = lead.strip_prefix("<!--") {
+            lead = rest.split_once("-->").map_or("", |(_, a)| a).trim_start();
+        }
+        if !lead.starts_with("<p") {
+            bad.push(format!("{path}: no lead paragraph right after the title"));
+        }
     }
     bad
 }

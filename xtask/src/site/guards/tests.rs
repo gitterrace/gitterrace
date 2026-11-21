@@ -29,7 +29,7 @@ fn doc(next: &str, body: &str) -> String {
         format!("<nav class=\"pager\"><a class=\"next\" href=\"/{next}\" rel=\"next\">N</a></nav>")
     };
     let menus = "<div class=\"menus\"><details><a href=\"/docs/a/\">A</a></details></div>\n";
-    page(&format!("{menus}<h1>T</h1><h2>S</h2><p>{body}</p>{pager}{list}"))
+    page(&format!("{menus}<h1>T</h1><p>Lead.</p><h2>S</h2><p>{body}</p>{pager}{list}"))
 }
 
 fn site() -> (BTreeMap<String, String>, Facts<'static>) {
@@ -212,6 +212,27 @@ fn guard_8_a_page_left_out_of_the_index_the_list_or_the_chain_is_red() {
         edit_page(p, "docs/a/index.html", next, "<a class=\"x\"");
     });
     assert!(broken.contains("the previous and next chain"), "{broken}");
+}
+
+/// The class: a docs page that opens with anything but its title and a lead paragraph. The
+/// second defect it catches: a page that jumps from the title straight to a section.
+#[test]
+fn guard_11_a_docs_page_without_title_first_and_a_lead_is_red() {
+    // own_main cuts the menus up to the title, so the plant goes before the menus, where a
+    // rendered front matter block lands.
+    let raw = plant(|p| {
+        edit_page(
+            p,
+            "docs/a/index.html",
+            "<div class=\"menus\">",
+            "<hr /><h2>name: x</h2><div class=\"menus\">",
+        );
+    });
+    assert!(raw.contains("docs/a/index.html: something comes before the title"), "{raw}");
+    let bare = plant(|p| {
+        edit_page(p, "docs/b/index.html", "<p>Lead.</p>", "");
+    });
+    assert!(bare.contains("docs/b/index.html: no lead paragraph right after the title"), "{bare}");
 }
 
 /// The class: a page that fetches one more file than its kind may, whatever its size. The second

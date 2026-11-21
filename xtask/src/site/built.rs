@@ -522,31 +522,12 @@ fn a_planted_dead_site_class_is_reported() {
     assert_eq!(dead_site_classes(&css, &site_code()), [name]);
 }
 
-/// Every docs page reads the same way: its title first in its main column, then a lead
-/// paragraph. Catches a document whose source opens with something the site renders raw (a
-/// skill file's front matter as a rule and a heading of keys) and one that jumps from the
-/// title straight to a section or a generated block.
+/// Every built docs page passes the title-and-lead guard. The red cases are planted in the
+/// guard's own tests.
 #[test]
 fn every_docs_page_opens_with_its_title() {
     let (pages, _) = generated();
-    let bad: Vec<&str> = pages
-        .iter()
-        .filter(|(p, _)| p.starts_with("docs/") && p != "docs/index.html")
-        .filter(|(_, html)| {
-            // The page menus (docs, "On this page") come first on a narrow screen, then the title.
-            let main = html.split_once("<main").map_or("", |(_, m)| m);
-            let Some((before, after)) = main.split_once("<h1") else { return true };
-            // After the title comes a lead paragraph that says what the page covers.
-            let mut lead = after.split_once("</h1>").map_or("", |(_, a)| a).trim_start();
-            while let Some(rest) = lead.strip_prefix("<!--") {
-                lead = rest.split_once("-->").map_or("", |(_, a)| a).trim_start();
-            }
-            before.contains("<hr")
-                || before.contains("<h2")
-                || before.contains("<p")
-                || !lead.starts_with("<p")
-        })
-        .map(|(p, _)| p.as_str())
-        .collect();
+    let pages: std::collections::BTreeMap<String, String> = pages.into_iter().collect();
+    let bad = guards::docs_open_with_title_and_lead(&pages);
     assert!(bad.is_empty(), "these pages do not open with their title and a lead: {bad:?}");
 }
