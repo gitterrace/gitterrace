@@ -8,12 +8,10 @@
 #   scripts/verify/docker-check.sh --self-test  the Dockerfile's fixed rules, no docker
 #
 # The self-test runs in `make docs-check`. The full run is the docker job of lint-and-test.yml.
-# DOCKER_JOBS sets the compile jobs of the build (default 2, the same as the Dockerfile, so a
-# busy machine stays usable).
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 image=gitterrace-check
-port=${DOCKER_CHECK_PORT:-18080}
+port=18080
 hadolint=hadolint/hadolint:v2.14.0@sha256:
 hadolint+=27086352fd5e1907ea2b934eb1023f217c5ae087992eb59fde121dce9c9ff21e
 
@@ -67,7 +65,7 @@ trap cleanup EXIT
 docker run --rm -i "$hadolint" hadolint - <"$root/Dockerfile" || fail "hadolint"
 echo "PASS: hadolint"
 
-docker build -q -t "$image" --build-arg JOBS="${DOCKER_JOBS:-2}" "$root" >/dev/null
+docker build -q -t "$image" "$root" >/dev/null
 size=$(docker image inspect -f '{{.Size}}' "$image" | awk '{ printf "%.1f MB", $1 / 1e6 }')
 echo "PASS: build ($size)"
 
