@@ -91,31 +91,43 @@ impl McpServer {
         let entry = match self.repos.pick(repo.as_deref()) {
             Ok(e) => e.clone(),
             Err(e) => {
-                return Ok(CallToolResult::error(vec![ContentBlock::text(e.to_string())]));
+                return Ok(refuse(e.to_string()));
             }
         };
         // Overrides are keyed by folder name, as `[repo.NAME]` is for the web.
         let folder = entry.path.file_name().map(|n| n.to_string_lossy().into_owned());
         if !tool_on(&self.cfg, folder.as_deref(), tool) {
-            return Ok(CallToolResult::error(vec![ContentBlock::text(format!(
+            return Ok(refuse(format!(
                 "the {tool} tool is switched off in [features] for {}",
                 entry.name
-            ))]));
+            )));
         }
         let (repos, cfg) = (self.repos.clone(), self.cfg.clone());
-        let out = tokio::task::spawn_blocking(move || f(&repos.state(&entry, &cfg)?))
-            .await
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+        let out =
+            joined(tokio::task::spawn_blocking(move || f(&repos.state(&entry, &cfg)?)).await)?;
         // Tool failures are results the agent can read and react to, not protocol errors.
-        Ok(match out {
-            Ok(v) => {
-                let text = serde_json::to_string(&v)
-                    .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-                CallToolResult::success(vec![ContentBlock::text(text)])
-            }
-            Err(e) => CallToolResult::error(vec![ContentBlock::text(tool_error_text(&e))]),
-        })
+        match out {
+            Ok(v) => ok_json(&v),
+            Err(e) => Ok(refuse(tool_error_text(&e))),
+        }
     }
+}
+
+/// A tool failure the agent reads and reacts to.
+fn refuse(text: impl Into<String>) -> CallToolResult {
+    CallToolResult::error(vec![ContentBlock::text(text)])
+}
+
+/// A tool answer: the value as JSON text.
+fn ok_json(v: &impl serde::Serialize) -> Result<CallToolResult, ErrorData> {
+    let text =
+        serde_json::to_string(v).map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
+    Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
+}
+
+/// A blocking task's result, its panic or cancellation as a protocol error.
+fn joined<T>(r: Result<T, tokio::task::JoinError>) -> Result<T, ErrorData> {
+    r.map_err(|e| ErrorData::internal_error(e.to_string(), None))
 }
 
 /// What an agent reads for a failed tool: the error, except for a server error, whose text
@@ -267,18 +279,11 @@ impl McpServer {
     #[tool(name = "list_repos", annotations(read_only_hint = true))]
     async fn list_repos(&self) -> Result<CallToolResult, ErrorData> {
         if !self.cfg.feature_on(Feature::Api, None) {
-            return Ok(CallToolResult::error(vec![ContentBlock::text(
-                "the list_repos tool is switched off in [features]",
-            )]));
+            return Ok(refuse("the list_repos tool is switched off in [features]"));
         }
         let repos = self.repos.clone();
         let cfg = self.cfg.clone();
-        let list = tokio::task::spawn_blocking(move || repos.list(&cfg))
-            .await
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        let text = serde_json::to_string(&list)
-            .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
-        Ok(CallToolResult::success(vec![ContentBlock::text(text)]))
+        ok_json(&joined(tokio::task::spawn_blocking(move || repos.list(&cfg)).await)?)
     }
 
     /// Commit history, newest first, with paging. Pass `path` to see only commits that touched a

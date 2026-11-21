@@ -42,7 +42,7 @@ pub(crate) struct LastCommit {
 }
 
 /// One row of `list_repos`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Default, Serialize, JsonSchema)]
 pub(crate) struct RepoRow {
     name: String,
     available: bool,
@@ -182,21 +182,12 @@ fn row(r: &McpRepo, cfg: &Config) -> RepoRow {
     if !cfg.feature_on(Feature::Api, Some(&r.name)) {
         return RepoRow {
             name: r.name.clone(),
-            available: false,
             error: Some("api off".to_owned()),
-            head: None,
-            head_branch: None,
-            last_commit: None,
+            ..RepoRow::default()
         };
     }
-    let mut out = RepoRow {
-        name: r.name.clone(),
-        available: false,
-        error: r.unavailable.clone(),
-        head: None,
-        head_branch: None,
-        last_commit: None,
-    };
+    let mut out =
+        RepoRow { name: r.name.clone(), error: r.unavailable.clone(), ..RepoRow::default() };
     if out.error.is_some() {
         return out;
     }
