@@ -110,43 +110,29 @@ fn main() -> Result<()> {
         Cmd::Check => {
             let outs = generators(&root, false)?;
             let unmarked = marks::check(&root, &outs)?;
-            if !unmarked.is_empty() {
-                println!("generated files are not marked:\n  {}", unmarked.join("\n  "));
-                std::process::exit(1);
-            }
+            fail_if(&unmarked, "generated files are not marked:\n  ", "\n  ");
             let orphans = unowned_blocks(&root, &outs)?;
-            if !orphans.is_empty() {
-                println!("generated blocks nobody fills: {}", orphans.join(", "));
-                std::process::exit(1);
-            }
+            fail_if(&orphans, "generated blocks nobody fills: ", ", ");
             let ws = facts::load(&root)?;
             let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
             let (site_outs, outs): (Vec<Out>, Vec<Out>) = outs.into_iter().partition(site::is_site);
             let stale = apply(&root, outs, Mode::Check)?;
-            if !stale.is_empty() {
-                println!("generated output is stale, run `make docs-gen`: {}", stale.join(", "));
-                std::process::exit(1);
-            }
+            fail_if(&stale, "generated output is stale, run `make docs-gen`: ", ", ");
             println!("generated output: up to date");
             // A fresh build, so the guards never see a site older than its sources.
             let dir = site::build(&root, generators(&root, false)?)?;
             let site_bad = site::disk::check(&root, &dir, &site_outs, repo)?;
-            if !site_bad.is_empty() {
-                println!(
-                    "the built site is out of step with the docs, or fails a site guard:\n  {}",
-                    site_bad.join("\n  ")
-                );
-                std::process::exit(1);
-            }
+            fail_if(
+                &site_bad,
+                "the built site is out of step with the docs, or fails a site guard:\n  ",
+                "\n  ",
+            );
             println!(
                 "site: every page is a published document in the docs order, with its title and \
                  description; every link and anchor lands, and no prose is on two pages"
             );
             let bad = docs_index::check(&root)?;
-            if !bad.is_empty() {
-                println!("documents out of step with the code:\n  {}", bad.join("\n  "));
-                std::process::exit(1);
-            }
+            fail_if(&bad, "documents out of step with the code:\n  ", "\n  ");
             println!("documents: links, anchors, keys, flags and the index check out");
             site::legal::check(&root)?;
             println!("legal pages: the sources exist");
@@ -164,26 +150,22 @@ fn main() -> Result<()> {
         }
         Cmd::DeployCheck => {
             let bad = site::legal::deploy_check(&root)?;
-            if !bad.is_empty() {
-                println!(
-                    "the legal pages still have placeholders, fill them in before a deploy:\n  {}",
-                    bad.join("\n  ")
-                );
-                std::process::exit(1);
-            }
+            fail_if(
+                &bad,
+                "the legal pages still have placeholders, fill them in before a deploy:\n  ",
+                "\n  ",
+            );
             // The files `make site` wrote, the ones wrangler uploads, not a fresh build.
             let ws = facts::load(&root)?;
             let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
             let site_outs: Vec<Out> =
                 generators(&root, false)?.into_iter().filter(site::is_site).collect();
             let site_bad = site::disk::check(&root, &root.join(site::SITE_DIR), &site_outs, repo)?;
-            if !site_bad.is_empty() {
-                println!(
-                    "built site fails a site guard, fix it and `make site`:\n  {}",
-                    site_bad.join("\n  ")
-                );
-                std::process::exit(1);
-            }
+            fail_if(
+                &site_bad,
+                "built site fails a site guard, fix it and `make site`:\n  ",
+                "\n  ",
+            );
             println!(
                 "deploy-check: the legal pages have no placeholders and the site passes its guards"
             );
@@ -197,12 +179,17 @@ fn theme_check(root: &Path) -> Result<()> {
     let mut outs = vec![theme::render(root)?];
     outs.extend(logo::outs(root)?);
     let stale = apply(root, outs, Mode::Check)?;
-    if !stale.is_empty() {
-        println!("theme files are stale, run `make docs-gen`: {}", stale.join(", "));
-        std::process::exit(1);
-    }
+    fail_if(&stale, "theme files are stale, run `make docs-gen`: ", ", ");
     println!("theme: tokens.css, the README headers and the logos match the snapshot");
     Ok(())
+}
+
+/// Prints `head` and the findings joined by `sep`, and exits 1, when there are any.
+fn fail_if(found: &[String], head: &str, sep: &str) {
+    if !found.is_empty() {
+        println!("{head}{}", found.join(sep));
+        std::process::exit(1);
+    }
 }
 
 /// The outputs that are tracked files, without the site build.
