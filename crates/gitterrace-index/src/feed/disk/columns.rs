@@ -57,13 +57,7 @@ pub(super) fn item(
 ) -> [u8; ITEM] {
     let mut sums = Sums::default();
     for f in &r.files {
-        let c = f.code_stat();
-        sums.add += u64::from(f.additions);
-        sums.del += u64::from(f.deletions);
-        sums.rewritten += u64::from(f.rewritten);
-        sums.code_add += u64::from(c.additions);
-        sums.code_del += u64::from(c.deletions);
-        sums.code_rewritten += u64::from(c.rewritten);
+        sums.add_file(f);
     }
     let opt = |v: Option<u32>| v.map_or(0, |v| v + 1);
     let mut out = [0u8; ITEM];

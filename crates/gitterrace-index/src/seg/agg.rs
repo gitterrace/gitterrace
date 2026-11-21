@@ -23,14 +23,8 @@ pub(crate) const SUM_OVER: &str = "counts sum past u64";
 
 /// `a += b` on a stored counter, `None` past u64.
 #[must_use]
-pub(crate) const fn add_count(a: &mut u64, b: u64) -> Option<()> {
-    match a.checked_add(b) {
-        Some(v) => {
-            *a = v;
-            Some(())
-        }
-        None => None,
-    }
+pub(crate) fn add_count(a: &mut u64, b: u64) -> Option<()> {
+    a.checked_add(b).map(|v| *a = v)
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

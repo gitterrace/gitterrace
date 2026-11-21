@@ -183,22 +183,15 @@ impl Sums {
     /// Adds `o`, or `None` when a sum passes u64: only stored counts get there, and the caller
     /// reports the cache unreadable then. `self` is unchanged on `None`.
     #[must_use]
-    pub const fn merge(&mut self, o: &Self) -> Option<()> {
-        let (Some(add), Some(del), Some(rewritten)) = (
-            self.add.checked_add(o.add),
-            self.del.checked_add(o.del),
-            self.rewritten.checked_add(o.rewritten),
-        ) else {
-            return None;
+    pub fn merge(&mut self, o: &Self) -> Option<()> {
+        *self = Self {
+            add: self.add.checked_add(o.add)?,
+            del: self.del.checked_add(o.del)?,
+            rewritten: self.rewritten.checked_add(o.rewritten)?,
+            code_add: self.code_add.checked_add(o.code_add)?,
+            code_del: self.code_del.checked_add(o.code_del)?,
+            code_rewritten: self.code_rewritten.checked_add(o.code_rewritten)?,
         };
-        let (Some(code_add), Some(code_del), Some(code_rewritten)) = (
-            self.code_add.checked_add(o.code_add),
-            self.code_del.checked_add(o.code_del),
-            self.code_rewritten.checked_add(o.code_rewritten),
-        ) else {
-            return None;
-        };
-        *self = Self { add, del, rewritten, code_add, code_del, code_rewritten };
         Some(())
     }
 }
