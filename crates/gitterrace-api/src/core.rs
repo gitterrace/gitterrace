@@ -229,23 +229,6 @@ impl ApiState {
         self.repo.clear_visible();
     }
 
-    /// Whether a background rebuild holds its flag (a test hook for the failed-rebuild test,
-    /// which needs unix permissions to make the rebuild fail).
-    #[cfg(all(test, unix))]
-    pub(crate) fn rebuild_running(&self) -> bool {
-        self.rebuilding.load(std::sync::atomic::Ordering::Acquire)
-    }
-
-    /// Whether the head memo holds anything (a test hook for [`ApiState::release_records`]).
-    /// Destructured, so a new field fails to compile here until the release test sees it.
-    #[cfg(test)]
-    pub(crate) fn head_memo_held(&self) -> bool {
-        self.head.lock().is_ok_and(|g| {
-            let HeadMemo { ignores, lines } = &*g;
-            ignores.is_some() || lines.is_some()
-        })
-    }
-
     fn rev(rev: Option<&str>) -> Result<&str, ApiError> {
         checked(rev.filter(|r| !r.is_empty()).unwrap_or(DEFAULT_REV))
     }
@@ -400,12 +383,16 @@ impl ApiState {
         let caps = self.settings().caps;
         let most_bytes = caps.blob_kb.saturating_mul(1024);
         let (text, total_lines, truncated) = blob.text.as_ref().map_or((None, None, false), |t| {
-            let all: Vec<&str> = t.lines().collect();
+            let total = t.lines().count();
             let start = start_line.unwrap_or(1).max(1) - 1;
             let limit = limit.unwrap_or(caps.blob_lines).min(caps.blob_lines);
-            let end = all.len().min(start.saturating_add(limit));
-            let slice = all.get(start..end).unwrap_or(&[]);
-            let mut text = slice.join("\n");
+            let end = total.min(start.saturating_add(limit));
+            let mut text = t
+                .lines()
+                .skip(start)
+                .take(end.saturating_sub(start))
+                .collect::<Vec<_>>()
+                .join("\n");
             let over = text.len() > most_bytes;
             if over {
                 let mut cut = most_bytes;
@@ -414,7 +401,7 @@ impl ApiState {
                 }
                 text.truncate(cut);
             }
-            (Some(text), Some(all.len()), over || end < all.len() || start > 0)
+            (Some(text), Some(total), over || end < total || start > 0)
         });
         let shown = match (&text, total_lines) {
             (Some(t), Some(_)) if !t.is_empty() => {

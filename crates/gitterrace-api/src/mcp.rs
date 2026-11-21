@@ -28,6 +28,9 @@ pub struct McpServer {
     cfg: Arc<Config>,
 }
 
+/// The diff line cap when a caller names none.
+const DEFAULT_MAX_LINES: usize = 400;
+
 /// What a tool needs on: the features and the insights page the web's `/api/v1` route of the
 /// same answer needs. `api_enabled` is needed by every tool. A tool missing here is refused.
 const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
@@ -322,7 +325,7 @@ impl McpServer {
         Parameters(a): Parameters<ShowArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("show_commit", a.repo.clone(), move |s| {
-            s.commit(&a.id, a.diff.unwrap_or(true), Some(a.max_lines.unwrap_or(400)))
+            s.commit(&a.id, a.diff.unwrap_or(true), Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)))
         })
         .await
     }
@@ -343,7 +346,7 @@ impl McpServer {
                 a.head.as_deref().filter(|h| !h.is_empty()),
                 a.path.as_deref(),
                 a.three_dot,
-                Some(a.max_lines.unwrap_or(400)),
+                Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)),
             )
         })
         .await
@@ -360,7 +363,7 @@ impl McpServer {
         Parameters(a): Parameters<WorktreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("worktree_diff", a.repo.clone(), move |s| {
-            s.worktree_diff(a.scope.as_deref(), Some(a.max_lines.unwrap_or(400)))
+            s.worktree_diff(a.scope.as_deref(), Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)))
         })
         .await
     }
@@ -497,10 +500,9 @@ fn stdio() -> (LineBound<tokio::io::Stdin>, tokio::io::Stdout) {
 )]
 pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Result<(), ApiError> {
     let path = repo_path.to_owned();
-    let served = cfg.clone();
-    let cfg = cfg.clone();
+    let owned = cfg.clone();
     let state = tokio::task::spawn_blocking(move || {
-        let state = ApiState::open(&path)?.configured(&cfg);
+        let state = ApiState::open(&path)?.configured(&owned);
         if let Err(e) = state.refresh_index() {
             eprintln!("gitterrace: insights index incomplete, serving anyway: {e}");
         }
@@ -509,7 +511,7 @@ pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Res
     .await
     .map_err(|e| ApiError::Task(e.to_string()))??;
     let running = McpServer::new(state)
-        .with_config(&served)
+        .with_config(cfg)
         .serve(stdio())
         .await
         .map_err(|e| ApiError::Task(e.to_string()))?;
