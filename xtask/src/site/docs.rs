@@ -370,6 +370,15 @@ fn title_of(rel: &str, text: &str) -> Result<String> {
         .with_context(|| format!("{rel} has no title"))
 }
 
+/// The document without a leading `---` front matter block. A skill file carries one for the
+/// agents that load it; on the site it would render as a rule and a heading of raw keys.
+fn without_front_matter(text: &str) -> &str {
+    let Some(rest) = text.strip_prefix("---\n") else {
+        return text;
+    };
+    rest.find("\n---\n").map_or(text, |end| rest[end + 5..].trim_start_matches('\n'))
+}
+
 /// One page per published document, the docs index, the legal pages and the changelog.
 /// Returns the files and every page path, for the sitemap and the link check.
 pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)> {
@@ -394,7 +403,7 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
     let mut titles = Vec::new();
     for (rel, path, title, what, text, _) in docs {
         let mut h2s = Vec::new();
-        let inner = body(&text, rel, &links, &mut |level, h| {
+        let inner = body(without_front_matter(&text), rel, &links, &mut |level, h| {
             let id = slug(h);
             if level == 2 {
                 h2s.push((id.clone(), h.to_owned()));

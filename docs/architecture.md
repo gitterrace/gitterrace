@@ -1,5 +1,8 @@
 # Architecture
 
+How the crates fit together, the decisions behind them, and where the cache,
+routes and guards live.
+
 <!-- BEGIN GENERATED: crates -->
 ```mermaid
 flowchart TD

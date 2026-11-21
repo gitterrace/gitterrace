@@ -1,5 +1,7 @@
 # Getting started
 
+Install gitterrace, open your first repository, and upgrade or remove it later.
+
 ## Install
 
 <!-- BEGIN GENERATED: install -->

@@ -1,5 +1,8 @@
 # Using it
 
+The everyday tasks, one section each: review before a push, browse and compare,
+find commits, share a line, work with an agent and change a setting.
+
 ## Review before you push
 
 1. Run `git terrace` in the repository and open the address it prints.
