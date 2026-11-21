@@ -24,47 +24,6 @@
   });
 })();
 
-// gtFilter, the filter behind every "narrow this list" box: typing hides the items that do not
-// contain the text, an empty result shows a note, and the arrow keys walk the links that are
-// left. Used by the filter below.
-// gtFilter(input, { items, text, link, none, root, clear, count }) returns { shown, apply }.
-//   items  the elements to hide or show   text  item -> the string searched (default textContent)
-//   link   item -> its focusable link     none  the note shown when nothing matches
-//   root   where arrow keys are heard     clear Escape empties the box
-//   count  called with (shown, total) after every change
-(function () {
-  "use strict";
-  window.gtFilter = function (q, o) {
-    var items = o.items;
-    var text = o.text || function (el) { return el.textContent; };
-    var link = o.link || function (el) { return el.firstChild; };
-    function shown() { return items.filter(function (el) { return !el.hidden; }); }
-    function apply() {
-      var t = q.value.trim().toLowerCase();
-      items.forEach(function (el) {
-        el.hidden = t !== "" && text(el).toLowerCase().indexOf(t) < 0;
-      });
-      var n = shown().length;
-      if (o.none) o.none.hidden = n > 0;
-      if (o.count) o.count(n, items.length);
-    }
-    q.addEventListener("input", apply);
-    (o.root || q).addEventListener("keydown", function (e) {
-      if (e.key === "Escape") {
-        if (o.clear && q.value) { e.preventDefault(); q.value = ""; apply(); }
-        return;
-      }
-      if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
-      var list = shown().map(link), i = list.indexOf(document.activeElement);
-      if (!list.length) return;
-      e.preventDefault();
-      var n = e.key === "ArrowDown" ? i + 1 : i - 1;
-      if (n < 0) { q.focus(); } else { list[Math.min(n, list.length - 1)].focus(); }
-    });
-    return { shown: shown, apply: apply };
-  };
-})();
-
 // The filter above the list. Without this script the form submits ?q= and the server narrows
 // the list; with it the same box narrows in place: "/" focuses it, Enter opens the first match,
 // Escape clears it and the arrow keys walk the matches.
@@ -72,27 +31,41 @@
   "use strict";
   var form = document.querySelector("[data-repofilter]");
   var q = document.getElementById("repoq");
-  if (!form || !q || !window.gtFilter) return;
+  if (!form || !q) return;
   var count = document.getElementById("repocount");
   var rows = Array.prototype.slice.call(document.querySelectorAll(".reporow"));
   var none = document.querySelector(".repos-none");
-  var f = window.gtFilter(q, {
-    items: rows,
-    text: function (li) { return li.dataset.name; },
-    link: function (li) { return li.querySelector(".rname"); },
-    none: none,
-    clear: true,
-    count: function (n, all) {
-      count.textContent = n + " of " + all;
-      var t = q.value.trim();
-      history.replaceState(null, "", t ? "?q=" + encodeURIComponent(t) : location.pathname);
+  function shown() { return rows.filter(function (li) { return !li.hidden; }); }
+  function apply() {
+    var t = q.value.trim().toLowerCase();
+    rows.forEach(function (li) {
+      li.hidden = t !== "" && li.dataset.name.toLowerCase().indexOf(t) < 0;
+    });
+    var n = shown().length;
+    if (none) none.hidden = n > 0;
+    count.textContent = n + " of " + rows.length;
+    var url = t ? "?q=" + encodeURIComponent(q.value.trim()) : location.pathname;
+    history.replaceState(null, "", url);
+  }
+  q.addEventListener("input", apply);
+  q.addEventListener("keydown", function (e) {
+    if (e.key === "Escape") {
+      if (q.value) { e.preventDefault(); q.value = ""; apply(); }
+      return;
     }
+    if (e.key !== "ArrowDown" && e.key !== "ArrowUp") return;
+    var list = shown().map(function (li) { return li.querySelector(".rname"); });
+    var i = list.indexOf(document.activeElement);
+    if (!list.length) return;
+    e.preventDefault();
+    var n = e.key === "ArrowDown" ? i + 1 : i - 1;
+    if (n < 0) { q.focus(); } else { list[Math.min(n, list.length - 1)].focus(); }
   });
   form.querySelector("button").hidden = true;
-  f.apply();
+  apply();
   form.addEventListener("submit", function (e) {
     e.preventDefault();
-    var first = f.shown()[0];
+    var first = shown()[0];
     if (first) location.href = first.querySelector(".rname").href;
   });
   document.addEventListener("keydown", function (e) {
