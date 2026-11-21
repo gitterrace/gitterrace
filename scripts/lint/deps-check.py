@@ -17,7 +17,9 @@ import re
 import sys
 from pathlib import Path
 
-import tomllib
+# tomllib is 3.11+. The lint runner picks such a python ($PY), but pyright reads the first
+# python3 on PATH, which can be an older system one.
+import tomllib  # pyright: ignore[reportMissingImports]
 
 ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = "scripts/dev/deps-run.sh"
