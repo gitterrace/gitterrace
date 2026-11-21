@@ -8,7 +8,8 @@ use crate::feed::disk::record::hash32;
 use crate::feed::disk::{DiskSource, scan};
 use crate::feed::{
     AuthorDayRow, CommitRange, CommitRow, FileRow, Hit, IdentId, InsightsSource, LabelId,
-    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, Sums,
+    PathAuthorRow, PathId, Posting, Rank, RenameEdge, SourceError, Stream, fold_author_day,
+    fold_path_author,
 };
 use crate::seg::hex;
 
@@ -87,50 +88,22 @@ impl InsightsSource for DiskSource {
     }
 
     fn agg_author_day(&self, days: Range<i64>) -> Stream<'_, AuthorDayRow> {
-        let mut m: BTreeMap<(i64, IdentId), (u64, Sums)> = BTreeMap::new();
-        self.each_row(|c, _| {
-            let day = crate::feed::local_day_of(c.time, c.offset);
-            if c.merge || !days.contains(&day) {
-                return;
-            }
-            let e = m.entry((day, c.ident)).or_default();
-            e.0 += 1;
-            self.over.note(e.1.merge(&c.sums));
-        });
-        Box::new(m.into_iter().map(|((day, ident), (commits, sums))| AuthorDayRow {
-            day,
-            ident,
-            commits,
-            sums,
-        }))
+        fold_author_day(self.commits_in(CommitRange::All), &days, &self.over)
     }
 
     fn agg_path_author(&self, prefix: &str) -> Stream<'_, PathAuthorRow> {
         let prefix = prefix.trim_matches('/');
         let mut keep: BTreeMap<PathId, bool> = BTreeMap::new();
-        let mut m: BTreeMap<(PathId, IdentId), (u64, Sums)> = BTreeMap::new();
-        self.each_row(|c, files| {
-            if c.merge {
-                return;
-            }
-            for f in files {
-                let ok = *keep.entry(f.path).or_insert_with(|| {
+        fold_path_author(
+            &self.over,
+            |p| {
+                *keep.entry(p).or_insert_with(|| {
                     prefix.is_empty()
-                        || self.path(f.path).is_some_and(|p| crate::insights::under(&p, prefix))
-                });
-                if ok {
-                    let e = m.entry((f.path, c.ident)).or_default();
-                    e.0 += 1;
-                    self.over.note(e.1.add_row(f));
-                }
-            }
-        });
-        Box::new(m.into_iter().map(|((path, ident), (touches, sums))| PathAuthorRow {
-            path,
-            ident,
-            touches,
-            sums,
-        }))
+                        || self.path(p).is_some_and(|n| crate::insights::under(&n, prefix))
+                })
+            },
+            |f| self.each_row(f),
+        )
     }
 
     fn postings(&self, key: Posting) -> Stream<'_, Hit> {
