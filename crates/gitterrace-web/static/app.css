@@ -197,17 +197,22 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
    does not stick, so nothing covers it. */
 section.file{scroll-margin-top:-1px;border:var(--border);border-radius:var(--radius);margin-top:var(--space-4);overflow:hidden;background:var(--bg)}
 /* Files above an #fN target never anchor the scroll, so their growth cannot push it down. */
-section.file:has(~section.file:target){
-  overflow-anchor:none}
+section.file:has(~section.file:target){overflow-anchor:none}
 section.file>header{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);background:var(--soft);border-bottom:var(--border);font-family:var(--mono);font-size:var(--text-sm)}
-section.file>header a{color:var(--fg)}section.file>header .counts{margin-left:auto}
-section.file>header .media-counts{white-space:nowrap;font-variant-numeric:tabular-nums}
-.viewed-mark{margin-left:auto;display:inline-flex;align-items:center;gap:var(--space-1);
-  color:var(--muted);cursor:pointer}
-.viewed-mark+.counts{margin-left:0}.diff-find{margin-top:var(--space-3)}
+section.file>header a{color:var(--fg)}
+section.file>header :is(.counts,.media-counts){flex:none;min-width:12ch;text-align:right;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
+/* The toggle owns a fixed slot just left of the counts, so it lands at one x in every header. */
+.viewed-mark{margin-left:auto;flex:none;width:9ch;display:inline-flex;align-items:center;
+  justify-content:flex-end;gap:var(--space-1);line-height:1;color:var(--muted);cursor:pointer}
+.viewed-mark input{margin:0}.viewed-changed{flex:none}
+/* Find sits left and the count right on one row: the form floats, the count fills the rest. */
+.diff-find{float:left;width:calc(100% - 20ch);margin-top:var(--space-3)}
 .diff-find input{width:100%;max-width:32rem}
-.viewed-count{margin:var(--space-3) 0 0}
-@media (max-width:600px){section.file>header{flex-wrap:wrap}section.file>header>a{overflow-wrap:anywhere;min-width:0}}
+.viewed-count{margin:var(--space-3) 0 0;overflow:hidden;text-align:right;line-height:2.25rem}
+section.file{clear:both}
+@media (max-width:600px){section.file>header{flex-wrap:wrap}section.file>header>a{overflow-wrap:anywhere;min-width:0}
+  .diff-find{float:none;width:auto}.viewed-count{text-align:left;line-height:1.5}}
 table.code{border-collapse:collapse;width:100%}
 .diffwrap{overflow-x:auto}
 .code td{padding:0 var(--space-3);line-height:var(--leading-code);white-space:pre;vertical-align:top}
@@ -243,7 +248,6 @@ box-shadow:inset 3px 0 0 var(--heat,transparent)}
 .blame td.who .sha{border-color:transparent}
 .blame td.who .sha:hover{border-color:var(--line-strong)}
 @media (max-width:900px){.blame .bl{grid-template-columns:auto 1fr}.blame .bl a.who{display:none}.blame td.who{width:auto;min-width:0;max-width:none}}
-
 
 /* loading and empty */
 progress{width:100%;height:4px;appearance:none;-webkit-appearance:none;border:0;border-radius:var(--radius);background:var(--soft);overflow:hidden}
@@ -365,7 +369,6 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .latest .subj,td.lc{font-size:var(--text-sm)}
 .av{border-radius:var(--radius)}
 .entries .bar{height:2px;border-radius:0}
-
 
 .brand{gap:var(--space-2)}
 .sep{color:var(--faint)}
@@ -534,8 +537,7 @@ td:has(>.actbtn.float){position:relative}
 .actmenu .ov-list li.busy .name::after{content:" \2026"}
 .actmenu .ov-list li.sep{height:0;padding:0;margin:var(--space-1) 0;border-top:var(--border);cursor:default}
 .actmenu .ov-list li.keynote{cursor:default;font-size:var(--text-xs);
-  color:var(--muted);border-top:var(--border);margin-top:var(--space-1);
-  padding-top:var(--space-2)}
+  color:var(--muted);border-top:var(--border);margin-top:var(--space-1);padding-top:var(--space-2)}
 .actmenu .ov-list li.hint{cursor:default;font-size:var(--text-xs)}
 .actmenu .ov-list li.hint a{color:var(--muted)}
 .actmenu .ov-list li.grp{cursor:default;padding:6px var(--space-3) 2px;font:var(--weight-semibold) var(--text-2xs)/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}

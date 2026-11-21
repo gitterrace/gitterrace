@@ -54,7 +54,7 @@
       box.checked = seen && !stale;
       if (stale && !badge) {
         badge = el("span", "tag viewed-changed", "Changed since viewed");
-        head.insertBefore(badge, box.parentNode.nextSibling);
+        head.insertBefore(badge, box.parentNode);
       } else if (!stale && badge) {
         badge.remove();
       }
