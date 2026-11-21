@@ -186,7 +186,8 @@ mod tests {
         let quiet = "[index]\nbuild_on_start = false\n";
         let mut f = fixture(quiet);
         let router = crate::repo_router(f.repo.path(), String::new(), "r".into(), None, &f.env)
-            .expect("router");
+            .expect("router")
+            .0;
         // The entity tag folds in the counting defaults, so it moves exactly when the API's
         // options do, whatever the background index has built so far.
         let tag = |r: axum::Router| async move {

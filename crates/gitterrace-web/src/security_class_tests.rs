@@ -136,7 +136,8 @@ fn patterns(r: &Router) -> BTreeSet<String> {
 fn every_route(b: &Built) -> BTreeSet<(Scope, String)> {
     let (repo, _) = hostile(&b.secret.parent().expect("root").join("probe"));
     let one = crate::repo_router(&repo, "/r/r".into(), "r".into(), None, &env(false, None))
-        .expect("repo router");
+        .expect("repo router")
+        .0;
     let mut out: BTreeSet<_> =
         patterns(&b.router).into_iter().map(|p| (Scope::Server, p)).collect();
     out.extend(patterns(&one).into_iter().map(|p| (Scope::Repo, p)));

@@ -145,23 +145,10 @@ pub fn export_router(
     Ok(build_multi(paths, None, None, &env)?.0)
 }
 
-/// One repository's pages and `/api/v1`, with links under `base`. Starts its
-/// index refresher, so call it inside a tokio runtime.
-#[cfg(test)]
+/// One repository's pages and `/api/v1`, with links under `base`, plus the handles of the
+/// background tasks it started (index refresher, idle release) and its app, so a repository
+/// taken off a running server stops them. Call it inside a tokio runtime.
 fn repo_router(
-    repo_path: &Path,
-    base: String,
-    key: String,
-    live: Option<Arc<actions::Live>>,
-    env: &Env,
-) -> io::Result<axum::Router> {
-    Ok(repo_router_tasks(repo_path, base, key, live, env)?.0)
-}
-
-/// [`repo_router`], the handles of the background tasks it started (index refresher, idle
-/// release, warm-up) and its app, so a repository taken off a running server stops them,
-/// halts its index writes and its memory returns.
-fn repo_router_tasks(
     repo_path: &Path,
     base: String,
     key: String,

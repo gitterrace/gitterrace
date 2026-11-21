@@ -109,7 +109,7 @@ async fn limits_unindexed_commits_reach_the_index() {
     assert_eq!(a.index.fresh_cap(), 2000);
     let env = crate::app::Env::new(cfg);
     let (_router, _tasks, _app) =
-        crate::repo_router_tasks(&p, String::new(), "r".into(), None, &env).expect("router");
+        crate::repo_router(&p, String::new(), "r".into(), None, &env).expect("router");
     let built = env.apps();
     assert_eq!(built.first().map(|a| a.index.fresh_cap()), Some(7));
 }

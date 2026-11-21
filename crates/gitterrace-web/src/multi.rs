@@ -284,7 +284,7 @@ impl Table {
             .get_or_try_init(|| async {
                 let (s, live, env) = (Arc::clone(served), self.live.clone(), self.env.clone());
                 let (router, tasks, app) = tokio::task::spawn_blocking(move || {
-                    crate::repo_router_tasks(&s.path, s.base(), s.name.clone(), live, &env)
+                    crate::repo_router(&s.path, s.base(), s.name.clone(), live, &env)
                 })
                 .await
                 .map_err(io::Error::other)??;
