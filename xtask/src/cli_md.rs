@@ -21,13 +21,13 @@ pub fn render() -> Out {
     root.build();
     let mut s = String::from(INTRO);
     s.push_str("\n## `git terrace`\n\n");
-    command_body(&mut s, &root, true);
+    command_body(&mut s, &root);
     let globals: Vec<&Arg> = visible(&root).filter(|a| a.is_global_set()).collect();
     s.push_str("\n## Global flags\n\n");
     table(&mut s, &globals);
     for sub in root.get_subcommands().filter(|c| c.get_name() != "help") {
         let _ = write!(s, "\n## `git terrace {}`\n\n", sub.get_name());
-        command_body(&mut s, sub, false);
+        command_body(&mut s, sub);
     }
     Out::block(PATH, "cli", s)
 }
@@ -37,7 +37,7 @@ fn visible(c: &Command) -> impl Iterator<Item = &Arg> {
         .filter(|a| !a.is_hide_set() && a.get_id() != "help" && a.get_id() != "version")
 }
 
-fn command_body(s: &mut String, c: &Command, is_root: bool) {
+fn command_body(s: &mut String, c: &Command) {
     if let Some(about) = c.get_long_about().or_else(|| c.get_about()) {
         // clap drops the period of a one-line about. Every summary ends in one on the page.
         let about = about.to_string();
@@ -48,9 +48,7 @@ fn command_body(s: &mut String, c: &Command, is_root: bool) {
     }
     let usage = c.clone().render_usage().to_string();
     let _ = writeln!(s, "```sh\n{}\n```", usage.trim_start_matches("Usage: ").trim());
-    let own: Vec<&Arg> = visible(c).filter(|a| is_root || !a.is_global_set()).collect();
-    let own: Vec<&Arg> =
-        if is_root { own.into_iter().filter(|a| !a.is_global_set()).collect() } else { own };
+    let own: Vec<&Arg> = visible(c).filter(|a| !a.is_global_set()).collect();
     if !own.is_empty() {
         s.push('\n');
         table(s, &own);

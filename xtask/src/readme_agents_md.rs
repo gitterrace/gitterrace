@@ -197,61 +197,50 @@ fn commands() -> String {
 /// `(usage, about)` of the root command and each subcommand.
 pub fn commands_rows() -> Vec<(String, String)> {
     let cmd = cli::Cli::command();
-    let flags = |c: &clap::Command| -> String {
-        let f: Vec<String> = c
-            .get_arguments()
-            .filter(|a| {
-                a.get_long().is_some()
-                    && !a.is_hide_set()
-                    && a.get_id() != "help"
-                    && a.get_id() != "version"
+    let mut rows = vec![(
+        format!("git terrace{}", positionals(&cmd, false)),
+        format!(
+            "{}{}",
+            first_line(&cmd),
+            flag_list(&cmd, |a| {
+                !a.is_hide_set() && a.get_id() != "help" && a.get_id() != "version"
             })
-            .map(|a| format!("--{}", a.get_long().unwrap_or_default()))
-            .collect();
-        if f.is_empty() { String::new() } else { format!(" [{}]", f.join(" ")) }
-    };
-    let positionals = |c: &clap::Command| -> String {
-        c.get_positionals()
-            .map(|a| {
-                let n = a.get_id().as_str().replace('_', "-");
-                if a.is_required_set() { format!(" <{n}>") } else { format!(" [{n}]") }
-            })
-            .collect()
-    };
-    let mut rows: Vec<(String, String)> = vec![(
-        format!("git terrace{}", positionals(&cmd)),
-        format!("{}{}", first_line(&cmd), flags(&cmd)),
+        ),
     )];
     for sub in cmd.get_subcommands().filter(|s| s.get_name() != "help") {
-        let own = |c: &clap::Command| -> String {
-            // Global flags are listed once, on the first row.
-            let f: Vec<String> = c
-                .get_arguments()
-                .filter(|a| a.get_long().is_some() && !a.is_global_set() && a.get_id() != "help")
-                .map(|a| format!("--{}", a.get_long().unwrap_or_default()))
-                .collect();
-            if f.is_empty() { String::new() } else { format!(" [{}]", f.join(" ")) }
-        };
+        // Global flags are listed once, on the first row.
+        let own = flag_list(sub, |a| !a.is_global_set() && a.get_id() != "help");
         rows.push((
-            format!("git terrace {}{}", sub.get_name(), positionals_no_global(sub)),
-            format!("{}{}", first_line(sub), own(sub)),
+            format!("git terrace {}{}", sub.get_name(), positionals(sub, true)),
+            format!("{}{own}", first_line(sub)),
         ));
     }
     rows
+}
+
+/// ` [--a --b]` for the long flags of `c` that `keep` accepts, empty when there are none.
+fn flag_list(c: &clap::Command, keep: impl Fn(&clap::Arg) -> bool) -> String {
+    let f: Vec<String> = c
+        .get_arguments()
+        .filter(|a| a.get_long().is_some() && keep(a))
+        .map(|a| format!("--{}", a.get_long().unwrap_or_default()))
+        .collect();
+    if f.is_empty() { String::new() } else { format!(" [{}]", f.join(" ")) }
+}
+
+/// The root command and each subcommand's arguments.
+fn all_args(cmd: &clap::Command) -> impl Iterator<Item = &clap::Arg> {
+    std::iter::once(cmd).chain(cmd.get_subcommands()).flat_map(clap::Command::get_arguments)
 }
 
 /// Every documented long flag of the root command and its subcommands, from the clap definition.
 /// Hidden (retired) flags are left out: a document naming one is stale, and none has to list it.
 pub fn cli_flags() -> std::collections::BTreeSet<String> {
     let cmd = cli::Cli::command();
-    let mut out = std::collections::BTreeSet::new();
-    for c in std::iter::once(&cmd).chain(cmd.get_subcommands()) {
-        out.extend(
-            c.get_arguments()
-                .filter(|a| !a.is_hide_set())
-                .filter_map(|a| a.get_long().map(str::to_owned)),
-        );
-    }
+    let mut out: std::collections::BTreeSet<String> = all_args(&cmd)
+        .filter(|a| !a.is_hide_set())
+        .filter_map(|a| a.get_long().map(str::to_owned))
+        .collect();
     out.extend(["help".to_owned(), "version".to_owned()]);
     out
 }
@@ -260,18 +249,17 @@ pub fn cli_flags() -> std::collections::BTreeSet<String> {
 /// in the docs but not owed a line in the README command list.
 pub fn shown_flags() -> std::collections::BTreeSet<String> {
     let cmd = cli::Cli::command();
-    let hidden: std::collections::BTreeSet<String> = std::iter::once(&cmd)
-        .chain(cmd.get_subcommands())
-        .flat_map(clap::Command::get_arguments)
+    let hidden: std::collections::BTreeSet<String> = all_args(&cmd)
         .filter(|a| a.is_hide_set())
         .filter_map(|a| a.get_long().map(str::to_owned))
         .collect();
     cli_flags().into_iter().filter(|f| !hidden.contains(f)).collect()
 }
 
-fn positionals_no_global(c: &clap::Command) -> String {
+/// ` <name>` per required positional and ` [name]` per optional one.
+fn positionals(c: &clap::Command, skip_global: bool) -> String {
     c.get_positionals()
-        .filter(|a| !a.is_global_set())
+        .filter(|a| !(skip_global && a.is_global_set()))
         .map(|a| {
             let n = a.get_id().as_str().replace('_', "-");
             if a.is_required_set() { format!(" <{n}>") } else { format!(" [{n}]") }
