@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 # Rebuild git-terrace and restart the preview server, run by `make preview`. The address is
 # PREVIEW_ADDR, else DEFAULT_ADDR from the config schema. PREVIEW_REPOS="a b" picks the repos,
-# default this checkout. The log goes to /tmp/gt-<port>.log.
+# default this checkout. The log goes to target/gt-<port>.log.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 schema=crates/gitterrace-config/src/schema.rs
 addr=${PREVIEW_ADDR:-$(sed -n 's/.*DEFAULT_ADDR: &str = "\(.*\)";/\1/p' "$schema")}
-log=/tmp/gt-${addr##*:}.log
+log=target/gt-${addr##*:}.log
+mkdir -p target
 cargo build -q --release -p gitterrace
 pkill -f "target/release/git-terrace .*$addr" 2>/dev/null || true
 sleep 0.3
