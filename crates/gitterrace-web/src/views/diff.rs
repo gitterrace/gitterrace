@@ -1,11 +1,18 @@
 //! Commit diff HTML: per-file sections, folding budgets and the folded file fragment.
 
-use std::fmt::Write as _;
+use std::{fmt::Write as _, sync::Arc};
 
+use axum::{
+    extract::{Path, Query, State},
+    response::Html,
+};
 use gitterrace_git::{ChangeKind, FileDiff, LineKind};
 
+use crate::app::App;
+use crate::error::Result;
 use crate::fmt::{enc_path, enc_seg, esc, esc_text};
 use crate::views::{Render, file_label};
+use crate::worktree_scope::ScopeQuery;
 
 fn num(n: Option<u32>) -> String {
     n.map_or_else(String::new, |n| n.to_string())
@@ -185,7 +192,8 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         );
     }
     for (i, f) in files.iter().enumerate() {
-        let gen_attr = if is_generated(src, f) { " data-generated" } else { "" };
+        let generated = is_generated(src, f);
+        let gen_attr = if generated { " data-generated" } else { "" };
         let _ = write!(
             out,
             "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{gen_attr}>\
@@ -195,7 +203,6 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
             a = esc(&crate::fmt::file_anchor(&f.path)),
             h = content_tag(f)
         );
-        let generated = is_generated(src, f);
         if generated {
             out.push_str("<span class=\"tag\">Generated</span> ");
         }
@@ -287,19 +294,16 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
         let shown =
             crate::media::is_image(&f.path) && crate::features::on(gitterrace_config::Feature::Raw);
         let old_path = f.old_path.as_deref().unwrap_or(&f.path);
-        let sides = match src {
-            DiffSource::Commit { rev, parent, .. } => {
-                Some((parent.map(|p| Side::At(p, old_path)), Side::At(rev, f.path.as_str())))
-            }
-            // HEAD through `/raw`, the copy on disk through `/worktree/raw`.
-            DiffSource::Worktree { .. } => {
-                Some((Some(Side::At("HEAD", old_path)), Side::Worktree(&f.path)))
-            }
-        };
-        if let (true, Some((old, new))) = (shown, sides) {
-            let (was, now) = match src {
-                DiffSource::Commit { media, .. } => media.get(&f.path).copied().unwrap_or_default(),
-                DiffSource::Worktree { .. } => (None, None),
+        if shown {
+            let ((old, new), (was, now)) = match src {
+                DiffSource::Commit { rev, parent, media, .. } => (
+                    (parent.map(|p| Side::At(p, old_path)), Side::At(rev, f.path.as_str())),
+                    media.get(&f.path).copied().unwrap_or_default(),
+                ),
+                // HEAD through `/raw`, the copy on disk through `/worktree/raw`.
+                DiffSource::Worktree { .. } => {
+                    ((Some(Side::At("HEAD", old_path)), Side::Worktree(&f.path)), (None, None))
+                }
             };
             let px = |x: Option<crate::media::Facts>| x.and_then(|x| x.dims);
             let old = old.filter(|_| f.kind != ChangeKind::Added).map(|s| (s, px(was)));
@@ -351,25 +355,25 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
 
 /// `GET /diff/{rev}/{index}`: the body of one folded file of a commit, as a fragment.
 pub(crate) async fn diff_fragment(
-    axum::extract::State(app): axum::extract::State<std::sync::Arc<crate::app::App>>,
-    axum::extract::Path((rev, index)): axum::extract::Path<(String, usize)>,
-) -> crate::error::Result<axum::response::Html<String>> {
+    State(app): State<Arc<App>>,
+    Path((rev, index)): Path<(String, usize)>,
+) -> Result<Html<String>> {
     let html = crate::app::blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let r = Render::of(a);
         Ok(a.repo.commit_file(&id, index)?.as_ref().map(|f| diff_body_html(&r, f)))
     })
     .await?;
-    html.map(axum::response::Html)
+    html.map(Html)
         .ok_or_else(|| gitterrace_git::Error::PathNotFound(format!("file {index}")).into())
 }
 
 /// `GET /worktree/diff/{path}`: the body of one folded file of the working tree page.
 pub(crate) async fn worktree_fragment(
-    axum::extract::State(app): axum::extract::State<std::sync::Arc<crate::app::App>>,
-    axum::extract::Path(path): axum::extract::Path<String>,
-    axum::extract::Query(q): axum::extract::Query<crate::worktree_scope::ScopeQuery>,
-) -> crate::error::Result<axum::response::Html<String>> {
+    State(app): State<Arc<App>>,
+    Path(path): Path<String>,
+    Query(q): Query<ScopeQuery>,
+) -> Result<Html<String>> {
     let scope = q.scope();
     let html = crate::app::blocking(&app, move |a| {
         let r = Render::of(a);
@@ -378,9 +382,7 @@ pub(crate) async fn worktree_fragment(
     })
     .await?;
     // A file committed or reverted since the page loaded has nothing left to show.
-    Ok(axum::response::Html(
-        html.unwrap_or_else(|| crate::empty::Empty::new("No longer changed.").to_string()),
-    ))
+    Ok(Html(html.unwrap_or_else(|| crate::empty::Empty::new("No longer changed.").to_string())))
 }
 
 #[cfg(test)]
