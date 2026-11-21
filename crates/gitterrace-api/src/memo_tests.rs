@@ -32,15 +32,17 @@ fn insights_after_the_first_walk_no_tree() {
 }
 
 #[test]
-fn release_records_empties_the_head_memo() {
+fn release_records_makes_the_next_insight_read_the_tree_again() {
     let dir = tempfile::tempdir().expect("tmp");
     let s = state(dir.path());
     let params = Params { period: Some("all".to_owned()), ..Params::default() };
     // Hotspots read both the ignore files and the head line counts.
     s.insight("hotspots", None, &params).expect("hotspots");
-    assert!(s.head_memo_held(), "a request fills the head memo");
+    let walked = s.repo.tree_walks();
     s.release_records();
-    assert!(!s.head_memo_held(), "the release keeps a per-commit value");
+    s.insight("hotspots", None, &params).expect("after release");
+    let again = s.repo.tree_walks();
+    assert!(again > walked, "the release drops the head memo, so the tree is read again");
 }
 
 #[test]

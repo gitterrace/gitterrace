@@ -429,10 +429,10 @@ async fn an_unreadable_cache_is_rebuilt_by_the_api_alone() {
 }
 
 /// A background rebuild that cannot write fails without taking the API down: the request
-/// still answers 503 and the rebuild flag is released, so the next read may try again.
+/// still answers 503, and once the cache is writable the next read rebuilds.
 #[cfg(unix)]
 #[tokio::test]
-async fn a_failed_background_rebuild_releases_its_flag() {
+async fn a_failed_background_rebuild_lets_the_next_read_retry() {
     use std::os::unix::fs::PermissionsExt;
     let (d, built) = fixture();
     drop(built);
@@ -441,9 +441,9 @@ async fn a_failed_background_rebuild_releases_its_flag() {
     std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o555)).expect("chmod");
     let s = ApiState::open(d.path()).expect("open");
     assert_eq!(get(&s, "/repo").await.0, StatusCode::SERVICE_UNAVAILABLE);
-    let idle = || async { !s.rebuild_running() };
-    gitterrace_testkit::wait::until("the failed rebuild released its flag", idle).await;
     std::fs::set_permissions(&cache, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+    let rebuilt = || async { get(&s, "/repo").await.0 == StatusCode::OK };
+    gitterrace_testkit::wait::until("a later read rebuilt after the failure", rebuilt).await;
 }
 
 /// With a server's rebuild installed, an unreadable cache goes to it, not to a second
