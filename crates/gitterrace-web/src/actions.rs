@@ -15,7 +15,7 @@ use std::{
 use axum::{
     Router,
     extract::{Path as UrlPath, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -25,7 +25,11 @@ use gitterrace_actions::{
 };
 use gitterrace_git::Repo;
 
-use crate::{fmt::enc_path, reload::poll_every};
+use crate::{
+    fmt::enc_path,
+    guard::{self, json_body, no_store},
+    reload::poll_every,
+};
 
 pub(crate) const RUN_PATH: &str = "/_actions/run";
 const STATUS_PATH: &str = "/_actions/status";
@@ -322,19 +326,20 @@ pub(crate) fn router(site: Arc<Site>) -> Router {
 /// `GET /_actions/status`: `{"note": string|null}`, fetched by `actions.js` on load, focus, show.
 async fn status(State(site): State<Arc<Site>>) -> Response {
     let body = serde_json::to_string(&StatusBody { note: site.status.note() }).unwrap_or_default();
-    ([(header::CONTENT_TYPE, "application/json"), (header::CACHE_CONTROL, "no-store")], body)
-        .into_response()
+    no_store(([(header::CONTENT_TYPE, "application/json")], body).into_response())
 }
 
 /// `GET /_send/targets`: `[{"id","label","parts":[{"lit"}|{"ph"}]}]`, `[]` with none.
 /// The same list under every repository prefix, since targets are not per repository.
 async fn send_targets(State(site): State<Arc<Site>>) -> Response {
     let config = site.sends.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c));
-    (
-        [(header::CONTENT_TYPE, "application/json"), (header::CACHE_CONTROL, "no-store")],
-        serde_json::to_string(&config.sends).unwrap_or_else(|_| "[]".to_owned()),
+    no_store(
+        (
+            [(header::CONTENT_TYPE, "application/json")],
+            serde_json::to_string(&config.sends).unwrap_or_else(|_| "[]".to_owned()),
+        )
+            .into_response(),
     )
-        .into_response()
 }
 
 async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Response {
@@ -365,17 +370,9 @@ async fn go(State(site): State<Arc<Site>>, UrlPath(rest): UrlPath<String>) -> Re
     crate::error::not_found(&format!("Repository {id} (or that commit) is not served here."))
 }
 
-fn is_json(h: &HeaderMap) -> bool {
-    h.get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(';').next())
-        .is_some_and(|m| m.trim().eq_ignore_ascii_case("application/json"))
-}
-
 fn reply(status: StatusCode, ok: bool, exit: Option<i32>, first_line: &str) -> Response {
     let body = Outcome { exit, first_line, ok };
-    (status, [(header::CACHE_CONTROL, HeaderValue::from_static("no-store"))], axum::Json(body))
-        .into_response()
+    no_store((status, axum::Json(body)).into_response())
 }
 
 fn bad(why: &str) -> Response {
@@ -395,7 +392,7 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
     if let Some(why) = crate::guard::same_origin_write(req.headers(), &live.token) {
         return (StatusCode::FORBIDDEN, why).into_response();
     }
-    if !is_json(req.headers()) {
+    if !guard::is_json(req.headers()) {
         return (StatusCode::UNSUPPORTED_MEDIA_TYPE, "json only\n").into_response();
     }
     let host = req
@@ -404,11 +401,9 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
         .and_then(|v| v.to_str().ok())
         .unwrap_or_default()
         .to_owned();
-    let Ok(bytes) = axum::body::to_bytes(req.into_body(), BODY_LIMIT).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "body too large\n").into_response();
-    };
-    let Ok(rr) = serde_json::from_slice::<RunRequest>(&bytes) else {
-        return bad("malformed request");
+    let rr = match json_body::<RunRequest>(req, BODY_LIMIT, || bad("malformed request")).await {
+        Ok(rr) => rr,
+        Err(res) => return *res,
     };
     let Some(action) = live.config().get(&rr.action).cloned() else {
         return bad("unknown action");

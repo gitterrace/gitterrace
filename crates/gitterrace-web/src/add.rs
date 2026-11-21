@@ -23,7 +23,10 @@ use axum::{
 use gitterrace_actions::Token;
 use gitterrace_git::Repo;
 
-use crate::multi::{Added, Kept, Table};
+use crate::{
+    guard::{json_body, no_store},
+    multi::{Added, Kept, Table},
+};
 
 /// Why a path cannot be added. The text goes back to the caller of `POST /_repos`.
 #[derive(Debug, thiserror::Error)]
@@ -130,7 +133,7 @@ fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
 }
 
 fn reply(status: StatusCode, body: &AddReply<'_>) -> Response {
-    (status, [(header::CACHE_CONTROL, "no-store")], axum::Json(body)).into_response()
+    no_store((status, axum::Json(body)).into_response())
 }
 
 fn bad(why: &str) -> Response {
@@ -141,11 +144,9 @@ async fn add(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     if let Some(why) = refusal(req.headers(), &adder.token) {
         return (StatusCode::FORBIDDEN, why).into_response();
     }
-    let Ok(bytes) = axum::body::to_bytes(req.into_body(), BODY_LIMIT).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "body too large\n").into_response();
-    };
-    let Ok(ar) = serde_json::from_slice::<AddRequest>(&bytes) else {
-        return bad("malformed request");
+    let ar = match json_body::<AddRequest>(req, BODY_LIMIT, || bad("malformed request")).await {
+        Ok(ar) => ar,
+        Err(res) => return *res,
     };
     let checked = tokio::task::spawn_blocking({
         let file = adder.actions_file.clone();
@@ -238,11 +239,9 @@ async fn remove(State(adder): State<Arc<Adder>>, req: Request) -> Response {
     if let Some(why) = refusal(req.headers(), &adder.token) {
         return (StatusCode::FORBIDDEN, why).into_response();
     }
-    let Ok(bytes) = axum::body::to_bytes(req.into_body(), BODY_LIMIT).await else {
-        return (StatusCode::PAYLOAD_TOO_LARGE, "body too large\n").into_response();
-    };
-    let Ok(rr) = serde_json::from_slice::<RemoveRequest>(&bytes) else {
-        return bad("malformed request");
+    let rr = match json_body::<RemoveRequest>(req, BODY_LIMIT, || bad("malformed request")).await {
+        Ok(rr) => rr,
+        Err(res) => return *res,
     };
     if rr.name.is_none() && rr.path.is_none() {
         return bad("name or path required");

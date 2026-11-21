@@ -25,6 +25,32 @@ pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self
     'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'none'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
+/// Whether the request declares a JSON body.
+pub(crate) fn is_json(h: &HeaderMap) -> bool {
+    h.get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(';').next())
+        .is_some_and(|m| m.trim().eq_ignore_ascii_case("application/json"))
+}
+
+/// The request's JSON body, bounded by `limit`: 413 past it, `malformed()` when it does not parse.
+pub(crate) async fn json_body<T: serde::de::DeserializeOwned>(
+    req: Request,
+    limit: usize,
+    malformed: impl FnOnce() -> Response,
+) -> Result<T, Box<Response>> {
+    let Ok(bytes) = axum::body::to_bytes(req.into_body(), limit).await else {
+        return Err(Box::new((StatusCode::PAYLOAD_TOO_LARGE, "body too large\n").into_response()));
+    };
+    serde_json::from_slice(&bytes).map_err(|_| Box::new(malformed()))
+}
+
+/// `res` marked uncacheable: pages and replies that change under the reader.
+pub(crate) fn no_store(mut res: Response) -> Response {
+    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res
+}
+
 /// What the guard checks, fixed at startup.
 pub(crate) struct Gate {
     bound: Option<IpAddr>,

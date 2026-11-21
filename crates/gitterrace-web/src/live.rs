@@ -175,10 +175,9 @@ fn sse(
             out.map(|e| (Ok::<_, Infallible>(e), (rx, stop, first, keep, lagged)))
         },
     );
-    let mut res =
-        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response();
-    res.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("no-store"));
-    res
+    crate::guard::no_store(
+        Sse::new(body).keep_alive(KeepAlive::new().interval(HEARTBEAT).text("hb")).into_response(),
+    )
 }
 
 /// `GET /events`: one stream per tab. Refused with 503 past `server.live_streams`.

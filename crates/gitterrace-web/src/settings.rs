@@ -13,7 +13,7 @@ use std::sync::Arc;
 use axum::{
     Router,
     extract::{Query, Request, State},
-    http::{HeaderMap, HeaderValue, StatusCode, header},
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{get, post},
 };
@@ -151,9 +151,7 @@ impl From<Located> for ErrorOut {
 }
 
 fn json<T: serde::Serialize>(status: StatusCode, body: &T) -> Response {
-    let mut res = (status, axum::Json(body)).into_response();
-    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    res
+    crate::guard::no_store((status, axum::Json(body)).into_response())
 }
 
 fn plain(status: StatusCode, why: &'static str) -> Response {
@@ -205,22 +203,12 @@ async fn body(s: &Settings, req: Request) -> Result<Edit, Box<Response>> {
     if let Some(no) = gate(req.headers(), s) {
         return Err(Box::new(no));
     }
-    let is_json = req
-        .headers()
-        .get(header::CONTENT_TYPE)
-        .and_then(|v| v.to_str().ok())
-        .and_then(|v| v.split(';').next())
-        .is_some_and(|m| m.trim().eq_ignore_ascii_case("application/json"));
-    if !is_json {
+    if !crate::guard::is_json(req.headers()) {
         return Err(Box::new(plain(StatusCode::UNSUPPORTED_MEDIA_TYPE, "json only\n")));
     }
     // The text plus JSON escaping and the change list.
     let limit = MAX_FILE_BYTES * 2;
-    let Ok(bytes) = axum::body::to_bytes(req.into_body(), limit).await else {
-        return Err(Box::new(plain(StatusCode::PAYLOAD_TOO_LARGE, "body too large\n")));
-    };
-    serde_json::from_slice(&bytes)
-        .map_err(|_| Box::new(plain(StatusCode::BAD_REQUEST, "malformed\n")))
+    crate::guard::json_body(req, limit, || plain(StatusCode::BAD_REQUEST, "malformed\n")).await
 }
 
 /// The text an edit produces: the plain text as sent, or the form changes over the file on disk.

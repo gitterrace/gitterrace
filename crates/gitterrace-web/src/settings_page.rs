@@ -9,7 +9,6 @@ use std::sync::Arc;
 use askama::Template;
 use axum::{
     extract::{Query, State},
-    http::{HeaderValue, header},
     response::{Html, IntoResponse, Response},
 };
 use gitterrace_config::{Control, Field};
@@ -251,11 +250,7 @@ pub(crate) async fn page(
     })
     .await;
     match r {
-        Ok(Ok(html)) => {
-            let mut res = Html(html).into_response();
-            res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-            res
-        }
+        Ok(Ok(html)) => crate::guard::no_store(Html(html).into_response()),
         _ => crate::error::not_found("The settings page could not be built."),
     }
 }

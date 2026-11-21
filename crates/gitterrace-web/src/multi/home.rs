@@ -235,7 +235,7 @@ pub(super) async fn dirty(State(table): State<Arc<Table>>) -> Response {
     .unwrap_or_default();
     let map: serde_json::Map<String, serde_json::Value> =
         names.into_iter().map(|n| (n, serde_json::Value::Bool(true))).collect();
-    ([(axum::http::header::CACHE_CONTROL, "no-store")], axum::Json(map)).into_response()
+    crate::guard::no_store(axum::Json(map).into_response())
 }
 
 #[cfg(test)]
