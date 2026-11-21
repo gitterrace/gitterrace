@@ -220,7 +220,7 @@ self_test() {
   list=$(steps)
   for want in scripts/lint/changelog-check.py kit/lint/changelog.py "CROSS=x86_64-pc-windows-gnu" \
     scripts/dev/macos-run.sh @ci @tag; do
-    grep -qxF -- "$want" <<<"$list" || grep -qF -- "$want" <<<"$list" || fail "no step runs $want"
+    grep -qF -- "$want" <<<"$list" || fail "no step runs $want"
   done
   [ "$(sed -n 1p <<<"$list")" = python3\ scripts/lint/changelog-check.py ] &&
     [ "$(sed -n 2p <<<"$list")" = @tag ] ||

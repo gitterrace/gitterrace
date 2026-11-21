@@ -272,7 +272,6 @@ self_test() {
       exit 1
     }
   leaf=$(land_cfg selftest.leaf)
-  got=$(printf '%s\n' "$leaf_path" | select_crates | tr '\n' ' ')
   [[ $got == *"$leaf "* ]] ||
     {
       echo "self-test: an edit in $leaf_path must select the $leaf tests: $got" >&2
@@ -309,21 +308,20 @@ self_test() {
       echo "self-test: a core.hooksPath at the hooks directory failed" >&2
       exit 1
     }
-  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "feat(x): ok"
-  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "wip stuff"
+  empty_commit "$d" "feat(x): ok"
+  empty_commit "$d" "wip stuff"
   if (cd "$d" && check_subjects HEAD~1) 2>/dev/null; then
     echo "self-test: a subject without a type passed" >&2
     exit 1
   fi
   git -C "$d" reset -q --hard HEAD~1
-  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty \
-    -m "feat(web): graph columns take cycling theme colours"
+  empty_commit "$d" "feat(web): graph columns take cycling theme colours"
   if (cd "$d" && check_subjects HEAD~1) 2>/dev/null; then
     echo "self-test: a subject with a British spelling passed" >&2
     exit 1
   fi
   git -C "$d" reset -q --hard HEAD~1
-  git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty -m "wip stuff"
+  empty_commit "$d" "wip stuff"
   # The message step, from this checkout over the scratch history: a body the shared deny list
   # refuses fails it, and the commit before it passes.
   git -C "$d" -c user.name=t -c user.email=t@example.invalid commit -q --allow-empty \
