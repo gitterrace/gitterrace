@@ -18,16 +18,6 @@ struct FarPage {
     indexed: Option<String>,
 }
 
-pub(crate) fn why(read: usize) -> String {
-    format!(
-        "Insights for this revision need a reindex: it has more than {} that the indexed branch \
-         does not (counted {} before stopping), and loading them all would hold that much \
-         history in memory.",
-        gitterrace_index::count(gitterrace_index::feed::FRESH_CAP, "commit", "commits"),
-        gitterrace_index::thousands(read)
-    )
-}
-
 /// Renders the page for tab `tab` of a revision past the cap.
 pub(crate) fn render(c: Chrome, tab: &'static str, read: usize) -> askama::Result<String> {
     let indexed = fmt::with_rev("HEAD", || {
@@ -43,7 +33,13 @@ pub(crate) fn render(c: Chrome, tab: &'static str, read: usize) -> askama::Resul
             ),
             String::new(),
         ),
-        why: why(read),
+        why: format!(
+            "Insights for this revision need a reindex: it has more than {} that the indexed \
+             branch does not (counted {} before stopping), and loading them all would hold that \
+             much history in memory.",
+            gitterrace_index::count(gitterrace_index::feed::FRESH_CAP, "commit", "commits"),
+            gitterrace_index::thousands(read)
+        ),
         indexed,
     }
     .render()
