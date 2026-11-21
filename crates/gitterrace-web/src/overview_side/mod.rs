@@ -11,7 +11,6 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use askama::Template;
-use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank, local_day_of};
 
 use self::lists::{langs, loose_ends, worktree_count};
@@ -86,7 +85,7 @@ pub(crate) struct Side {
 /// The sidebar's HTML for `head` over `src`, from the memo when the tip, the index and the
 /// working tree are as last time.
 pub(crate) fn html(a: &App, head: &str, src: &dyn InsightsSource) -> String {
-    let dirty = !a.public() && crate::features::on(Feature::Worktree) && a.dirty();
+    let dirty = crate::gitstate::local_state(a) && a.dirty();
     // The section list joins the key: a Live reload of `display.sidebar` must not be
     // answered with the old sidebar.
     let key = format!(

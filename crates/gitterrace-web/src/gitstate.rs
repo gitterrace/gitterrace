@@ -30,6 +30,22 @@ pub(crate) fn local_state(a: &crate::app::App) -> bool {
     !a.public() && crate::features::on(gitterrace_config::Feature::Worktree)
 }
 
+/// The subject of each of `ids`, keyed by id: only those commits are read, so a page
+/// never scans history for them. Empty (and logged under `what`) when they do not read.
+pub(crate) fn subjects(
+    a: &crate::app::App,
+    ids: &[String],
+    what: &str,
+) -> std::collections::HashMap<String, String> {
+    match a.repo.raw_summaries(ids) {
+        Ok(s) => s.into_iter().map(|s| (s.id, s.subject)).collect(),
+        Err(e) => {
+            tracing::warn!("{what}: subjects unavailable: {e}");
+            std::collections::HashMap::new()
+        }
+    }
+}
+
 pub(crate) fn worktree_rows(a: &crate::app::App) -> Result<Vec<WorktreeRow>> {
     Ok(a.repo
         .linked_worktrees()?

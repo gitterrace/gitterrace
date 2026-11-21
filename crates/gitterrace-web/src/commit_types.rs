@@ -390,13 +390,7 @@ pub(crate) fn section(
     // Only this page's subjects: scanning the whole history for 20 lines cost seconds on a
     // large repository.
     let ids: Vec<String> = shown.iter().map(|r| r.0.clone()).collect();
-    let subjects: HashMap<String, String> = match a.repo.summaries(&ids) {
-        Ok(s) => s.into_iter().map(|s| (s.id, s.subject)).collect(),
-        Err(e) => {
-            tracing::warn!("commit types: subjects unavailable: {e}");
-            HashMap::new()
-        }
-    };
+    let subjects = crate::gitstate::subjects(a, &ids, "commit types");
     let commits = shown
         .iter()
         .map(|(id, author, email, time, offset)| CommitRow {

@@ -44,7 +44,7 @@ pub(crate) fn kind(path: &str) -> Option<Kind> {
     if lower.ends_with(".tar.gz") {
         return Some(Kind::TarGz);
     }
-    match lower.rsplit_once('.')?.1 {
+    match crate::fmt::ext(path)?.as_str() {
         "tgz" => Some(Kind::TarGz),
         "zip" | "jar" => Some(Kind::Zip),
         "tar" => Some(Kind::Tar),

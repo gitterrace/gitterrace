@@ -13,7 +13,7 @@ pub(crate) enum Kind {
 }
 
 fn ext(path: &str) -> String {
-    path.rsplit_once('.').map_or_else(String::new, |(_, e)| e.to_ascii_lowercase())
+    crate::fmt::ext(path).unwrap_or_default()
 }
 
 pub(crate) fn kind(path: &str) -> Option<Kind> {

@@ -224,7 +224,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         rev: rev.to_owned(),
         rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
-        dirty: (!app.public() && crate::features::on(Feature::Worktree)).then(|| app.dirty()),
+        dirty: crate::gitstate::local_state(app).then(|| app.dirty()),
         // Links to pages computed from the selected ref carry the page's ref, whether it came
         // from the path (`/tree/dev`) or `?rev=`, so a tab change keeps the branch.
         nav: crate::fmt::with_rev(rev, || {

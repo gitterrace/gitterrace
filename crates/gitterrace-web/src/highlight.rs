@@ -120,12 +120,7 @@ fn syntax_for_file(path: &str, first_line: &str) -> Option<&'static SyntaxRefere
         // Autoconf is shell under m4 macros, and the set has no m4 grammar.
         "configure.in" | ".bashrc" | ".zshrc" | ".bash_profile" | ".zprofile" | ".profile"
         | ".zshenv" => Some("sh"),
-        _ if name
-            .rsplit_once('.')
-            .is_some_and(|(_, e)| e.eq_ignore_ascii_case("ac") || e.eq_ignore_ascii_case("m4")) =>
-        {
-            Some("sh")
-        }
+        _ if crate::fmt::has_ext(name, &["ac", "m4"]) => Some("sh"),
         _ if name.starts_with("Dockerfile") || name.starts_with("Containerfile") => {
             Some("Dockerfile")
         }

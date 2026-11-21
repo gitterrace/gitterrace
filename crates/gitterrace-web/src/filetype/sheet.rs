@@ -24,8 +24,7 @@ const CELL_CAP: u64 = 1 << 20;
 
 /// Whether `path` is a workbook this module reads.
 pub(crate) fn is_sheet(path: &str) -> bool {
-    path.rsplit_once('.')
-        .is_some_and(|(_, e)| e.eq_ignore_ascii_case("xlsx") || e.eq_ignore_ascii_case("ods"))
+    crate::fmt::has_ext(path, &["xlsx", "ods"])
 }
 
 /// The declared inflated size of every member, or `None` when the zip does not read.

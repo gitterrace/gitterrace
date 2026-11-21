@@ -45,7 +45,7 @@ const MAGIC: &[(usize, &[u8], &str)] = &[
 
 /// By extension, for formats without a fixed magic number (or when the head is not read).
 fn by_ext(path: &str) -> Option<&'static str> {
-    let ext = path.rsplit_once('.')?.1.to_ascii_lowercase();
+    let ext = crate::fmt::ext(path)?;
     Some(match ext.as_str() {
         "sqlite" | "sqlite3" | "db" => "SQLite database",
         "epub" => "EPUB book",

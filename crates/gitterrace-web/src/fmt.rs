@@ -9,6 +9,16 @@ pub(crate) use gitterrace_git::{
     percent_encode_path as enc_path, percent_encode_segment as enc_seg,
 };
 
+/// The lowercased text after the last `.` of `path`, the one extension sniff.
+pub(crate) fn ext(path: &str) -> Option<String> {
+    path.rsplit_once('.').map(|(_, e)| e.to_ascii_lowercase())
+}
+
+/// Whether `path`'s extension is one of `exts` (lowercase), ignoring case.
+pub(crate) fn has_ext(path: &str, exts: &[&str]) -> bool {
+    ext(path).is_some_and(|e| exts.contains(&e.as_str()))
+}
+
 /// The favicon `<link>`, the same file the page templates include, for pages built as strings.
 pub(crate) const FAVICON: &str = include_str!("../templates/_favicon.html");
 
@@ -45,7 +55,7 @@ thread_local! {
 
 /// Runs `f` with the thread-local `key` set to `value`. A drop guard restores the previous
 /// value, so a panic inside `f` cannot leave one request's state on a pooled thread.
-fn scoped<V: 'static, T>(
+pub(crate) fn scoped<V: 'static, T>(
     key: &'static std::thread::LocalKey<std::cell::RefCell<V>>,
     value: V,
     f: impl FnOnce() -> T,
@@ -260,7 +270,7 @@ pub(crate) fn day_label(time: i64, offset: i32, now: i64) -> String {
 /// The one rendering of a commit id: a link to its commit page showing the short form, the
 /// full id on hover. Returns finished HTML (ids are hex, still escaped), `""` for no id.
 pub(crate) fn sha_link(full: &str) -> String {
-    sha_link_at(&base(), full)
+    sha_link_to(&base(), full, "")
 }
 
 /// The anchor id of one file's section on a commit page, stable across file order.
@@ -275,24 +285,25 @@ pub(crate) fn commit_file_href(id: &str, path: &str) -> String {
 
 /// [`sha_link`] that lands on `path`'s section of the commit.
 pub(crate) fn sha_file_link(full: &str, path: &str) -> String {
-    let link = sha_link(full);
-    if full.is_empty() {
-        return link;
-    }
-    let plain = format!("/commit/{}\"", esc(full));
-    let with = format!("/commit/{}#{}\"", esc(full), esc(&file_anchor(&enc_path(path))));
-    link.replacen(&plain, &with, 1)
+    let anchor = format!("#{}", esc(&file_anchor(&enc_path(path))));
+    sha_link_to(&base(), full, &anchor)
 }
 
 /// [`sha_link`] for code that runs outside a request (the watcher), with the URL prefix given.
 pub(crate) fn sha_link_at(base: &str, full: &str) -> String {
+    sha_link_to(base, full, "")
+}
+
+/// The commit link with `anchor` (escaped, with its `#`, or empty) after the commit URL.
+fn sha_link_to(base: &str, full: &str, anchor: &str) -> String {
     if full.is_empty() {
         return String::new();
     }
     format!(
-        r#"<a class="sha" href="{}/commit/{}" data-tip="{}">{}</a>"#,
+        r#"<a class="sha" href="{}/commit/{}{}" data-tip="{}">{}</a>"#,
         esc(base),
         esc(full),
+        anchor,
         esc(full),
         esc(gitterrace_git::short_id(full)),
     )

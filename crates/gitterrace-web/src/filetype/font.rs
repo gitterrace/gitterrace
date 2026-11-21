@@ -48,9 +48,7 @@ struct FontMarkup<'a> {
 }
 
 pub(crate) fn is_font(path: &str) -> bool {
-    path.rsplit_once('.').is_some_and(|(_, e)| {
-        ["ttf", "otf", "woff", "woff2"].iter().any(|f| e.eq_ignore_ascii_case(f))
-    })
+    crate::fmt::has_ext(path, &["ttf", "otf", "woff", "woff2"])
 }
 
 /// The facts and sample of a font, `None` when it does not read. A panic in a parser on a

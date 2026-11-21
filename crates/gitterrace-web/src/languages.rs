@@ -195,13 +195,10 @@ pub(crate) async fn page(
         let ch = sk.view(&**r, &filter, view);
         let at = shown(ch.len(), view);
         let ids: Vec<String> = at.iter().map(|i| ch.id(*i).to_owned()).collect();
-        let subj = match a.repo.summaries(&ids) {
-            Ok(sums) => Subjects(at.into_iter().zip(sums.into_iter().map(|s| s.subject)).collect()),
-            Err(e) => {
-                tracing::warn!("subjects unavailable: {e}");
-                Subjects(HashMap::new())
-            }
-        };
+        let mut by_id = crate::gitstate::subjects(a, &ids, "languages");
+        let subj = Subjects(
+            at.into_iter().zip(&ids).filter_map(|(i, id)| Some((i, by_id.remove(id)?))).collect(),
+        );
         let body = body(&ch, view, &subj);
         let (lead, toolbar) = body.shown.as_ref().map_or_else(Default::default, |s| {
             (s.lead.clone(), format!("{}{}{}", s.period, s.axis, s.scale))

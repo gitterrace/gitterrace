@@ -22,7 +22,7 @@ struct TableMarkup<'a> {
 
 /// The delimiter `path` is split on, or `None` for a file that is not tabular.
 pub(crate) fn delimiter(path: &str) -> Option<u8> {
-    let ext = path.rsplit_once('.')?.1.to_ascii_lowercase();
+    let ext = crate::fmt::ext(path)?;
     match ext.as_str() {
         "csv" => Some(b','),
         "tsv" | "tab" => Some(b'\t'),

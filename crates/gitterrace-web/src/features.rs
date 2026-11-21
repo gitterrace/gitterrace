@@ -167,15 +167,7 @@ thread_local! {
 /// Runs `f` with `e` in force for [`on`], restoring the previous value afterwards, also on
 /// a panic, so one request's switches never stay on a pooled thread.
 pub(crate) fn with<T>(e: Effective, f: impl FnOnce() -> T) -> T {
-    struct Restore(Option<Arc<Effective>>);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            let prev = self.0.take();
-            NOW.with(|n| *n.borrow_mut() = prev);
-        }
-    }
-    let _restore = Restore(NOW.with(|n| n.replace(Some(Arc::new(e)))));
-    f()
+    crate::fmt::scoped(&NOW, Some(Arc::new(e)), f)
 }
 
 fn now<T>(f: impl FnOnce(Option<&Effective>) -> T) -> T {
