@@ -248,5 +248,104 @@ export function checks(env) {
       rmSync(state, { recursive: true, force: true });
     }
   }
-  return { liveRead };
+  // A reader at the top of the working tree page stays at scrollY 0 through refreshes that change
+  // the height of what is above the first file (the counts, the file list grows and shrinks), and
+  // a reader mid-page keeps the file at the middle of the viewport within 4 px.
+  async function worktreeScroll() {
+    const body = (tag) =>
+      Array.from({ length: 30 }, (_, k) => `line ${k} ${tag}`).join('\n') + '\n';
+    const nm = (i) => `w${String(i).padStart(2, '0')}.txt`;
+    const repo = mkdtempSync(join(tmpdir(), 'gt-wtscroll-'));
+    const state = mkdtempSync(join(tmpdir(), 'gt-state-'));
+    const saved = process.env.XDG_STATE_HOME;
+    process.env.XDG_STATE_HOME = state;
+    let one;
+    try {
+      sh(repo, 'git', 'init', '-q', '-b', 'main');
+      for (let i = 0; i < 40; i++) writeFileSync(join(repo, nm(i)), body('base'));
+      commitAll(repo, 'base');
+      for (let i = 0; i < 40; i++) writeFileSync(join(repo, nm(i)), body('edited'));
+      one = await serve(bin, repo, cfg);
+      for (const name of browsers) {
+        const { b, ctx } = await context(name);
+        try {
+          const p = await ctx.newPage();
+          await p.setViewportSize({ width: 1100, height: 800 });
+          let ready = false;
+          for (let i = 0; i < 40 && !ready; i++) {
+            await p.goto(`${one.base}/worktree`, { waitUntil: 'load' });
+            ready = (await p.$$('section[data-path]')).length >= 40;
+            if (!ready) await p.waitForTimeout(250);
+          }
+          await p.evaluate(() => {
+            const w = /** @type {any} */ (window);
+            w.__n = 0;
+            document.addEventListener('gt:live-refreshed', () => { w.__n++; });
+          });
+          const refreshes = async (n, tag) => {
+            const start = await p.evaluate(() => /** @type {any} */ (window).__n);
+            let k = 0;
+            const t0 = Date.now();
+            while (Date.now() - t0 < 30000) {
+              const now = await p.evaluate(() => /** @type {any} */ (window).__n);
+              if (now - start >= n) return true;
+              // Added and removed files change the counts and the list above the reader.
+              const extra = join(repo, `new${k % 3}.txt`);
+              writeFileSync(extra, body(`new ${k}`));
+              writeFileSync(join(repo, nm(k % 5)), body(`${tag} ${k}`));
+              if (k % 2) rmSync(extra, { force: true });
+              k++;
+              await p.waitForTimeout(700);
+            }
+            return false;
+          };
+          const bad = [];
+          // At the top.
+          await p.evaluate(() => scrollTo(0, 0));
+          let ys = [];
+          const sample = () => p.evaluate(() => scrollY).then((y) => ys.push(y), () => {});
+          const watchTop = setInterval(sample, 50);
+          if (!(await refreshes(6, 'top'))) bad.push('top: refreshes did not land');
+          clearInterval(watchTop);
+          ys.push(await p.evaluate(() => scrollY));
+          if (ys.some((y) => y !== 0)) bad.push(`top: scrollY left 0 (${Math.max(...ys)})`);
+          // Mid-page.
+          await p.evaluate(() => scrollTo(0, 5000));
+          await p.waitForTimeout(300);
+          const probe = () => p.evaluate(() => {
+            const el = document.elementFromPoint(550, 400);
+            const s = el && el.closest('section[data-path]');
+            if (!s) return null;
+            const path = /** @type {HTMLElement} */ (s).dataset.path;
+            return { path, top: s.getBoundingClientRect().top };
+          });
+          const at = await probe();
+          const y0 = await p.evaluate(() => scrollY);
+          if (!(await refreshes(6, 'mid'))) bad.push('mid: refreshes did not land');
+          await p.waitForTimeout(1200);
+          const after = at && await p.evaluate((path) => {
+            const s = document.querySelector(`section[data-path="${CSS.escape(path)}"]`);
+            return s ? s.getBoundingClientRect().top : null;
+          }, at.path);
+          if (!at || after == null || Math.abs(after - at.top) > 4) {
+            const y1 = await p.evaluate(() => scrollY);
+            bad.push(`mid: ${at && at.path} moved to ${after} (scrollY ${y0} -> ${y1})`);
+          }
+          if (bad.length) r.fail(`worktree-scroll ${name}: ${bad.join(', ')}`);
+          else r.ok(`worktree-scroll ${name}: top held at 0, mid-page held within 4 px`);
+        } finally {
+          await b.close();
+        }
+      }
+    } catch (e) {
+      r.fail(`worktree-scroll: ${e && e.stack}`);
+    } finally {
+      if (one) one.stop();
+      if (saved === undefined) delete process.env.XDG_STATE_HOME;
+      else process.env.XDG_STATE_HOME = saved;
+      rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      rmSync(state, { recursive: true, force: true });
+    }
+  }
+  return { liveRead, worktreeScroll };
 }

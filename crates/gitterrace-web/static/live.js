@@ -73,12 +73,16 @@
   // when that top is far above, inside a long file). The topmost file reaching into view is often
   // one that started far above: it folds again or loads, and holding it moved the page by whole
   // files. An enclosing element with an id spans the viewport too, so files come first.
+  // A reader at the very top has no place to keep but the top: the summary, counts and banner
+  // above the first file change height, and holding a file below them would walk the page down.
   function anchor(root) {
+    if (window.scrollY <= 0) return null;
     var files = root.querySelectorAll("section[data-path]"), mid = window.innerHeight / 2, near = null;
     for (var j = 0; j < files.length; j++) {
       var f = files[j].getBoundingClientRect();
       if (f.bottom <= 0) continue;
       if (f.top <= mid && f.bottom > mid) return { key: keyOf(files[j]), top: f.top };
+      if (f.top >= window.innerHeight) break; // below the fold: the reader cannot see it
       if (!near) near = { key: keyOf(files[j]), top: f.top };
       if (f.top > mid) break;
     }
@@ -88,7 +92,7 @@
       var el = list[i];
       if (el === root) continue;
       var r = el.getBoundingClientRect();
-      if (r.bottom > 0) return { key: keyOf(el), top: r.top };
+      if (r.bottom > 0 && r.top < window.innerHeight) return { key: keyOf(el), top: r.top };
     }
     return null;
   }
@@ -107,7 +111,7 @@
     ours = null;
     var main = document.getElementById("gt-main");
     var a = main && anchor(main);
-    if (a) hold = a;
+    if (a) hold = a; else release(); // back at the top: nothing to hold
   }
 
   function release() {
