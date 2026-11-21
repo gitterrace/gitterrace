@@ -134,23 +134,30 @@ fn a_removed_repository_leaves_no_index_child_behind() {
         });
         pid.is_some()
     });
-    let pid = rustix::process::Pid::from_raw(pid.expect("pid")).expect("nonzero pid");
+    let pid = pid.expect("pid").to_string();
     let before = files(&cache);
     gitterrace_testkit::wait::until_blocking("the add secret is published", || {
         gitterrace_web::add_token(&state, addr.port()).is_ok()
     });
     let token = gitterrace_web::add_token(&state, addr.port()).expect("token");
-    let reply = delete(addr, &token, r#"{"name":"alpha"}"#).expect("DELETE /_repos");
+    let reply = delete(addr, &token, r#"{"name":"alpha"}"#);
+    // The child may still be dying when the reply arrives, and a zombie is no running
+    // process: wait for it, as a reaper that runs later would.
+    let gone = std::panic::catch_unwind(|| {
+        gitterrace_testkit::wait::process_gone_blocking(
+            "the removed repository's index child",
+            &pid,
+        );
+    });
+    // Beta's child holds forever: never wait for its update. It ends with this process,
+    // whose exit closes its stdin. Shut down before any assert: a runtime dropped while a
+    // panic unwinds waits on that child's reader and hangs the run instead of failing it.
+    rt.shutdown_background();
+    let reply = reply.expect("DELETE /_repos");
     assert!(reply.starts_with("HTTP/1.1 200"), "{reply}");
-    assert!(
-        rustix::process::test_kill_process(pid).is_err(),
-        "the index child of a removed repository still runs"
-    );
+    assert!(gone.is_ok(), "the index child of a removed repository still runs");
     assert_eq!(files(&cache), before, "the stopped build wrote into the cache");
     assert!(!cache.join("MANIFEST").exists(), "the stopped build published a set");
-    // Beta's child holds forever: never wait for its update. It ends with this process,
-    // whose exit closes its stdin.
-    rt.shutdown_background();
 }
 
 /// File names in `dir` with their sizes.
