@@ -26,11 +26,8 @@ In scope:
   style attribute in its own markup. A page from another site or local port
   reaching gitterrace is in scope.
 - **Public mode.** `--public` is the only way to serve beyond loopback. Its
-  promises are in [running it online](docs/online.md): committed history only,
-  full commit ids only, `GET` and `HEAD` only, no live updates, actions, Send to
-  or adding repositories, and no host paths, also in `5xx` bodies. Any other
-  Host gets `403`. Any read beyond that list, any other method, or an answer to
-  a Host outside `server.hosts` is in scope.
+  promises are in [running it online](docs/online.md). Any read beyond them, any
+  other method, or an answer to a Host outside `server.hosts` is in scope.
 - **Adding and removing a repository.** `POST` and `DELETE /_repos` answer only
   loopback binds, refuse a browser `Origin` or `Sec-Fetch-Site`, need a
   per-process token, and accept only a served name or a repository's canonical

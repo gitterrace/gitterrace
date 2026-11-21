@@ -172,10 +172,8 @@ process tree with `taskkill /T` (then `/F`). The sample `.sh` scripts need a
 POSIX shell, so call a Windows tool directly, such as `command = ["clip.exe"]`
 with `stdin = "markdown"`.
 
-Windows relies on the ACLs of your profile folder: `%APPDATA%` is private to
-your account by default, and gitterrace does not read ACLs itself. A shared
-account, or an `%APPDATA%` other users can write to, is not supported.
-Background processes a script starts are not reaped when the action completes
+Windows relies on the ACLs of your profile folder, as the
+[security model](security.md#accepted-risks) explains. Background processes a script starts are not reaped when the action completes
 normally. Only a timeout triggers `taskkill /T` (then `/F`) cleanup.
 
 ### Scripts shared by actions

@@ -53,9 +53,8 @@ Install any tool it reports as missing.
 - shellcheck and shfmt: the shell scripts under `scripts/`
 - ruff (`ruff.toml`): the Python scripts under `scripts/`
 - cargo-machete: unused dependencies
-- ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): structural rules from
-  AGENTS.md (gix only in gitterrace-git, no git subprocess, no `use super::`
-  outside tests), each with a test
+- ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): the structural rules from
+  AGENTS.md, each with a test
 - the shared house checks (personal data, own commit ids, internal references,
   the theme copy, the commit message hook), plus the repository's own: pinned
   actions, CSS scope, the site's content security policy, test configuration
@@ -95,10 +94,9 @@ is a cut, not coverage.
 - Integration tests live in each crate's `tests/`, one behavior per file.
 - Two tests hitting the same branch with trivially different inputs become one
   table-driven test. A test that cannot fail is deleted.
-- A test-only change that merges or drops tests carries its proof:
-  `make coverage-check BASE=<before> REV=<after>` (with `MUTANTS_PKG` and
-  `MUTANTS_FILES` for the files whose tests moved) shows no covered line,
-  branch percentage or caught mutant lost.
+- A test-only change that merges or drops tests carries its proof, the
+  `make coverage-check` run described under
+  [Before a pull request](#before-a-pull-request).
 
 `scripts/lint/test-layout-check.py` enforces the first and third rules, with a
 red and a green case in its self test.
