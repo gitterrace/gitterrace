@@ -381,6 +381,8 @@
   // Single page keys: g, t, /, y, b, ?, j, k, Enter. RESERVED_KEYS in the actions config
   // refuses the letters among them as action keys; a test pins the two lists together.
   var goto = { c: B + "/", i: B + "/stats", b: B + "/refs", l: B + "/log/" + revEnc, s: B + "/search" };
+  // A page with no repository (settings) searches the repository its form names.
+  if (q && q.form) goto.s = new URL(q.form.action, location.href).pathname;
   if (isOff("insights")) delete goto.i;
   if (isOff("search")) delete goto.s;
   document.addEventListener("keydown", function (e) {

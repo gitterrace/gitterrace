@@ -27,7 +27,7 @@ async fn two_repos(root: &Path, dir: &Path) -> axum::Router {
 }
 
 /// Every page kind carries the shared top bar: brand, repository switcher with several
-/// repositories, theme button and tab row; repository pages add search, the server's own page
+/// repositories, theme button and tab row; repository pages add the branch switcher, the server's own page
 /// leaves out only what needs a repository. A page with a header of its own fails here.
 #[tokio::test]
 async fn every_page_kind_renders_the_shared_header() {
@@ -61,11 +61,7 @@ async fn every_page_kind_renders_the_shared_header() {
             "{uri}: the switcher is hidden with two repositories"
         );
         assert_eq!(html.matches("<header class=\"top\"").count(), 1, "{uri}");
-        assert_eq!(
-            html.contains("class=\"topsearch\""),
-            repo_page,
-            "{uri}: search follows the repository"
-        );
+        assert!(html.contains("class=\"topsearch\""), "{uri}: every page can search");
         assert_eq!(
             html.contains("id=\"refbtn\""),
             repo_page,
@@ -80,4 +76,14 @@ async fn every_page_kind_renders_the_shared_header() {
     );
     assert!(html.contains("name=\"gitterrace-settings\""), "token meta stays");
     assert!(html.contains("/static/settings.css"), "settings.css stays");
+}
+
+#[tokio::test]
+async fn the_settings_page_searches_the_first_served_repository() {
+    let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
+    let app = two_repos(root.path(), dir.path()).await;
+    let (_, html) = page(&app, "/_settings").await;
+    assert!(html.contains("class=\"topsearch\" action=\"/r/"), "{html}");
+    assert!(html.contains("/search\""));
+    assert!(html.contains("id=\"searchbtn\""));
 }

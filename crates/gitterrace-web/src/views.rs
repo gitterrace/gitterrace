@@ -124,6 +124,9 @@ pub(crate) struct Chrome {
     pub(crate) actions: Option<(String, String)>,
     /// Which of the top bar's switchable tools the page shows.
     pub(crate) tools: Tools,
+    /// Where the search form points when the page has no repository of its own (the settings
+    /// page): the first served repository's prefix. `None` means the page's own `base`.
+    pub(crate) search_base: Option<String>,
     /// The scripted features the config turned off, space separated, for the `gt-off` meta;
     /// empty (and no meta) when every one is on.
     pub(crate) off: String,
@@ -287,6 +290,11 @@ impl Chrome {
     /// renders markdown, without them everywhere else.
     pub(crate) const fn late_css(&self) -> &'static str {
         if self.md { "late-md.css" } else { "late.css" }
+    }
+
+    /// The URL prefix of the repository the search form queries.
+    pub(crate) fn search_prefix(&self) -> &str {
+        self.search_base.as_deref().unwrap_or(&self.base)
     }
 
     /// A server's own page, not a repository's.

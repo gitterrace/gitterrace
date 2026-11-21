@@ -32,7 +32,7 @@
 </div>
 <span class="livenote" id="livenote" hidden role="status"></span>
 <div class="tools">
-{% if c.tools.search %}<form class="topsearch" action="{{ c.base }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"></form>
+{% if c.tools.search %}<form class="topsearch" action="{{ c.search_prefix() }}/search" method="get" role="search"><input id="q" name="q" type="search" placeholder="Search code and commits" aria-label="Search code and commits" autocomplete="off"><input type="hidden" name="rev" value="{{ c.rev }}"></form>
 <button class="ghost icon searchbtn" type="button" id="searchbtn" aria-label="Search" aria-controls="q" data-tip="Search (/)"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>{% endif %}
 <button class="actbtn top ghost icon" type="button" id="actpage" aria-haspopup="menu"
  data-tip="Actions for this page (.)" aria-label="Actions for this page (.)"></button>

@@ -256,6 +256,8 @@ pub(crate) async fn page(
 fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::Chrome {
     use gitterrace_config::Feature;
     let cfg = env.cfg();
+    // The page has no repository, so its search queries the first one served.
+    let first = env.apps().into_iter().next().map(|a| a.base.clone());
     crate::views::Chrome {
         name: name.to_owned(),
         rev: "HEAD".to_owned(),
@@ -268,10 +270,11 @@ fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::C
         }],
         home: "/".to_owned(),
         tools: crate::views::Tools {
-            search: false,
+            search: first.is_some() && crate::features::on(Feature::Search),
             picker: crate::features::on(Feature::Picker),
             many: env.served() > 1,
         },
+        search_base: first,
         off: crate::features::scripted_off(),
         owner: crate::views::Owner::Server,
         ..crate::views::Chrome::from_cfg(&cfg)
