@@ -45,44 +45,27 @@ pub enum Mode {
 pub fn apply(root: &Path, outs: Vec<Out>, mode: Mode) -> Result<Vec<String>> {
     let mut stale = Vec::new();
     for out in outs {
-        if let Out::Bytes { path, body } = out {
-            let file = root.join(&path);
-            if std::fs::read(&file).ok().as_deref() == Some(body.as_slice()) {
-                continue;
+        let (path, label, next, same) = match out {
+            Out::Bytes { path, body } => {
+                let same = std::fs::read(root.join(&path)).ok().as_deref() == Some(body.as_slice());
+                (path.clone(), path, body, same)
             }
-            if mode == Mode::Write {
-                if let Some(parent) = file.parent() {
-                    std::fs::create_dir_all(parent).with_context(|| format!("creating {path}"))?;
-                }
-                std::fs::write(&file, &body).with_context(|| format!("writing {path}"))?;
-            }
-            stale.push(path);
-            continue;
-        }
-        let (path, label, next, current) = match out {
             Out::File { path, body } => {
                 let current = read(&root.join(&path))?;
-                let body = if Path::new(&path).extension().is_some_and(|e| e == "md") {
-                    wrap_markdown(&body)
-                } else {
-                    body
-                };
-                (path.clone(), path, body, current)
+                let next = wrap_if_md(&path, body);
+                let same = current.as_deref() == Some(next.as_str());
+                (path.clone(), path, next.into_bytes(), same)
             }
-            Out::Bytes { .. } => continue,
             Out::Block { path, id, body } => {
                 let current =
                     read(&root.join(&path))?.with_context(|| format!("{path} does not exist"))?;
-                let body = if Path::new(&path).extension().is_some_and(|e| e == "md") {
-                    wrap_markdown(&body)
-                } else {
-                    body
-                };
-                let next = splice(&current, &id, &body).with_context(|| path.clone())?;
-                (path.clone(), format!("{path}#{id}"), next, Some(current))
+                let next = splice(&current, &id, &wrap_if_md(&path, body))
+                    .with_context(|| path.clone())?;
+                let same = current == next;
+                (path.clone(), format!("{path}#{id}"), next.into_bytes(), same)
             }
         };
-        if current.as_deref() == Some(next.as_str()) {
+        if same {
             continue;
         }
         if mode == Mode::Write {
@@ -95,6 +78,11 @@ pub fn apply(root: &Path, outs: Vec<Out>, mode: Mode) -> Result<Vec<String>> {
         stale.push(label);
     }
     Ok(stale)
+}
+
+/// Generated markdown is wrapped at the prose width, every other file is written as it is.
+fn wrap_if_md(path: &str, body: String) -> String {
+    if Path::new(path).extension().is_some_and(|e| e == "md") { wrap_markdown(&body) } else { body }
 }
 
 fn read(path: &Path) -> Result<Option<String>> {
@@ -184,29 +172,16 @@ fn flush(out: &mut String, para: &mut Vec<&str>) {
 /// One Markdown list item `- text`, wrapped at the prose width with its continuation lines
 /// indented under the text.
 pub fn wrap_item(text: &str) -> String {
-    let guarded: String = {
-        let mut g = String::with_capacity(text.len());
-        let mut in_code = false;
-        for ch in text.chars() {
-            if ch == '`' {
-                in_code = !in_code;
-            }
-            g.push(if in_code && ch == ' ' { '\u{a0}' } else { ch });
-        }
-        g
-    };
-    let opts = textwrap::Options::new(PROSE_WIDTH)
-        .initial_indent("- ")
-        .subsequent_indent("  ")
-        .break_words(false)
-        .word_splitter(textwrap::WordSplitter::NoHyphenation)
-        .word_separator(textwrap::WordSeparator::AsciiSpace);
-    textwrap::fill(&guarded, &opts).replace('\u{a0}', " ")
+    fill(text, "- ", "  ")
 }
 
 /// Breaks one prose line at spaces. A code span never breaks: its spaces become no-break
 /// spaces while wrapping, which `textwrap` keeps inside a word, and turn back after.
 fn wrap_line(text: &str, indent: &str) -> String {
+    fill(text, indent, indent)
+}
+
+fn fill(text: &str, initial: &str, subsequent: &str) -> String {
     let mut guarded = String::with_capacity(text.len());
     let mut in_code = false;
     for ch in text.chars() {
@@ -216,8 +191,8 @@ fn wrap_line(text: &str, indent: &str) -> String {
         guarded.push(if in_code && ch == ' ' { '\u{a0}' } else { ch });
     }
     let opts = textwrap::Options::new(PROSE_WIDTH)
-        .initial_indent(indent)
-        .subsequent_indent(indent)
+        .initial_indent(initial)
+        .subsequent_indent(subsequent)
         .break_words(false)
         .word_splitter(textwrap::WordSplitter::NoHyphenation)
         .word_separator(textwrap::WordSeparator::AsciiSpace);
