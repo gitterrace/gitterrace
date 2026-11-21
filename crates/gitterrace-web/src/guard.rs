@@ -190,6 +190,62 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
 #[cfg(test)]
 mod tests {
     use super::{CSP, Gate, host_allowed};
+    use axum::http::{HeaderMap, HeaderValue, Method, StatusCode};
+
+    /// A public server answers by method alone: a foreign Origin or cross-site fetch changes
+    /// nothing for a read, and every write is refused before a body is read.
+    #[test]
+    fn public_mode_ignores_origin_and_refuses_every_write() {
+        let g = gate(None, &["git.example.com"]);
+        let mut h = HeaderMap::new();
+        h.insert("host", HeaderValue::from_static("git.example.com"));
+        h.insert("origin", HeaderValue::from_static("http://evil.test"));
+        h.insert("sec-fetch-site", HeaderValue::from_static("cross-site"));
+        assert!(super::refusal(&Method::GET, &h, &g).is_none());
+        for m in [Method::POST, Method::PUT, Method::DELETE, Method::PATCH] {
+            let got = super::refusal(&m, &h, &g).map(|r| r.0);
+            assert_eq!(got, Some(StatusCode::METHOD_NOT_ALLOWED), "{m}");
+        }
+    }
+
+    /// Class: every `|safe` in a template is listed here with its count. A new one fails until
+    /// its source is shown to come from an escaping builder and the entry is added.
+    #[test]
+    fn every_safe_template_site_is_inventoried() {
+        const SITES: [(&str, usize); 19] = [
+            ("_base.html", 1),
+            ("blame.html", 1),
+            ("blob.html", 8),
+            ("commit.html", 3),
+            ("commit_line.html", 1),
+            ("compare.html", 1),
+            ("dochead.html", 6),
+            ("hotspots.html", 1),
+            ("languages_body.html", 2),
+            ("notebook.html", 2),
+            ("overview.html", 3),
+            ("pagehead.html", 2),
+            ("refs.html", 1),
+            ("search.html", 1),
+            ("side.html", 1),
+            ("stats.html", 2),
+            ("toolbar.html", 1),
+            ("tree.html", 1),
+            ("worktree.html", 1),
+        ];
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/templates");
+        let mut found = Vec::new();
+        for e in std::fs::read_dir(dir).expect("templates") {
+            let path = e.expect("entry").path();
+            let n = std::fs::read_to_string(&path).expect("read").matches("|safe").count();
+            if n > 0 {
+                found.push((path.file_name().expect("name").to_string_lossy().into_owned(), n));
+            }
+        }
+        found.sort();
+        let want: Vec<_> = SITES.iter().map(|(f, n)| ((*f).to_owned(), *n)).collect();
+        assert_eq!(found, want, "a |safe changed: vet its source, then update SITES");
+    }
 
     impl Gate {
         pub(crate) const fn timeout_for_test(&self) -> std::time::Duration {

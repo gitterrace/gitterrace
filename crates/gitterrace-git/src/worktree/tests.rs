@@ -105,3 +105,21 @@ fn symlinked_directory_is_not_followed() {
         d.iter().flat_map(|f| &f.hunks).flat_map(|h| &h.lines).any(|l| l.text.contains("secret"));
     assert!(!leaked, "{d:?}");
 }
+
+/// A link in the tree reads as its target's path text, never the target's bytes.
+#[test]
+#[cfg(unix)]
+fn a_symlink_shows_its_target_path_and_never_the_target_content() {
+    let outside = tempfile::tempdir().expect("tempdir");
+    let secret = outside.path().join("passwd");
+    std::fs::write(&secret, "root:x:0:0-secret-body\n").expect("write");
+    let dir = tempfile::tempdir().expect("tempdir");
+    let f = Fixture::init(dir.path()).write("a.txt", "a\n");
+    let p = f.commit("feat: one").path().to_path_buf();
+    std::os::unix::fs::symlink(&secret, p.join("link")).expect("link");
+    let d = worktree_diff(&Repo::discover(&p).expect("repo")).expect("diff");
+    let text: String =
+        d.iter().flat_map(|f| &f.hunks).flat_map(|h| &h.lines).map(|l| l.text.clone()).collect();
+    assert!(text.contains("passwd"), "the link text is listed: {d:?}");
+    assert!(!text.contains("secret-body"), "{d:?}");
+}

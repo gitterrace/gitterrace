@@ -476,3 +476,18 @@ fn a_timed_out_run_frees_its_slot_on_return() {
         runner.run(&shell("next", "cat >/dev/null", Duration::from_secs(5)), &p, &repo.root());
     assert!(next.is_ok_and(|o| o.ok), "the slot was still held after the time-out");
 }
+
+/// A script that never reads stdin must not stall the run, even when the payload is larger than
+/// a pipe buffer: the write sits on its own thread.
+#[test]
+fn a_script_that_ignores_a_large_stdin_still_finishes() {
+    let (_t, repo) = fixture();
+    let mut p = payload(&repo, Kind::Commit);
+    p.markdown = "x".repeat(1 << 20);
+    let mut a = shell("a", "sleep 0.1; echo done", Duration::from_secs(10));
+    a.stdin = Stdin::Markdown;
+    let began = Instant::now();
+    let r = Runner::new(Limits::default()).run(&a, &p, &repo.root()).expect("run");
+    assert!(r.ok && r.first_line == "done", "{r:?}");
+    assert!(began.elapsed() < Duration::from_secs(5));
+}

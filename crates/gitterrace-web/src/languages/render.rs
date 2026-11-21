@@ -219,8 +219,14 @@ fn area_chart(ch: &Chain, view: View, subj: &Subjects, lead: &str) -> (Area, Str
         }),
         x: xs.iter().map(|x| (x * 10.0).round() / 10.0).collect(),
     };
-    // Strings and numbers only: serialization cannot fail.
-    let json = serde_json::to_string(&data).unwrap_or_default().replace('<', "\\u003c");
+    // Strings and numbers only: serialization cannot fail. Inside a <script> block `<` could
+    // close it, `&` could open an entity in older parsers and U+2028/9 end a line in old JS.
+    let json = serde_json::to_string(&data)
+        .unwrap_or_default()
+        .replace('<', "\\u003c")
+        .replace('&', "\\u0026")
+        .replace('\u{2028}', "\\u2028")
+        .replace('\u{2029}', "\\u2029");
     (area, json)
 }
 

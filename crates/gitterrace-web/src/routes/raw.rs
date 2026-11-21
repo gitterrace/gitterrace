@@ -171,8 +171,30 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
 mod tests {
     use std::sync::Arc;
 
-    use axum::body::HttpBody;
+    use axum::body::{Body, HttpBody};
     use tokio::sync::Semaphore;
+
+    /// Guard: every media kind is served with `nosniff` and a policy that loads nothing.
+    /// Only the formats that run no author code go without the sandbox, and a PDF is a download.
+    #[test]
+    fn each_media_kind_is_served_inert() {
+        for (name, sandboxed, disposition) in [
+            ("a.png", false, "inline"),
+            ("a.mp3", false, "inline"),
+            ("a.mp4", false, "inline"),
+            ("a.svg", true, "inline"),
+            ("a.pdf", true, "attachment"),
+            ("a.html", true, "inline"),
+            ("a.txt", true, "inline"),
+        ] {
+            let h = super::media_response(name, Body::empty(), None).headers().clone();
+            let csp = h["content-security-policy"].to_str().expect("ascii");
+            assert!(csp.contains("default-src 'none'"), "{name}: {csp}");
+            assert_eq!(csp.contains("sandbox"), sandboxed, "{name}");
+            assert_eq!(h["x-content-type-options"], "nosniff", "{name}");
+            assert_eq!(h["content-disposition"], disposition, "{name}");
+        }
+    }
 
     /// Guard: a body may be polled again after its end (compression does this). It must answer
     /// end again, not panic.
