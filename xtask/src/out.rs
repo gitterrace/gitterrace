@@ -163,7 +163,7 @@ fn flush(out: &mut String, para: &mut Vec<&str>) {
         let first = para[0];
         let indent = &first[..first.len() - first.trim_start().len()];
         let joined: Vec<&str> = para.iter().map(|l| l.trim()).collect();
-        out.push_str(&wrap_line(&joined.join(" "), indent));
+        out.push_str(&fill(&joined.join(" "), indent, indent));
         out.push('\n');
     }
     para.clear();
@@ -177,10 +177,6 @@ pub fn wrap_item(text: &str) -> String {
 
 /// Breaks one prose line at spaces. A code span never breaks: its spaces become no-break
 /// spaces while wrapping, which `textwrap` keeps inside a word, and turn back after.
-fn wrap_line(text: &str, indent: &str) -> String {
-    fill(text, indent, indent)
-}
-
 fn fill(text: &str, initial: &str, subsequent: &str) -> String {
     let mut guarded = String::with_capacity(text.len());
     let mut in_code = false;
