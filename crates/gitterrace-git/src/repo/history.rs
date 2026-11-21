@@ -81,11 +81,7 @@ impl Repo {
         limit: usize,
     ) -> Result<Vec<CommitSummary>> {
         let mailmap = ident::mailmap(repo, tips[0]);
-        let walk = repo
-            .rev_walk(tips.iter().copied())
-            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-            .all()
-            .map_err(git)?;
+        let walk = crate::walk::newest_first(repo, tips.iter().copied())?;
         let mut out = Vec::new();
         for info in walk.skip(skip).take(limit) {
             let commit = info.map_err(git)?.object().map_err(git)?;
@@ -175,11 +171,7 @@ impl Repo {
     pub fn rev_list(&self, rev: &str) -> Result<Vec<String>> {
         let repo = self.repo();
         let tip = self.resolve_id(&repo, rev)?;
-        let walk = repo
-            .rev_walk([tip])
-            .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-            .all()
-            .map_err(git)?;
+        let walk = crate::walk::newest_first(&repo, [tip])?;
         let mut ids = Vec::new();
         for info in walk {
             ids.push(info.map_err(git)?.id.to_string());
@@ -507,11 +499,7 @@ fn parents_from(
     tips: &[gix::ObjectId],
     limit: usize,
 ) -> Result<Vec<(String, Vec<String>)>> {
-    let walk = repo
-        .rev_walk(tips.iter().copied())
-        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-        .all()
-        .map_err(git)?;
+    let walk = crate::walk::newest_first(repo, tips.iter().copied())?;
     let mut out = Vec::new();
     for info in walk.take(limit) {
         let info = info.map_err(git)?;

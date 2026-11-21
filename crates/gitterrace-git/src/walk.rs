@@ -199,11 +199,7 @@ pub fn scan_commits(
     let tip = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
     let mailmap = ident::mailmap(&r, tip);
-    let walk = r
-        .rev_walk([tip])
-        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-        .all()
-        .map_err(git)?;
+    let walk = newest_first(&r, [tip])?;
     let mut scan = CommitScan::default();
     for info in walk {
         let commit = info.map_err(git)?.object().map_err(git)?;
@@ -248,6 +244,17 @@ fn summary_of(
     })
 }
 
+/// Every commit reachable from `tips`, newest committer time first.
+pub(crate) fn newest_first(
+    repo: &gix::Repository,
+    tips: impl IntoIterator<Item = impl Into<gix::ObjectId>>,
+) -> Result<gix::revision::Walk<'_>> {
+    repo.rev_walk(tips)
+        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
+        .all()
+        .map_err(git)
+}
+
 /// Commit ids reachable from `rev` in the canonical order: parents before children, ties among
 /// ready commits broken by (committer time, oid) ascending.
 ///
@@ -257,11 +264,7 @@ fn summary_of(
 pub fn canonical_order(repo: &Repo, rev: &str) -> Result<Vec<String>> {
     let tip = oid(&repo.resolve(rev)?)?;
     let r = open(repo)?;
-    let walk = r
-        .rev_walk([tip])
-        .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-        .all()
-        .map_err(git)?;
+    let walk = newest_first(&r, [tip])?;
     let mut nodes: Vec<(i64, gix::ObjectId, Vec<gix::ObjectId>)> = Vec::new();
     for info in walk {
         let info = info.map_err(git)?;
@@ -338,13 +341,9 @@ fn steps<'l>(
         Some(list) => {
             Box::new(list.iter().map(|(id, names)| Ok((oid(id)?, Some(names.as_slice())))))
         }
-        None => Box::new(
-            r.rev_walk([tip])
-                .sorting(Sorting::ByCommitTime(CommitTimeOrder::NewestFirst))
-                .all()
-                .map_err(git)?
-                .map(|info| info.map(|i| (i.id, None)).map_err(git)),
-        ),
+        None => {
+            Box::new(newest_first(r, [tip])?.map(|info| info.map(|i| (i.id, None)).map_err(git)))
+        }
     })
 }
 
