@@ -90,6 +90,13 @@ struct Which {
     f: SettingsFile,
 }
 
+impl CheckReply {
+    /// A refused edit: just its one error.
+    fn error(l: Located) -> Self {
+        Self { errors: vec![l.into()], ..Self::default() }
+    }
+}
+
 #[derive(serde::Serialize)]
 struct FileReply {
     text: String,
@@ -249,14 +256,11 @@ pub(crate) fn validate(f: SettingsFile, text: &str, before: &str, env: &Env) -> 
                     .restart_changes(&l.config),
                 ..CheckReply::default()
             },
-            Err(e) => CheckReply {
-                errors: vec![gitterrace_config::located(text, &e).into()],
-                ..CheckReply::default()
-            },
+            Err(e) => CheckReply::error(gitterrace_config::located(text, &e)),
         },
         SettingsFile::Actions => match check_actions(text) {
             Ok(()) => CheckReply { ok: true, ..CheckReply::default() },
-            Err(l) => CheckReply { errors: vec![l.into()], ..CheckReply::default() },
+            Err(l) => CheckReply::error(l),
         },
     }
 }
@@ -292,7 +296,7 @@ async fn check(State(s): State<Arc<Settings>>, req: Request) -> Response {
             reply.text = Some(text);
             reply
         }
-        Err(l) => CheckReply { errors: vec![l.into()], ..CheckReply::default() },
+        Err(l) => CheckReply::error(l),
     })
     .await;
     r.map_or_else(
@@ -335,10 +339,9 @@ async fn write(State(s): State<Arc<Settings>>, req: Request) -> Response {
             reply.stamp = Some(Stamp::tag(Some(saved.stamp)));
             json(StatusCode::OK, &reply)
         }
-        Ok(Err(SaveError::Invalid(l))) => json(
-            StatusCode::UNPROCESSABLE_ENTITY,
-            &CheckReply { errors: vec![l.into()], ..CheckReply::default() },
-        ),
+        Ok(Err(SaveError::Invalid(l))) => {
+            json(StatusCode::UNPROCESSABLE_ENTITY, &CheckReply::error(l))
+        }
         Ok(Err(SaveError::Stale)) => {
             plain(StatusCode::CONFLICT, "changed on disk since it was read, reload it\n")
         }

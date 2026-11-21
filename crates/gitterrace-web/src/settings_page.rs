@@ -213,10 +213,6 @@ pub(crate) async fn page(
             (SettingsFile::Config, Ok(l)) => (sections(&l), overrides(&l.config)),
             _ => (Vec::new(), Vec::new()),
         };
-        let file_name = match f {
-            SettingsFile::Config => "config.toml",
-            SettingsFile::Actions => "actions.toml",
-        };
         let mut files =
             vec![Choice::new("config.toml", "/_settings?f=config", f == SettingsFile::Config)];
         if actions_on {
@@ -236,9 +232,9 @@ pub(crate) async fn page(
             token,
             file: f.as_str(),
             head: settings_head(files, form_off.is_none(), &path, stamp.is_some()),
-            missing: stamp.is_none().then(|| {
-                Empty::new(format!("No {file_name} yet: every setting is at its default."))
-            }),
+            missing: stamp
+                .is_none()
+                .then(|| Empty::new(format!("No {f}.toml yet: every setting is at its default."))),
             stamp: gitterrace_config::Stamp::tag(stamp),
             text,
             sections,
