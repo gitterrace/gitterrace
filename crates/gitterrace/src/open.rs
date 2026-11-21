@@ -399,25 +399,35 @@ fn secret_request(
     let state = state.ok_or(ServerError::NoState)?;
     let token = gitterrace_web::add_token(state, addr.port()).map_err(ServerError::Secret)?;
     let body = serde_json::to_string(body).map_err(std::io::Error::from)?;
-    let mut s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT)?;
-    // Building the repository's router opens its index; give it longer than a probe.
-    s.set_read_timeout(Some(READY_WAIT))?;
+    let s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT)?;
     let req = format!(
         "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: \
         application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         gitterrace_web::ADD_TOKEN_HEADER,
         body.len()
     );
-    s.write_all(req.as_bytes())?;
-    let mut buf = Vec::new();
-    // A timeout after a partial read still leaves the status line to judge.
-    let _partial = s.take(64 * 1024).read_to_end(&mut buf);
-    let text = String::from_utf8_lossy(&buf);
-    let Some(status) = text.get(9..12).and_then(|c| c.parse::<u16>().ok()) else {
+    // Building the repository's router opens its index; give it longer than a probe.
+    let text = exchange(s, &req, READY_WAIT)?;
+    let (Some(status), reply) = split_response(&text) else {
         return Err(ServerError::NoAnswer);
     };
-    let reply = text.split("\r\n\r\n").nth(1).unwrap_or_default().trim();
-    Ok((status, RepoReply::parse(reply)))
+    Ok((status, RepoReply::parse(reply.trim())))
+}
+
+/// Sends `request` on `s` and reads the whole answer, at most 64 KiB. A timeout after a partial
+/// read still leaves what arrived to judge.
+fn exchange(mut s: TcpStream, request: &str, timeout: Duration) -> std::io::Result<String> {
+    s.set_read_timeout(Some(timeout))?;
+    s.write_all(request.as_bytes())?;
+    let mut buf = Vec::new();
+    let _partial = s.take(64 * 1024).read_to_end(&mut buf);
+    Ok(String::from_utf8_lossy(&buf).into_owned())
+}
+
+/// The status code of an HTTP/1.1 answer, when it has one, and its body.
+fn split_response(text: &str) -> (Option<u16>, &str) {
+    let status = text.get(9..12).and_then(|c| c.parse::<u16>().ok());
+    (status, text.split("\r\n\r\n").nth(1).unwrap_or_default())
 }
 
 /// Starts a detached `git-terrace <clone> --addr <addr> serve`, logging to `server.log`.
@@ -461,7 +471,7 @@ fn spawn_server(
 /// with `sha256(secret:nonce)`. A listener that cannot (another program, another user's
 /// server, a stale token) is `Other`, so it is never sent a repository path.
 fn identify(addr: SocketAddr, state: Option<&Path>) -> Listener {
-    let Ok(mut s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
+    let Ok(s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
         return Listener::Free;
     };
     let Some(secret) = state.and_then(|d| gitterrace_web::add_token(d, addr.port()).ok()) else {
@@ -470,45 +480,27 @@ fn identify(addr: SocketAddr, state: Option<&Path>) -> Listener {
     let Ok(nonce) = gitterrace_actions::Token::generate() else {
         return Listener::Other;
     };
-    if s.set_read_timeout(Some(PROBE_TIMEOUT)).is_err() {
-        return Listener::Other;
-    }
     let req = format!(
         "GET /_repos?nonce={} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n",
         nonce.as_str()
     );
-    if s.write_all(req.as_bytes()).is_err() {
+    let Ok(text) = exchange(s, &req, PROBE_TIMEOUT) else {
         return Listener::Other;
-    }
-    let mut buf = Vec::new();
-    // A timeout after a partial read still leaves the bytes to judge.
-    let _partial = s.take(64 * 1024).read_to_end(&mut buf);
-    let text = String::from_utf8_lossy(&buf);
+    };
     let want =
         format!("{{\"proof\":\"{}\"}}", gitterrace_actions::token_proof(&secret, nonce.as_str()));
-    let body = text.split("\r\n\r\n").nth(1).unwrap_or_default();
-    if text.starts_with("HTTP/1.1 200") && body.trim() == want {
-        Listener::Gitterrace
-    } else {
-        Listener::Other
-    }
+    let (status, body) = split_response(&text);
+    if status == Some(200) && body.trim() == want { Listener::Gitterrace } else { Listener::Other }
 }
 
 /// Whether `addr` answers `GET path` with a redirect: `/go` redirects only for a repository
 /// it serves, so a server for another repository (or not gitterrace at all) says no.
 fn serves(addr: SocketAddr, path: &str) -> bool {
-    let Ok(mut s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
+    let Ok(s) = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT) else {
         return false;
     };
-    if s.set_read_timeout(Some(PROBE_TIMEOUT)).is_err() {
-        return false;
-    }
     let req = format!("GET {path} HTTP/1.1\r\nHost: {addr}\r\nConnection: close\r\n\r\n");
-    if s.write_all(req.as_bytes()).is_err() {
-        return false;
-    }
-    let mut head = [0u8; 12];
-    s.read_exact(&mut head).is_ok() && head.starts_with(b"HTTP/1.1 302")
+    exchange(s, &req, PROBE_TIMEOUT).is_ok_and(|text| split_response(&text).0 == Some(302))
 }
 
 /// A server bound to every interface is reached over loopback.
@@ -536,9 +528,7 @@ fn expand(p: &str) -> PathBuf {
 fn browse(url: &str) -> anyhow::Result<()> {
     let opener = if cfg!(target_os = "macos") {
         "open"
-    } else if std::fs::read_to_string("/proc/version")
-        .is_ok_and(|v| v.to_ascii_lowercase().contains("microsoft"))
-    {
+    } else if crate::handler::is_wsl() {
         "wslview"
     } else {
         "xdg-open"

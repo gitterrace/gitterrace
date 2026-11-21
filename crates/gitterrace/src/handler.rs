@@ -52,7 +52,7 @@ pub(crate) fn run(uninstall: bool) -> anyhow::Result<()> {
     }
 }
 
-fn is_wsl() -> bool {
+pub(crate) fn is_wsl() -> bool {
     std::fs::read_to_string("/proc/version").is_ok_and(|v| v.to_lowercase().contains("microsoft"))
 }
 
