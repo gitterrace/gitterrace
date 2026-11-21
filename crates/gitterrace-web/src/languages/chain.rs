@@ -258,63 +258,14 @@ impl Chain {
 
 /// Extensions that name a file format, never a language: signatures, archives, binaries and
 /// build outputs. Their lines count under `Other`, so the legend lists only languages.
-const NOT_LANGUAGES: &[&str] = &[
-    ".asc",
-    ".sig",
-    ".gpg",
-    ".pgp",
-    ".minisig",
-    ".sha256",
-    ".sha512",
-    ".md5",
-    ".prebuilt",
-    ".bin",
-    ".exe",
-    ".dll",
-    ".so",
-    ".dylib",
-    ".a",
-    ".o",
-    ".obj",
-    ".lib",
-    ".class",
-    ".jar",
-    ".wasm",
-    ".pyc",
-    ".gz",
-    ".tgz",
-    ".bz2",
-    ".xz",
-    ".zst",
-    ".zip",
-    ".tar",
-    ".7z",
-    ".png",
-    ".jpg",
-    ".jpeg",
-    ".gif",
-    ".ico",
-    ".icns",
-    ".webp",
-    ".bmp",
-    ".pdf",
-    ".woff",
-    ".woff2",
-    ".ttf",
-    ".otf",
-    ".eot",
-    ".mp3",
-    ".mp4",
-    ".mov",
-    ".wav",
-    ".lock",
-    ".map",
-    ".snap",
-];
+const NOT_LANGUAGES: &str = ".asc .sig .gpg .pgp .minisig .sha256 .sha512 .md5 .prebuilt .bin .exe \
+    .dll .so .dylib .a .o .obj .lib .class .jar .wasm .pyc .gz .tgz .bz2 .xz .zst .zip .tar .7z \
+    .png .jpg .jpeg .gif .ico .icns .webp .bmp .pdf .woff .woff2 .ttf .otf .eot .mp3 .mp4 .mov \
+    .wav .lock .map .snap";
 
 /// Whether the slot `name` is a language the legend may name.
 pub(crate) fn is_language(name: &str) -> bool {
-    !NOT_LANGUAGES.contains(&name)
+    !NOT_LANGUAGES.split(' ').any(|e| e == name)
 }
 
 /// Which language slots the page shows, by their lines at the newest commit.

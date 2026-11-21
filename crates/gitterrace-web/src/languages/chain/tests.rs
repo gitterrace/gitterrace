@@ -402,3 +402,14 @@ fn the_state_key_follows_the_rules_and_the_ignore_files() {
     assert_ne!(base, k("r", &ig("d/.gitignore", "*.o\n")));
     assert_ne!(k("r", &ig("ab", "c")), k("r", &ig("a", "bc")), "no run-together");
 }
+
+/// Guard class: a typo in the extension list. Every entry is a dot extension with no stray
+/// characters, and the lookup finds exactly the entries.
+#[test]
+fn every_format_extension_is_a_dotted_word() {
+    for e in super::NOT_LANGUAGES.split(' ') {
+        assert!(e.len() > 1 && e.starts_with('.') && !e[1..].contains(['.', ' ']), "{e:?}");
+        assert!(!super::is_language(e), "{e}");
+    }
+    assert!(super::is_language(".rs") && super::is_language(""));
+}
