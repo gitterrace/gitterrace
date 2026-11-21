@@ -5,6 +5,7 @@
   "use strict";
   var meta = document.querySelector('meta[name="gitterrace-settings"]');
   if (!meta) return;
+  var mk = window.gtNav.el;
   var token = meta.content;
   var file = meta.dataset.file;
   var stamp = meta.dataset.stamp;
@@ -64,8 +65,7 @@
   // becomes name and value rows with an Add and a Remove button each; the textarea stays the
   // one source, so check and save read it as before.
   function kvRows(area) {
-    var box = document.createElement("div");
-    box.className = "kvrows";
+    var box = mk("div", "kvrows");
     var id = area.id;
     function sync() {
       var lines = [];
@@ -77,16 +77,15 @@
       area.dispatchEvent(new Event("input", { bubbles: true }));
     }
     function add(name, value) {
-      var r = document.createElement("div");
-      r.className = "kvrow";
-      var n = document.createElement("input");
-      n.type = "text"; n.className = "kvname"; n.value = name;
+      var r = mk("div", "kvrow");
+      var n = mk("input", "kvname");
+      n.type = "text"; n.value = name;
       n.setAttribute("aria-label", "Variable name");
-      var v = document.createElement("input");
-      v.type = "text"; v.className = "kvval"; v.value = value;
+      var v = mk("input", "kvval");
+      v.type = "text"; v.value = value;
       v.setAttribute("aria-label", "Variable value");
-      var x = document.createElement("button");
-      x.type = "button"; x.className = "kvdel"; x.textContent = "Remove";
+      var x = mk("button", "kvdel", "Remove");
+      x.type = "button";
       x.setAttribute("aria-label", "Remove variable");
       r.append(n, v, x);
       box.appendChild(r);
@@ -96,8 +95,8 @@
       var i = l.indexOf("=");
       if (i > 0) add(l.slice(0, i).trim(), l.slice(i + 1).trim());
     });
-    var plus = document.createElement("button");
-    plus.type = "button"; plus.className = "kvadd"; plus.textContent = "Add variable";
+    var plus = mk("button", "kvadd", "Add variable");
+    plus.type = "button";
     plus.id = id + "-add";
     box.addEventListener("input", function (e) { e.stopPropagation(); sync(); });
     box.addEventListener("click", function (e) {
@@ -156,8 +155,7 @@
     }
     var first = null;
     (reply.errors || []).forEach(function (e) {
-      var li = document.createElement("li");
-      li.textContent = (e.line ? "Line " + e.line + ": " : "") + e.msg;
+      var li = mk("li", "", (e.line ? "Line " + e.line + ": " : "") + e.msg);
       if (e.line) li.dataset.line = String(e.line);
       errs.appendChild(li);
       var row = e.key && form && form.querySelector('.setrow[data-id="' + e.key + '"]');
@@ -173,9 +171,7 @@
       }
     });
     (reply.warnings || []).forEach(function (w) {
-      var li = document.createElement("li");
-      li.className = "muted";
-      li.textContent = w;
+      var li = mk("li", "muted", w);
       errs.appendChild(li);
     });
     lines();
