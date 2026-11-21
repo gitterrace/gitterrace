@@ -42,11 +42,7 @@ fn too_long(what: &str) -> String {
 
 /// `s` cut to at most `MAX_QUERY_BYTES`, on a character boundary.
 fn clip(s: &str) -> &str {
-    let mut end = s.len().min(MAX_QUERY_BYTES);
-    while !s.is_char_boundary(end) {
-        end -= 1;
-    }
-    &s[..end]
+    &s[..s.floor_char_boundary(MAX_QUERY_BYTES)]
 }
 
 /// Whether the query or glob of `q` is over the cap, so it is neither run nor memoized.
