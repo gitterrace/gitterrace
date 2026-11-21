@@ -261,44 +261,23 @@ fn chrome_bare(env: &crate::app::Env, name: &str, href: &str) -> crate::views::C
     use gitterrace_config::Feature;
     let cfg = env.cfg();
     crate::views::Chrome {
-        base: String::new(),
         name: name.to_owned(),
-        branch: String::new(),
-        md: false,
         rev: "HEAD".to_owned(),
         rev_enc: "HEAD".to_owned(),
-        commit: String::new(),
-        dirty: None,
         nav: vec![crate::views::Nav {
             href: href.to_owned(),
             label: "Settings",
             key: "settings",
             on: true,
         }],
-        banner: None,
-        actions_note: None,
         home: "/".to_owned(),
-        repo_id: String::new(),
-        link_style: cfg.links.style.as_str(),
-        repo_key: String::new(),
-        theme: match cfg.display.theme {
-            gitterrace_types::ColorScheme::System => String::new(),
-            t => t.as_str().to_owned(),
-        },
-        has_line_hover: cfg.display.has_line_hover,
-        diff: crate::views::DiffLook::of(&cfg.display),
-        live: false,
-        live_how: "",
-        live_on: "",
-        version: String::new(),
-        actions: None,
         tools: crate::views::Tools {
             search: false,
             picker: crate::features::on(Feature::Picker),
             many: env.served() > 1,
         },
         off: crate::features::scripted_off(),
-        settings: false,
         owner: crate::views::Owner::Server,
+        ..crate::views::Chrome::from_cfg(&cfg)
     }
 }

@@ -78,6 +78,7 @@ pub(crate) struct Nav {
     clippy::struct_excessive_bools,
     reason = "independent page switches, each read by the shared chrome template"
 )]
+#[derive(Default)]
 pub(crate) struct Chrome {
     /// Prefix for absolute links; empty for a single repository.
     pub(crate) base: String,
@@ -136,16 +137,17 @@ pub(crate) struct Chrome {
 }
 
 /// Whose page the bar is on.
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum Owner {
     /// A repository's page: the bar has its branch and working tree.
+    #[default]
     Repo,
     /// The server's own page, which belongs to no repository.
     Server,
 }
 
 /// The top bar's tools a `[features]` switch can take away.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Default)]
 pub(crate) struct Tools {
     /// `features.search_enabled`: the search button and the field it opens.
     pub(crate) search: bool,
@@ -221,7 +223,6 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         base: crate::fmt::base(),
         name: app.name.clone(),
         branch: app.repo.head_branch().unwrap_or_else(|| "HEAD".to_owned()),
-        md: false,
         rev: rev.to_owned(),
         rev_enc: enc_seg(rev),
         commit: app.repo.resolve(rev).unwrap_or_default(),
@@ -242,25 +243,16 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         }),
         banner: if app.public() { None } else { banner(&app.repo.head_state(), &app.base) },
         actions_note: app.actions_note(),
-        theme: match app.cfg().display.theme {
-            ColorScheme::System => String::new(),
-            t => t.as_str().to_owned(),
-        },
-        has_line_hover: app.cfg().display.has_line_hover,
-        diff: DiffLook::of(&app.cfg().display),
         live: !app.public()
             && crate::features::on(Feature::Live)
             && app.cfg().watch.enabled
             && !crate::live::Mode::pinned_to(rev),
-        live_how: "",
-        live_on: "",
         version: app.version().to_string(),
         home: crate::fmt::with_rev(rev, || href("/")),
         // Read without waiting: the refresher computes it before ready, and a page that came
         // first (or while root walks of related repositories load the disk) must not block on
         // that walk. The permalink scripts skip an empty id.
         repo_id: app.repo.id_if_known().unwrap_or_default(),
-        link_style: app.cfg().links.style.as_str(),
         repo_key: app.key.clone(),
         actions: app
             .actions
@@ -274,11 +266,25 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         },
         off: crate::features::scripted_off(),
         settings: app.settings_on() && crate::features::on(Feature::Settings),
-        owner: Owner::Repo,
+        ..Chrome::from_cfg(&app.cfg())
     }
 }
 
 impl Chrome {
+    /// The bar's look from the settings in force, every other slot blank.
+    pub(crate) fn from_cfg(cfg: &gitterrace_config::Config) -> Self {
+        Self {
+            link_style: cfg.links.style.as_str(),
+            theme: match cfg.display.theme {
+                ColorScheme::System => String::new(),
+                t => t.as_str().to_owned(),
+            },
+            has_line_hover: cfg.display.has_line_hover,
+            diff: DiffLook::of(&cfg.display),
+            ..Self::default()
+        }
+    }
+
     /// The stylesheet that closes the cascade: led by the rendered-markdown rules on a page that
     /// renders markdown, without them everywhere else.
     pub(crate) const fn late_css(&self) -> &'static str {

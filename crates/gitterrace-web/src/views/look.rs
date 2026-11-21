@@ -3,6 +3,7 @@
 use gitterrace_config::Display;
 
 /// What the base template writes on `<body>` for diffs.
+#[derive(Default)]
 pub(crate) struct DiffLook {
     pub(crate) palette: String,
     pub(crate) wrap: bool,
