@@ -77,12 +77,12 @@ struct Repos {
     peers: crate::related::Peers,
 }
 
-/// Why [`Table::take`] left the table as it was.
 /// A folder name that cannot be a URL name; holds the name.
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 #[error("unusable repository name {0:?}")]
 pub(crate) struct NameError(pub(crate) String);
 
+/// Why [`Table::take`] left the table as it was.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Kept {
     NotServed,
@@ -114,19 +114,14 @@ impl Table {
         };
         for path in paths {
             let repo = Repo::discover(&path).map_err(io::Error::other)?;
-            let root = repo.root();
-            let mut g = table.write();
-            if g.order.iter().any(|s| s.root == root) {
-                continue;
-            }
-            let name =
-                table.allocate(&g, &url_stem(&repo.name()), &root).map_err(|NameError(stem)| {
+            table.add_inner(path.clone(), repo.root(), &url_stem(&repo.name()), false).map_err(
+                |NameError(stem)| {
                     io::Error::other(format!(
                         "unusable repository name {stem:?} for {}",
                         path.display()
                     ))
-                })?;
-            g.insert(name, path, root, false);
+                },
+            )?;
         }
         Ok(table)
     }
@@ -163,12 +158,22 @@ impl Table {
     /// A root already served comes back as [`Added::Present`]; check and insert hold one lock,
     /// so two racing additions of the same folder add it once.
     pub(crate) fn add(&self, root: PathBuf, stem: &str) -> Result<Added, NameError> {
+        self.add_inner(root.clone(), root, &url_stem(stem), true)
+    }
+
+    fn add_inner(
+        &self,
+        path: PathBuf,
+        root: PathBuf,
+        stem: &str,
+        opening: bool,
+    ) -> Result<Added, NameError> {
         let mut g = self.write();
         if let Some(s) = g.order.iter().find(|s| s.root == root) {
-            return Ok(Added::Present { name: s.name.clone(), base: format!("/r/{}/", s.name) });
+            return Ok(Added::Present { name: s.name.clone(), base: s.href() });
         }
-        let name = self.allocate(&g, &url_stem(stem), &root)?;
-        Ok(Added::Fresh(g.insert(name, root.clone(), root, true)))
+        let name = self.allocate(&g, stem, &root)?;
+        Ok(Added::Fresh(g.insert(name, path, root, opening)))
     }
 
     /// Drops `served` again, for an addition whose repository would not open. Its name claim
@@ -278,10 +283,11 @@ impl Table {
             .router
             .get_or_try_init(|| async {
                 let (s, live, env) = (Arc::clone(served), self.live.clone(), self.env.clone());
-                let (router, tasks, app) =
-                    tokio::task::spawn_blocking(move || repo_router(&s, live, &env))
-                        .await
-                        .map_err(io::Error::other)??;
+                let (router, tasks, app) = tokio::task::spawn_blocking(move || {
+                    crate::repo_router_tasks(&s.path, s.base(), s.name.clone(), live, &env)
+                })
+                .await
+                .map_err(io::Error::other)??;
                 served.adopt(tasks, &app);
                 served.opening.store(false, Ordering::Release);
                 Ok::<_, io::Error>(router)
@@ -302,7 +308,7 @@ impl Table {
             .map(|s| {
                 Ok(crate::actions::Target {
                     key: s.name.clone(),
-                    base: format!("/r/{}", s.name),
+                    base: s.base(),
                     repo: Repo::discover(&s.path).map_err(io::Error::other)?,
                 })
             })
@@ -337,6 +343,16 @@ impl Repos {
 }
 
 impl Served {
+    /// The prefix its pages live under.
+    fn base(&self) -> String {
+        format!("/r/{}", self.name)
+    }
+
+    /// Its home page link.
+    pub(crate) fn href(&self) -> String {
+        format!("{}/", self.base())
+    }
+
     /// Stops the background tasks its router started and every index write: an update
     /// running in-process returns at its next record, the index child is killed and reaped
     /// before this returns.
@@ -505,15 +521,6 @@ fn opening_page(name: &str) -> Response {
         .into_response()
 }
 
-fn repo_router(
-    served: &Served,
-    live: Option<Arc<crate::actions::Live>>,
-    env: &Env,
-) -> io::Result<Built> {
-    let base = format!("/r/{}", served.name);
-    crate::repo_router_tasks(&served.path, base, served.name.clone(), live, env)
-}
-
 async fn repos_json(State(table): State<Arc<Table>>) -> Response {
     let items = tokio::task::spawn_blocking(move || {
         let now = fmt::now();
@@ -522,7 +529,7 @@ async fn repos_json(State(table): State<Arc<Table>>) -> Response {
             .iter()
             .map(|s| RepoItem {
                 name: s.name.clone(),
-                href: format!("/r/{}/", s.name),
+                href: s.href(),
                 when: s
                     .recent(now)
                     .last

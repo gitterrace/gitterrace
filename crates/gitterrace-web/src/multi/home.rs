@@ -123,7 +123,7 @@ pub(super) async fn index(
     Query(query): Query<HomeQuery>,
 ) -> crate::error::Result<Response> {
     if let [one] = table.snapshot().as_slice() {
-        let to = format!("/r/{}/", one.name);
+        let to = one.href();
         return Ok((StatusCode::FOUND, [(axum::http::header::LOCATION, to)]).into_response());
     }
     let q = query.q.unwrap_or_default();
@@ -144,7 +144,7 @@ pub(super) async fn index(
             .iter()
             .zip(reads)
             .map(|(s, (r, dirty, state))| {
-                let href = format!("/r/{}/", s.name);
+                let href = s.href();
                 let c = r.last.as_ref();
                 let counts = &r.series.counts;
                 let peak = counts.iter().copied().max().unwrap_or(0);
