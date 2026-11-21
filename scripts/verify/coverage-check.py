@@ -13,9 +13,9 @@ run covers and another does not is unstable (a race, a thread that ends after th
 counts as covered on the AFTER side when any run hit it and as covered on the BEFORE side only
 when every run did, so only a line no run of AFTER reaches can read as lost. The same holds for a
 crate's branch percentage (lowest before, highest after). One run per side keeps the old, noisy
-reading. Lines compare by number, so the product source must be the same on both sides: a commit that
-also edits product code needs its own proof. Missing mutant output on one side is an error,
-never a pass.
+reading. Lines compare by number, so the product source must be the same on both sides: a
+commit that also edits product code needs its own proof. Missing mutant output on one side
+is an error, never a pass.
 """
 
 from __future__ import annotations
@@ -127,10 +127,20 @@ def compare(before: Path, after: Path) -> list[str]:
     return errors
 
 
+def unstable(run: Path) -> dict[str, list[int]]:
+    """Lines some runs of one tree covered and others did not, per file."""
+    stable, union, _, _ = read_lcov(run)
+    return {p: sorted(union[p] - stable[p]) for p in sorted(union) if union[p] - stable[p]}
+
+
 def report(before: Path, after: Path) -> int:
     errors = compare(before, after)
     for e in errors:
         print(f"coverage-check: {e}", file=sys.stderr)
+    # Unstable lines are named, never dropped: a reader sees what the comparison forgave.
+    for side, run in (("BEFORE", before), ("AFTER", after)):
+        for path, nums in unstable(run).items():
+            print(f"coverage-check: unstable in {side}: {path}: {len(nums)} line(s): {nums[:20]}")
     if not errors:
         stable, union, _, _ = read_lcov(after)
         lines = sum(len(v) for v in stable.values())
