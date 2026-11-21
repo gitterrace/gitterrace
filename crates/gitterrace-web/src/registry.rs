@@ -75,11 +75,13 @@ pub fn state_dir() -> Option<PathBuf> {
 /// A path may now hold another project, and reading an id
 /// walks the whole history (seconds on a large clone). A caller narrows by the recorded id,
 /// then reads the candidate's own id before trusting it.
-/// A missing file is empty; a corrupt one is too, since the next serve rewrites it.
+/// A missing file is empty. A corrupt one is an error, so a writer refuses and the file stays
+/// on disk for the user instead of being reset to empty.
 pub fn candidates(dir: &Path) -> io::Result<Vec<Entry>> {
-    Ok(gitterrace_git::read_no_follow_bounded(dir, FILE, MAX_FILE)?
-        .map(|b| serde_json::from_slice(&b).unwrap_or_default())
-        .unwrap_or_default())
+    match gitterrace_git::read_no_follow_bounded(dir, FILE, MAX_FILE)? {
+        Some(b) => serde_json::from_slice(&b).map_err(io::Error::other),
+        None => Ok(Vec::new()),
+    }
 }
 
 /// Records `repos` as served now. A repository without commits has no id and is skipped.
@@ -413,6 +415,20 @@ mod tests {
         let big = usize::try_from(MAX_TOKEN + 1).expect("fits");
         std::fs::write(t.path().join(token_file(1)), vec![b'a'; big]).expect("big token");
         assert!(add_token(t.path(), 1).is_err(), "a huge token is not read");
+    }
+
+    /// A corrupt registry is an error and is never overwritten by a record or a claim.
+    #[test]
+    fn a_corrupt_registry_is_kept_not_reset() {
+        let t = tempfile::tempdir().expect("tmp");
+        let state = t.path().join("s");
+        std::fs::create_dir_all(&state).expect("dir");
+        std::fs::write(state.join(FILE), "{not json").expect("w");
+        let a = repo(&t.path().join("a"), "a");
+        assert!(candidates(&state).is_err(), "corrupt read is an error");
+        assert!(record(&state, &[&a]).is_err(), "record refuses");
+        assert!(claim(&state, t.path(), "a", &|_| false).is_err(), "claim refuses");
+        assert_eq!(std::fs::read_to_string(state.join(FILE)).expect("r"), "{not json");
     }
 
     #[cfg(unix)]
