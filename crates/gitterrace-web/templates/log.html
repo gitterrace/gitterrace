@@ -14,8 +14,5 @@
 {% for r in d.rows %}{{ r }}{% endfor %}
 </ul>
 {% endfor %}
-<nav class="pager">
-{% if let Some(h) = newer %}<a href="{{ h }}">Newer</a>{% else %}<span></span>{% endif %}
-{% if let Some(h) = older %}<a href="{{ h }}">Older</a>{% endif %}
-</nav>
+{% include "_pager.html" %}
 {% endblock %}
