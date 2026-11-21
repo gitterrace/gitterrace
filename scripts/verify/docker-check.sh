@@ -17,15 +17,10 @@ port=${DOCKER_CHECK_PORT:-18080}
 hadolint=hadolint/hadolint:v2.14.0@sha256:
 hadolint+=27086352fd5e1907ea2b934eb1023f217c5ae087992eb59fde121dce9c9ff21e
 
-fail() {
-  echo "docker-check: $*" >&2
-  exit 1
-}
-
-# The channel in a file: rust-toolchain.toml form, or the Dockerfile's ARG form.
-toolchain_pin() {
-  sed -n -e 's/^channel *= *"\(.*\)"/\1/p' -e 's/^ARG RUST_TOOLCHAIN=\(.*\)/\1/p' "$1"
-}
+# shellcheck disable=SC2034  # read by fail() in run-lib.sh
+fail_prefix=docker-check
+# shellcheck source=/dev/null  # not followed: shellcheck runs without -x
+. "$root/scripts/lib/run-lib.sh"
 
 # The rules a Dockerfile edit could break without a failing build: the pin, the read-only
 # public mode, a non-root user, trusted mounts, and a build context free of local state.

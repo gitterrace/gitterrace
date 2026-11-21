@@ -12,39 +12,11 @@ root=$(cd "$(dirname "$0")/../.." && pwd)
 dockerfile=$root/deploy/test/linux.Dockerfile
 tools=$root/.github/actions/lint-tools
 
-# Prints the mode for the arguments, or fails on an unknown one.
-parse_args() {
-  if [ "$#" -gt 1 ]; then
-    echo "usage: scripts/dev/linux-run.sh [--full | --self-test]" >&2
-    return 2
-  fi
-  case "${1:-}" in
-  "") echo smoke ;;
-  --full) echo full ;;
-  --self-test) echo self-test ;;
-  *)
-    echo "usage: scripts/dev/linux-run.sh [--full | --self-test]" >&2
-    return 2
-    ;;
-  esac
-}
-
-# The channel in a file: rust-toolchain.toml form, or the Dockerfile's ARG form.
-toolchain_pin() {
-  sed -n -e 's/^channel *= *"\(.*\)"/\1/p' -e 's/^ARG RUST_TOOLCHAIN=\(.*\)/\1/p' "$1"
-}
-
-fail() {
-  echo "self-test: $*" >&2
-  exit 1
-}
+# shellcheck source=/dev/null  # not followed: shellcheck runs without -x
+. "$root/scripts/lib/run-lib.sh"
 
 self_test() {
-  [ "$(parse_args)" = smoke ] || fail "no argument is not smoke"
-  [ "$(parse_args --full)" = full ] || fail "--full is not full"
-  [ "$(parse_args --self-test)" = self-test ] || fail "--self-test not parsed"
-  ! parse_args --bogus >/dev/null 2>&1 || fail "an unknown argument was accepted"
-  ! parse_args --full --self-test >/dev/null 2>&1 || fail "two arguments were accepted"
+  parse_args_self_test linux-run
   local want got
   want=$(toolchain_pin "$root/rust-toolchain.toml")
   got=$(toolchain_pin "$dockerfile")
@@ -67,7 +39,7 @@ self_test() {
   echo "linux-run self-test: ok (toolchain $want)"
 }
 
-mode=$(parse_args "$@") || exit 2
+mode=$(parse_args linux-run "$@") || exit 2
 if [ "$mode" = self-test ]; then
   self_test
   exit 0

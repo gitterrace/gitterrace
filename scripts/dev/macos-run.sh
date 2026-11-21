@@ -9,22 +9,8 @@
 set -euo pipefail
 root=$(cd "$(dirname "$0")/../.." && pwd)
 
-# Prints the mode for the arguments, or fails on an unknown one.
-parse_args() {
-  if [ "$#" -gt 1 ]; then
-    echo "usage: scripts/dev/macos-run.sh [--full | --self-test]" >&2
-    return 2
-  fi
-  case "${1:-}" in
-  "") echo smoke ;;
-  --full) echo full ;;
-  --self-test) echo self-test ;;
-  *)
-    echo "usage: scripts/dev/macos-run.sh [--full | --self-test]" >&2
-    return 2
-    ;;
-  esac
-}
+# shellcheck source=/dev/null  # not followed: shellcheck runs without -x
+. "$root/scripts/lib/run-lib.sh"
 
 # Runs a command with nothing inherited but HOME, PATH and the given extras.
 clean_env() {
@@ -33,17 +19,8 @@ clean_env() {
   env -i HOME="$home" PATH="$search" TMPDIR="${TMPDIR:-/tmp}" "$@"
 }
 
-fail() {
-  echo "self-test: $*" >&2
-  exit 1
-}
-
 self_test() {
-  [ "$(parse_args)" = smoke ] || fail "no argument is not smoke"
-  [ "$(parse_args --full)" = full ] || fail "--full is not full"
-  [ "$(parse_args --self-test)" = self-test ] || fail "--self-test not parsed"
-  ! parse_args --bogus >/dev/null 2>&1 || fail "an unknown argument was accepted"
-  ! parse_args --full --self-test >/dev/null 2>&1 || fail "two arguments were accepted"
+  parse_args_self_test macos-run
   local home out
   home=$(mktemp -d)
   # shellcheck disable=SC2016  # the child shell expands these, not this one
@@ -54,7 +31,7 @@ self_test() {
   echo "macos-run self-test: ok"
 }
 
-mode=$(parse_args "$@") || exit 2
+mode=$(parse_args macos-run "$@") || exit 2
 if [ "$mode" = self-test ]; then
   self_test
   exit 0
