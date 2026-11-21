@@ -21,7 +21,8 @@ pub(crate) fn remap(
     let Some(col) = MessageColumn::of(store)? else {
         return Ok(None);
     };
-    let items = col.items()?;
+    // Each old rank is read once, so the items move out instead of being cloned.
+    let mut items: Vec<Option<Item>> = col.items()?.into_iter().map(Some).collect();
     let old: HashMap<Oid, u32> = old_order
         .iter()
         .enumerate()
@@ -44,7 +45,9 @@ pub(crate) fn remap(
         let Some(&r) = old.get(oid) else {
             return Ok(None);
         };
-        let mut it = items[r as usize].clone();
+        let Some(mut it) = items[r as usize].take() else {
+            return Ok(None);
+        };
         it.parents =
             it.parents.iter().filter_map(|p| new.get(&old_order[*p as usize]).copied()).collect();
         w.push(&it)?;
