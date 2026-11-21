@@ -99,7 +99,7 @@ inherits = "release"
 # step.
 [workspace.metadata.demo]
 url = "https://demo.gitterrace.dev"
-repos = ["jq jq-1.8.2", "ripgrep 15.2.0", "gitterrace v0.1.1"]
+repos = ["jq jq-1.8.2", "ripgrep 15.2.0", "gitterrace v0.2.0"]
 
 # Release automation (cargo-dist): GitHub releases with prebuilt binaries, a
 # shell installer and a formula in gitterrace/homebrew-tap, which the release job fills. Run `dist plan` to preview.
