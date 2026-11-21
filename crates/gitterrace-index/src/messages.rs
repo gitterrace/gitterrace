@@ -12,6 +12,7 @@
 //! packed into blocks of about 64 KiB and compressed with zstd. An item over 512 KiB (a
 //! giant generated message) is stored without its text and checked from git when searched.
 
+use std::borrow::Cow;
 use std::collections::{BinaryHeap, HashMap};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -33,16 +34,23 @@ const MAX_THREADS: usize = 8;
 const INLINE: u8 = 0;
 const IN_GIT: u8 = 1;
 
+/// Author name and email as written, and the message. A scan borrows them from the block.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Item {
-    pub time: i64,
-    pub parents: Vec<u32>,
-    /// Author name and email as written, and the message. `None` for an item too large to
-    /// keep, which search checks from git.
-    pub text: Option<(Vec<u8>, Vec<u8>, String)>,
+pub struct Text<'a> {
+    pub name: Cow<'a, [u8]>,
+    pub email: Cow<'a, [u8]>,
+    pub message: Cow<'a, str>,
 }
 
-impl Item {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Item<'a> {
+    pub time: i64,
+    pub parents: Vec<u32>,
+    /// `None` for an item too large to keep, which search checks from git.
+    pub text: Option<Text<'a>>,
+}
+
+impl Item<'_> {
     /// The item of `t`, with parent ids mapped to ranks by `rank`. A parent outside the set
     /// (a shallow boundary) is left out: the walk cannot visit it either.
     pub fn of(t: gitterrace_git::CommitText, rank: &HashMap<Oid, u32>) -> Self {
@@ -54,35 +62,51 @@ impl Item {
         Self {
             time: t.committer_time,
             parents,
-            text: Some((t.author_name, t.author_email, t.message)),
+            text: Some(Text {
+                name: t.author_name.into(),
+                email: t.author_email.into(),
+                message: t.message.into(),
+            }),
+        }
+    }
+
+    fn into_owned(self) -> Item<'static> {
+        Item {
+            time: self.time,
+            parents: self.parents,
+            text: self.text.map(|t| Text {
+                name: t.name.into_owned().into(),
+                email: t.email.into_owned().into(),
+                message: t.message.into_owned().into(),
+            }),
         }
     }
 
     fn encode(&self, out: &mut Vec<u8>) {
         let start = out.len();
-        self.encode_as(out, self.text.as_ref());
-        if out.len() - start > INLINE_MAX {
-            out.truncate(start);
-            self.encode_as(out, None);
-        }
-    }
-
-    fn encode_as(&self, out: &mut Vec<u8>, text: Option<&(Vec<u8>, Vec<u8>, String)>) {
-        out.push(if text.is_some() { INLINE } else { IN_GIT });
+        out.push(if self.text.is_some() { INLINE } else { IN_GIT });
         put_varint(out, zigzag(self.time));
         put_varint(out, self.parents.len() as u64);
         for p in &self.parents {
             put_varint(out, u64::from(*p));
         }
-        if let Some((name, email, message)) = text {
-            for b in [name.as_slice(), email.as_slice(), message.as_bytes()] {
-                put_varint(out, b.len() as u64);
-                out.extend_from_slice(b);
-            }
+        let head = out.len();
+        let Some(t) = &self.text else {
+            return;
+        };
+        for b in [&*t.name, &*t.email, t.message.as_bytes()] {
+            put_varint(out, b.len() as u64);
+            out.extend_from_slice(b);
+        }
+        if out.len() - start > INLINE_MAX {
+            out.truncate(head);
+            out[start] = IN_GIT;
         }
     }
+}
 
-    fn decode(c: &mut Cursor<'_>, commits: u32) -> SegResult<Self> {
+impl<'a> Item<'a> {
+    fn decode(c: &mut Cursor<'a>, commits: u32) -> SegResult<Self> {
         let flag = c.u8()?;
         if flag != INLINE && flag != IN_GIT {
             return Err(c.err("message item flag"));
@@ -98,14 +122,14 @@ impl Item {
             parents.push(p);
         }
         let text = if flag == INLINE {
-            let part = |c: &mut Cursor<'_>| -> SegResult<Vec<u8>> {
+            let part = |c: &mut Cursor<'a>| -> SegResult<&'a [u8]> {
                 let n = c.count(MAX_RAW)?;
-                Ok(c.bytes(n)?.to_vec())
+                c.bytes(n)
             };
             let name = part(c)?;
             let email = part(c)?;
-            let message = String::from_utf8(part(c)?).map_err(|_| c.err("message not utf-8"))?;
-            Some((name, email, message))
+            let message = std::str::from_utf8(part(c)?).map_err(|_| c.err("message not utf-8"))?;
+            Some(Text { name: name.into(), email: email.into(), message: message.into() })
         } else {
             None
         };
@@ -249,7 +273,7 @@ impl MessageColumn {
         Ok(Some(MessageHits { capped: total > ids.len(), ids }))
     }
 
-    pub(crate) fn items(&self) -> SegResult<Vec<Item>> {
+    pub(crate) fn items(&self) -> SegResult<Vec<Item<'static>>> {
         let mut out = Vec::with_capacity(self.commits as usize);
         let mut z = codec::Unpacker::new()?;
         let mut buf = Vec::new();
@@ -258,7 +282,7 @@ impl MessageColumn {
                 let raw = block(f, e, &mut z, &mut buf)?;
                 let mut c = Cursor::new(&raw, f.name(), e.offset);
                 for _ in 0..e.items {
-                    out.push(Item::decode(&mut c, self.commits)?);
+                    out.push(Item::decode(&mut c, self.commits)?.into_owned());
                 }
                 if !c.is_empty() {
                     return Err(c.err("bytes after the last item"));
@@ -291,7 +315,7 @@ impl MessageIndex for MessageColumn {
                     s.spawn(|| -> SegResult<Vec<(usize, Part)>> {
                         let mut z = codec::Unpacker::new()?;
                         let mut buf = Vec::new();
-                        let mut names: HashMap<(Vec<u8>, Vec<u8>), String> = HashMap::new();
+                        let mut names: HashMap<Vec<u8>, String> = HashMap::new();
                         let mut done = Vec::new();
                         loop {
                             let i = next.fetch_add(1, Ordering::Relaxed);
@@ -372,7 +396,7 @@ fn scan_block(
     first: u32,
     commits: u32,
     query: &MessageQuery<'_>,
-    names: &mut HashMap<(Vec<u8>, Vec<u8>), String>,
+    names: &mut HashMap<Vec<u8>, String>,
 ) -> SegResult<Part> {
     let n = entry.items as usize;
     let mut part = Part {
@@ -384,19 +408,23 @@ fn scan_block(
     };
     let mut cur = Cursor::new(raw, file.name(), entry.offset);
     let mut hay = String::new();
+    let mut key = Vec::new();
     for i in 0..entry.items {
         let item = Item::decode(&mut cur, commits)?;
         part.time.push(item.time);
         part.parents.extend(&item.parents);
         part.ends.push(u32::try_from(part.parents.len()).unwrap_or(u32::MAX));
-        let hit = if let Some((name, email, message)) = item.text {
-            let key = (name, email);
+        let hit = if let Some(t) = item.text {
+            // Length-prefixed, so two different pairs never share a key.
+            key.clear();
+            put_varint(&mut key, t.name.len() as u64);
+            key.extend_from_slice(&t.name);
+            key.extend_from_slice(&t.email);
             if !names.contains_key(&key) {
-                let shown = (query.author)(&key.0, &key.1);
-                names.insert(key.clone(), shown);
+                names.insert(key.clone(), (query.author)(&t.name, &t.email));
             }
             hay.clear();
-            hay.push_str(&message);
+            hay.push_str(&t.message);
             hay.push('\n');
             hay.push_str(names.get(&key).map_or("", String::as_str));
             (query.is_match)(&hay)

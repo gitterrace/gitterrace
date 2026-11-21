@@ -57,12 +57,12 @@ fn a_merged_column_equals_a_fresh_one_byte_for_byte() {
 /// wrong item.
 #[test]
 fn hostile_items_error_not_panic() {
-    use super::Item;
+    use super::{Item, Text};
     use crate::seg::bounds::Cursor;
     let it = Item {
         time: -5,
         parents: vec![0, 1],
-        text: Some((b"n".to_vec(), b"e".to_vec(), "msg".into())),
+        text: Some(Text { name: b"n"[..].into(), email: b"e"[..].into(), message: "msg".into() }),
     };
     let mut raw = Vec::new();
     it.encode(&mut raw);
@@ -82,11 +82,16 @@ fn hostile_items_error_not_panic() {
 /// A message too large to keep is stored without its text and still found, from git.
 #[test]
 fn a_huge_message_is_kept_out_of_the_column_and_still_found() {
-    use super::Item;
+    use super::{Item, Text};
+    use std::borrow::Cow;
     let it = Item {
         time: 1,
         parents: Vec::new(),
-        text: Some((Vec::new(), Vec::new(), "x".repeat(super::INLINE_MAX + 1))),
+        text: Some(Text {
+            name: Cow::default(),
+            email: Cow::default(),
+            message: "x".repeat(super::INLINE_MAX + 1).into(),
+        }),
     };
     let mut raw = Vec::new();
     it.encode(&mut raw);
@@ -109,7 +114,7 @@ fn history(dir: &Path, n: usize) -> (Repo, String) {
     (Repo::discover(f.path()).expect("repo"), tip)
 }
 
-fn items(dir: &Path) -> Vec<super::Item> {
+fn items(dir: &Path) -> Vec<super::Item<'static>> {
     let store = crate::seg::read::Store::open(dir).expect("open").expect("set");
     let col = super::MessageColumn::of(store).expect("column").expect("whole");
     col.items().expect("items")
