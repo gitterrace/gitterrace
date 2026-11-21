@@ -257,7 +257,7 @@ fn run(a: &App, q: SearchQuery) -> Result<SearchPage> {
     let re = match build_regex(&text, regex, case) {
         Ok(r) => r,
         Err(e) => {
-            page.error = Some(e.to_string());
+            page.error = Some(e);
             return Ok(page);
         }
     };
@@ -329,21 +329,25 @@ fn search_head(rev: &str) -> crate::pagehead::PageHead {
     crate::pagehead::PageHead::new("Search", crate::pagehead::Tagline::of(&said))
 }
 
-/// The last line of the regex engine's complaint, which is the part a reader needs.
-#[derive(Debug, thiserror::Error)]
-#[error("{0}")]
-struct PatternError(String);
+/// Compiles `pat` under the size limit every search pattern shares.
+fn compile(
+    pat: &str,
+    tune: impl FnOnce(&mut RegexBuilder),
+) -> std::result::Result<Regex, regex::Error> {
+    let mut b = RegexBuilder::new(pat);
+    b.size_limit(8 * 1024 * 1024);
+    tune(&mut b);
+    b.build()
+}
 
-fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, PatternError> {
+/// The error is the last line of the regex engine's complaint, which is the part a reader
+/// needs.
+fn build_regex(q: &str, is_regex: bool, case: bool) -> std::result::Result<Regex, String> {
     let pat = if is_regex { q.to_owned() } else { regex::escape(q) };
-    RegexBuilder::new(&pat)
-        .case_insensitive(!case)
-        .multi_line(true)
-        .size_limit(8 * 1024 * 1024)
-        .build()
-        .map_err(|e| {
-            PatternError(e.to_string().lines().last().unwrap_or("invalid pattern").to_owned())
-        })
+    compile(&pat, |b| {
+        b.case_insensitive(!case).multi_line(true);
+    })
+    .map_err(|e| e.to_string().lines().last().unwrap_or("invalid pattern").to_owned())
 }
 
 /// Comma separated globs. Without a `/` a glob matches a file name at any depth.
@@ -375,11 +379,7 @@ fn glob_regex(glob: &str) -> std::result::Result<Option<Regex>, String> {
         }
         alts.push(if g.contains('/') { format!("^{body}$") } else { format!("(?:^|/){body}$") });
     }
-    RegexBuilder::new(&alts.join("|"))
-        .size_limit(8 * 1024 * 1024)
-        .build()
-        .map(Some)
-        .map_err(|e| e.to_string())
+    compile(&alts.join("|"), |_| {}).map(Some).map_err(|e| e.to_string())
 }
 
 enum Scanned {

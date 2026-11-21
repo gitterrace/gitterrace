@@ -5,6 +5,16 @@ use regex::Regex;
 use crate::app::App;
 use crate::error::Result;
 
+/// The text a commit is matched on: its message, then the author as `name <email>`.
+fn write_hay(out: &mut String, message: &str, name: &str, email: &str) {
+    out.push_str(message);
+    out.push('\n');
+    out.push_str(name);
+    out.push_str(" <");
+    out.push_str(email);
+    out.push('>');
+}
+
 pub(crate) fn search_commits(
     a: &App,
     rev: &str,
@@ -15,7 +25,7 @@ pub(crate) fn search_commits(
         let rows = a.repo.search_summaries(rev, &hits.ids)?;
         return Ok((rows, hits.capped));
     }
-    walk_commits(a, rev, re)
+    search_commits_counted(a, rev, re).map(|(rows, capped, _)| (rows, capped))
 }
 
 /// Commit search from the index's message column, the same hits in the same order as the
@@ -41,7 +51,9 @@ pub(crate) fn search_indexed(
             &a.repo,
             id,
             |message, name, email| {
-                hit = re.is_match(&format!("{message}\n{name} <{email}>"));
+                let mut hay = String::new();
+                write_hay(&mut hay, message, name, email);
+                hit = re.is_match(&hay);
                 false
             },
             |_, _| false,
@@ -66,16 +78,8 @@ pub(crate) fn search_indexed(
     }
 }
 
-pub(crate) fn walk_commits(
-    a: &App,
-    rev: &str,
-    re: &Regex,
-) -> Result<(Vec<gitterrace_git::CommitSummary>, bool)> {
-    search_commits_counted(a, rev, re).map(|(rows, capped, _)| (rows, capped))
-}
-
-/// [`walk_commits`] with the work the walk did, so a test can hold a miss to the cost of
-/// the walk alone: only a matching commit has its summary built.
+/// Commit search by walking git, with the work the walk did, so a test can hold a miss to the
+/// cost of the walk alone: only a matching commit has its summary built.
 pub(crate) fn search_commits_counted(
     a: &App,
     rev: &str,
@@ -90,12 +94,7 @@ pub(crate) fn search_commits_counted(
         rev,
         |message, name, email| {
             hay.clear();
-            hay.push_str(message);
-            hay.push('\n');
-            hay.push_str(name);
-            hay.push_str(" <");
-            hay.push_str(email);
-            hay.push('>');
+            write_hay(&mut hay, message, name, email);
             re.is_match(&hay)
         },
         |c, _| {

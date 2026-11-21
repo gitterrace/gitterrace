@@ -9,7 +9,7 @@ use regex::Regex;
 
 use crate::app::{App, Env};
 use crate::search::build_regex;
-use crate::search::commits::{search_commits, search_indexed, walk_commits};
+use crate::search::commits::{search_commits, search_commits_counted, search_indexed};
 
 /// Queries that hit and miss: subjects, bodies, authors before and after the mailmap, the
 /// lossy replacement of a non-UTF-8 byte, anchors and the message/author seam.
@@ -58,7 +58,7 @@ fn re(q: &str, case: bool) -> Regex {
 fn assert_equal(a: &App, what: &str) {
     for (q, case) in QUERIES {
         let r = re(q, *case);
-        let (walk, walk_capped) = walk_commits(a, "HEAD", &r).expect("walk");
+        let (walk, walk_capped, _) = search_commits_counted(a, "HEAD", &r).expect("walk");
         let hits = search_indexed(a, "HEAD", &r, a.cfg().limits.search_commits)
             .expect("indexed")
             .unwrap_or_else(|| panic!("{what}: the column answers {q:?}"));
@@ -145,7 +145,7 @@ fn turned_off_the_search_walks_git_and_the_column_goes() {
     let before = off.repo.commits_read();
     let (rows, _) = search_commits(&off, "HEAD", &r).expect("search");
     assert!(off.repo.commits_read() > before, "off reads git, as before the column");
-    assert_eq!(ids(&rows), ids(&walk_commits(&off, "HEAD", &r).expect("walk").0));
+    assert_eq!(ids(&rows), ids(&search_commits_counted(&off, "HEAD", &r).expect("walk").0));
     build(&off);
     assert!(names(&off).is_empty(), "off drops the column on the next update");
     assert!(
@@ -165,7 +165,7 @@ fn a_damaged_column_is_rebuilt_never_served() {
     let r = re("fix", false);
     let a = app(&repo, true, 200);
     build(&a);
-    let want = ids(&walk_commits(&a, "HEAD", &r).expect("walk").0);
+    let want = ids(&search_commits_counted(&a, "HEAD", &r).expect("walk").0);
     let file = |a: &App| {
         let m = gitterrace_index::seg::manifest::Manifest::load(a.index.dir())
             .expect("manifest")
