@@ -17,21 +17,9 @@ pub struct Field {
     pub source: Source,
     /// Whether a running server takes an edit only after a restart.
     pub restart: bool,
-    pub input: Input,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Input {
-    Checkbox,
-    Tri,
-    /// A whole number, with the range [`BOUNDS`] gives when it lists the key.
-    Number {
-        min: Option<u64>,
-        max: Option<u64>,
-    },
-    Text,
-    List,
-    Select(Vec<&'static str>),
+    pub control: Control,
+    /// The range of a [`Control::Number`] when [`BOUNDS`] lists the key.
+    pub bounds: Option<(u64, u64)>,
 }
 
 impl Field {
@@ -58,17 +46,7 @@ pub fn fields(loaded: &Loaded) -> Vec<Field> {
 
 fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
     let value = config.show(&k);
-    let input = match k.control {
-        Control::Checkbox => Input::Checkbox,
-        Control::Tri => Input::Tri,
-        Control::Number => {
-            let b = BOUNDS.iter().find(|(id, _, _)| *id == k.id);
-            Input::Number { min: b.map(|b| b.1), max: b.map(|b| b.2) }
-        }
-        Control::Text => Input::Text,
-        Control::List => Input::List,
-        Control::Select(v) => Input::Select(v),
-    };
+    let bounds = BOUNDS.iter().find(|(id, _, _)| *id == k.id).map(|b| (b.1, b.2));
     Field {
         id: k.id,
         section: k.section,
@@ -78,7 +56,8 @@ fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
         source: loaded.sources.get(k.id).copied().unwrap_or(Source::Default),
         restart: k.reload == Reload::Restart,
         default: k.default,
-        input,
+        control: k.control,
+        bounds: bounds.filter(|_| k.control == Control::Number),
     }
 }
 
@@ -86,7 +65,8 @@ fn field(config: &Config, loaded: &Loaded, k: Key) -> Field {
 mod tests {
     use gitterrace_types::{ColorScheme, DateStyle, LinkStyle, Period, StringEnum};
 
-    use super::{Input, fields};
+    use super::fields;
+    use crate::value::Control;
     use crate::{BOUNDS, keys, parse};
 
     fn ids_of(v: &[super::Field]) -> Vec<&'static str> {
@@ -107,10 +87,10 @@ mod tests {
         let f = fields(&parse("").expect("empty"));
         for (id, lo, hi) in BOUNDS {
             let x = f.iter().find(|x| x.id == *id).expect("bounded key has a field");
-            assert_eq!(x.input, Input::Number { min: Some(*lo), max: Some(*hi) }, "{id}");
+            assert_eq!((&x.control, x.bounds), (&Control::Number, Some((*lo, *hi))), "{id}");
         }
         let free = f.iter().find(|x| x.id == "watch.rescan_secs").expect("key");
-        assert_eq!(free.input, Input::Number { min: None, max: None });
+        assert_eq!((&free.control, free.bounds), (&Control::Number, None));
     }
 
     #[test]
@@ -119,15 +99,15 @@ mod tests {
             T::ALL.iter().map(|v| v.as_str()).collect()
         }
         let f = fields(&parse("").expect("empty"));
-        let sel = |id: &str| f.iter().find(|x| x.id == id).expect(id).input.clone();
-        assert_eq!(sel("display.theme"), Input::Select(all::<ColorScheme>()));
-        assert_eq!(sel("insights.period"), Input::Select(all::<Period>()));
-        assert_eq!(sel("links.style"), Input::Select(all::<LinkStyle>()));
-        assert_eq!(sel("display.dates"), Input::Select(all::<DateStyle>()));
-        assert_eq!(sel("features.api_enabled"), Input::Tri);
-        assert_eq!(sel("server.is_public"), Input::Checkbox);
-        assert_eq!(sel("server.hosts"), Input::List);
-        assert_eq!(sel("server.addr"), Input::Text);
+        let sel = |id: &str| f.iter().find(|x| x.id == id).expect(id).control.clone();
+        assert_eq!(sel("display.theme"), Control::Select(all::<ColorScheme>()));
+        assert_eq!(sel("insights.period"), Control::Select(all::<Period>()));
+        assert_eq!(sel("links.style"), Control::Select(all::<LinkStyle>()));
+        assert_eq!(sel("display.dates"), Control::Select(all::<DateStyle>()));
+        assert_eq!(sel("features.api_enabled"), Control::Tri);
+        assert_eq!(sel("server.is_public"), Control::Checkbox);
+        assert_eq!(sel("server.hosts"), Control::List);
+        assert_eq!(sel("server.addr"), Control::Text);
     }
 
     #[test]

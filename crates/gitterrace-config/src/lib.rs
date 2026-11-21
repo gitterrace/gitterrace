@@ -26,7 +26,7 @@ use std::path::{Path, PathBuf};
 pub use budget::{Cache, PARTS, SHARES, shares_doc};
 pub use edit::{Change, apply};
 pub use features::{Feature, INSIGHT_PAGES};
-pub use form::{Field, Input, fields};
+pub use form::{Field, fields};
 pub use locate::{Located, located, syntax};
 pub use rows::{RowKey, row_editable, row_literal, rows, table_literal};
 pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Display, Key, Reload, RepoOverride, keys};

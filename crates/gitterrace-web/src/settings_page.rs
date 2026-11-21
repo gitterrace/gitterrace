@@ -12,7 +12,7 @@ use axum::{
     http::{HeaderValue, header},
     response::{Html, IntoResponse, Response},
 };
-use gitterrace_config::{Field, Input};
+use gitterrace_config::{Control, Field};
 use gitterrace_types::SettingsFile;
 
 use crate::empty::Empty;
@@ -70,13 +70,14 @@ pub(crate) struct Which {
 
 fn row(f: Field) -> Row {
     let value = f.plain();
-    let (kind, min, max, options) = match &f.input {
-        Input::Checkbox => ("checkbox", None, None, Vec::new()),
-        Input::Tri => ("tri", None, None, Vec::new()),
-        Input::Number { min, max } => ("number", *min, *max, Vec::new()),
-        Input::Text => ("text", None, None, Vec::new()),
-        Input::List => ("list", None, None, Vec::new()),
-        Input::Select(v) => ("select", None, None, v.iter().map(|o| (*o, *o == value)).collect()),
+    let (min, max) = f.bounds.unzip();
+    let (kind, options) = match &f.control {
+        Control::Checkbox => ("checkbox", Vec::new()),
+        Control::Tri => ("tri", Vec::new()),
+        Control::Number => ("number", Vec::new()),
+        Control::Text => ("text", Vec::new()),
+        Control::List => ("list", Vec::new()),
+        Control::Select(v) => ("select", v.iter().map(|o| (*o, *o == value)).collect()),
     };
     Row {
         id: f.id,
