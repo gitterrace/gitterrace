@@ -158,9 +158,11 @@ deploy workflow or token in the repository. It refuses a dirty tree and builds
 the site from HEAD into `target/site`. `make site-preview` serves the same site
 on http://127.0.0.1:4343.
 
-1. Bump `SECURITY_TXT_EXPIRES` in `xtask/src/site.rs`, commit. For the first
-   release, set `Effective:` in `docs/legal/privacy.md` to the launch date.
-   After that it moves only when the policy's content does.
+1. For the first release, set `Effective:` in `docs/legal/privacy.md` to the
+   launch date. After that it moves only when the policy's content does.
+   security.txt's `Expires` needs no step: `xtask/src/security_expires.rs`
+   derives it from the newest changelog release plus a fixed span, and a test
+   fails if it has passed or is over a year out.
 2. On the release candidate commit, in a clean clone on a quiet machine,
    `make bench LARGE=1` and commit the results.
 3. `make release-gate VERSION=x.y.z` on main: it removes any old x.y.z

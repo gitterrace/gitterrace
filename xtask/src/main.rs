@@ -27,6 +27,7 @@ mod openapi_json;
 mod out;
 mod plate;
 mod readme_agents_md;
+mod security_expires;
 mod site;
 mod tagline;
 mod theme;

@@ -50,15 +50,12 @@ const BRAND: [&str; 5] = ["logo-light", "logo-dark", "mark-light", "mark-dark", 
 const TOKENS: &str = "crates/gitterrace-web/static/tokens.css";
 /// The app's syntax colours, which the site's code blocks share.
 const SYNTAX_CSS: &str = "crates/gitterrace-web/static/syntax.css";
-/// RFC 9116 makes `Expires` mandatory in security.txt. Bump it with each release, at most a year
-/// out; a passed date tells reporters the contact may be dead.
 /// The two mailboxes of the site: the legal pages name `SUPPORT_EMAIL` for contact and rights
 /// requests, and `SECURITY_EMAIL` for vulnerability reports, which is also `security.txt`'s
 /// first Contact. The legal sources are Markdown, so a test holds their addresses to these.
 #[cfg(test)]
 pub(crate) const SUPPORT_EMAIL: &str = "support@gitterrace.dev";
 pub(crate) const SECURITY_EMAIL: &str = "security@gitterrace.dev";
-const SECURITY_TXT_EXPIRES: &str = "2027-11-20T23:00:00Z";
 
 /// The site's own rules, after the app's tokens in `site.css`.
 const PAGE_CSS: &str = include_str!("../templates/site.css");
@@ -148,7 +145,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     ));
     let (pages, paths) = docs::pages(root, &site)?;
     outs.extend(pages);
-    outs.extend(host_files(&site, &paths));
+    outs.extend(host_files(&site, &paths, &crate::security_expires::expires(&log)?));
     Ok(version_assets(outs))
 }
 
@@ -310,7 +307,7 @@ fn csp_hash(body: &str) -> String {
 /// The files the static host reads beside the page: response headers, the 404 page, the
 /// crawler files and the security contact. The CSP is tight because the page is static: the
 /// only scripts allowed are [`SCRIPTS`], by their hashes.
-fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
+fn host_files(site: &Site, pages: &[String], expires: &str) -> Vec<Out> {
     let (home, repo, name) = (site.home, site.repo, site.name);
     let pages = pages.iter().fold(String::new(), |mut s, p| {
         let _ = writeln!(s, "<url><loc>{home}/{p}</loc></url>");
@@ -373,7 +370,7 @@ fn host_files(site: &Site, pages: &[String]) -> Vec<Out> {
                  Contact: {repo}/security/advisories/new\n\
                  Policy: {repo}/blob/main/SECURITY.md\n\
                  Canonical: {home}/.well-known/security.txt\n\
-                 Expires: {SECURITY_TXT_EXPIRES}\n\
+                 Expires: {expires}\n\
                  Preferred-Languages: en\n"
             ),
         ),
