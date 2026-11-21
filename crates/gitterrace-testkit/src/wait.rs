@@ -114,10 +114,13 @@ pub async fn page_until(router: &axum::Router, uri: &str, ok: impl Fn(&str) -> b
     .await
 }
 
-/// A page body that holds data, not the indexing progress.
+/// A page body that holds data, not the indexing progress, and whose chrome shows the repo id.
+///
+/// Both arrive in the background, so a test that compares two pages waits for both, or the pages
+/// differ by the id alone.
 #[must_use]
 pub fn indexed(body: &str) -> bool {
-    !body.contains("data-progress")
+    !body.contains("data-progress") && identified(body)
 }
 
 /// A page body whose chrome already shows the repo id.
