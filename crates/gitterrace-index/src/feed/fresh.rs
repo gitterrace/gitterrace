@@ -2,8 +2,7 @@
 //! a capped number, so a view of a side branch costs its divergence, not the history. Strings
 //! new to the set get ids after the set's own, so ids of indexed strings never change.
 
-use std::cmp::Reverse;
-use std::collections::{BinaryHeap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::io;
 use std::sync::Arc;
 
@@ -68,7 +67,13 @@ pub(crate) fn walk(
         todo.extend(r.parents.iter().rev().cloned());
         recs.push(r);
     }
-    let order = topo(&recs);
+    // The unindexed commits all come after the indexed part, which none of them is an
+    // ancestor of, so they sort alone by (author time, id).
+    let nodes: Vec<(i64, &str, Vec<&str>)> = recs
+        .iter()
+        .map(|r| (r.time, r.id.as_str(), r.parents.iter().map(String::as_str).collect()))
+        .collect();
+    let order = gitterrace_git::topo_sort(&nodes);
     let mut f = Fresh::default();
     let latest = crate::wall_clock().saturating_add(crate::insights::DAY);
     let first = u32::try_from(base.len()).unwrap_or(u32::MAX);
@@ -127,38 +132,6 @@ pub(crate) fn walk(
         f.rows.push(FreshRow { row, id, parents, files });
     }
     Ok(Walk::Done(f, met))
-}
-
-/// Kahn over the unindexed commits alone, ready ones by (author time, id): they all come after
-/// the indexed part, which none of them is an ancestor of.
-fn topo(recs: &[CommitRecord]) -> Vec<usize> {
-    let pos: HashMap<&str, usize> =
-        recs.iter().enumerate().map(|(i, r)| (r.id.as_str(), i)).collect();
-    let mut waiting = vec![0usize; recs.len()];
-    let mut children: Vec<Vec<usize>> = vec![Vec::new(); recs.len()];
-    for (i, r) in recs.iter().enumerate() {
-        for p in r.parents.iter().filter_map(|p| pos.get(p.as_str())) {
-            waiting[i] += 1;
-            children[*p].push(i);
-        }
-    }
-    let mut ready: BinaryHeap<Reverse<(i64, &str, usize)>> = waiting
-        .iter()
-        .enumerate()
-        .filter(|(_, w)| **w == 0)
-        .map(|(i, _)| Reverse((recs[i].time, recs[i].id.as_str(), i)))
-        .collect();
-    let mut out = Vec::with_capacity(recs.len());
-    while let Some(Reverse((_, _, i))) = ready.pop() {
-        out.push(i);
-        for &c in &children[i] {
-            waiting[c] -= 1;
-            if waiting[c] == 0 {
-                ready.push(Reverse((recs[c].time, recs[c].id.as_str(), c)));
-            }
-        }
-    }
-    out
 }
 
 /// Labels have no count on the seam, so new ones start past the last id the set names.

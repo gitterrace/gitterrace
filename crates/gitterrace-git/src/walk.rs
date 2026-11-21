@@ -248,10 +248,9 @@ pub fn canonical_order(repo: &Repo, rev: &str) -> Result<Vec<String>> {
 }
 
 /// Kahn's algorithm over `(time, id, parents)`, picking the smallest (time, id) among the ready
-/// commits. Returns positions into `nodes`.
-fn topo_sort(nodes: &[(i64, gix::ObjectId, Vec<gix::ObjectId>)]) -> Vec<usize> {
-    let pos: HashMap<gix::ObjectId, usize> =
-        nodes.iter().enumerate().map(|(i, n)| (n.1, i)).collect();
+/// commits. Returns positions into `nodes`. Parents not in `nodes` hold nothing back.
+pub fn topo_sort<K: Copy + Ord + std::hash::Hash>(nodes: &[(i64, K, Vec<K>)]) -> Vec<usize> {
+    let pos: HashMap<K, usize> = nodes.iter().enumerate().map(|(i, n)| (n.1, i)).collect();
     let mut waiting = vec![0usize; nodes.len()];
     let mut children: Vec<Vec<usize>> = vec![Vec::new(); nodes.len()];
     for (i, (_, _, parents)) in nodes.iter().enumerate() {
@@ -261,7 +260,7 @@ fn topo_sort(nodes: &[(i64, gix::ObjectId, Vec<gix::ObjectId>)]) -> Vec<usize> {
             children[*p].push(i);
         }
     }
-    let mut ready: BinaryHeap<Reverse<(i64, gix::ObjectId, usize)>> = waiting
+    let mut ready: BinaryHeap<Reverse<(i64, K, usize)>> = waiting
         .iter()
         .enumerate()
         .filter(|(_, w)| **w == 0)
@@ -503,5 +502,26 @@ mod tests {
         let b = vec![(5, id(1), vec![]), (5, id(9), vec![])];
         assert_eq!(order(&a), order(&b));
         assert_eq!(order(&a)[0], id(1));
+    }
+
+    /// The index sorts its unindexed commits by the 40-hex id, git by the raw id: equal times
+    /// must break the same way in both.
+    #[test]
+    fn hex_ids_and_raw_ids_break_equal_times_alike() {
+        let raw = vec![
+            (5, id(0xf0), vec![]),
+            (5, id(0x0a), vec![]),
+            (5, id(0x9c), vec![id(0x0a)]),
+            (5, id(0x10), vec![id(0xf0), id(0x9c)]),
+        ];
+        let hex: Vec<(i64, String, Vec<String>)> = raw
+            .iter()
+            .map(|(t, i, ps)| (*t, i.to_string(), ps.iter().map(ToString::to_string).collect()))
+            .collect();
+        let by_ref: Vec<(i64, &str, Vec<&str>)> = hex
+            .iter()
+            .map(|(t, i, ps)| (*t, i.as_str(), ps.iter().map(String::as_str).collect()))
+            .collect();
+        assert_eq!(topo_sort(&raw), topo_sort(&by_ref));
     }
 }
