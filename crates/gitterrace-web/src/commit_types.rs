@@ -188,17 +188,9 @@ fn matrix(
     }
     let grid: HashMap<(&str, &str), usize> =
         named.iter().map(|((k, sc), n)| ((k.as_str(), sc.as_str()), *n)).collect();
-    let all: usize = scopes
-        .iter()
-        .flat_map(|s| kinds.iter().map(move |k| (k, s)))
-        .map(|(k, s)| grid.get(&(k.as_str(), s.as_str())).copied().unwrap_or(0))
-        .sum();
-    let max = scopes
-        .iter()
-        .flat_map(|s| kinds.iter().map(move |k| (k, s)))
-        .map(|(k, s)| grid.get(&(k.as_str(), s.as_str())).copied().unwrap_or(0))
-        .max()
-        .unwrap_or(0);
+    let count = |k: &str, s: &str| grid.get(&(k, s)).copied().unwrap_or(0);
+    let counts = || scopes.iter().flat_map(|s| kinds.iter().map(move |k| count(k, s)));
+    let (all, max) = (counts().sum::<usize>(), counts().max().unwrap_or(0));
     Matrix {
         cols: scopes
             .iter()
@@ -212,7 +204,7 @@ fn matrix(
                 cells: scopes
                     .iter()
                     .map(|s| {
-                        let n = grid.get(&(k.as_str(), s.as_str())).copied().unwrap_or(0);
+                        let n = count(k, s);
                         Cell {
                             n,
                             level: level(n, max),
