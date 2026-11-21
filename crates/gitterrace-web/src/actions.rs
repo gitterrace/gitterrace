@@ -25,7 +25,7 @@ use gitterrace_actions::{
 };
 use gitterrace_git::Repo;
 
-use crate::fmt::enc_path;
+use crate::{fmt::enc_path, reload::poll_every};
 
 pub(crate) const RUN_PATH: &str = "/_actions/run";
 const STATUS_PATH: &str = "/_actions/status";
@@ -270,44 +270,29 @@ fn start_live(
     Some(live)
 }
 
-async fn reload(mut reloader: Reloader, status: Arc<Status>) {
-    loop {
-        tokio::time::sleep(RELOAD_POLL).await;
-        let Ok((back, lines)) = tokio::task::spawn_blocking(move || {
-            let lines = reloader.poll();
-            (reloader, lines)
-        })
-        .await
-        else {
-            return;
-        };
-        reloader = back;
+async fn reload(reloader: Reloader, status: Arc<Status>) {
+    poll_every(RELOAD_POLL, reloader, Reloader::poll, |reloader, lines| {
         status.set(reloader.error().map(not_loaded));
-        for l in lines {
-            tracing::info!("{l}");
-        }
+        log_info(lines);
+    })
+    .await;
+}
+
+fn log_info(lines: Vec<String>) {
+    for l in lines {
+        tracing::info!("{l}");
     }
 }
 
 /// After a refused first load: keeps the note current as the file is edited. A valid file
 /// cannot turn actions on without a restart, so the note says so instead of vanishing.
 async fn retry(file: PathBuf, roots: Vec<PathBuf>, status: Arc<Status>) {
-    let mut reloader = Reloader::new(file, roots, Config::default());
+    let reloader = Reloader::new(file, roots, Config::default());
     let handle = reloader.handle();
-    loop {
-        tokio::time::sleep(RELOAD_POLL).await;
-        let Ok((back, lines)) = tokio::task::spawn_blocking(move || {
-            let lines = reloader.poll();
-            (reloader, lines)
-        })
-        .await
-        else {
-            return;
-        };
-        reloader = back;
+    poll_every(RELOAD_POLL, reloader, Reloader::poll, |reloader, lines| {
         // An unchanged file keeps the note startup set.
         if lines.is_empty() {
-            continue;
+            return;
         }
         let usable = handle.read().is_ok_and(|c| !c.actions.is_empty());
         let note = match reloader.error() {
@@ -318,10 +303,9 @@ async fn retry(file: PathBuf, roots: Vec<PathBuf>, status: Arc<Status>) {
             None => None,
         };
         status.set(note);
-        for l in lines {
-            tracing::info!("{l}");
-        }
-    }
+        log_info(lines);
+    })
+    .await;
 }
 
 /// `/go/...` always; the run route only when actions are on.

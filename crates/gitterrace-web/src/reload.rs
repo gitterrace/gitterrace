@@ -65,27 +65,46 @@ fn stamp(file: &std::path::Path) -> Stamp {
     Some((m.modified().ok()?, m.len()))
 }
 
-pub(crate) async fn run(mut reloader: Reloader, env: Env) {
+/// Every `every`: `poll` the watcher on a blocking thread, then hand it and its log lines to
+/// `each`. Ends only when the blocking task dies.
+pub(crate) async fn poll_every<R: Send + 'static>(
+    every: Duration,
+    mut watcher: R,
+    poll: impl Fn(&mut R) -> Vec<String> + Clone + Send + 'static,
+    mut each: impl FnMut(&R, Vec<String>),
+) {
     loop {
-        tokio::time::sleep(POLL).await;
-        let env = env.clone();
+        tokio::time::sleep(every).await;
+        let poll = poll.clone();
         let Ok((back, lines)) = tokio::task::spawn_blocking(move || {
-            let lines = reloader.poll(&env);
-            (reloader, lines)
+            let lines = poll(&mut watcher);
+            (watcher, lines)
         })
         .await
         else {
             return;
         };
-        reloader = back;
-        for l in lines {
-            if l.contains("not reloaded") || l.contains("restart") {
-                tracing::warn!("{l}");
-            } else {
-                tracing::info!("{l}");
-            }
-        }
+        watcher = back;
+        each(&watcher, lines);
     }
+}
+
+pub(crate) async fn run(reloader: Reloader, env: Env) {
+    poll_every(
+        POLL,
+        reloader,
+        move |r| r.poll(&env),
+        |_, lines| {
+            for l in lines {
+                if l.contains("not reloaded") || l.contains("restart") {
+                    tracing::warn!("{l}");
+                } else {
+                    tracing::info!("{l}");
+                }
+            }
+        },
+    )
+    .await;
 }
 
 #[cfg(test)]
