@@ -58,3 +58,17 @@ fn ancestor_steps_above_the_cap_are_refused_fast() {
     let spent = started.elapsed();
     assert!(spent < std::time::Duration::from_millis(500), "refusals took {spent:?}");
 }
+
+/// Guard class: a committed-only rev is read as `base` then only `~N` and `^N` steps, and any
+/// other byte after a step, multibyte ones included, is a refusal. Red on a panic (a slice
+/// inside a character) or on a stray character taken for a parent step.
+#[test]
+fn a_rev_with_anything_but_steps_after_the_base_is_refused() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    linear(tmp.path(), 5);
+    let repo = Repo::discover(tmp.path()).expect("repo").committed_only();
+    for rev in ["main~\u{e9}", "main~1\u{e9}", "main^x", "main~1x", "main~~x", "main^^\u{1f600}"] {
+        assert!(matches!(repo.resolve(rev), Err(crate::Error::RevNotFound(_))), "{rev} resolved");
+    }
+    assert!(repo.resolve("main~1^").is_ok(), "a bare ^ is ^1");
+}

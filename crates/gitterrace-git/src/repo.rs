@@ -377,6 +377,9 @@ fn committed_rev(repo: &gix::Repository, rev: &str) -> Option<gix::ObjectId> {
     };
     let mut budget = MAX_REV_STEPS;
     while let Some(op) = steps.chars().next() {
+        if !matches!(op, '~' | '^') {
+            return None;
+        }
         steps = &steps[1..];
         let digits = steps.bytes().take_while(u8::is_ascii_digit).count();
         let n: usize = if digits == 0 { 1 } else { steps[..digits].parse().ok()? };
