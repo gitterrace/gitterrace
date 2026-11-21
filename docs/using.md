@@ -149,7 +149,8 @@ Good to know: Settings is never on a public server or in an export.
 `features.settings_enabled = false` removes it. `display.diff_palette = "colorblind"` marks diff additions blue and
 removals orange instead of green and red.
 `display.has_diff_wrap`, `display.diff_tab_chars` and `display.diff_font_px` wrap diff
-lines, set the tab width and the code font size in every diff. [Configuration](configuration.md) lists every key.
+lines, set the tab width and the code font size in every diff.
+[Configuration](configuration.md) lists every key.
 
 ## Keys
 

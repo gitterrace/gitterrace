@@ -173,8 +173,8 @@ POSIX shell, so call a Windows tool directly, such as `command = ["clip.exe"]`
 with `stdin = "markdown"`.
 
 Windows relies on the ACLs of your profile folder, as the
-[security model](security.md#accepted-risks) explains. Background processes a script starts are not reaped when the action completes
-normally. Only a timeout triggers `taskkill /T` (then `/F`) cleanup.
+[security model](security.md#accepted-risks) explains. Background processes a script starts are not reaped
+when the action completes normally. Only a timeout triggers `taskkill /T` (then `/F`) cleanup.
 
 ### Scripts shared by actions
 

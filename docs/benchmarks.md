@@ -68,8 +68,7 @@ measures it on a real clone.
 
 Runs are made on a quiet machine: the harness waits for it to settle, and
 `make docs-check` refuses results from a busy one. The published run is made
-once per release, on the release candidate commit. The 0.1.0 run is the first
-baseline.
+once per release, on the release candidate commit.
 
 ### Insights pages on a large history
 
