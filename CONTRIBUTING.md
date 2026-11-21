@@ -178,8 +178,8 @@ on http://127.0.0.1:4343.
    released section apart from its tag. To re-tag an unpublished release,
    `make release-gate VERSION=x.y.z RETAG=1`.
 4. The release workflow builds the binaries, the installer and the formula.
-5. `make deploy` (it refuses until the tag, repository and tap answer), then
-   `make domains`.
+5. `make deploy` (it refuses until the tag, repository and tap answer, and a site
+   that fails a site guard), then `make domains`.
 6. Refresh the live demo: `make demo demo-deploy` exports the pinned jq and
    ripgrep and ships them to demo.gitterrace.dev.
 

@@ -171,7 +171,22 @@ fn main() -> Result<()> {
                 );
                 std::process::exit(1);
             }
-            println!("deploy-check: the legal pages have no placeholders");
+            // The files `make site` wrote, the ones wrangler uploads, not a fresh build.
+            let ws = facts::load(&root)?;
+            let repo = &ws.packages.get("gitterrace").context("package gitterrace")?.repository;
+            let site_outs: Vec<Out> =
+                generators(&root, false)?.into_iter().filter(site::is_site).collect();
+            let site_bad = site::disk::check(&root, &root.join(site::SITE_DIR), &site_outs, repo)?;
+            if !site_bad.is_empty() {
+                println!(
+                    "built site fails a site guard, fix it and `make site`:\n  {}",
+                    site_bad.join("\n  ")
+                );
+                std::process::exit(1);
+            }
+            println!(
+                "deploy-check: the legal pages have no placeholders and the site passes its guards"
+            );
         }
     }
     Ok(())
