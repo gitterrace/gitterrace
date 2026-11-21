@@ -215,17 +215,22 @@ fn failure_reports_stderr_and_exit() {
 fn timeout_kills_the_whole_group() {
     let (t, repo) = fixture();
     let pidfile = t.path().join("grandchild.pid");
-    let script = format!("sh -c 'echo $$ > \"{}\"; sleep 30' & sleep 30", pidfile.display());
+    // The pid is published by rename, so a reader never sees it half written, and the timeout is
+    // wide enough that the grandchild has started on a loaded machine before it fires.
+    let script = format!(
+        "sh -c 'echo $$ > \"{0}.tmp\"; mv \"{0}.tmp\" \"{0}\"; sleep 30' & sleep 30",
+        pidfile.display()
+    );
     let start = Instant::now();
     let r = Runner::new(Limits::default())
         .run(
-            &shell("a", &script, Duration::from_millis(300)),
+            &shell("a", &script, Duration::from_millis(2000)),
             &payload(&repo, Kind::Commit),
             &repo.root(),
         )
         .expect("run");
     assert!(r.timed_out && !r.ok);
-    assert!(start.elapsed() < Duration::from_secs(5), "{:?}", start.elapsed());
+    assert!(start.elapsed() < Duration::from_secs(10), "{:?}", start.elapsed());
     let pid: i32 = std::fs::read_to_string(&pidfile).expect("pid").trim().parse().expect("int");
     // The kernel reaps the signalled group soon after, on a loaded runner later.
     gitterrace_testkit::wait::process_gone_blocking("the grandchild is reaped", &pid.to_string());
