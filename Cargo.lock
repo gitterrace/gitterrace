@@ -1118,7 +1118,6 @@ dependencies = [
  "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-types",
- "libc",
  "proptest",
  "rustc-hash",
  "rustix",

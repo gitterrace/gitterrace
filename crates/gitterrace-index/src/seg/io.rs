@@ -55,20 +55,7 @@ pub(crate) fn create_no_follow(dir: &Path, name: &str) -> io::Result<File> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => return Err(e),
     }
-    let mut o = fs::OpenOptions::new();
-    o.read(true).write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.mode(0o644).custom_flags(libc::O_NOFOLLOW);
-    }
-    #[cfg(windows)]
-    {
-        use std::os::windows::fs::OpenOptionsExt;
-        // FILE_FLAG_OPEN_REPARSE_POINT: a link or junction opens as itself, so writing fails.
-        o.custom_flags(0x0020_0000);
-    }
-    o.open(path)
+    gitterrace_git::create_new_no_follow(&path, 0o644)
 }
 
 /// Writes `bytes` to `<name>.tmp`, fsyncs and renames it to `name`, then syncs `dir`.

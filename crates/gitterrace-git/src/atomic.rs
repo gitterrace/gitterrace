@@ -76,16 +76,9 @@ fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
     o.custom_flags(libc::O_NOFOLLOW | libc::O_NONBLOCK)
 }
 
-#[cfg(windows)]
+#[cfg(not(unix))]
 fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
-    use std::os::windows::fs::OpenOptionsExt;
-    // FILE_FLAG_OPEN_REPARSE_POINT
-    o.custom_flags(0x0020_0000)
-}
-
-#[cfg(not(any(unix, windows)))]
-fn read_flags(o: &mut OpenOptions) -> &mut OpenOptions {
-    o
+    no_follow(o)
 }
 
 /// Replaces `dir/name` with `bytes`: a uniquely named temp file (created new, `O_NOFOLLOW`,
@@ -126,17 +119,7 @@ fn write_replacing(dir: &Path, name: &str, bytes: &[u8], mode: u32, sync: bool) 
         std::process::id(),
         SEQ.fetch_add(1, Ordering::Relaxed)
     ));
-    let mut o = OpenOptions::new();
-    o.write(true).create_new(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.mode(mode);
-    }
-    #[cfg(not(unix))]
-    let _ = mode;
-    let written = no_follow(&mut o)
-        .open(&tmp)
+    let written = create_new_no_follow(&tmp, mode)
         .and_then(|mut f| {
             f.write_all(bytes)?;
             if sync {
@@ -162,15 +145,32 @@ pub fn open_append_no_follow(dir: &Path, name: &str, mode: u32) -> io::Result<fs
     let path = regular_entry(dir, name)?;
     let mut o = OpenOptions::new();
     o.create(true).append(true).read(true);
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        o.mode(mode);
-    }
-    #[cfg(not(unix))]
-    let _ = mode;
+    set_mode(&mut o, mode);
     no_follow(&mut o).open(&path)
 }
+
+/// Creates `path` new for writing, `O_NOFOLLOW` and `mode` on unix, so a link or an existing
+/// file at the path is an error, never written through.
+///
+/// # Errors
+/// When the path exists or the open fails.
+pub fn create_new_no_follow(path: &Path, mode: u32) -> io::Result<fs::File> {
+    let mut o = OpenOptions::new();
+    o.read(true).write(true).create_new(true);
+    set_mode(&mut o, mode);
+    no_follow(&mut o).open(path)
+}
+
+/// The creation mode where the platform has one.
+#[cfg(unix)]
+fn set_mode(o: &mut OpenOptions, mode: u32) {
+    use std::os::unix::fs::OpenOptionsExt;
+    o.mode(mode);
+}
+
+/// Other platforms have no creation mode.
+#[cfg(not(unix))]
+const fn set_mode(_o: &mut OpenOptions, _mode: u32) {}
 
 /// `dir/name`, after checking `dir` is a real folder and `name`, when present, a regular file.
 fn regular_entry(dir: &Path, name: &str) -> io::Result<PathBuf> {
