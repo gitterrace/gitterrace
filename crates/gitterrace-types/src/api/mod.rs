@@ -4,6 +4,8 @@
 //! Every struct declares its fields in alphabetical order: the JSON these replace was a
 //! `serde_json` map, which sorts keys, and the bytes must not move. Never reorder fields.
 
+use std::borrow::Cow;
+
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -160,10 +162,10 @@ pub struct TreeResponse {
 /// One query parameter of an endpoint.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct ParamDoc {
-    pub description: String,
-    pub name: String,
+    pub description: Cow<'static, str>,
+    pub name: Cow<'static, str>,
     pub required: bool,
-    pub ty: String,
+    pub ty: Cow<'static, str>,
 }
 
 /// One endpoint, as `GET /` lists it.

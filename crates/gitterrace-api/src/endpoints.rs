@@ -1,25 +1,19 @@
 //! The one registry of HTTP endpoints. [`crate::router`] builds its routes from it, `GET /`
 //! returns it and the generated API reference renders it, so the three cannot drift.
 
+use std::borrow::Cow;
+
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    IndexResponse, InsightList, InsightResponse, LogResponse, RefsResponse, RepoResponse,
-    TreeResponse, WorktreeResponse,
+    IndexResponse, InsightList, InsightResponse, LogResponse, ParamDoc as Param, RefsResponse,
+    RepoResponse, TreeResponse, WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
 
 use crate::core::ApiState;
 use crate::http;
-
-#[derive(Debug, Serialize)]
-pub struct Param {
-    pub name: &'static str,
-    pub ty: &'static str,
-    pub required: bool,
-    pub description: &'static str,
-}
 
 /// One `GET` endpoint under `/api/v1`.
 #[derive(Serialize)]
@@ -75,11 +69,21 @@ fn of<T: JsonSchema>(g: &mut SchemaGenerator) -> Schema {
 }
 
 const fn p(name: &'static str, ty: &'static str, description: &'static str) -> Param {
-    Param { name, ty, required: false, description }
+    Param {
+        name: Cow::Borrowed(name),
+        ty: Cow::Borrowed(ty),
+        required: false,
+        description: Cow::Borrowed(description),
+    }
 }
 
 const fn req(name: &'static str, ty: &'static str, description: &'static str) -> Param {
-    Param { name, ty, required: true, description }
+    Param {
+        name: Cow::Borrowed(name),
+        ty: Cow::Borrowed(ty),
+        required: true,
+        description: Cow::Borrowed(description),
+    }
 }
 
 const REV: Param = p("rev", "string", "Revision to read, default `HEAD`.");

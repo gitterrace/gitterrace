@@ -58,7 +58,7 @@ where
 /// Refuses a query key the endpoint does not list with 400: an unread key would answer
 /// unfiltered numbers to a caller who thinks they are filtered.
 async fn known_params(
-    params: &'static [endpoints::Param],
+    params: &'static [ParamDoc],
     req: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
@@ -70,7 +70,7 @@ async fn known_params(
     });
     match unknown {
         Some(k) => {
-            let known: Vec<&str> = params.iter().map(|p| p.name).collect();
+            let known: Vec<&str> = params.iter().map(|p| p.name.as_ref()).collect();
             let known = if known.is_empty() { "none".to_owned() } else { known.join(", ") };
             ApiError::BadRequest(format!(
                 "unknown parameter `{k}`. Known: {known}. Select commits with `q`"
@@ -132,16 +132,7 @@ pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> IndexResponse 
         .iter()
         .filter(|e| keep(e.path))
         .map(|e| EndpointDoc {
-            params: e
-                .params
-                .iter()
-                .map(|p| ParamDoc {
-                    description: p.description.to_owned(),
-                    name: p.name.to_owned(),
-                    required: p.required,
-                    ty: p.ty.to_owned(),
-                })
-                .collect(),
+            params: e.params.to_vec(),
             path: e.path.to_owned(),
             returns: e.returns(&mut generator),
             summary: e.summary.to_owned(),

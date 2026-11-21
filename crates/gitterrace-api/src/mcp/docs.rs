@@ -1,24 +1,16 @@
 //! The tool and prompt registries as documentation data for the API reference.
 
+use gitterrace_types::api::ParamDoc;
 use serde::Deserialize;
 
 use crate::mcp::McpServer;
-
-/// One MCP tool parameter, from the tool's input schema.
-#[derive(Debug)]
-pub struct Param {
-    pub name: String,
-    pub ty: String,
-    pub required: bool,
-    pub description: String,
-}
 
 /// One MCP tool as the API reference shows it.
 #[derive(Debug)]
 pub struct ToolDoc {
     pub name: String,
     pub description: String,
-    pub params: Vec<Param>,
+    pub params: Vec<ParamDoc>,
     pub read_only: bool,
 }
 
@@ -67,14 +59,14 @@ impl McpServer {
             .into_iter()
             .map(|t| {
                 let schema = InputSchema::deserialize(&*t.input_schema).unwrap_or_default();
-                let mut params: Vec<Param> = schema
+                let mut params: Vec<ParamDoc> = schema
                     .properties
                     .iter()
-                    .map(|(name, prop)| Param {
-                        name: name.clone(),
-                        ty: prop.type_name(),
+                    .map(|(name, prop)| ParamDoc {
+                        name: name.clone().into(),
+                        ty: prop.type_name().into(),
                         required: schema.required.contains(name),
-                        description: prop.description.clone().unwrap_or_default(),
+                        description: prop.description.clone().unwrap_or_default().into(),
                     })
                     .collect();
                 params.sort_by(|a, b| a.name.cmp(&b.name));
@@ -101,15 +93,15 @@ impl McpServer {
             .list_all()
             .into_iter()
             .map(|p| {
-                let mut params: Vec<Param> = p
+                let mut params: Vec<ParamDoc> = p
                     .arguments
                     .unwrap_or_default()
                     .into_iter()
-                    .map(|a| Param {
-                        name: a.name,
-                        ty: "string".to_owned(),
+                    .map(|a| ParamDoc {
+                        name: a.name.into(),
+                        ty: "string".into(),
                         required: a.required.unwrap_or(false),
-                        description: a.description.unwrap_or_default(),
+                        description: a.description.unwrap_or_default().into(),
                     })
                     .collect();
                 params.sort_by(|a, b| a.name.cmp(&b.name));
