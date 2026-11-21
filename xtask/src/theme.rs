@@ -60,7 +60,8 @@ fn luminance(c: &str) -> Result<f64> {
     Ok(0.2126 * ch(r) + 0.7152 * ch(g) + 0.0722 * ch(b))
 }
 
-fn contrast(a: &str, b: &str) -> Result<f64> {
+/// WCAG contrast ratio of two #rrggbb colors.
+pub(crate) fn contrast(a: &str, b: &str) -> Result<f64> {
     let (la, lb) = (luminance(a)?, luminance(b)?);
     Ok((la.max(lb) + 0.05) / (la.min(lb) + 0.05))
 }

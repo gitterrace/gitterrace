@@ -17,6 +17,7 @@ use regex::{Captures, Regex};
 
 use crate::out::Out;
 use crate::tagline;
+use crate::theme::contrast;
 
 const BRAND: &str = "docs/brand";
 const TEMPLATES: &str = "crates/gitterrace-web/templates";
@@ -318,21 +319,6 @@ fn wordmark(re: &Re, header: &str) -> Result<String> {
         x1 - x0,
         y1 - y0
     ))
-}
-
-/// WCAG contrast ratio of two #rrggbb colors.
-fn contrast(a: &str, b: &str) -> Result<f64> {
-    let lum = |h: &str| -> Result<f64> {
-        let mut c = [0.0; 3];
-        for (i, slot) in c.iter_mut().enumerate() {
-            let x = f64::from(u8::from_str_radix(h.get(1 + 2 * i..3 + 2 * i).unwrap_or(""), 16)?)
-                / 255.0;
-            *slot = if x <= 0.03928 { x / 12.92 } else { ((x + 0.055) / 1.055).powf(2.4) };
-        }
-        Ok(0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2])
-    };
-    let (la, lb) = (lum(a)?, lum(b)?);
-    Ok((la.max(lb) + 0.05) / (la.min(lb) + 0.05))
 }
 
 /// Each wordmark token against the fill the header gives its half in `theme`. A token is a
