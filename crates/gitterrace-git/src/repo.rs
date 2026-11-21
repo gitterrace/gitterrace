@@ -17,6 +17,7 @@ use gix::bstr::ByteSlice;
 use crate::error::git;
 use crate::repo::blame::{BLAME_CACHE_BYTES, BlameCache};
 pub use crate::repo::changes::ChangeMemo;
+pub(crate) use crate::repo::history::{subject, summary};
 pub(crate) use crate::repo::objects::blob_of;
 use crate::repo::visible::Visible;
 use crate::{Error, MAX_TEXT_BYTES, RefInfo, RefKind, Result};

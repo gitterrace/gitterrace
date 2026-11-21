@@ -93,7 +93,7 @@ impl Repo {
             .map(|id| {
                 let commit = repo.find_commit(self.full_id(&repo, id)?).map_err(git)?;
                 self.count_commit_read();
-                crate::walk::search_summary(&commit, &mailmap)
+                crate::repo::summary(&commit, &mailmap)
             })
             .collect()
     }

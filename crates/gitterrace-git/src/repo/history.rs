@@ -403,15 +403,21 @@ fn result_bytes(s: &CommitSummary, files: &[crate::FileDiff]) -> usize {
     files + s.subject.len() + s.parents.len() * 48 + 256
 }
 
-fn summary(commit: &gix::Commit<'_>, mailmap: &gix::mailmap::Snapshot) -> Result<CommitSummary> {
-    let message = commit.message_raw().map_err(git)?;
-    let subject = message.lines().next().unwrap_or_default().to_str_lossy().trim().to_string();
+/// The first line of a raw commit message, trimmed.
+pub(crate) fn subject(raw: &[u8]) -> String {
+    raw.lines().next().unwrap_or_default().to_str_lossy().trim().to_owned()
+}
+
+pub(crate) fn summary(
+    commit: &gix::Commit<'_>,
+    mailmap: &gix::mailmap::Snapshot,
+) -> Result<CommitSummary> {
     Ok(CommitSummary {
         id: commit.id.to_string(),
         parents: commit.parent_ids().map(|p| p.to_string()).collect(),
         author: ident::signature(mailmap, commit.author().map_err(git)?),
         committer: ident::signature(mailmap, commit.committer().map_err(git)?),
-        subject,
+        subject: subject(commit.message_raw().map_err(git)?),
     })
 }
 
@@ -531,5 +537,12 @@ mod tests {
         f.git(&["commit-graph", "write", "--reachable"]);
         let repo = crate::Repo::discover(f.path()).expect("open");
         assert_eq!(super::merge_positions(&repo.repo(), &ids), want);
+    }
+
+    #[test]
+    fn subject_is_the_trimmed_first_line_whatever_the_bytes() {
+        assert_eq!(super::subject(b"  fix it \r\n\r\nbody"), "fix it");
+        assert_eq!(super::subject(b"ab\xe9 bar\nrest"), "ab\u{fffd} bar");
+        assert_eq!(super::subject(b""), "");
     }
 }
