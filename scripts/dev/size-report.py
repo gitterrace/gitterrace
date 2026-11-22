@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Report the project's size: gitterrace's languages insight, split into prod, test and comment.
 
-The languages insight (`git-terrace mcp`, tool `languages`) is the one size metric: the total
+The languages insight (`git-terrace insights languages`) is the one size metric: the total
 and the lines per language come from it, the same numbers the web Languages page and
 `/api/v1/insights/languages` show for the HEAD tree. This script counts nothing for the total.
 It keeps only a breakdown of that total by kind, and the breakdown sums to it: lines of the
@@ -141,39 +141,17 @@ def binary(repo: Path) -> list[str]:
 
 
 def languages(repo: Path, cmd: list[str]) -> dict[str, Any]:
-    """The `languages` insight of `repo` at HEAD, asked of `git-terrace mcp` over stdio."""
-
-    def msg(i: int | None, method: str, params: dict[str, Any] | None = None) -> str:
-        m: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
-        if i is not None:
-            m["id"] = i
-        if params is not None:
-            m["params"] = params
-        return json.dumps(m) + "\n"
-
-    init = {
-        "protocolVersion": "2025-03-26",
-        "capabilities": {},
-        "clientInfo": {"name": "size-report", "version": "1"},
-    }
-    ask = (
-        msg(1, "initialize", init)
-        + msg(None, "notifications/initialized")
-        + msg(2, "tools/call", {"name": "languages", "arguments": {"rev": "HEAD"}})
-    )
+    """The `languages` insight of `repo` at HEAD, from `git-terrace insights languages --json`."""
     run = subprocess.run(
-        [*cmd, "mcp", str(repo)], input=ask, capture_output=True, text=True, timeout=900
+        [*cmd, "insights", "languages", "--json"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        timeout=900,
     )
-    for line in run.stdout.splitlines():
-        reply = json.loads(line)
-        if reply.get("id") != 2:
-            continue
-        result = reply.get("result", {})
-        text = "".join(c.get("text", "") for c in result.get("content", []))
-        if result.get("isError") or "error" in reply:
-            raise SystemExit(f"size-report: the languages tool failed: {text or reply}")
-        return json.loads(text)["data"]
-    raise SystemExit(f"size-report: no languages answer from {cmd}: {run.stderr[-400:]}")
+    if run.returncode:
+        raise SystemExit(f"size-report: the languages insight failed: {run.stderr[-400:]}")
+    return json.loads(run.stdout)["data"]
 
 
 def breakdown(total: int, kinds: dict[str, int]) -> dict[str, int]:
