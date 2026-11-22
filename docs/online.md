@@ -87,7 +87,7 @@ No prebuilt image is published. The build takes 5 to 10 minutes, on amd64 or
 arm64.
 
 On `docker stop` the server lets open responses finish and exits 0, well
-inside Docker's 10 seconds. The healthcheck runs `git-terrace --version`. It
+inside Docker's 10 seconds. The healthcheck runs the binary with `--version`. It
 proves the binary starts, not that the port answers: the image has no shell or
 HTTP client. A client that does not send its request headers in 10 seconds is
 disconnected.

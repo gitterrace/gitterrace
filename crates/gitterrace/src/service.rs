@@ -19,7 +19,7 @@ const UNIT_NAME: &str = "gitterrace.service";
 const LABEL: &str = "dev.gitterrace.server";
 /// First line of a unit we wrote, and the plist key that marks a `LaunchAgent` as ours.
 const UNIT_MARKER: &str =
-    "# Written by git-terrace service install. Remove it with: git-terrace service uninstall";
+    "# Written by git-terrace service install. Remove it with: git terrace service uninstall";
 const PLIST_KEY: &str = "GitterraceService";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -211,7 +211,7 @@ pub(crate) fn run(
     } else {
         println!("start it at login and now with: {}", cmd.join(" "));
     }
-    println!("remove with: git-terrace service uninstall");
+    println!("remove with: git terrace service uninstall");
     Ok(())
 }
 

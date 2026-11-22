@@ -18,7 +18,7 @@ linters `make check` runs. On macOS it uses Homebrew, so install that first.
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
 make deps
 make build
-make install  # git-terrace into ~/.cargo/bin, so `git terrace` works
+make install  # the binary into ~/.cargo/bin, so `git terrace` works
 git terrace   # serves this checkout on 127.0.0.1
 ```
 
@@ -28,7 +28,7 @@ and `make bench` refuses to run without it. A build failure on a clean checkout
 is a bug worth reporting. In-checkout builds read `.cargo/config.toml` (one
 allocator arena), so `cargo install --git` idles a few MB higher.
 
-The size metric is `git-terrace insights languages --json .` (`total_lines`), the
+The size metric is `git terrace insights languages --json .` (`total_lines`), the
 numbers of the Languages page for the HEAD tree. `make size` prints it.
 
 ## Rules

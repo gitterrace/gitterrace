@@ -66,12 +66,13 @@ a restart or when you run `git terrace` in it.
 The service keeps running the old program until restarted.
 
 ```sh
-cargo install gitterrace          # or however you installed
+brew update && brew upgrade gitterrace   # or however you installed
 systemctl --user restart gitterrace.service
 launchctl kickstart -k gui/$(id -u)/dev.gitterrace.server
 ```
 
-If the program moved, run `git terrace service install` again. It rewrites its
+The other ways to upgrade (the prebuilt download, then cargo) are in
+[Getting started](getting-started.md#upgrade). If the program moved, run `git terrace service install` again. It rewrites its
 own file.
 
 ## Uninstall
@@ -85,11 +86,13 @@ It stops the service and removes only the file `install` wrote. Without
 
 ## Point an MCP client at it
 
-An MCP client starts its own `git-terrace mcp` over stdio. With the service
-running, `--served` also reads every repository the server holds:
+An MCP client starts its own `git terrace mcp` over stdio. With the service
+running, `--served` also reads every repository the server holds. A client
+spawns the program without a shell, so the config names `git` and passes
+`terrace` as the first argument:
 
 ```json
-{ "mcpServers": { "gitterrace": { "command": "git-terrace", "args": ["mcp", "--served"] } } }
+{ "mcpServers": { "gitterrace": { "command": "git", "args": ["terrace", "mcp", "--served"] } } }
 ```
 
 See [Agents and MCP](mcp.md) and the [API](api.md#mcp-stdio).
