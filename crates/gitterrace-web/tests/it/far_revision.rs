@@ -2,48 +2,14 @@
 //! commit it lacks: the API answers `needs_reindex`, HEAD keeps serving from the index, and a
 //! revision within the cap is served as usual.
 
-use std::fmt::Write as _;
-use std::path::Path;
+use gitterrace_testkit::{chain, git, oracle, page};
 
-use gitterrace_testkit::{git, git_stdin, oracle, page};
-
-/// `main` with a few commits, `near` 3 commits off it and `far` past the cap, built with one
-/// fast-import (thousands of `git commit` calls would take minutes).
-fn repo(dir: &Path) {
+/// `main` with a few commits, `near` 3 commits off it and `far` past the cap.
+fn repo(dir: &std::path::Path) {
     git(dir, &["init", "-q", "-b", "main"]);
-    let far = gitterrace_index::feed::FRESH_CAP + 5;
-    let mut s = String::new();
-    let mut mark = 0;
-    let mut commit = |s: &mut String, branch: &str, from: Option<usize>, file: &str, n: usize| {
-        mark += 1;
-        let t = 1_700_000_000 + mark * 60;
-        let body = format!("line {n}\n");
-        let _ = write!(
-            s,
-            "commit refs/heads/{branch}\nmark :{mark}\n\
-             author A <a@x.io> {t} +0000\ncommitter A <a@x.io> {t} +0000\n\
-             data 8\nfeat: {n:02}\n"
-        );
-        if let Some(f) = from {
-            let _ = writeln!(s, "from :{f}");
-        }
-        let _ = write!(s, "M 100644 inline {file}\ndata {}\n{body}\n", body.len());
-        mark
-    };
-    let mut tip = None;
-    for n in 0..5 {
-        tip = Some(commit(&mut s, "main", tip, "a.txt", n));
-    }
-    let fork = tip;
-    let mut near = fork;
-    for n in 0..3 {
-        near = Some(commit(&mut s, "near", near, "near.txt", n));
-    }
-    let mut far_tip = fork;
-    for n in 0..far {
-        far_tip = Some(commit(&mut s, "far", far_tip, "far.txt", n % 100));
-    }
-    git_stdin(dir, &["fast-import", "--quiet"], s.as_bytes());
+    chain(dir, "main", None, 5);
+    chain(dir, "near", Some("refs/heads/main"), 3);
+    chain(dir, "far", Some("refs/heads/main"), gitterrace_index::feed::FRESH_CAP + 5);
     git(dir, &["checkout", "-q", "main"]);
 }
 

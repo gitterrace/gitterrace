@@ -127,6 +127,28 @@ pub fn git_stdin(dir: &Path, args: &[&str], input: &[u8]) -> String {
     try_run_with(dir, None, args, Some(input)).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
 }
 
+/// `n` one-line commits on `branch` in one fast-import (thousands of `git commit` calls would
+/// take minutes), the first on top of the ref `from`, or a root when `from` is `None`.
+pub fn chain(dir: &Path, branch: &str, from: Option<&str>, n: usize) {
+    use std::fmt::Write as _;
+    let mut stream = String::new();
+    for i in 0..n {
+        let body = format!("{}\n", i % 100);
+        let parent = match from {
+            Some(r) if i == 0 => format!("from {r}\n"),
+            _ => String::new(),
+        };
+        let _ = write!(
+            stream,
+            "commit refs/heads/{branch}\ncommitter T <t@x> {} +0000\ndata 4\nfeat\n{parent}\
+             M 100644 inline {branch}.txt\ndata {}\n{body}\n",
+            1_709_300_000 + i,
+            body.len()
+        );
+    }
+    git_stdin(dir, &["fast-import", "--quiet"], stream.as_bytes());
+}
+
 /// [`git_stdin`] with the dates of [`git_at`] when `date` is set.
 pub fn git_stdin_at(dir: &Path, date: Option<&str>, args: &[&str], input: &[u8]) -> String {
     try_run_with(dir, date, args, Some(input)).unwrap_or_else(|e| panic!("git {args:?}: {e}"))
