@@ -51,6 +51,8 @@ git terrace          # joins the server already running, no second port
 
 Next: [using it](using.md) and the [command line](cli.md).
 
+To start the server at login, see [Run it as a service](service.md).
+
 ## Windows
 
 Releases ship a zip. Config lives in `%APPDATA%\gitterrace`, the repository

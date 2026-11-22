@@ -89,16 +89,17 @@ Without a target, **Copy as markdown** puts the same note on the clipboard.
 
 <!-- BEGIN GENERATED: commands -->
 ```text
-git terrace [paths]          Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public --ref --print]
-git terrace serve            Serve the repository in the browser (the default)
-git terrace config           Print the effective configuration and where each value comes from
-git terrace mcp              Run a read-only MCP server over stdio for agents [--served]
-git terrace insights [name]  Print one insight of the first repository as JSON, or list them: the numbers of the web pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for byte. Reads the repository of the current folder, offline [--rev --period --q --label --metric --limit --json]
-git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
-git terrace remove [target]  Take a repository off the running server. Its pages then answer 404
-git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
-git terrace init             Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
-git terrace export [out]     Write a static copy of the site to a folder, for sharing or hosting [--force --commits --file-kb --export-pages --quiet --project]
+git terrace [paths]           Browse a git repository in your browser, offline [--addr --no-watch --config --no-actions --public --ref --print]
+git terrace serve             Serve the repository in the browser (the default)
+git terrace config            Print the effective configuration and where each value comes from
+git terrace mcp               Run a read-only MCP server over stdio for agents [--served]
+git terrace insights [name]   Print one insight of the first repository as JSON, or list them: the numbers of the web pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for byte. Reads the repository of the current folder, offline [--rev --period --q --label --metric --limit --json]
+git terrace open <link>       Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
+git terrace remove [target]   Take a repository off the running server. Its pages then answer 404
+git terrace install-handler   Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
+git terrace service <action>  Run the server at login: print, install or uninstall a systemd user unit or launchd agent [--now]
+git terrace init              Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder
+git terrace export [out]      Write a static copy of the site to a folder, for sharing or hosting [--force --commits --file-kb --export-pages --quiet --project]
 ```
 
 <!-- END GENERATED: commands -->

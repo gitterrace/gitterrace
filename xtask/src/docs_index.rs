@@ -71,6 +71,7 @@ const DOCS: &[(&str, Kind, &str)] = &[
         Kind::Guide,
         "Send a selection to another app, or run your own program on it",
     ),
+    ("docs/service.md", Kind::Guide, "Run the server at login with systemd or launchd"),
     ("docs/mcp.md", Kind::Guide, "One agent skill: review a change, history and hotspots over MCP"),
     (
         "docs/online.md",

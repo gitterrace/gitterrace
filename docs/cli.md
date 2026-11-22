@@ -132,6 +132,25 @@ git terrace install-handler [OPTIONS] [PATHS]...
 
 - `--uninstall`: Remove what a previous install wrote.
 
+## `git terrace service`
+
+Run the server at login: print, install or uninstall a systemd user unit or
+launchd agent.
+
+The unit runs this program with the given paths (made absolute) and `--addr` if
+set, restarts on failure and logs to journald (Linux) or
+`~/Library/Logs/gitterrace.log` (macOS). It never sets `--public`. `uninstall`
+removes only a file this command wrote. Windows is not supported.
+
+```sh
+git terrace service [OPTIONS] <ACTION> [PATHS]...
+```
+
+- `<ACTION>`: `print` the unit, `install` it, or `uninstall` it. One of `print`,
+  `install`, `uninstall`.
+- `--now`: With `install` or `uninstall`: also run the enable/start (or stop)
+  command.
+
 ## `git terrace init`
 
 Write a documented `config.toml` and the pre-filled `actions.toml` to the config

@@ -18,6 +18,7 @@ then read [why](why.md) it exists. Contributors start at
 | --- | --- |
 | [using](using.md) | Repositories, the log graph, outlines, keys, settings |
 | [actions](actions.md) | Send a selection to another app, or run your own program on it |
+| [service](service.md) | Run the server at login with systemd or launchd |
 | [mcp](mcp.md) | One agent skill: review a change, history and hotspots over MCP |
 | [online](online.md) | Publish a static export, public mode, Docker, a reverse proxy |
 

@@ -13,6 +13,7 @@ mod export;
 mod handler;
 mod insights;
 mod open;
+mod service;
 
 use cli::{Cli, Command};
 
@@ -101,6 +102,7 @@ async fn main() -> anyhow::Result<()> {
             let addr = server_addr(&loaded.config)?;
             tokio::task::block_in_place(|| open::remove_cmd(addr, target.as_deref()))?;
         }
+        Command::Service { action, now } => service::run(action, now, &cli.paths, cli.addr)?,
         Command::Init => init(cli.config.as_deref())?,
         Command::InstallHandler { uninstall } => handler::run(uninstall)?,
         Command::Export { out, force, commits, file_kb, export_pages, quiet, project } => {

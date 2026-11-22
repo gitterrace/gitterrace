@@ -42,6 +42,16 @@ pub(crate) struct Cli {
     pub(crate) command: Option<Command>,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, clap::ValueEnum)]
+pub(crate) enum Action {
+    /// Write the unit to stdout.
+    Print,
+    /// Write the unit file and show how to enable it.
+    Install,
+    /// Remove the unit file this command wrote.
+    Uninstall,
+}
+
 #[derive(Subcommand)]
 pub(crate) enum Command {
     /// Serve the repository in the browser (the default).
@@ -115,6 +125,19 @@ pub(crate) enum Command {
         /// Remove what a previous install wrote.
         #[arg(long)]
         uninstall: bool,
+    },
+    /// Run the server at login: print, install or uninstall a systemd user unit or launchd agent.
+    ///
+    /// The unit runs this program with the given paths (made absolute) and `--addr` if set,
+    /// restarts on failure and logs to journald (Linux) or `~/Library/Logs/gitterrace.log`
+    /// (macOS). It never sets `--public`. `uninstall` removes only a file this command wrote.
+    /// Windows is not supported.
+    Service {
+        /// `print` the unit, `install` it, or `uninstall` it.
+        action: Action,
+        /// With `install` or `uninstall`: also run the enable/start (or stop) command.
+        #[arg(long)]
+        now: bool,
     },
     /// Write a documented `config.toml` and the pre-filled `actions.toml` to the config folder.
     ///
