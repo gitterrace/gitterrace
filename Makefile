@@ -192,7 +192,7 @@ bench-guard:
 	python3 scripts/bench/speed-check.py --self-test
 
 ##@ Slow checks, not in check
-.PHONY: memory-check speed-check browser-deps browser-check browser-reap \
+.PHONY: memory-check speed-check browser-deps browser-check browser-reap browser-disk \
 	docker-check coverage-check act-check
 
 ## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
@@ -220,12 +220,16 @@ browser-deps:
 	PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install chromium webkit
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace)
-browser-check: browser-reap
+browser-check: browser-reap browser-disk
 	node scripts/verify/browser/browser-check.mjs $(if $(BIN),--bin $(BIN))
 
 ## browser-reap: A killed or throwing browser check leaves no test server behind
 browser-reap:
 	node scripts/verify/browser/reap-check.mjs $(if $(BIN),--bin $(BIN))
+
+## browser-disk: --from-disk shows a disk edit to a stylesheet and a script in the served page
+browser-disk:
+	node scripts/verify/browser/disk-check.mjs $(if $(BIN),--bin $(BIN))
 
 ## docker-check: Build the Docker image and serve a mounted repository with it (needs docker)
 docker-check:

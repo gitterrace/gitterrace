@@ -5,7 +5,7 @@
 // - builds a temp repository and serves it with a given binary on a free port
 // - opens pages at given widths and colour schemes
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
@@ -71,6 +71,41 @@ function chromiumPath() {
 
 export async function launch(pw, name) {
   return name === 'webkit' ? pw.webkit.launch() : pw.chromium.launch({ executablePath: chromiumPath() });
+}
+
+/**
+ * The stylesheet bundles the pages load (`base.css`, `late.css`, ...) as name to part list,
+ * read from BUNDLES in routes/assets.rs so the list lives in one place.
+ */
+function bundles() {
+  const src = readFileSync(join(root, 'crates/gitterrace-web/src/routes/assets.rs'), 'utf8');
+  const block = /const BUNDLES[^=]*=\s*\[([\s\S]*?)\n\];/.exec(src)?.[1] ?? '';
+  const out = new Map();
+  for (const m of block.matchAll(/"([\w-]+\.css)",\s*&\[([^\]]*)\]/g)) {
+    out.set(m[1], [...m[2].matchAll(/"([\w-]+\.css)"/g)].map((x) => x[1]));
+  }
+  return out;
+}
+
+/**
+ * Serves every script and stylesheet of `staticDir` from disk in `ctx`, over the binary's copies.
+ * A page asks for them as `/static/app.js?v=<build>`, so the match is on the path and takes any
+ * query: a glob on the bare name never matches and the binary's copy is served instead. The
+ * stylesheets a page loads are the bundles, so each is its parts read back to back.
+ */
+export async function routeFromDisk(ctx, staticDir = join(root, 'crates/gitterrace-web/static')) {
+  const parts = bundles();
+  const files = new Map(readdirSync(staticDir).filter((n) => n.endsWith('.js') || n.endsWith('.css'))
+    .map((n) => [n, n.endsWith('.css') ? 'text/css' : 'text/javascript']));
+  for (const name of parts.keys()) files.set(name, 'text/css');
+  const asset = (u) => /\/static\/([^/?#]+)$/.exec(new URL(u).pathname)?.[1];
+  const body = (f) => parts.has(f)
+    ? parts.get(f).map((p) => readFileSync(join(staticDir, p), 'utf8')).join('\n')
+    : readFileSync(join(staticDir, f));
+  await ctx.route((u) => files.has(asset(u.href)), (q) => {
+    const f = asset(q.request().url());
+    return q.fulfill({ contentType: files.get(f), body: body(f) });
+  });
 }
 
 export async function freePort() {

@@ -9,14 +9,14 @@
 // Every check is an export of a scripts/verify/browser/*-lib.mjs `checks(env)`, described where it
 // is defined. `--checks` names them in kebab-case; an unknown name prints the list.
 //
-// --from-disk serves crates/gitterrace-web/static/*.js from the working tree over the (possibly
+// --from-disk serves crates/gitterrace-web/static/*.js and *.css from the working tree over the (possibly
 // older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE
 // or the repo's node_modules, installed by `make browser-deps` (see lib/browser-lib.mjs).
 import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { root, RESCAN_SECS, loadPlaywright, launch, makeRepo, serve, openPage, reporter, sh } from '../../lib/browser-lib.mjs';
+import { root, RESCAN_SECS, loadPlaywright, launch, routeFromDisk, makeRepo, serve, openPage, reporter, sh } from '../../lib/browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
@@ -44,10 +44,7 @@ async function context(name, opts = {}) {
   const ctx = await b.newContext(opts);
   // Every script and stylesheet in the folder, read at run time, so a new or forgotten file is
   // never served stale from the binary while the check claims to test the working tree.
-  if (fromDisk) for (const f of readdirSync(join(root, 'crates/gitterrace-web/static')).filter((n) => n.endsWith('.js') || n.endsWith('.css'))) {
-    const type = f.endsWith('.css') ? 'text/css' : 'text/javascript';
-    await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType: type, body: readFileSync(join(root, 'crates/gitterrace-web/static', f)) }));
-  }
+  if (fromDisk) await routeFromDisk(ctx);
   return { b, ctx };
 }
 
