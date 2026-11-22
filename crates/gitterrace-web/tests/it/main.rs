@@ -43,7 +43,6 @@ mod renamed_ownership;
 mod running_cache_rewritten;
 mod sha_links;
 mod shared_markup_pages;
-mod stats_chip_anchor;
 mod stats_drill;
 mod theme;
 mod top_tab_follows_section;

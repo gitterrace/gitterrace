@@ -83,4 +83,6 @@ async fn patterns_empty_state_follows_the_period_anchor() {
     assert!(body.contains("No commits match these filters."), "{body}");
     let (_, all) = page(&router, "/stats/hotspots?q=author:bob%40y.io&period=all").await;
     assert!(!all.contains("No commits match these filters."), "{all}");
+    let (_, month) = page(&router, "/stats?q=author:bob%40y.io&period=1m").await;
+    assert!(month.contains("2024-02-20 to 2024-03-20"), "{month}");
 }
