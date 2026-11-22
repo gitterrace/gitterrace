@@ -58,6 +58,34 @@ pub(crate) enum Command {
         #[arg(long)]
         served: bool,
     },
+    /// Print one insight of the first repository as JSON, or list them: the numbers of the web
+    /// pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for byte. Reads the
+    /// repository of the current folder, offline.
+    Insights {
+        /// The insight to compute. Omit it to list every insight.
+        name: Option<String>,
+        /// Branch, tag, sha or HEAD. Default HEAD.
+        #[arg(long)]
+        rev: Option<String>,
+        /// `1w`, `1m`, `3m`, `1y` or `all` (default).
+        #[arg(long)]
+        period: Option<String>,
+        /// Commit filter, as the web pages' text, e.g. `author:ann !merge`.
+        #[arg(long)]
+        q: Option<String>,
+        /// `kind` (default) or `scope`, for the label insights.
+        #[arg(long)]
+        label: Option<String>,
+        /// `commits` (default), `added`, `deleted` or `net`, for `contributors`.
+        #[arg(long)]
+        metric: Option<String>,
+        /// Most rows, for the insights that list rows.
+        #[arg(long)]
+        limit: Option<usize>,
+        /// List as JSON too. An insight is always printed as JSON.
+        #[arg(long)]
+        json: bool,
+    },
     /// Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed.
     ///
     /// The clone is found among repositories served before and under `links.roots`. An

@@ -11,6 +11,7 @@ mod alloc;
 mod cli;
 mod export;
 mod handler;
+mod insights;
 mod open;
 
 use cli::{Cli, Command};
@@ -76,6 +77,13 @@ async fn main() -> anyhow::Result<()> {
             } else {
                 gitterrace_api::serve_mcp(&path, &loaded.config).await?;
             }
+        }
+        Command::Insights { name, rev, period, q, label, metric, limit, json } => {
+            let params = gitterrace_api::Params::new(period, q, label, metric, limit);
+            let out = tokio::task::block_in_place(|| {
+                insights::run(&path, &loaded.config, name.as_deref(), rev.as_deref(), &params, json)
+            })?;
+            println!("{out}");
         }
         Command::Open { link, print } => {
             let r = tokio::task::block_in_place(|| {
