@@ -73,11 +73,14 @@ impl<'a> Ahead<'a> {
     /// `next` is the head of one of them, and it always fits: some worker can always start it.
     /// That keeps the run moving however small the window and however late `first` reaches.
     fn take(&mut self, len: usize, span: usize, budget: usize) -> Option<usize> {
-        let fits = |e: &Self, i: usize| {
+        let fits = |e: &Self, i: usize, budget: usize| {
             i == e.next || (i < e.next.saturating_add(span) && e.held <= budget)
         };
+        // `first` runs far ahead of the emitting, so its results must not fill the whole byte
+        // budget: the ascending items next to emit would then run one at a time behind the
+        // oldest, with every other worker waiting. Half is left to them.
         if let Some(&i) = self.first.get(self.first_taken)
-            && fits(self, i)
+            && fits(self, i, budget / 2)
         {
             self.first_taken += 1;
             return Some(i);
@@ -86,7 +89,7 @@ impl<'a> Ahead<'a> {
         if i >= len {
             return (self.first_taken >= self.first.len()).then_some(len);
         }
-        if fits(self, i) {
+        if fits(self, i, budget) {
             self.rest += 1;
             return Some(i);
         }

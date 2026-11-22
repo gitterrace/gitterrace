@@ -111,6 +111,41 @@ fn held_results_stay_inside_the_byte_budget() -> crate::Result<()> {
     Ok(())
 }
 
+/// Results of items named first, finished far ahead, must leave byte budget for the items
+/// next to emit. Item 0 is slow, items 100.. are named first and heavy, and every other item is
+/// light: counted, the light items near the head must still start while item 0 runs, far more
+/// than the one-at-a-time a budget filled by `first` would leave. Catches `first` spending the
+/// whole budget.
+#[test]
+fn heavy_first_items_leave_byte_budget_for_the_items_near_the_head() -> crate::Result<()> {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    let items: Vec<u64> = (0..300).collect();
+    let first: Vec<usize> = (100..300).collect();
+    let near_head = AtomicUsize::new(0);
+    let seen = AtomicUsize::new(0);
+    stream(
+        &items,
+        8,
+        Window { items: 1000, bytes: 1000, first: &first, budget: None },
+        || Ok(()),
+        |(), i| {
+            if *i < 100 {
+                near_head.fetch_add(1, Ordering::SeqCst);
+            }
+            if *i == 0 {
+                gitterrace_testkit::wait::pause_blocking(Duration::from_millis(300));
+                seen.store(near_head.load(Ordering::SeqCst), Ordering::SeqCst);
+            }
+            Ok(*i)
+        },
+        |i| if *i >= 100 { 100 } else { 1 },
+        |_, _| Ok(()),
+    )?;
+    let seen = seen.load(Ordering::SeqCst);
+    assert!(seen >= 20, "only {seen} items near the head started behind the slow one");
+    Ok(())
+}
+
 /// Runs [`stream`] over 0..n with `first` on a thread of its own, records the order the items
 /// start in, and checks the results come out in input order. Waits on the run finishing, so a
 /// scheduler that can stall fails on the deadline instead of hanging the suite.
