@@ -1,6 +1,6 @@
 // Keyboard and reflow checks over every page the goldens cover: a Tab walk with a visible ring
 
-import { eachBrowser } from '../../lib/browser-lib.mjs';
+import { eachBrowser, frames } from '../../lib/browser-lib.mjs';
 // on every stop, 320 px reflow, WCAG 1.4.12 text spacing, 24 px targets, and the shortcut off
 // switch. Each list of known pages can only shrink: a page green everywhere fails until it is
 // dropped. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
@@ -141,7 +141,7 @@ export function checks(env) {
           '*{line-height:1.5 !important;letter-spacing:0.12em !important;'
             + 'word-spacing:0.16em !important}p{margin-bottom:2em !important}',
       });
-      await p.waitForTimeout(100);
+      await frames(p);
       return p.evaluate(() => {
         const out = [];
         for (const e of document.body.querySelectorAll('*')) {

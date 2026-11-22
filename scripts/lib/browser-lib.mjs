@@ -108,6 +108,90 @@ export async function routeFromDisk(ctx, staticDir = join(root, 'crates/gitterra
   });
 }
 
+/** Polls `fn` until it returns something truthy, or throws after `ms`. Returns that value. */
+export async function poll(fn, what = 'condition', ms = WATCH_BOUND_MS) {
+  const end = Date.now() + ms;
+  for (;;) {
+    const v = await fn();
+    if (v) return v;
+    if (Date.now() > end) throw new Error(`timed out after ${ms} ms waiting for ${what}`);
+    await new Promise((ok) => setTimeout(ok, 50));
+  }
+}
+
+/**
+ * Loads `url` (or reloads the page when none) until `ready(page)` holds: parts of a page appear
+ * once the server has built its index or seen a working tree edit. Throws after `ms`.
+ */
+export async function reloadUntil(p, ready, url = null, what = 'the page to be ready', ms = WATCH_BOUND_MS) {
+  let first = true;
+  await poll(async () => {
+    if (url) await p.goto(url, { waitUntil: 'load' });
+    else if (!first) await p.reload({ waitUntil: 'load' });
+    first = false;
+    return ready(p);
+  }, what, ms);
+}
+
+/**
+ * Waits until the server shows what git now holds in `dir`: the head commit, and as many changed
+ * files in the working tree as `git status` lists. A check that commits or edits a file then
+ * reads the served page calls this instead of sleeping for the rescan.
+ */
+export async function synced(srv, dir) {
+  const head = sh(dir, 'git', 'rev-parse', 'HEAD');
+  const changed = sh(dir, 'git', 'status', '--porcelain', '-uall').split('\n').filter(Boolean).length;
+  await poll(async () => {
+    const repo = await (await fetch(`${srv.base}/api/v1/repo`)).json();
+    if (repo.head !== head) return false;
+    const wt = await (await fetch(`${srv.base}/api/v1/worktree`)).json();
+    return wt.files.length === changed;
+  }, `the server to show ${head.slice(0, 8)} and ${changed} changed file(s)`);
+}
+
+/**
+ * Runs `fn` in the page once it is the front tab: a background tab runs no animation frames, so
+ * a frame wait on it never ends. Bounded, so a page that never paints fails instead of hanging.
+ */
+async function inFront(p, fn, arg) {
+  await p.bringToFront();
+  return Promise.race([
+    p.evaluate(fn, arg),
+    new Promise((_, no) => setTimeout(() => no(new Error('no animation frames within the bound')), WATCH_BOUND_MS)),
+  ]);
+}
+
+/** Waits `n` animation frames in the page: layout and the scroll handlers have run. */
+export const frames = (p, n = 2) => inFront(p, (k) => new Promise((ok) => {
+  const tick = (i) => (i ? requestAnimationFrame(() => tick(i - 1)) : ok());
+  tick(k);
+}), n);
+
+/** Waits until the DOM has not changed for `n` frames: a swap or a lazy load is done. */
+export const domQuiet = (p, n = 30) => inFront(p, (k) => new Promise((ok) => {
+  let still = 0;
+  const seen = new MutationObserver(() => { still = 0; });
+  seen.observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
+  const tick = () => {
+    if (++still >= k) { seen.disconnect(); ok(); } else requestAnimationFrame(tick);
+  };
+  tick();
+}), n);
+
+/**
+ * Waits until the page's scroll position is the same on `n` reads in a row. Polls from here, so
+ * it also works on a page with scripts off, where no animation frame callback runs.
+ */
+export async function scrollSettled(p, n = 5) {
+  let last = NaN, same = 0;
+  await poll(async () => {
+    const y = await p.evaluate(() => scrollY);
+    same = y === last ? same + 1 : 0;
+    last = y;
+    return same >= n;
+  }, 'the scroll position to settle');
+}
+
 export async function freePort() {
   return new Promise((ok) => {
     const s = net.createServer().listen(0, '127.0.0.1', () => { const p = /** @type {net.AddressInfo} */ (s.address()).port; s.close(() => ok(p)); });

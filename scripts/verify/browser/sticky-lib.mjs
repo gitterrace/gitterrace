@@ -5,7 +5,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { eachBrowser } from '../../lib/browser-lib.mjs';
+import { eachBrowser, synced, frames } from '../../lib/browser-lib.mjs';
 
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [
@@ -41,7 +41,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
     for (let i = 0; i < 60; i++) writeFileSync(join(dir, `many/f${i}.txt`), `${i}\n`);
     sh('add', 'guide', 'README.md', 'many');
     sh('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '-m', 'Docs and long files');
-    await new Promise((res) => setTimeout(res, 2500));
+    await synced(srv, dir);
   }
 
   async function stickyLine() {
@@ -56,7 +56,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
         if (v.code) await p.click('[data-show=source]');
         // Scroll the box's top 300 px above the window, then let the scroll handler run.
         await p.evaluate((s) => { const box = document.querySelector(s); if (box) scrollTo(0, box.getBoundingClientRect().top + scrollY + 300); }, v.box);
-        await p.waitForTimeout(150);
+        await frames(p);
         const m = await p.evaluate(({ head, box }) => {
           const hs = [...document.querySelectorAll(head)];
           const bx = document.querySelector(box);
@@ -121,7 +121,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           const target = v.code ? '#L40' : '#part-6';
           await p.goto(srv.base + v.path + target, { waitUntil: 'load' });
           if (v.code) { await p.click('[data-show=source]'); await p.evaluate(() => document.querySelector('#L40')?.scrollIntoView()); }
-          await p.waitForTimeout(150);
+          await frames(p);
           const under = await p.evaluate((t) => {
             const h = document.querySelector('main>.ph.pin'), el = document.querySelector(t);
             if (!h || !el) return 'no target';
@@ -132,7 +132,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
           if (v.code) await p.click('[data-show=source]');
         }
         await p.evaluate(() => scrollTo(0, 0));
-        await p.waitForTimeout(100);
+        await frames(p);
         const top = await p.evaluate((s) => document.querySelector(s)?.hasAttribute('data-stuck'), v.head);
         if (top) bad.push('closing line shown before any scroll');
         r.verdict(where, bad);

@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { eachBrowser, WATCH_BOUND_MS, makeRepo, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, WATCH_BOUND_MS, makeRepo, serve, sh, commitAll, synced, reloadUntil, frames, scrollSettled, domQuiet } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -22,7 +22,7 @@ async function marked() {
   try { await markedIn(); } finally {
     writeFileSync(join(dir, 'README.md'), readme);
     commitAll(dir, 'docs: restore the README');
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
   }
 }
 async function markedIn() {
@@ -32,7 +32,7 @@ async function markedIn() {
   writeFileSync(join(dir, 'notes/guide.md'), GUIDE);
   writeFileSync(join(dir, 'notes/list.md'), LIST);
   commitAll(dir, 'docs: text to mark');
-  await new Promise((ok) => setTimeout(ok, 600));
+  await synced(srv, dir);
   const raw = (a, b) => GUIDE.split('\n').slice(a - 1, b).join('\n');
   // Marks text in the page: whole code lines, a cut through a word, or a rendered block.
   const mark = ([how, arg]) => {
@@ -60,7 +60,7 @@ async function markedIn() {
     return r.toString().trim();
   };
   const sendOpen = async (p, via) => {
-    await p.waitForTimeout(300);
+    await p.waitForSelector('#actmark', { state: 'attached' });
     if (via === 'button') await p.click('#actmark'); else await p.keyboard.press('.');
     await p.keyboard.press('s');
     await p.waitForSelector('.send-ctx');
@@ -74,8 +74,7 @@ async function markedIn() {
     await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
     if (!(await p.$('#L3'))) { r.fail(`marked ${name}: no code lines to mark`); return; }
     await p.evaluate(mark, ['lines']);
-    await p.waitForTimeout(300);
-    const shown = await p.evaluate(() => { const m = document.getElementById('actmark'); return !!m && !m.hidden; });
+    const shown = await p.waitForSelector('#actmark:not([hidden])', { timeout: 5000 }).then(() => true, () => false);
     if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); return; }
     const send = await sendOpen(p, 'button');
     const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
@@ -133,7 +132,7 @@ async function menuKeys() {
     await p.waitForSelector('.actmenu', { state: 'detached' });
     const url = p.url();
     for (const k of ['p', 'm', 's', ',']) await p.keyboard.press(k);
-    await p.waitForTimeout(300);
+    await frames(p, 20);
     const stray = await p.evaluate(() =>
       document.querySelectorAll('.actmenu, .send, dialog[open], .toast').length);
     const help = await (async () => {
@@ -193,13 +192,14 @@ async function menuSame() {
 async function gutter() {
   writeFileSync(join(dir, 'long.txt'), Array.from({ length: 250 }, (_, i) => `line ${i + 1}`).join('\n') + '\n');
   commitAll(dir, 'docs: a file across chunks');
-  await new Promise((ok) => setTimeout(ok, 600));
+  await synced(srv, dir);
   for (const name of browsers) {
     const { b, ctx } = await context(name);
     const p = await ctx.newPage();
     await p.setViewportSize({ width: 1200, height: 900 });
     await p.goto(srv.base + '/blob/HEAD/long.txt#L99-L103', { waitUntil: 'load' });
-    await p.waitForTimeout(300);
+    await p.evaluate(() => document.fonts.ready);
+    await scrollSettled(p);
     // The number shown before a line is its ::before content. Every number must equal its line.
     const nums = await p.evaluate(() =>
       [...document.querySelectorAll('.src .l')].map((l) =>
@@ -275,7 +275,8 @@ async function tips() {
       for (const k of keys) await p.keyboard.press(k);
       await p.waitForSelector('.ov');
       await p.keyboard.press('Escape');
-      await p.waitForTimeout(50);
+      await p.waitForSelector('.ov', { state: 'hidden' });
+      await frames(p);
       const on = await tipOn();
       if (on) bad.push(`${keys.join('+')}: "${on}"`);
     }
@@ -302,14 +303,14 @@ async function dateTips() {
       const want = await el.getAttribute('data-tip');
       const shown = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return t && t.classList.contains('on') ? t.textContent : ''; });
       await el.hover();
-      await p.waitForTimeout(700);
+      await p.waitForFunction(() => document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
       const hover = await shown();
       await p.mouse.move(0, 0);
-      await p.waitForTimeout(100);
+      await p.waitForFunction(() => !document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
       // The tip shows on focus reached by Tab, so mark the last key as Tab, then focus.
       await p.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
       await el.focus();
-      await p.waitForTimeout(100);
+      await p.waitForFunction(() => document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
       const focus = await shown();
       out[label] = hover === want && focus === want && !!want ? 'ok' : { want, hover, focus };
     }
@@ -325,7 +326,7 @@ async function outline() {
   const doc = ['# Doc', ...[1, 2, 3, 4, 5, 6].flatMap((i) => [`\n## Section ${i}\n`, ...Array.from({ length: 14 }, (_, j) => `Paragraph ${i}.${j} of filler text for scrolling.\n`), `### Part ${i}\n`, 'More text.\n'])].join('\n');
   writeFileSync(join(dir, 'outline.md'), doc);
   commitAll(dir, 'docs: outline fixture');
-  await new Promise((ok) => setTimeout(ok, 600));
+  await synced(srv, dir);
   const vis = (p, sel) => p.evaluate((s) => { const e = document.querySelector(s); return !!e && getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0; }, sel);
   for (const name of browsers) {
     const { b, ctx } = await context(name);
@@ -340,10 +341,11 @@ async function outline() {
         await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-1400.png`) });
         if (scheme === 'light') {
           await p.click('.outline.rail a[href="#section-3"]');
-          await p.waitForTimeout(400);
+          await scrollSettled(p);
           res.click = await p.evaluate(() => ({ hash: location.hash, top: document.getElementById('section-3').getBoundingClientRect().top, y: scrollY }));
           await p.evaluate(() => document.getElementById('section-2').scrollIntoView());
-          await p.waitForTimeout(400);
+          await scrollSettled(p);
+          await frames(p);
           res.active = await p.evaluate(() => document.querySelector('.outline.rail a.on')?.getAttribute('href'));
           await p.click('[data-show=source]');
           res.source = { rail: await vis(p, '.outline.rail'), menu: await vis(p, 'details.outline') };
@@ -354,7 +356,7 @@ async function outline() {
         res[scheme].menuNarrow = await vis(p, 'details.outline');
         res[scheme].btnText = await p.evaluate(() => { const s = /** @type {HTMLElement} */ (document.querySelector('details.outline summary')); return s.innerText.trim() || s.getAttribute('aria-label'); });
         await p.click('details.outline summary');
-        await p.waitForTimeout(200);
+        await frames(p, 6);
         await p.screenshot({ path: join(process.env.OUTLINE_SHOTS || tmpdir(), `outline-${name}-${scheme}-900.png`) });
         await p.keyboard.press('Escape');
         res[scheme].closed = await p.evaluate(() => !(/** @type {HTMLDetailsElement} */ (document.querySelector('details.outline'))).open);
@@ -365,7 +367,7 @@ async function outline() {
       const readme = readFileSync(join(dir, 'README.md'));
       writeFileSync(join(dir, 'README.md'), '# Fixture\n\n' + Array.from({ length: 11 }, (_, i) => `## Topic ${i}\n\ntext\n`).join('\n') + '\n### Part 2\n\ntext\n');
       commitAll(dir, 'docs: outline README');
-      await new Promise((ok) => setTimeout(ok, 600));
+      await synced(srv, dir);
       try {
         for (const scheme of ['light', 'dark']) for (const width of [1400, 900, 360]) {
           const p = await ctx.newPage();
@@ -390,7 +392,7 @@ async function outline() {
       } finally {
         writeFileSync(join(dir, 'README.md'), readme);
         commitAll(dir, 'docs: restore the README');
-        await new Promise((ok) => setTimeout(ok, 600));
+        await synced(srv, dir);
       }
       if (bad.length) r.fail(`outline ${name} overview: ${JSON.stringify(bad)}`);
       else r.ok(`outline ${name} overview: icon-only button inside the README bar, right-aligned, labelled`);
@@ -419,7 +421,8 @@ async function repoSwitch() {
       try {
         const p = await ctx.newPage();
         await p.goto(one.base + '/', { waitUntil: 'load' });
-        await p.waitForTimeout(300);
+        await p.evaluate(() => document.fonts.ready);
+        await frames(p);
         const alone = await shown(p);
         sh(two, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, two);
         // No reload: the open page hears the join over its live stream and shows the switcher.
@@ -503,24 +506,20 @@ async function liveScroll() {
       try {
         const p = await ctx.newPage();
         await p.setViewportSize({ width: 1100, height: 800 });
-        let ready = false;
-        for (let i = 0; i < 40 && !ready; i++) {
-          await p.goto(`${one.base}/worktree#f3`, { waitUntil: 'load' });
-          ready = (await p.$$('section[data-path]')).length >= FILES;
-          if (!ready) await p.waitForTimeout(250);
-        }
+        await reloadUntil(p, async () => (await p.$$('section[data-path]')).length >= FILES,
+          `${one.base}/worktree#f3`, `${FILES} file sections`);
         await p.evaluate(() => { /** @type {any} */ (window).__refreshed = 0; document.addEventListener('gt:live-refreshed', () => { /** @type {any} */ (window).__refreshed++; }); });
         // Far down: a file the page budget folded, which loads as it comes near.
         await p.evaluate(() => document.getElementById('f70').scrollIntoView());
         await p.waitForFunction(() => !document.querySelector('#f70 [data-load-diff]'), null, { timeout: 8000 }).catch(() => {});
-        await p.waitForTimeout(500);
+        await domQuiet(p);
         await p.evaluate(() => window.scrollBy(0, -37));
-        await p.waitForTimeout(300);
+        await scrollSettled(p);
         const read = () => p.evaluate(() => ({ top: document.getElementById('f70').getBoundingClientRect().top, bodies: document.querySelectorAll('#gt-main .diffwrap').length, f3: !document.querySelector('#f3 [data-load-diff]'), y: scrollY }));
         const before = await read();
         writeFileSync(join(repo, 's01.txt'), body('edited again'));
         await p.waitForFunction(() => /** @type {any} */ (window).__refreshed > 0, null, { timeout: WATCH_BOUND_MS }).catch(() => {});
-        await p.waitForTimeout(2500);
+        await domQuiet(p);
         const after = await read();
         const bad = [];
         if (!before.bodies) bad.push('no loaded bodies before the refresh');

@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createServer } from 'node:http';
-import { eachLaunch, root, launch, lum } from '../../lib/browser-lib.mjs';
+import { eachLaunch, root, launch, lum, scrollSettled } from '../../lib/browser-lib.mjs';
 
 const siteDir = join(root, 'target/site');
 const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp',
@@ -216,7 +216,7 @@ export function checks(env) {
               (as) => as.map((a) => a.getAttribute('href').slice(1)));
             for (const id of [ids[1], ids[ids.length - 1]]) {
               await p.evaluate((i) => { document.getElementById(i).scrollIntoView(); }, id);
-              await p.waitForTimeout(250);
+              await scrollSettled(p);
               const on = await p.evaluate(() => {
                 const a = [...document.querySelectorAll('nav.outline.rail a.on')];
                 // The accent as the page resolves it, from a probe painted with it.
@@ -452,7 +452,7 @@ async function narrowMenus(p, docs, railed) {
   if (JSON.stringify(items) !== JSON.stringify(rail)) why.push('On this page menu is not the rail');
   const pick = items[items.length - 1];
   await outline.evaluate((d, h) => d.querySelector(`a[href="${h}"]`).click(), pick);
-  await p.waitForTimeout(250);
+  await scrollSettled(p);
   const after = await outline.evaluate((d, h) => ({
     open: d.open,
     top: document.getElementById(h.slice(1)).getBoundingClientRect().top,

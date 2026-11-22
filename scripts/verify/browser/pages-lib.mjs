@@ -2,7 +2,7 @@
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { root, WATCH_BOUND_MS, launch, openPage, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { root, WATCH_BOUND_MS, launch, openPage, sh, commitAll, reloadUntil, synced, frames } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -144,7 +144,7 @@ async function liveTabs() {
     const { b, ctx } = await context(name);
     const pages = [];
     for (let i = 0; i < 3; i++) { const p = await ctx.newPage(); await p.goto(url, { waitUntil: 'load' }); pages.push(p); }
-    await new Promise((ok) => setTimeout(ok, 1000));
+    await Promise.all(pages.map((p) => frames(p)));
     writeFileSync(join(dir, 'a.txt'), `one\ntwo ${name}\n`);
     const t = Date.now();
     const ms = await Promise.all(pages.map((p) => p.waitForSelector('#wtchip:not([hidden])', { timeout: WATCH_BOUND_MS }).then(() => Date.now() - t, () => null)));
@@ -152,7 +152,7 @@ async function liveTabs() {
     if (ms.every((v) => v != null)) r.ok(`live-tabs ${name}: chip per tab (ms) ${ms.join(', ')}`);
     await b.close();
     sh(dir, 'git', 'checkout', '-q', '--', 'a.txt');
-    await new Promise((ok) => setTimeout(ok, 800));
+    await synced(srv, dir);
   }
 }
 
@@ -182,11 +182,7 @@ async function chip() {
   const b = await launch(pw, 'chromium');
   for (const scheme of ['light', 'dark']) {
     const p = await openPage(b, srv.base + '/', { scheme, height: 120 });
-    const end = Date.now() + WATCH_BOUND_MS;
-    while (await p.$eval('#wtchip', (d) => d.hidden).catch(() => true) && Date.now() < end) {
-      await p.waitForTimeout(200);
-      await p.reload({ waitUntil: 'load' });
-    }
+    await reloadUntil(p, async () => !(await p.$eval('#wtchip', (d) => d.hidden).catch(() => true)), null, 'the working tree chip').catch(() => {});
     const anim = await p.$eval('#wtchip .dot', (d) => getComputedStyle(d).animationName).catch(() => 'no chip');
     const hidden = await p.$eval('#wtchip', (d) => d.hidden).catch(() => 'no chip');
     if (anim === 'no chip' || hidden) r.fail(`chip ${scheme}: chip missing or hidden on a dirty tree`);
@@ -203,7 +199,7 @@ async function doctabs() {
   writeFileSync(join(dir, 'SECURITY.md'), '# Security\n');
   writeFileSync(join(dir, 'contributing.md'), '# Contributing\n');
   commitAll(dir, 'docs: about files');
-  await new Promise((ok) => setTimeout(ok, 600));
+  await synced(srv, dir);
   const shots = resolve(arg('--shots', join(root, 'target/shots')));
   mkdirSync(shots, { recursive: true });
   const b = await launch(pw, 'chromium');
@@ -237,7 +233,7 @@ async function chords() {
   await p.keyboard.press('x');
   // Waits for the marker itself: a fixed pause lost to a slow action runner.
   for (const end = Date.now() + 10000; !existsSync(marker) && Date.now() < end;) {
-    await p.waitForTimeout(100);
+    await frames(p, 6);
   }
   if (existsSync(marker)) r.ok('chords: a then x opens the action'); else r.fail('chords: a then x did not run the action');
   await p.keyboard.press('?');
@@ -256,7 +252,9 @@ async function chords() {
   if (await q.evaluate(() => document.body.dataset.static) === undefined) r.fail('chords: the static fixture is not marked');
   await q.keyboard.press('a');
   await q.keyboard.press('x');
-  await new Promise((ok) => setTimeout(ok, 800));
+  // Nothing to wait for when nothing should happen: let any request the keys sent finish.
+  await q.waitForLoadState('networkidle');
+  await frames(q, 30);
   if (existsSync(marker)) r.fail('chords: a then x ran on a static page'); else r.ok('chords: a then x does nothing on a static page');
   await q.close();
   await b.close();

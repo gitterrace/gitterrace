@@ -3,7 +3,7 @@
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
-import { root, sh, sweep } from '../../lib/browser-lib.mjs';
+import { root, sh, sweep, reloadUntil, synced } from '../../lib/browser-lib.mjs';
 
 const SCHEMES = ['light', 'dark'];
 const WIDTHS = [1400, 900];
@@ -44,10 +44,8 @@ export function checks({ dir, srv, r, browsers, context }) {
 
   /** Reloads `p` until `sel` is on the page: insights parts appear once the index is built. */
   async function until(p, sel) {
-    for (let i = 0; i < 40 && !(await p.$(sel)); i++) {
-      await p.waitForTimeout(250);
-      await p.reload();
-    }
+    // Some pages have no such part at all: the checks that follow report what they find.
+    await reloadUntil(p, async () => !!(await p.$(sel)), null, `${sel} on the page`).catch(() => {});
   }
 
   // Every highlight of text (a search match, any <mark>) is one background: no outline, border,
@@ -187,7 +185,7 @@ export function checks({ dir, srv, r, browsers, context }) {
     sh(dir, 'git', 'checkout', '-q', '-B', 'axe-ahead');
     sh(dir, 'git', 'commit', '-q', '--allow-empty', '-m', 'Work ahead of main');
     sh(dir, 'git', 'checkout', '-q', 'main');
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
     const seen = new Set();
     let walked = new Set();
     for (const name of browsers) {

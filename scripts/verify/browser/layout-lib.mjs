@@ -3,7 +3,7 @@
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { eachBrowser, STATS, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, STATS, sh, commitAll, synced } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -71,7 +71,7 @@ async function pathCells() {
     for (const f of deep) writeFileSync(join(dir, f), `${i}\n`);
     commitAll(dir, `feat(web): coupled change ${i}`);
   }
-  await new Promise((ok) => setTimeout(ok, 1500));
+  await synced(srv, dir);
   const pages = ['/stats/hotspots', '/stats/ownership'];
   await eachBrowser(browsers, context, async (ctx, name) => {
     for (const width of [1440, 900, 360]) for (const path of pages) {
@@ -115,7 +115,7 @@ async function viewFileColumn() {
   commitAll(dir, 'test: files for the working tree list');
   writeFileSync(join(dir, files[0]), 'edited\n');
   writeFileSync(join(dir, files[1]), 'x\n'.repeat(2500));
-  await new Promise((ok) => setTimeout(ok, 1500));
+  await synced(srv, dir);
   try {
     await eachBrowser(browsers, context, async (ctx, name) => {
       for (const width of [1440, 900]) {
@@ -149,7 +149,7 @@ async function viewFileColumn() {
 async function codeRows() {
   writeFileSync(join(dir, 'rows.txt'), 'one\n\nthree\n');
   commitAll(dir, 'docs: rows with an empty line');
-  await new Promise((ok) => setTimeout(ok, 600));
+  await synced(srv, dir);
   await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     const seen = {};

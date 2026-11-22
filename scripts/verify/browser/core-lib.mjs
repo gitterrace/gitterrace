@@ -3,7 +3,7 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { eachBrowser, STATS, sh, sweep, commitFiles } from '../../lib/browser-lib.mjs';
+import { eachBrowser, STATS, sh, sweep, commitFiles, synced, reloadUntil, scrollSettled } from '../../lib/browser-lib.mjs';
 import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
@@ -26,11 +26,7 @@ async function sideWidth() {
   const sw = { browsers, context, widths: [1440, 1100, 360], height: 900 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     // The sidebar appears once the index is built: reload until it does.
-    for (let i = 0; i < 40; i++) {
-      await p.goto(srv.base + '/', { waitUntil: 'load' });
-      if (await p.$('.side .langbar')) break;
-      await p.waitForTimeout(250);
-    }
+    await reloadUntil(p, async () => !!(await p.$('.side .langbar')), srv.base + '/', 'the sidebar');
     const m = await p.evaluate(() => {
       const s = document.querySelector('.side svg.spark'),
         l = document.querySelector('.side .langbar');
@@ -47,7 +43,7 @@ async function sideWidth() {
 }
 async function calmHeader() {
   writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
-  await new Promise((ok) => setTimeout(ok, 2600));
+  await synced(srv, dir);
   const sw = { browsers, context, widths: [1440, 900, 360], height: 400 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     await p.goto(srv.base + '/', { waitUntil: 'load' });
@@ -316,7 +312,7 @@ async function stickyHeads() {
       if (width <= 600 && Math.abs(m.site) <= 1) bad.push('site header pinned at 375');
     }
     await p.goto(`${srv.base}/blob/${sha}/sticky/two.txt#L120`, { waitUntil: 'load' });
-    await p.waitForTimeout(100);
+    await scrollSettled(p);
     const a = await p.evaluate(() => {
       const l = document.getElementById('L120');
       if (!l) return null;

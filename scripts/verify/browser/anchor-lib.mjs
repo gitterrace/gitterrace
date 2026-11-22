@@ -2,7 +2,7 @@
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { deflateSync } from 'node:zlib';
 import { join } from 'node:path';
-import { launch, commitFiles } from '../../lib/browser-lib.mjs';
+import { launch, commitFiles, scrollSettled, poll } from '../../lib/browser-lib.mjs';
 
 /** A valid w x h grey PNG, as bytes. */
 function png(w, h) {
@@ -77,7 +77,7 @@ export function checks(env) {
       await p.goto(`${srv.base}/blob/${sha}/anchor/index.md`, { waitUntil: 'load' });
       await p.click('a[href$="guide.md#syntax-highlighting"]');
       await p.waitForURL(/guide\.md#syntax-highlighting$/);
-      await p.waitForTimeout(400);
+      await scrollSettled(p);
       let m = await seen(p);
       if (!m) r.fail(`${where}: link: no rendered heading on the target page`);
       else if (!m.scrolled || !m.inView) r.fail(`${where}: link: heading at ${Math.round(m.top)} px, page ${m.scrolled ? 'scrolled' : 'not scrolled'}`);
@@ -86,19 +86,19 @@ export function checks(env) {
       const q = await ctx.newPage();
       await q.setViewportSize({ width: 900, height: 600 });
       await q.goto(`${srv.base}/blob/${sha}/anchor/guide.md#syntax-highlighting`, { waitUntil: 'load' });
-      await q.waitForTimeout(400);
+      await scrollSettled(q);
       m = await seen(q);
       m && m.scrolled && m.inView ? r.ok(`${where}: typed URL lands on the heading`) : r.fail(`${where}: typed URL: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
       await q.evaluate(() => { history.replaceState(null, '', location.pathname); scrollTo(0, 0); });
       await q.evaluate(() => { location.hash = '#syntax-highlighting'; });
-      await q.waitForTimeout(400);
+      await scrollSettled(q);
       m = await seen(q);
       m && m.scrolled && m.inView ? r.ok(`${where}: hashchange lands on the heading`) : r.fail(`${where}: hashchange: ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
       // A heading named "main" is plain now that the page's own <main> is gt-main.
       const c = await ctx.newPage();
       await c.setViewportSize({ width: 900, height: 600 });
       await c.goto(`${srv.base}/blob/${sha}/anchor/guide.md#main`, { waitUntil: 'load' });
-      await c.waitForTimeout(400);
+      await scrollSettled(c);
       const own = await c.evaluate(() => document.getElementById('gt-main')?.tagName);
       m = await seen(c, 'main');
       own === 'MAIN' && m && m.scrolled && m.inView ? r.ok(`${where}: #main lands on the heading, page <main> intact`) : r.fail(`${where}: #main: own=${own} ${m ? `heading at ${Math.round(m.top)} px` : 'no heading'}`);
@@ -109,7 +109,7 @@ export function checks(env) {
       const n = await nctx.newPage();
       await n.setViewportSize({ width: 900, height: 600 });
       await n.goto(`${srv.base}/blob/${sha}/anchor/guide.md#syntax-highlighting`, { waitUntil: 'load' });
-      await n.waitForTimeout(400);
+      await scrollSettled(n);
       const pos = await n.evaluate(() => ({ y: scrollY }));
       const box = await n.locator('[id="syntax-highlighting"]').boundingBox();
       box && pos.y > 0 && box.y >= -2 && box.y < 600 ? r.ok(`${where}: JS off, plain #fragment lands on the heading`) : r.fail(`${where}: JS off: y=${pos.y} box=${box && Math.round(box.y)}`);
@@ -118,16 +118,22 @@ export function checks(env) {
       for (const js of [true, false]) {
         const jb = await launch(env.pw, name);
         const jctx = await jb.newContext({ javaScriptEnabled: js });
+        // Held back 400 ms each. `held` counts those not yet released, so a check reads the page
+        // only after every picture has arrived, not on a guess of how long that takes.
+        let held = 0;
         await jctx.route('**/raw/**', async (q) => {
+          held++;
           await new Promise((ok) => setTimeout(ok, 400));
           await q.continue();
+          held--;
         });
         const how = `${where} JS ${js ? 'on' : 'off'}`;
         const land = async (path, id, lo, hi) => {
           const pg = await jctx.newPage();
           await pg.setViewportSize({ width: 1100, height: 700 });
           await pg.goto(`${srv.base}${path}#${id}`, { waitUntil: 'load' });
-          await pg.waitForTimeout(1500);
+          await poll(() => held === 0, 'the held-back pictures');
+          await scrollSettled(pg);
           const at = await pg.evaluate((x) => {
             const e = document.getElementById(x);
             if (!e) return null;
@@ -160,7 +166,8 @@ export function checks(env) {
           const pg = await jctx.newPage();
           await pg.setViewportSize({ width: 1100, height: 600 });
           await pg.goto(`${srv.base}/tree/${sha}/anchor#about`, { waitUntil: 'load' });
-          await pg.waitForTimeout(1500);
+          await poll(() => held === 0, 'the held-back pictures');
+          await scrollSettled(pg);
           const at = await pg.evaluate(() => {
             const t = document.getElementById('about').getBoundingClientRect().top;
             const end = scrollY >= document.documentElement.scrollHeight - innerHeight - 1;

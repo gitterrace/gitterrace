@@ -1,6 +1,6 @@
 // Anchored popups stay usable when the page is scrolled. Imported by browser-check.mjs,
 
-import { eachBrowser } from '../../lib/browser-lib.mjs';
+import { eachBrowser, frames } from '../../lib/browser-lib.mjs';
 // not run alone.
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
@@ -23,7 +23,7 @@ export function checks(env) {
           document.querySelector('main, .wrap, body').appendChild(f);
           scrollTo(0, document.documentElement.scrollHeight);
         });
-        await p.waitForTimeout(200);
+        await frames(p);
         const inside = () => p.evaluate(() => {
           const o = document.querySelector('.ov');
           if (!o) return null;
@@ -38,7 +38,7 @@ export function checks(env) {
         });
         for (const [key, input] of [['b', true], ['.', false]]) {
           await p.keyboard.press(key);
-          await p.waitForTimeout(150);
+          await frames(p);
           const m = await inside();
           if (!m) { r.fail(`${where}: ${key}: no popup opened`); continue; }
           if (!m.ok) {
@@ -54,7 +54,7 @@ export function checks(env) {
             else r.fail(`${where}: ${key}: filter holds ${JSON.stringify(v)}`);
           } else r.ok(`${where}: ${key}: menu inside the viewport with focus`);
           await p.keyboard.press('Escape');
-          await p.waitForTimeout(100);
+          await frames(p);
         }
       } catch (e) {
         r.fail(`${where}: ${e.message.split('\n')[0]}`);
@@ -73,7 +73,7 @@ export function checks(env) {
       const bad = [];
       for (const [keys, kind] of want) {
         for (const k of keys) await p.keyboard.press(k);
-        await p.waitForTimeout(150);
+        await frames(p);
         const got = await p.evaluate(() => {
           const box = document.activeElement?.closest('.ov');
           if (!box) return 'none';
@@ -83,7 +83,7 @@ export function checks(env) {
         });
         if (got !== kind) bad.push(`${keys.join('+')}: ${got}, want ${kind}`);
         await p.keyboard.press('Escape');
-        await p.waitForTimeout(100);
+        await frames(p);
       }
       if (!bad.length) r.ok(`overlay-native ${name}: dialogs are modal, menus are popovers`);
       else r.fail(`overlay-native ${name}: ${bad.join('; ')}`);

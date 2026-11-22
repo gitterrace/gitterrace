@@ -13,7 +13,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { eachBrowser, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve, sh, commitAll, poll, domQuiet } from '../../lib/browser-lib.mjs';
 
 const RENAMES = 1960;
 const EDITS = 40;
@@ -82,7 +82,7 @@ export function checks(env) {
       }
       return out;
     });
-    await p.waitForTimeout(2000);
+    await domQuiet(p);
     const scrollLong = await p.evaluate(() => /** @type {any} */ (window).__long.slice());
     frames.sort((x, y) => x - y);
     const pct = (q) => (frames.length ? frames[Math.min(frames.length - 1, Math.floor(frames.length * q))].toFixed(1) : 'n/a');
@@ -134,7 +134,7 @@ export function checks(env) {
     else {
       await h.evaluate((x) => { location.hash = x; }, far);
       await h.waitForFunction((x) => !document.querySelector(`#${x} [data-load-diff]`), far, { timeout: 15000 }).catch(() => {});
-      await h.waitForTimeout(1500);
+      await domQuiet(h);
       const top = await h.evaluate((x) => document.getElementById(x).getBoundingClientRect().top, far);
       top > -2 && top < 900 ? r.ok(`${where}: hashchange to #${far} opens it in view (top ${Math.round(top)})`) : r.fail(`${where}: hashchange to #${far} left it at top ${Math.round(top)}`);
     }
@@ -151,7 +151,7 @@ export function checks(env) {
     const pick = [open[Math.floor(open.length / 2)], open[open.length - 1]].filter(Boolean);
     for (const id of pick) {
       await g.goto(`${url}#${id}`, { waitUntil: 'load', timeout: 180000 });
-      await g.waitForTimeout(1500);
+      await domQuiet(g);
       const at = await g.evaluate((x) => {
         const s = document.getElementById(x);
         const hdr = s.querySelector('header').getBoundingClientRect();
@@ -183,9 +183,9 @@ export function checks(env) {
     if (!target) r.fail(`${where}: no lazy file for the retry check`);
     else {
       await f.evaluate((x) => document.getElementById(x).scrollIntoView(), target);
-      await f.waitForTimeout(1500);
+      await domQuiet(f);
       await f.evaluate(() => scrollTo(0, 0));
-      await f.waitForTimeout(800);
+      await domQuiet(f);
       await f.evaluate((x) => document.getElementById(x).scrollIntoView(), target);
       const retried = await f.waitForFunction((x) => !document.querySelector(`#${x} [data-load-diff]`), target, { timeout: 15000 }).then(() => true, () => false);
       retried ? r.ok(`${where}: a lazy file that failed once loads on the next scroll`) : r.fail(`${where}: #${target} failed once and never retried on scroll`);
@@ -203,7 +203,7 @@ export function checks(env) {
       });
       // The same change, uncommitted: the working tree page of a big uncommitted rename.
       sh(dir, 'git', 'reset', '-q', '--soft', 'HEAD~1');
-      await new Promise((ok) => setTimeout(ok, 1500));
+      await poll(async () => (await (await fetch(`${srv.base}/api/v1/worktree`)).json()).files.length > 0, 'the soft reset to show in the working tree');
       await eachBrowser(browsers, context, async (ctx, name) => {
         await onePage(ctx, `huge-diff ${name} worktree`, `${srv.base}/worktree`);
       });

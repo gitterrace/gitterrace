@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { eachLaunch, eachBrowser, root, launch, makeRepo, sh } from '../../lib/browser-lib.mjs';
+import { eachLaunch, eachBrowser, root, launch, makeRepo, sh, scrollSettled, frames } from '../../lib/browser-lib.mjs';
 import { serve } from './sitebar-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
@@ -118,7 +118,7 @@ async function siteTheme() {
         };
         await p.goto(url, { waitUntil: 'load' });
         await p.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
-        await p.waitForTimeout(400);
+        await scrollSettled(p);
         let s = await state(p);
         if (s.theme !== 'system' || s.label !== 'Theme: system, click for light') r.fail(`site-theme ${where}: first load is ${s.theme} (${s.label})`);
         const other = want(scheme, s, 'first load');
@@ -133,7 +133,7 @@ async function siteTheme() {
           const done = () => document.querySelector('.hero picture')?.querySelector('img')
             ?.complete !== false;
           await p.waitForFunction(done, null, { timeout: 5000 }).catch(() => {});
-          await p.waitForTimeout(300);
+          await frames(p);
           s = await state(p);
           if (s.theme !== t || s.label !== `Theme: ${t}, click for ${next[t]}`) r.fail(`site-theme ${where}: click gave ${s.theme} (${s.label}), wanted ${t}`);
           else want(t === 'system' ? scheme : t, s, `after click to ${t}`);
@@ -228,10 +228,9 @@ async function exportFromDisk() {
       const shown = [...await forms()];
       // The repository switcher reads its list when the page loads: give it the time a
       // failed fetch takes to report.
-      await p.waitForTimeout(300);
+      await p.waitForLoadState('networkidle');
       for (const f of pages) {
-        await p.goto(pathToFileURL(f).href, { waitUntil: 'load' });
-        await p.waitForTimeout(300);
+        await p.goto(pathToFileURL(f).href, { waitUntil: 'networkidle' });
         for (const x of await forms()) shown.push(`${f.replace(out, '')}: ${x}`);
       }
       if (!pages.some((f) => /\/log\//.test(f))) bad.push('the export has no log page to check');
@@ -336,7 +335,7 @@ async function exportSwitch() {
     p.on('pageerror', (e) => errors.push(String(e)));
     try {
       await p.goto(pathToFileURL(join(out, 'r', sites[0], 'log', 'HEAD', 'index.html')).href);
-      await p.waitForTimeout(300);
+      await p.waitForLoadState('networkidle');
       const bad = [];
       if (await p.$eval('#reposwitch', (e) => e.hidden)) bad.push('the switcher is hidden');
       await p.click('#repobtn', { timeout: 3000 }).catch(() => bad.push('no switcher button'));

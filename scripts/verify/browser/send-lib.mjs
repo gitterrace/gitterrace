@@ -1,6 +1,6 @@
 // The Send to window and image diffs, as a reader meets them. Imported by
 
-import { eachBrowser } from '../../lib/browser-lib.mjs';
+import { eachBrowser, frames } from '../../lib/browser-lib.mjs';
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
@@ -15,7 +15,8 @@ export function checks(env) {
       for (const width of [1440, 390]) {
         await p.setViewportSize({ width, height: 800 });
         await p.goto(srv.base + '/blob/HEAD/a.txt', { waitUntil: 'load' });
-        await p.waitForTimeout(300);
+        await p.evaluate(() => document.fonts.ready);
+        await frames(p);
         await p.keyboard.press('.');
         await p.keyboard.press('s');
         await p.waitForSelector('.send-ctx');

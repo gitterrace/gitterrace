@@ -1,6 +1,6 @@
 // The filter on the repositories home. Imported by browser-check.mjs, not run alone.
 import { basename } from 'node:path';
-import { eachBrowser, sh, makeRepo, serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, sh, makeRepo, serve, poll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {
@@ -14,11 +14,7 @@ export function checks(env) {
     for (const o of others) {
       sh(o, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, o);
     }
-    for (let i = 0; i < 100; i++) {
-      const n = (await (await fetch(one.origin + '/api/repos')).json()).length;
-      if (n >= 3) break;
-      await new Promise((ok) => setTimeout(ok, 100));
-    }
+    await poll(async () => (await (await fetch(one.origin + '/api/repos')).json()).length >= 3, 'three repositories');
     const target = basename(others[0]);
     try {
       await eachBrowser(browsers, context, async (ctx, name) => {

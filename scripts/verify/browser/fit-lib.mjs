@@ -3,7 +3,7 @@
 // with symbols and the built site's docs pages, at 1440, 900 and 360 px.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { existsSync, writeFileSync } from 'node:fs';
-import { eachBrowser, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, commitAll, synced } from '../../lib/browser-lib.mjs';
 import { join } from 'node:path';
 import { serve, pages as sitePages } from './sitebar-lib.mjs';
 
@@ -129,7 +129,7 @@ export function checks(env) {
   }
   async function all(label, fn) {
     fixtures();
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
     const pages = Object.fromEntries(Object.entries(repoPages).map(([k, v]) => [k, srv.base + v]));
     const s = await serve();
     for (const p of sitePages().filter((p) => p.startsWith('/docs/') && p !== '/docs/')) {

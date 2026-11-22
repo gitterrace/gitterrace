@@ -3,7 +3,7 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { serve, sh, commitAll, reloadUntil, domQuiet, scrollSettled, frames, WATCH_BOUND_MS } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
 export function checks(env) {
@@ -42,12 +42,8 @@ export function checks(env) {
         try {
           const p = await ctx.newPage();
           await p.setViewportSize({ width: 1100, height: 800 });
-          let ready = false;
-          for (let i = 0; i < 40 && !ready; i++) {
-            await p.goto(`${one.base}/worktree#f3`, { waitUntil: 'load' });
-            ready = (await p.$$('section[data-path]')).length >= FILES;
-            if (!ready) await p.waitForTimeout(250);
-          }
+          await reloadUntil(p, async () => (await p.$$('section[data-path]')).length >= FILES,
+            `${one.base}/worktree#f3`, `${FILES} file sections`);
           // Bodies arrive late, so refreshes land while loads are in flight.
           const diffs = await p.$$eval(
             '[data-load-diff]',
@@ -58,7 +54,7 @@ export function checks(env) {
             await new Promise((ok) => setTimeout(ok, 300));
             await q.continue();
           });
-          await p.waitForTimeout(800);
+          await domQuiet(p);
           await p.evaluate(() => {
             const w = /** @type {any} */ (window);
             w.__refreshed = 0;
@@ -114,7 +110,7 @@ export function checks(env) {
           const t0 = Date.now();
           while (Date.now() - t0 < 10000) {
             await p.mouse.wheel(0, 40);
-            await p.waitForTimeout(16);
+            await frames(p, 1);
           }
           await p.evaluate(() => {
             /** @type {any} */ (window).__phase = 'keys';
@@ -122,20 +118,12 @@ export function checks(env) {
           await p.evaluate(() => /** @type {HTMLElement} */ (document.activeElement)?.blur());
           for (let k = 0; k < 16; k++) {
             await p.keyboard.press(k % 2 ? 'Space' : 'PageDown');
-            await p.waitForTimeout(200);
+            await frames(p, 12);
           }
           editing = false;
           await edits;
           // The reader stops: one more refresh, then they must still be where they stopped.
-          await p.waitForFunction(
-            () =>
-              new Promise((ok) => {
-                const y = scrollY;
-                setTimeout(() => ok(scrollY === y), 300);
-              }),
-            null,
-            { timeout: 5000 },
-          ).catch(() => {});
+          await scrollSettled(p);
           await p.evaluate(() => {
             /** @type {any} */ (window).__phase = 'still';
           });
@@ -162,7 +150,7 @@ export function checks(env) {
           await p.waitForFunction((k) => /** @type {any} */ (window).__refreshed > k, seen, {
             timeout: 8000,
           }).catch(() => {});
-          await p.waitForTimeout(2500);
+          await domQuiet(p);
           const end = await where();
           const endTop = stop ? await topOf(stop.path) : null;
           // Inside the long file: its top is above the viewport and its bottom below.
@@ -178,9 +166,9 @@ export function checks(env) {
             null,
             { timeout: 8000 },
           ).catch(() => {});
-          await p.waitForTimeout(500);
+          await domQuiet(p);
           await p.evaluate(() => window.scrollBy(0, 3000));
-          await p.waitForTimeout(500);
+          await domQuiet(p);
           const bigTop = () =>
             p.evaluate(() =>
               document.querySelector('section[data-path="s45big.txt"]').getBoundingClientRect().top
@@ -191,7 +179,7 @@ export function checks(env) {
           await p.waitForFunction((k) => /** @type {any} */ (window).__refreshed > k, seen2, {
             timeout: 8000,
           }).catch(() => {});
-          await p.waitForTimeout(2500);
+          await domQuiet(p);
           const big1 = await bigTop();
           const res = await p.evaluate(() => ({
             worst: /** @type {any} */ (window).__worst,
@@ -271,12 +259,8 @@ export function checks(env) {
         try {
           const p = await ctx.newPage();
           await p.setViewportSize({ width: 1100, height: 800 });
-          let ready = false;
-          for (let i = 0; i < 40 && !ready; i++) {
-            await p.goto(`${one.base}/worktree`, { waitUntil: 'load' });
-            ready = (await p.$$('section[data-path]')).length >= 40;
-            if (!ready) await p.waitForTimeout(250);
-          }
+          await reloadUntil(p, async () => (await p.$$('section[data-path]')).length >= 40,
+            `${one.base}/worktree`, '40 file sections');
           await p.evaluate(() => {
             const w = /** @type {any} */ (window);
             w.__n = 0;
@@ -295,7 +279,7 @@ export function checks(env) {
               writeFileSync(join(repo, nm(k % 5)), body(`${tag} ${k}`));
               if (k % 2) rmSync(extra, { force: true });
               k++;
-              await p.waitForTimeout(700);
+              await p.waitForFunction((x) => window.__n > x, now, { timeout: WATCH_BOUND_MS }).catch(() => {});
             }
             return false;
           };
@@ -311,7 +295,7 @@ export function checks(env) {
           if (ys.some((y) => y !== 0)) bad.push(`top: scrollY left 0 (${Math.max(...ys)})`);
           // Mid-page.
           await p.evaluate(() => scrollTo(0, 5000));
-          await p.waitForTimeout(300);
+          await scrollSettled(p);
           const probe = () => p.evaluate(() => {
             const el = document.elementFromPoint(550, 400);
             const s = el && el.closest('section[data-path]');
@@ -322,7 +306,7 @@ export function checks(env) {
           const at = await probe();
           const y0 = await p.evaluate(() => scrollY);
           if (!(await refreshes(6, 'mid'))) bad.push('mid: refreshes did not land');
-          await p.waitForTimeout(1200);
+          await domQuiet(p);
           const after = at && await p.evaluate((path) => {
             const s = document.querySelector(`section[data-path="${CSS.escape(path)}"]`);
             return s ? s.getBoundingClientRect().top : null;

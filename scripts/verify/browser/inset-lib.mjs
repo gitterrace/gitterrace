@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { eachBrowser, serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve, frames } from '../../lib/browser-lib.mjs';
 
 /** Device pixels per CSS px for the ink screenshots, sub-pixel positions averaged, and the
  * most the ink above may differ from the ink below, in CSS px: a label is centered within a
@@ -236,11 +236,13 @@ export function checks(env) {
           await p.evaluate(() => document.fonts.ready);
           judge(`inset-balance ${name} ${scheme} blame row`, await p.evaluate(blameInsets));
           await p.goto(srv.base + '/blob/HEAD/one.txt', { waitUntil: 'load' });
-          await p.waitForTimeout(300);
+          await p.evaluate(() => document.fonts.ready);
+          await frames(p);
           await p.keyboard.press('.');
           await p.keyboard.press('s');
           await p.waitForSelector('.send-foot');
-          await p.waitForTimeout(300);
+          await p.evaluate(() => document.fonts.ready);
+          await frames(p);
           const foot = await p.evaluate(footInsets, '.send-foot');
           judge(`inset-balance ${name} ${scheme} send actions`, foot);
           judge(`inset-balance ${name} ${scheme} title inset`, await p.evaluate(titleInsets));

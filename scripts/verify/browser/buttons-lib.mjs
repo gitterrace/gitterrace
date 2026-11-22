@@ -1,6 +1,6 @@
 // One button vocabulary, checked where readers meet it: on the log, a file, its blame, a
 
-import { eachBrowser, lum } from '../../lib/browser-lib.mjs';
+import { eachBrowser, lum, frames } from '../../lib/browser-lib.mjs';
 // Markdown file, settings (with a list's Add pressed) and the Send to window, in light and dark.
 // Every visible <button> looks at rest like a fresh button with the same variant classes
 // (secondary, .primary, .ghost, .danger) in the same spot, so no component paints its own; one
@@ -123,7 +123,8 @@ export function checks(env) {
           await p.emulateMedia({ colorScheme: scheme, reducedMotion: 'reduce' });
           await p.setViewportSize({ width: 1280, height: 800 });
           await p.goto((where === 'origin' ? srv.origin : srv.base) + path, { waitUntil: 'load' });
-          await p.waitForTimeout(300);
+          await p.evaluate(() => document.fonts.ready);
+          await frames(p);
           if (before) await before(p);
           await p.mouse.move(1, 799);
           const s = await p.evaluate(survey, VARIANTS);

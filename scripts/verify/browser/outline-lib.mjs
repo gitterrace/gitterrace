@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { eachBrowser, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, commitAll, synced, frames, scrollSettled } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {
@@ -13,7 +13,7 @@ export function checks(env) {
   async function outlineMenu() {
     writeFileSync(join(dir, 'menu-outline.md'), '# Doc\n\n' + Array.from({ length: 12 }, (_, i) => `## Head ${i}\n\ntext\n`).join('\n'));
     commitAll(dir, 'docs: menu outline fixture');
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
     await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       await p.setViewportSize({ width: 900, height: 800 });
@@ -22,7 +22,7 @@ export function checks(env) {
         try {
           await p.goto(srv.base + path, { waitUntil: 'load' });
           await p.click('details.outline summary');
-          await p.waitForTimeout(200);
+          await frames(p);
           const v = await p.evaluate(() => {
             const d = document.querySelector('details.outline');
             return { open: /** @type {HTMLDetailsElement} */ (d).open, total: d.querySelectorAll('li').length };
@@ -44,7 +44,7 @@ export function checks(env) {
     const head = 'pub struct Holder;\n\nimpl Holder {\n    pub fn new() -> Self { Holder }\n}\n\n';
     writeFileSync(join(dir, 'symbols.rs'), head + body);
     commitAll(dir, 'feat: symbols fixture');
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
     // The followed line: selected, its box, and the bottom of the path bar when it is pinned.
     // f5 is on line 47.
     const landed = (p, id) => p.evaluate((i) => {
@@ -78,7 +78,7 @@ export function checks(env) {
           v.items = await p.evaluate(() => document.querySelectorAll('[data-outline] a').length);
           if (width === 1440) {
             await p.click('.outline.rail a[href="#L47"]');
-            await p.waitForTimeout(400);
+            await scrollSettled(p);
             v.go = await landed(p, 'L47');
             v.railTop = await p.evaluate(
               () => document.querySelector('.outline.rail').getBoundingClientRect().top,
@@ -88,13 +88,13 @@ export function checks(env) {
             );
           } else {
             await p.click('main>.ph details.outline summary');
-            await p.waitForTimeout(200);
+            await frames(p);
             v.pop = await p.evaluate(() => {
               const r = document.querySelector('main>.ph .outline-pop').getBoundingClientRect();
               return r.left >= 0 && r.right <= innerWidth + 1;
             });
             await p.click('main>.ph .outline-pop a[href="#L47"]');
-            await p.waitForTimeout(400);
+            await scrollSettled(p);
             v.go = await landed(p, 'L47');
           }
           const shots = process.env.OUTLINE_SHOTS || tmpdir();
@@ -127,7 +127,7 @@ export function checks(env) {
     const fn = (i) => `pub fn g${i}() -> u32 {\n${"    1 +\n".repeat(56)}    0\n}\n`;
     writeFileSync(join(dir, 'current.rs'), Array.from({ length: 90 }, (_, i) => fn(i)).join("\n"));
     commitAll(dir, 'feat: current symbol fixture');
-    await new Promise((ok) => setTimeout(ok, 600));
+    await synced(srv, dir);
     // The symbol whose lines hold n: fn k starts on line 60k+1.
     const holding = (n) => `#L${60 * Math.floor((n - 1) / 60) + 1}`;
     const lit = (p) => p.evaluate(
@@ -144,10 +144,10 @@ export function checks(env) {
           // Past the first-screen swap of the code chunks.
           await p.waitForFunction(() => !document.querySelector('.src[data-hl]') ||
             document.querySelectorAll('.src .ch').length > 0);
-          await p.waitForTimeout(1200);
+          await scrollSettled(p);
           const seen = { landed: await lit(p) };
           await p.mouse.wheel(0, -2400);
-          await p.waitForTimeout(500);
+          await scrollSettled(p);
           seen.up = await lit(p);
           seen.upLine = await p.evaluate(() => {
             const line = (innerHeight) * 0.55;
@@ -161,7 +161,7 @@ export function checks(env) {
             return '#' + id;
           });
           await p.mouse.wheel(0, 4800);
-          await p.waitForTimeout(500);
+          await scrollSettled(p);
           seen.down = await lit(p);
           const want = holding(n);
           const ok = seen.landed.length === 1 && seen.landed[0] === want &&
