@@ -4,6 +4,8 @@
 
 use gitterrace_testkit::Fixture;
 
+use crate::common::{bars, pulse};
+
 /// Week of Monday 2024-03-04: two commits on Wednesday, one on Thursday. Others are lone.
 const DATES: [&str; 6] = [
     "2024-02-14T12:00:00+0000",
@@ -64,7 +66,7 @@ async fn the_chip_removes_the_range() {
     let page = body(&r, "/stats?period=1y&from=2024-03-04&to=2024-03-10").await;
     // The old keys and the new text read the same page.
     let by_q = body(&r, "/stats?q=after%3A2024-03-04%20before%3A2024-03-11").await;
-    assert_eq!(kpi_commits(&by_q), kpi_commits(&page));
+    assert_eq!(pulse(&by_q, "Commits without merges"), pulse(&page, "Commits without merges"));
     let chips = page
         .split("<div class=\"chips\">")
         .nth(1)
@@ -89,37 +91,18 @@ async fn without_a_range_there_is_no_range_markup() {
     assert_eq!(bad, page, "a malformed range is ignored");
 }
 
-/// The commit total of the pulse table.
-fn kpi_commits(page: &str) -> u64 {
-    let row = page.split("Commits without merges</th>").nth(1).expect("commits row");
-    let b = row.split("<b>").nth(1).expect("value");
-    b.split("</b>").next().expect("end").replace(',', "").parse().expect("number")
-}
-
-/// The commits of every bar of the per-bucket chart, summed.
-fn bar_commits(page: &str) -> u64 {
-    page.split("aria-label=\"")
-        .skip(1)
-        .filter_map(|s| s.split('"').next())
-        .filter_map(|l| {
-            let n = l.split(": ").nth(1)?;
-            n.split(' ').next()?.parse::<u64>().ok()
-        })
-        .sum()
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn every_section_of_a_narrowed_page_covers_the_range() {
     let (_root, r) = router();
     let wide = body(&r, "/stats?period=1y").await;
     let narrow = body(&r, "/stats?period=1y&from=2024-03-04&to=2024-03-10").await;
-    assert_eq!(kpi_commits(&narrow), 3, "{narrow}");
+    assert_eq!(pulse(&narrow, "Commits without merges"), 3, "{narrow}");
     assert_eq!(
-        kpi_commits(&narrow),
-        bar_commits(&narrow),
+        pulse(&narrow, "Commits without merges"),
+        bars(&narrow),
         "the table and the per-day chart count the same commits"
     );
-    assert!(kpi_commits(&wide) > kpi_commits(&narrow));
+    assert!(pulse(&wide, "Commits without merges") > pulse(&narrow, "Commits without merges"));
     let span = narrow
         .split("<p class=\"hint\">")
         .nth(1)

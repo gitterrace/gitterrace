@@ -4,6 +4,8 @@
 
 use gitterrace_testkit::Fixture;
 
+use crate::common::{bars, pulse};
+
 fn router() -> (tempfile::TempDir, axum::Router) {
     let root = tempfile::tempdir().expect("tmp");
     let f = Fixture::init(&root.path().join("repo"))
@@ -30,26 +32,6 @@ async fn page(r: &axum::Router, uri: &str) -> String {
     .await
 }
 
-/// The first number in the `<b>` of the pulse row `label`, whose label cell is a row header.
-fn row(page: &str, label: &str) -> u64 {
-    let cell = [format!("{label}</th>"), format!("{label}</td>")]
-        .iter()
-        .find_map(|end| page.split(end.as_str()).nth(1))
-        .expect("row")
-        .split("<b>")
-        .nth(1)
-        .expect("value");
-    cell.split("</b>").next().expect("end").replace(',', "").parse().expect("number")
-}
-
-fn bars(page: &str) -> u64 {
-    page.split("aria-label=\"")
-        .skip(1)
-        .filter_map(|s| s.split('"').next())
-        .filter_map(|l| l.split(": ").nth(1)?.split(' ').next()?.parse::<u64>().ok())
-        .sum()
-}
-
 /// The column total every punch card cell names ("of N").
 fn punch(page: &str) -> u64 {
     let heat = page.split("class=\"chart heat\"").nth(1).expect("heat");
@@ -63,14 +45,14 @@ async fn the_page_follows_the_merges_option_and_lines_and_files_do_not() {
     let (_root, r) = router();
     let off = page(&r, "/stats?period=all").await;
     let on = page(&r, "/stats?period=all&merges=1").await;
-    assert_eq!(row(&off, "Commits without merges"), 3);
-    assert_eq!(row(&on, "Commits"), 4);
+    assert_eq!(pulse(&off, "Commits without merges"), 3);
+    assert_eq!(pulse(&on, "Commits"), 4);
     for (p, n) in [(&off, 3), (&on, 4)] {
         assert_eq!(bars(p), n, "per-day bars");
         assert_eq!(punch(p), n, "punch card");
     }
     for label in ["Files changed", "Lines added", "Lines removed"] {
-        assert_eq!(row(&off, label), row(&on, label), "{label}");
+        assert_eq!(pulse(&off, label), pulse(&on, label), "{label}");
     }
     assert!(on.contains("merges=1"), "the link and the toggle carry it");
 }
