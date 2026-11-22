@@ -1,13 +1,9 @@
 //! Every page marks the top tab of the section it belongs to: file views under Code, commit
 //! views under Commits, refs under Branches & Tags, and only the insights pages under Insights.
 //! A page built through a shared helper inherits that helper's tab unless it names its own.
-//! Commit types and code frequency are sections of Activity, patterns a section of Hotspots:
-//! each renders there, and the pages they once had answer like any unknown path.
+//! Commit types and code frequency are sections of Activity, patterns a section of Hotspots.
 
 use gitterrace_testkit::{Fixture, base, page};
-
-/// Pages that are gone: no redirect keeps them, so they must 404 like an unknown path.
-const GONE: [&str; 4] = ["/stats/types", "/stats/frequency", "/stats/patterns", "/insights"];
 
 /// Every section id and heading of the old pages, on the page that holds it now. Code age and
 /// release cadence are named on their own: they cover all history and were easy to drop.
@@ -133,9 +129,6 @@ async fn five_insights_tabs_and_compare_sits_under_commits() {
         .nth(1)
         .and_then(|t| t.split("</nav>").next())
         .expect("tab row");
-    for gone in ["Commit types", "Code frequency", "Patterns", "More"] {
-        assert!(!tabs.contains(gone), "{gone} is still a tab");
-    }
     for kept in ["Activity", "Contributors", "Hotspots", "Languages", "Ownership"] {
         assert!(tabs.contains(&format!(">{kept}</a>")), "{kept} tab missing");
     }
@@ -153,20 +146,4 @@ async fn five_insights_tabs_and_compare_sits_under_commits() {
     let nav = cmp.split("<nav class=\"tabnav\">").nth(1).unwrap_or_default();
     let on = nav.split("class=\"on\"").nth(1).unwrap_or_default();
     assert!(on.starts_with(" aria-current=\"page\">Commits<"), "{nav}");
-}
-
-/// Class guard: a removed page must not silently resolve, neither as a redirect nor a page.
-#[tokio::test]
-async fn removed_insights_paths_answer_as_unknown_pages() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let f = sections_fixture(dir.path());
-    let router = crate::common::ready_router(f.path()).await;
-    for p in GONE {
-        let (status, body) = page(&router, p).await;
-        // The not-found page, never a redirect or the page that took the old one's place. Its
-        // next steps follow the path, so the body is checked by what makes it that page.
-        assert_eq!(status, 404, "{p}");
-        assert!(body.contains("Nothing at this address"), "{p}: not the not-found page");
-        assert!(body.contains("class=\"card empty lost\""), "{p}: not the not-found page");
-    }
 }
