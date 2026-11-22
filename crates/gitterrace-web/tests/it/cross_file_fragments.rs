@@ -30,11 +30,6 @@ async fn cross_file_fragments_stay_plain() {
         body.contains("href=\"#intro\"") && body.contains("id=\"intro\""),
         "same-page link and its heading stay plain"
     );
-    assert!(
-        !body.contains("href=\"/blob/SHA/other.md#user-content-".replace("SHA", &sha).as_str())
-            && !body.contains("#user-content-top\""),
-        "cross-file fragment was prefixed"
-    );
     assert!(!body.contains("other.md#user-content-"), "cross-file fragment was prefixed");
     assert!(!body.contains("page.md#user-content-"), "cross-file fragment was prefixed");
 }

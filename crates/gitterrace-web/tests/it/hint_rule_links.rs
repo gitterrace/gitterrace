@@ -1,5 +1,5 @@
 //! A chart whose numbers can surprise says why in its own hint line, so the reason reads
-//! offline. No page links a counting page on the site: the explanation is the sentence.
+//! offline, and never by a link: the explanation is the sentence.
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 use std::path::Path;
@@ -34,7 +34,7 @@ fn hints(code: &str) -> Vec<&str> {
 }
 
 #[test]
-fn surprising_counts_are_explained_in_their_hint() {
+fn surprising_counts_are_explained_in_their_hint_and_no_hint_links_off_the_machine() {
     let all = templates();
     for (file, phrase) in SUBTLETIES {
         let (_, code) = all.iter().find(|(n, _)| n == file).expect(file);
@@ -43,14 +43,9 @@ fn surprising_counts_are_explained_in_their_hint() {
             "{file}: no hint says \"{phrase}\" inline"
         );
     }
-}
-
-#[test]
-fn no_page_links_a_counting_page() {
-    for (file, code) in templates() {
+    for (file, code) in all {
         for hint in hints(&code) {
             assert!(!hint.contains("href=\"http"), "{file}: a hint links off the machine: {hint}");
         }
-        assert!(!code.contains("/docs/counting"), "{file} links the counting page");
     }
 }

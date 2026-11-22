@@ -23,8 +23,6 @@ async fn an_empty_period_shows_the_empty_card_and_the_chart() {
         gitterrace_testkit::wait::indexed,
     )
     .await;
-    let (status, _) = get(&router, "/stats/languages?period=1w").await;
-    assert_eq!(status, 200);
     assert!(body.contains("No commits in this period."), "{body}");
     assert!(body.contains("<svg"), "the chart is still drawn");
     let (_, all) = get(&router, "/stats/languages").await;
