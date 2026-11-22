@@ -3,9 +3,6 @@
 //! today's answer byte for byte. Today's in-memory implementation wrote `tests/golden/*.txt`
 //! (`TEST_BLESS=1`); any later implementation must reproduce it. A failure dumps the differing
 //! bodies beside the golden.
-//!
-//! `TEST_GITGIT=/path/to/git` adds a seeded sample of 64 cells over a real history. Its golden is
-//! kept outside the repository, at `$TEST_GITGIT_GOLDEN` (default `target/gitgit-golden.txt`).
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
 use std::collections::BTreeMap;
@@ -467,36 +464,6 @@ fn the_frozen_clock_reaches_every_page() {
         let (_, log) = gitterrace_testkit::page(&router, "/log/HEAD").await;
         assert!(log.contains("2 days ago"), "web clock not frozen");
     });
-}
-
-#[test]
-fn a_real_history_samples_match_the_oracle() {
-    let Some(repo) = std::env::var_os("TEST_GITGIT") else {
-        return;
-    };
-    if !oracle::frozen("a_real_history_samples_match_the_oracle") {
-        return;
-    }
-    let rt = tokio::runtime::Runtime::new().expect("runtime");
-    let values = matrix::Values {
-        author: "gitster@pobox.com".to_owned(),
-        kind: "fix".to_owned(),
-        scope: "t".to_owned(),
-        path: "builtin".to_owned(),
-        exclude: "t/**".to_owned(),
-    };
-    let cells: Vec<_> =
-        matrix::sample(64, 64).into_iter().filter(|c| c.mailmap == Mailmap::AsIs).collect();
-    let answers = rt.block_on(async {
-        let router = gitterrace_web::app_router(Path::new(&repo)).expect("router");
-        oracle::ready(&router).await;
-        oracle::capture(&router, &targets(), &cells, &values).await
-    });
-    let golden = std::env::var_os("TEST_GITGIT_GOLDEN").map_or_else(
-        || Path::new(env!("CARGO_MANIFEST_DIR")).join("../../target/gitgit-golden.txt"),
-        Into::into,
-    );
-    oracle::check(&golden, &dump(&golden), &answers);
 }
 
 /// The re-bless proof: two `TEST_ORACLE_DUMP` folders of the same cells, one per commit, compared

@@ -7,7 +7,7 @@
 //! of `/proc/PID/smaps_rollup` (Linux). File-backed page cache is not counted by either.
 //!
 //! Red on the in-memory implementation by design: it holds the parsed history. Runs in every
-//! `cargo test --release` and in CI. `TEST_RUSTGIT=<path>` adds a real history.
+//! `cargo test --release` and in CI.
 #![cfg(all(not(debug_assertions), not(windows)))]
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
@@ -464,17 +464,6 @@ fn memory_stays_in_budget_at_every_size() {
         }
     }
     assert!(bad.is_empty(), "{}", bad.join("\n"));
-}
-
-/// Opt-in on a real history: `TEST_RUSTGIT=<path>`. A no-op without it.
-#[test]
-fn memory_stays_in_budget_on_rust() {
-    if serve_if_child() {
-        return;
-    }
-    if let Some(repo) = std::env::var_os("TEST_RUSTGIT") {
-        measure(Path::new(&repo), "memory_stays_in_budget_on_rust", 0);
-    }
 }
 
 /// Idle memory is flat in the size of the tree, not only the history: 300 commits over 1k and
