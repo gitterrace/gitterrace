@@ -160,5 +160,6 @@ steps = [
   "pre-push-test|python3|install python3|python3 scripts/release/push-check.py --self-test",
   "landed-clones|bash|install bash|bash scripts/dev/sweep-run.sh --ratchet",
   "landed-clones-test|bash|install bash|bash scripts/dev/sweep-run.sh --self-test",
+  "land-run-test|bash|install bash|bash scripts/dev/land-run.sh --self-test",
   "machete|cargo-machete|cargo install cargo-machete|cargo-machete",
 ]
