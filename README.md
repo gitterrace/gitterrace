@@ -6,7 +6,7 @@
 </h1>
 
 <!-- BEGIN GENERATED: pitch -->
-A local, read-only git browser that hands findings to any tool.
+Review your repo before you push, and hand findings to any tool.
 
 <!-- END GENERATED: pitch -->
 

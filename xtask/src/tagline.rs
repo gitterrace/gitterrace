@@ -20,7 +20,7 @@ use skrifa::{FontRef, MetadataProvider};
 
 /// The one pitch sentence: the package description, the README, the landing page and the meta
 /// description show it too, and generation fails when the manifest says something else.
-pub const TAGLINE: &str = "A local, read-only git browser that hands findings to any tool.";
+pub const TAGLINE: &str = "Review your repo before you push, and hand findings to any tool.";
 
 const FONT: &str =
     "vendor/schwarzwald/kit/fonts/bricolage-grotesque/bricolage-grotesque-latin-wght-normal.woff2";
