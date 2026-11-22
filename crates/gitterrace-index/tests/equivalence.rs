@@ -44,25 +44,3 @@ fn an_unshallowed_clone_indexes_like_a_full_one() {
     assert_eq!(records(&index, &adv.shallow), fresh(&adv.shallow));
     assert_eq!(fresh(&adv.shallow), full, "unshallowed history equals the original");
 }
-
-/// HEAD~k indexed first, then HEAD in the same cache (an incremental update), equals a
-/// one-step build of HEAD: the output equivalence an unmerged two-step set promises.
-#[test]
-fn a_two_step_build_answers_like_a_one_step_build() {
-    // The fixture has a future-dated commit, which is pinned to the wall clock: freeze it.
-    if !gitterrace_testkit::oracle::frozen("a_two_step_build_answers_like_a_one_step_build") {
-        return;
-    }
-    let dir = tempfile::tempdir().expect("tmp");
-    let adv = Adversarial::build(dir.path());
-    let step = dir.path().join("step");
-    git(
-        dir.path(),
-        &["clone", "-q", adv.repo.to_str().expect("utf8"), step.to_str().expect("utf8")],
-    );
-    git(&step, &["reset", "-q", "--hard", "HEAD~2"]);
-    let index = Index::open_dir(dir.path().join("cache")).expect("index");
-    let _first = records(&index, &step);
-    git(&step, &["reset", "-q", "--hard", &adv.tip]);
-    assert_eq!(records(&index, &step), fresh(&adv.repo));
-}

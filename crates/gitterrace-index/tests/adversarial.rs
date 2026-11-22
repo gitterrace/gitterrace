@@ -11,7 +11,7 @@ use gitterrace_index::{
     CountContext, Index, Insights, Label, LineCache, MAX_BUCKETS, Options, Period, Scope,
     ScopeParams, TimeAxis, head_files,
 };
-use gitterrace_testkit::{Adversarial, git_at};
+use gitterrace_testkit::Adversarial;
 
 const PERIODS: [Period; 5] =
     [Period::Week, Period::Month, Period::Quarter, Period::Year, Period::All];
@@ -92,36 +92,6 @@ fn an_axis_never_exceeds_the_bucket_cap() {
         assert!(axis.len() <= MAX_BUCKETS && !axis.is_empty(), "{first}..{last}");
         assert!(start.elapsed() < FAST);
     }
-}
-
-/// The `.mailmap` at the tip applies to all history, and an edit reaches cached records.
-#[test]
-fn the_tip_mailmap_names_every_cached_commit() {
-    let tmp = tempfile::tempdir().expect("tmp");
-    let fx = Adversarial::build(tmp.path());
-    let (repo, index) = indexed(&fx.repo);
-    let records = index.records(&repo, "HEAD").expect("records");
-    let ins = Insights::new(&records, Options::default(), None);
-    let people = &ins.contributors(Period::All).contributors;
-    assert_eq!(people.len(), 1, "{people:?}");
-    let log = repo.log("HEAD", None, 0, 100).expect("log");
-    for r in &records {
-        let shown = log.iter().find(|c| c.id == r.id).expect("in log");
-        assert_eq!(r.author, shown.author.name, "{}", r.id);
-    }
-    std::fs::write(
-        fx.repo.join(".mailmap"),
-        "Jane D. <jane@x.io> <old@x.io>\nJane D. <jane@x.io> <jane@x.io>\n",
-    )
-    .expect("write mailmap");
-    git_at(&fx.repo, "2024-04-01T12:00:00Z", &["commit", "-qam", "docs: rename"]);
-    index.update(&repo, "HEAD", &|_| {}).expect("update");
-    let records = index.records(&repo, "HEAD").expect("records");
-    assert!(
-        records.iter().all(|r| r.author == "Jane D."),
-        "{:?}",
-        records.iter().map(|r| &r.author).collect::<Vec<_>>()
-    );
 }
 
 /// A shallow clone indexes completely, its boundary diffed as a root, and every insight holds.

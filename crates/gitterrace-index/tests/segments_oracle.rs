@@ -178,7 +178,7 @@ fn segments_answer_like_the_oracle_over_the_golden_corpus() {
 }
 
 /// An incremental update (HEAD~2, then HEAD: an unmerged two-segment set) answers like the
-/// oracle too.
+/// oracle too, over the option matrix with an edited mailmap and over the adversarial history.
 #[test]
 fn an_appended_segment_answers_like_the_oracle() {
     if !frozen("an_appended_segment_answers_like_the_oracle") {
@@ -186,13 +186,18 @@ fn an_appended_segment_answers_like_the_oracle() {
     }
     let tmp = tempfile::tempdir().expect("tmp");
     let (path, _) = matrix_repo(&tmp.path().join("m"), Mailmap::Edited);
-    let repo = Repo::discover(&path).expect("open");
+    appended(&path, "appended");
+    appended(&Adversarial::build(&tmp.path().join("adv")).repo, "appended adversarial");
+}
+
+fn appended(path: &Path, case: &str) {
+    let repo = Repo::discover(path).expect("open");
     let cache = tempfile::tempdir().expect("tmp");
     let index = Index::open_dir(cache.path().join("c")).expect("index");
-    let tip = git(&path, &["rev-parse", "HEAD"]);
-    git(&path, &["checkout", "-q", "HEAD~2"]);
+    let tip = git(path, &["rev-parse", "HEAD"]);
+    git(path, &["checkout", "-q", "HEAD~2"]);
     index.update(&repo, "HEAD", &|_| {}).expect("first step");
-    git(&path, &["checkout", "-q", tip.trim()]);
+    git(path, &["checkout", "-q", tip.trim()]);
     index.update(&repo, "HEAD", &|_| {}).expect("second step");
     let set = index.disk_source(&repo, "HEAD").expect("open").expect("set").unchecked();
     // The appended set ranks old order then new commits: the oracle follows the same order.
@@ -201,7 +206,7 @@ fn an_appended_segment_answers_like_the_oracle() {
         .collect();
     let oracle = from_git(&repo, Some(&order), true);
     let raw = from_git(&repo, Some(&order), false);
-    same_source(&*set, &oracle, &raw, "appended");
-    same_insights(&*set, &oracle, "appended");
-    same_lives(&cache.path().join("c"), &repo, Some(&order), "appended");
+    same_source(&*set, &oracle, &raw, case);
+    same_insights(&*set, &oracle, case);
+    same_lives(&cache.path().join("c"), &repo, Some(&order), case);
 }
