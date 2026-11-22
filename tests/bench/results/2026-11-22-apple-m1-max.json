@@ -1,0 +1,248 @@
+{
+ "harness": 4,
+ "idle_secs": 60,
+ "machine": {
+  "arch": "arm64",
+  "commit": "262128e",
+  "cpu": "Apple M1 Max",
+  "cpus": 10,
+  "dirty": false,
+  "disk": "4.0 TB SSD",
+  "git": "git version 2.54.0 (Apple Git-157)",
+  "gitterrace": "gitterrace v0.2.0-262128e",
+  "label": "apple-m1-max",
+  "os": "macOS 26.6.2",
+  "ram_gb": 64.0
+ },
+ "repos": {
+  "control": {
+   "budget": {
+    "export_secs": {"limit": 60, "max": 29.29, "min": 28.76, "status": "pass", "value": 29.03},
+    "footprint_idle_mb": {"limit": 48, "status": "pass", "value": 5.83},
+    "idle_cpu_pct": {"limit": 1, "status": "pass", "value": 0.1},
+    "index_secs": {"limit": 30, "max": 0.46, "min": 0.4, "phase": "stream", "status": "pass", "value": 0.43},
+    "page_cold_ms": {"limit": 1500, "max": 30.88, "min": 28.55, "status": "pass", "value": 28.7},
+    "page_warm_ms": {"limit": 300, "page": "diff-fragment", "status": "pass", "value": 4.42},
+    "ready_secs": {"limit": 30, "max": 1.47, "min": 1.23, "phase": "stream", "status": "pass", "value": 1.26},
+    "rss_mb": {"limit": 500, "phase": "unknown", "status": "pass", "value": 100.0}
+   },
+   "class": "small",
+   "cold_samples": 3,
+   "config": "empty config.toml, no actions.toml",
+   "export": {
+    "commits": 500,
+    "ok": true,
+    "out_mb": 140.74,
+    "samples": [28.76, 29.29, 29.03],
+    "secs": 29.03
+   },
+   "idle": {
+    "cpu_pct": 0.05,
+    "cpu_pct_events_client": 0.1,
+    "secs": 60
+   },
+   "index": {
+    "cache_mb": 1.11,
+    "peak_child_footprint_mb": 100.0,
+    "peak_footprint_mb": 20.0,
+    "peak_rss_mb": 61.03,
+    "phases": [{"busy": null, "cpu_secs": 0.01, "name": "rev_list", "secs": 0.01}, {"busy": null, "cpu_secs": 0.0, "name": "held", "secs": 0.0}, {"busy": 0.99, "cpu_secs": 1.58, "name": "stream", "secs": 0.21}, {"busy": null, "cpu_secs": null, "name": "stream.fold", "secs": 0.02}, {"busy": null, "cpu_secs": 0.01, "name": "finish", "secs": 0.07}, {"busy": 0.46, "cpu_secs": 0.03, "name": "messages", "secs": 0.03}, {"busy": null, "cpu_secs": 0.0, "name": "tip", "secs": 0.0}],
+    "ready_samples": [1.23, 1.26, 1.47],
+    "ready_secs": 1.26,
+    "samples": [0.43, 0.46, 0.4],
+    "secs": 0.43
+   },
+   "load": {
+    "limit": 5.0,
+    "phases": {"export": 3.44, "export#2": 4.36, "export#3": 3.77, "idle": 3.57, "index": 4.11, "index#2": 4.17, "index#3": 3.99, "pages": 3.66, "pages#2": 3.67, "pages#3": 3.63},
+    "sampled": {"export": {"max": 1.68, "mean": 1.51, "n": 7}, "export#2": {"max": 2.64, "mean": 1.4, "n": 7}, "export#3": {"max": 2.58, "mean": 1.44, "n": 7}, "idle": {"max": 2.19, "mean": 1.62, "n": 25}, "index": {"max": 1.56, "mean": 1.56, "n": 1}, "index#2": {"max": 2.91, "mean": 2.91, "n": 1}, "index#3": {"max": 2.08, "mean": 2.08, "n": 1}, "pages": {"max": 1.7, "mean": 1.7, "n": 1}, "pages#2": {"max": 4.63, "mean": 4.63, "n": 1}, "pages#3": {"max": 2.01, "mean": 2.01, "n": 1}}
+   },
+   "memory": {
+    "footprint_after_pages_mb": 16.0,
+    "footprint_idle_mb": 11.0,
+    "footprint_releases": 1,
+    "footprint_start_mb": 5.17,
+    "rss_after_index_mb": 40.73,
+    "rss_after_pages_mb": 43.17,
+    "rss_idle_mb": 38.39
+   },
+   "pages": {
+    "blame-long-history": {"bytes": 355701, "cold": {"samples": [3.62, 3.66, 3.5], "total_ms": 3.62, "ttfb_ms": 3.57}, "path": "/r/bench-021/blame/HEAD/crates/gitterrace-web/tests/golden/revisions.txt", "status": 200, "warm_total_ms": {"max": 1.01, "median": 0.86, "min": 0.82, "n": 5}, "warm_ttfb_ms": {"max": 0.9, "median": 0.76, "min": 0.74, "n": 5}},
+    "blob-largest": {"bytes": 187092, "cold": {"samples": [1.51, 1.55, 1.54], "total_ms": 1.54, "ttfb_ms": 1.49}, "path": "/r/bench-021/blob/HEAD/crates/gitterrace-web/tests/golden/revisions.txt", "status": 200, "warm_total_ms": {"max": 1.62, "median": 1.49, "min": 1.45, "n": 5}, "warm_ttfb_ms": {"max": 1.6, "median": 1.47, "min": 1.43, "n": 5}},
+    "commit-largest": {"bytes": 53429, "cold": {"samples": [9.29, 9.65, 9.29], "total_ms": 9.29, "ttfb_ms": 9.28}, "path": "/r/bench-021/commit/HEAD", "status": 200, "warm_total_ms": {"max": 0.66, "median": 0.62, "min": 0.59, "n": 5}, "warm_ttfb_ms": {"max": 0.66, "median": 0.62, "min": 0.59, "n": 5}},
+    "diff-fragment": {"bytes": 34415, "cold": {"samples": [4.46, 4.95, 4.62], "total_ms": 4.62, "ttfb_ms": 4.46}, "path": "/r/bench-021/diff/HEAD/0", "status": 200, "warm_total_ms": {"max": 4.47, "median": 4.42, "min": 4.4, "n": 5}, "warm_ttfb_ms": {"max": 4.47, "median": 4.42, "min": 4.4, "n": 5}},
+    "log": {"bytes": 49917, "cold": {"samples": [1.66, 1.79, 1.71], "total_ms": 1.71, "ttfb_ms": 1.66}, "path": "/r/bench-021/log/HEAD", "status": 200, "warm_total_ms": {"max": 1.5, "median": 1.46, "min": 1.4, "n": 5}, "warm_ttfb_ms": {"max": 1.49, "median": 1.46, "min": 1.4, "n": 5}},
+    "overview": {"bytes": 35808, "cold": {"samples": [15.22, 15.42, 13.61], "total_ms": 15.22, "ttfb_ms": 15.22}, "path": "/r/bench-021/", "status": 200, "warm_total_ms": {"max": 2.0, "median": 1.76, "min": 1.74, "n": 5}, "warm_ttfb_ms": {"max": 2.0, "median": 1.76, "min": 1.74, "n": 5}},
+    "refs": {"bytes": 18446, "cold": {"samples": [0.98, 0.99, 0.95], "total_ms": 0.98, "ttfb_ms": 0.97}, "path": "/r/bench-021/refs", "status": 200, "warm_total_ms": {"max": 0.86, "median": 0.84, "min": 0.83, "n": 5}, "warm_ttfb_ms": {"max": 0.85, "median": 0.84, "min": 0.82, "n": 5}},
+    "search": {"bytes": 343479, "cold": {"samples": [28.7, 30.88, 28.55], "total_ms": 28.7, "ttfb_ms": 28.63}, "path": "/r/bench-021/search?q=fn", "status": 200, "warm_total_ms": {"max": 1.17, "median": 1.0, "min": 0.94, "n": 5}, "warm_ttfb_ms": {"max": 1.1, "median": 0.96, "min": 0.86, "n": 5}},
+    "stats-overview": {"bytes": 130293, "cold": {"samples": [0.69, 0.84, 0.76], "total_ms": 0.76, "ttfb_ms": 0.69}, "path": "/r/bench-021/stats", "status": 200, "warm_total_ms": {"max": 0.7, "median": 0.67, "min": 0.65, "n": 5}, "warm_ttfb_ms": {"max": 0.7, "median": 0.67, "min": 0.64, "n": 5}},
+    "stats/contributors": {"bytes": 17886, "cold": {"samples": [0.51, 0.52, 0.51], "total_ms": 0.51, "ttfb_ms": 0.51}, "path": "/r/bench-021/stats/contributors", "status": 200, "warm_total_ms": {"max": 0.5, "median": 0.49, "min": 0.48, "n": 5}, "warm_ttfb_ms": {"max": 0.5, "median": 0.48, "min": 0.48, "n": 5}},
+    "stats/hotspots": {"bytes": 255043, "cold": {"samples": [0.88, 0.91, 0.83], "total_ms": 0.88, "ttfb_ms": 0.82}, "path": "/r/bench-021/stats/hotspots", "status": 200, "warm_total_ms": {"max": 0.95, "median": 0.82, "min": 0.79, "n": 5}, "warm_ttfb_ms": {"max": 0.89, "median": 0.79, "min": 0.75, "n": 5}},
+    "stats/languages": {"bytes": 437066, "cold": {"samples": [1.37, 1.54, 1.41], "total_ms": 1.41, "ttfb_ms": 1.28}, "path": "/r/bench-021/stats/languages", "status": 200, "warm_total_ms": {"max": 1.39, "median": 1.31, "min": 1.3, "n": 5}, "warm_ttfb_ms": {"max": 1.26, "median": 1.21, "min": 1.19, "n": 5}},
+    "stats/ownership": {"bytes": 24587, "cold": {"samples": [0.53, 0.58, 0.5], "total_ms": 0.53, "ttfb_ms": 0.51}, "path": "/r/bench-021/stats/ownership", "status": 200, "warm_total_ms": {"max": 0.52, "median": 0.51, "min": 0.5, "n": 5}, "warm_ttfb_ms": {"max": 0.52, "median": 0.51, "min": 0.5, "n": 5}},
+    "tree-deep": {"bytes": 15772, "cold": {"samples": [1.06, 1.24, 1.24], "total_ms": 1.24, "ttfb_ms": 1.06}, "path": "/r/bench-021/tree/HEAD/vendor/schwarzwald/kit/lint/red-cases/actions-pin/green-run/.github/actions/t", "status": 200, "warm_total_ms": {"max": 0.68, "median": 0.53, "min": 0.52, "n": 5}, "warm_ttfb_ms": {"max": 0.68, "median": 0.53, "min": 0.51, "n": 5}},
+    "tree-root": {"bytes": 32372, "cold": {"samples": [1.95, 2.25, 1.96], "total_ms": 1.96, "ttfb_ms": 1.95}, "path": "/r/bench-021/tree/HEAD", "status": 200, "warm_total_ms": {"max": 0.6, "median": 0.59, "min": 0.57, "n": 5}, "warm_ttfb_ms": {"max": 0.6, "median": 0.59, "min": 0.57, "n": 5}}
+   },
+   "probe": {
+    "blame": "crates/gitterrace-web/tests/golden/revisions.txt",
+    "blob": "crates/gitterrace-web/tests/golden/revisions.txt",
+    "commit": "HEAD",
+    "deep_tree": "vendor/schwarzwald/kit/lint/red-cases/actions-pin/green-run/.github/actions/t"
+   },
+   "sha": "HEAD"
+  },
+  "git": {
+   "budget": {
+    "export_secs": {"limit": 300, "max": 25.58, "min": 25.36, "status": "pass", "value": 25.51},
+    "footprint_idle_mb": {"limit": 48, "status": "pass", "value": 4.81},
+    "idle_cpu_pct": {"limit": 1, "status": "pass", "value": 0.05},
+    "index_secs": {"limit": 300, "max": 11.43, "min": 10.36, "phase": "stream", "status": "pass", "value": 10.81},
+    "page_cold_ms": {"limit": 3000, "max": 2383.1, "min": 2371.74, "status": "pass", "value": 2377.43},
+    "page_warm_ms": {"limit": 300, "page": "blob-largest", "status": "pass", "value": 12.43},
+    "ready_secs": {"limit": 300, "max": 14.66, "min": 13.57, "phase": "stream", "status": "pass", "value": 14.04},
+    "rss_mb": {"limit": 1500, "phase": "unknown", "status": "pass", "value": 407.0}
+   },
+   "class": "medium",
+   "cold_samples": 3,
+   "config": "empty config.toml, no actions.toml",
+   "export": {
+    "commits": 500,
+    "ok": true,
+    "out_mb": 249.52,
+    "samples": [25.36, 25.58, 25.51],
+    "secs": 25.51
+   },
+   "idle": {
+    "cpu_pct": 0.05,
+    "cpu_pct_events_client": 0.02,
+    "secs": 60
+   },
+   "index": {
+    "cache_mb": 44.24,
+    "peak_child_footprint_mb": 407.0,
+    "peak_footprint_mb": 177.0,
+    "peak_rss_mb": 265.47,
+    "phases": [{"busy": null, "cpu_secs": 0.05, "name": "rev_list", "secs": 0.05}, {"busy": null, "cpu_secs": 0.03, "name": "held", "secs": 0.03}, {"busy": 1.0, "cpu_secs": 81.16, "name": "stream", "secs": 9.69}, {"busy": null, "cpu_secs": null, "name": "stream.fold", "secs": 0.64}, {"busy": null, "cpu_secs": 0.11, "name": "finish", "secs": 0.17}, {"busy": 0.5, "cpu_secs": 1.28, "name": "messages", "secs": 0.36}, {"busy": null, "cpu_secs": 0.0, "name": "tip", "secs": 0.0}],
+    "ready_samples": [13.57, 14.66, 14.04],
+    "ready_secs": 14.04,
+    "samples": [10.36, 11.43, 10.81],
+    "secs": 10.81
+   },
+   "load": {
+    "limit": 5.0,
+    "phases": {"export": 3.48, "export#2": 3.81, "export#3": 4.01, "idle": 3.54, "index": 3.53, "index#2": 3.05, "index#3": 3.76, "pages": 4.08, "pages#2": 4.37, "pages#3": 4.05},
+    "sampled": {"export": {"max": 1.96, "mean": 1.71, "n": 6}, "export#2": {"max": 4.88, "mean": 2.86, "n": 7}, "export#3": {"max": 1.96, "mean": 1.45, "n": 6}, "idle": {"max": 4.91, "mean": 2.09, "n": 25}, "index": {"max": 1.29, "mean": 1.2, "n": 3}, "index#2": {"max": 2.35, "mean": 2.14, "n": 4}, "index#3": {"max": 1.73, "mean": 1.65, "n": 4}, "pages": {"max": 1.42, "mean": 1.36, "n": 2}, "pages#2": {"max": 1.66, "mean": 1.6, "n": 2}, "pages#3": {"max": 1.75, "mean": 1.61, "n": 2}}
+   },
+   "memory": {
+    "footprint_after_pages_mb": 18.0,
+    "footprint_idle_mb": 10.0,
+    "footprint_releases": 2,
+    "footprint_start_mb": 5.19,
+    "rss_after_index_mb": 121.02,
+    "rss_after_pages_mb": 120.69,
+    "rss_idle_mb": 112.94
+   },
+   "pages": {
+    "blame-long-history": {"bytes": 705831, "cold": {"samples": [2371.74, 2377.43, 2383.1], "total_ms": 2377.43, "ttfb_ms": 2371.67}, "path": "/r/git/blame/HEAD/po/bg.po", "status": 200, "warm_total_ms": {"max": 1.68, "median": 1.63, "min": 1.61, "n": 5}, "warm_ttfb_ms": {"max": 1.44, "median": 1.28, "min": 1.27, "n": 5}},
+    "blob-largest": {"bytes": 1757060, "cold": {"samples": [12.97, 13.2, 13.48], "total_ms": 13.2, "ttfb_ms": 12.34}, "path": "/r/git/blob/HEAD/po/bg.po", "status": 200, "warm_total_ms": {"max": 12.59, "median": 12.43, "min": 12.34, "n": 5}, "warm_ttfb_ms": {"max": 11.87, "median": 11.76, "min": 11.74, "n": 5}},
+    "commit-largest": {"bytes": 19141, "cold": {"samples": [6.45, 6.56, 6.99], "total_ms": 6.56, "ttfb_ms": 6.44}, "path": "/r/git/commit/50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7", "status": 200, "warm_total_ms": {"max": 0.74, "median": 0.64, "min": 0.6, "n": 5}, "warm_ttfb_ms": {"max": 0.73, "median": 0.64, "min": 0.6, "n": 5}},
+    "diff-fragment": {"bytes": 4232, "cold": {"samples": [2.73, 2.84, 2.87], "total_ms": 2.84, "ttfb_ms": 2.73}, "path": "/r/git/diff/50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7/0", "status": 200, "warm_total_ms": {"max": 2.69, "median": 2.66, "min": 2.64, "n": 5}, "warm_ttfb_ms": {"max": 2.69, "median": 2.66, "min": 2.63, "n": 5}},
+    "log": {"bytes": 47685, "cold": {"samples": [2.2, 2.38, 2.65], "total_ms": 2.38, "ttfb_ms": 2.2}, "path": "/r/git/log/HEAD", "status": 200, "warm_total_ms": {"max": 2.05, "median": 2.0, "min": 1.93, "n": 5}, "warm_ttfb_ms": {"max": 2.05, "median": 1.99, "min": 1.92, "n": 5}},
+    "overview": {"bytes": 144702, "cold": {"samples": [93.4, 94.3, 93.38], "total_ms": 93.4, "ttfb_ms": 93.34}, "path": "/r/git/", "status": 200, "warm_total_ms": {"max": 4.73, "median": 4.2, "min": 4.04, "n": 5}, "warm_ttfb_ms": {"max": 4.72, "median": 4.19, "min": 4.03, "n": 5}},
+    "refs": {"bytes": 14301, "cold": {"samples": [1.04, 1.16, 1.17], "total_ms": 1.16, "ttfb_ms": 1.03}, "path": "/r/git/refs", "status": 200, "warm_total_ms": {"max": 0.96, "median": 0.94, "min": 0.91, "n": 5}, "warm_ttfb_ms": {"max": 0.95, "median": 0.94, "min": 0.91, "n": 5}},
+    "search": {"bytes": 243912, "cold": {"samples": [57.23, 56.87, 60.44], "total_ms": 57.23, "ttfb_ms": 57.18}, "path": "/r/git/search?q=strbuf", "status": 200, "warm_total_ms": {"max": 1.1, "median": 0.86, "min": 0.83, "n": 5}, "warm_ttfb_ms": {"max": 1.08, "median": 0.84, "min": 0.79, "n": 5}},
+    "stats-overview": {"bytes": 126103, "cold": {"samples": [0.71, 1.06, 0.97], "total_ms": 0.97, "ttfb_ms": 0.7}, "path": "/r/git/stats", "status": 200, "warm_total_ms": {"max": 0.72, "median": 0.68, "min": 0.65, "n": 5}, "warm_ttfb_ms": {"max": 0.71, "median": 0.68, "min": 0.65, "n": 5}},
+    "stats/contributors": {"bytes": 92060, "cold": {"samples": [0.61, 0.68, 0.67], "total_ms": 0.67, "ttfb_ms": 0.61}, "path": "/r/git/stats/contributors", "status": 200, "warm_total_ms": {"max": 0.62, "median": 0.6, "min": 0.58, "n": 5}, "warm_ttfb_ms": {"max": 0.61, "median": 0.59, "min": 0.57, "n": 5}},
+    "stats/hotspots": {"bytes": 219104, "cold": {"samples": [0.8, 0.99, 0.89], "total_ms": 0.89, "ttfb_ms": 0.79}, "path": "/r/git/stats/hotspots", "status": 200, "warm_total_ms": {"max": 0.77, "median": 0.75, "min": 0.72, "n": 5}, "warm_ttfb_ms": {"max": 0.75, "median": 0.73, "min": 0.7, "n": 5}},
+    "stats/languages": {"bytes": 405829, "cold": {"samples": [1.39, 1.54, 1.53], "total_ms": 1.53, "ttfb_ms": 1.27}, "path": "/r/git/stats/languages", "status": 200, "warm_total_ms": {"max": 1.45, "median": 1.45, "min": 1.32, "n": 5}, "warm_ttfb_ms": {"max": 1.32, "median": 1.28, "min": 1.26, "n": 5}},
+    "stats/ownership": {"bytes": 32325, "cold": {"samples": [0.52, 0.62, 0.59], "total_ms": 0.59, "ttfb_ms": 0.51}, "path": "/r/git/stats/ownership", "status": 200, "warm_total_ms": {"max": 0.62, "median": 0.53, "min": 0.49, "n": 5}, "warm_ttfb_ms": {"max": 0.62, "median": 0.53, "min": 0.49, "n": 5}},
+    "tree-deep": {"bytes": 14952, "cold": {"samples": [1.48, 1.69, 1.59], "total_ms": 1.59, "ttfb_ms": 1.47}, "path": "/r/git/tree/HEAD/t/unit-tests/clar/test/suites/resources/test", "status": 200, "warm_total_ms": {"max": 0.57, "median": 0.53, "min": 0.51, "n": 5}, "warm_ttfb_ms": {"max": 0.57, "median": 0.53, "min": 0.51, "n": 5}},
+    "tree-root": {"bytes": 141516, "cold": {"samples": [3.88, 4.37, 4.49], "total_ms": 4.37, "ttfb_ms": 3.86}, "path": "/r/git/tree/HEAD", "status": 200, "warm_total_ms": {"max": 0.81, "median": 0.8, "min": 0.73, "n": 5}, "warm_ttfb_ms": {"max": 0.8, "median": 0.79, "min": 0.72, "n": 5}}
+   },
+   "probe": {
+    "blame": "po/bg.po",
+    "blob": "po/bg.po",
+    "commit": "50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7",
+    "deep_tree": "t/unit-tests/clar/test/suites/resources/test"
+   },
+   "sha": "50fe5cc63f9cd6e89b87a2c9ccf96a444f4cfdb7"
+  },
+  "rust": {
+   "budget": {
+    "footprint_idle_mb": {"limit": 48, "status": "pass", "value": 9.8},
+    "idle_cpu_pct": {"limit": 1, "status": "pass", "value": 0.07},
+    "index_secs": {"limit": 2400, "max": 198.96, "min": 191.41, "phase": "stream", "status": "pass", "value": 192.77},
+    "page_cold_ms": {"limit": 10000, "max": 1391.62, "min": 1362.68, "status": "pass", "value": 1387.2},
+    "page_warm_ms": {"limit": 300, "page": "diff-fragment", "status": "pass", "value": 30.21},
+    "ready_secs": {"limit": 2400, "max": 204.13, "min": 196.29, "phase": "stream", "status": "pass", "value": 197.69},
+    "rss_mb": {"limit": 6000, "phase": "unknown", "status": "pass", "value": 999.0}
+   },
+   "class": "large",
+   "cold_samples": 3,
+   "config": "empty config.toml, no actions.toml",
+   "export": {
+    "commits": 500,
+    "ok": true,
+    "out_mb": 2052.23,
+    "samples": [493.83],
+    "secs": 493.83
+   },
+   "idle": {
+    "cpu_pct": 0.07,
+    "cpu_pct_events_client": 0.02,
+    "secs": 60
+   },
+   "index": {
+    "cache_mb": 290.06,
+    "peak_child_footprint_mb": 999.0,
+    "peak_footprint_mb": 498.0,
+    "peak_rss_mb": 618.78,
+    "phases": [{"busy": null, "cpu_secs": 0.27, "name": "rev_list", "secs": 0.27}, {"busy": null, "cpu_secs": 0.11, "name": "held", "secs": 0.11}, {"busy": 0.37, "cpu_secs": 615.3, "name": "stream", "secs": 188.89}, {"busy": null, "cpu_secs": null, "name": "stream.fold", "secs": 4.42}, {"busy": null, "cpu_secs": 0.73, "name": "finish", "secs": 0.86}, {"busy": 0.35, "cpu_secs": 5.23, "name": "messages", "secs": 0.98}, {"busy": null, "cpu_secs": 0.0, "name": "tip", "secs": 0.0}],
+    "ready_samples": [196.29, 197.69, 204.13],
+    "ready_secs": 197.69,
+    "samples": [191.41, 192.77, 198.96],
+    "secs": 192.77
+   },
+   "load": {
+    "limit": 5.0,
+    "phases": {"export": 3.4, "idle": 3.9, "index": 4.05, "index#2": 2.94, "index#3": 3.92, "pages": 4.14, "pages#2": 4.33, "pages#3": 3.77},
+    "sampled": {"export": {"max": 5.08, "mean": 1.79, "n": 102}, "idle": {"max": 2.22, "mean": 1.64, "n": 25}, "index": {"max": 2.68, "mean": 1.5, "n": 40}, "index#2": {"max": 4.76, "mean": 1.86, "n": 41}, "index#3": {"max": 4.79, "mean": 2.53, "n": 41}, "pages": {"max": 2.1, "mean": 2.0, "n": 2}, "pages#2": {"max": 1.61, "mean": 1.45, "n": 2}, "pages#3": {"max": 1.51, "mean": 1.51, "n": 1}}
+   },
+   "memory": {
+    "footprint_after_pages_mb": 114.0,
+    "footprint_idle_mb": 15.0,
+    "footprint_releases": 2,
+    "footprint_start_mb": 5.2,
+    "rss_after_index_mb": 283.69,
+    "rss_after_pages_mb": 256.5,
+    "rss_idle_mb": 157.66
+   },
+   "pages": {
+    "blame-long-history": {"bytes": 611833, "cold": {"samples": [620.89, 605.21, 607.22], "total_ms": 607.22, "ttfb_ms": 620.59}, "path": "/r/rust/blame/HEAD/library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs", "status": 200, "warm_total_ms": {"max": 1.54, "median": 1.39, "min": 1.35, "n": 5}, "warm_ttfb_ms": {"max": 1.25, "median": 1.07, "min": 1.02, "n": 5}},
+    "blob-largest": {"bytes": 2390587, "cold": {"samples": [17.01, 16.14, 16.29], "total_ms": 16.29, "ttfb_ms": 15.6}, "path": "/r/rust/blob/HEAD/library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs", "status": 200, "warm_total_ms": {"max": 17.42, "median": 16.55, "min": 16.43, "n": 5}, "warm_ttfb_ms": {"max": 16.26, "median": 15.51, "min": 15.31, "n": 5}},
+    "commit-largest": {"bytes": 86382, "cold": {"samples": [77.04, 71.89, 71.32], "total_ms": 71.89, "ttfb_ms": 77.01}, "path": "/r/rust/commit/f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8", "status": 200, "warm_total_ms": {"max": 1.76, "median": 1.36, "min": 1.3, "n": 5}, "warm_ttfb_ms": {"max": 1.75, "median": 1.36, "min": 1.29, "n": 5}},
+    "diff-fragment": {"bytes": 14446, "cold": {"samples": [29.48, 29.0, 29.38], "total_ms": 29.38, "ttfb_ms": 29.47}, "path": "/r/rust/diff/f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8/0", "status": 200, "warm_total_ms": {"max": 31.34, "median": 30.21, "min": 29.07, "n": 5}, "warm_ttfb_ms": {"max": 31.33, "median": 30.2, "min": 29.04, "n": 5}},
+    "log": {"bytes": 47411, "cold": {"samples": [4.12, 3.69, 3.75], "total_ms": 3.75, "ttfb_ms": 4.11}, "path": "/r/rust/log/HEAD", "status": 200, "warm_total_ms": {"max": 4.7, "median": 4.23, "min": 3.78, "n": 5}, "warm_ttfb_ms": {"max": 4.69, "median": 4.22, "min": 3.77, "n": 5}},
+    "overview": {"bytes": 32521, "cold": {"samples": [860.89, 846.99, 848.69], "total_ms": 848.69, "ttfb_ms": 860.88}, "path": "/r/rust/", "status": 200, "warm_total_ms": {"max": 6.0, "median": 4.92, "min": 4.37, "n": 5}, "warm_ttfb_ms": {"max": 5.99, "median": 4.91, "min": 4.36, "n": 5}},
+    "refs": {"bytes": 14381, "cold": {"samples": [2.45, 1.41, 1.66], "total_ms": 1.66, "ttfb_ms": 2.45}, "path": "/r/rust/refs", "status": 200, "warm_total_ms": {"max": 1.44, "median": 1.35, "min": 1.32, "n": 5}, "warm_ttfb_ms": {"max": 1.44, "median": 1.35, "min": 1.32, "n": 5}},
+    "search": {"bytes": 299814, "cold": {"samples": [98.53, 93.12, 92.72], "total_ms": 93.12, "ttfb_ms": 98.45}, "path": "/r/rust/search?q=Option", "status": 200, "warm_total_ms": {"max": 1.43, "median": 1.25, "min": 1.16, "n": 5}, "warm_ttfb_ms": {"max": 1.33, "median": 1.13, "min": 1.05, "n": 5}},
+    "stats-overview": {"bytes": 117968, "cold": {"samples": [487.58, 474.08, 474.22], "total_ms": 474.22, "ttfb_ms": 487.57}, "path": "/r/rust/stats", "status": 200, "warm_total_ms": {"max": 1.04, "median": 0.81, "min": 0.75, "n": 5}, "warm_ttfb_ms": {"max": 1.04, "median": 0.8, "min": 0.75, "n": 5}},
+    "stats/contributors": {"bytes": 87781, "cold": {"samples": [55.34, 53.17, 53.41], "total_ms": 53.41, "ttfb_ms": 55.33}, "path": "/r/rust/stats/contributors", "status": 200, "warm_total_ms": {"max": 0.95, "median": 0.76, "min": 0.75, "n": 5}, "warm_ttfb_ms": {"max": 0.94, "median": 0.76, "min": 0.74, "n": 5}},
+    "stats/hotspots": {"bytes": 273978, "cold": {"samples": [339.01, 327.08, 334.66], "total_ms": 334.66, "ttfb_ms": 338.94}, "path": "/r/rust/stats/hotspots", "status": 200, "warm_total_ms": {"max": 2.83, "median": 1.06, "min": 1.0, "n": 5}, "warm_ttfb_ms": {"max": 2.69, "median": 0.96, "min": 0.9, "n": 5}},
+    "stats/languages": {"bytes": 436074, "cold": {"samples": [1391.62, 1387.2, 1362.68], "total_ms": 1387.2, "ttfb_ms": 1391.51}, "path": "/r/rust/stats/languages", "status": 200, "warm_total_ms": {"max": 1.71, "median": 1.6, "min": 1.42, "n": 5}, "warm_ttfb_ms": {"max": 1.52, "median": 1.47, "min": 1.31, "n": 5}},
+    "stats/ownership": {"bytes": 32359, "cold": {"samples": [83.51, 79.89, 80.0], "total_ms": 80.0, "ttfb_ms": 83.49}, "path": "/r/rust/stats/ownership", "status": 200, "warm_total_ms": {"max": 0.78, "median": 0.68, "min": 0.63, "n": 5}, "warm_ttfb_ms": {"max": 0.77, "median": 0.67, "min": 0.63, "n": 5}},
+    "tree-deep": {"bytes": 15940, "cold": {"samples": [2.42, 2.47, 2.45], "total_ms": 2.45, "ttfb_ms": 2.41}, "path": "/r/rust/tree/HEAD/src/tools/rustfmt/tests/cargo-fmt/source/workspaces/path-dep-above/ws/a/d/f/src", "status": 200, "warm_total_ms": {"max": 0.75, "median": 0.66, "min": 0.61, "n": 5}, "warm_ttfb_ms": {"max": 0.74, "median": 0.66, "min": 0.6, "n": 5}},
+    "tree-root": {"bytes": 28870, "cold": {"samples": [3.16, 3.04, 3.03], "total_ms": 3.04, "ttfb_ms": 3.15}, "path": "/r/rust/tree/HEAD", "status": 200, "warm_total_ms": {"max": 0.76, "median": 0.72, "min": 0.68, "n": 5}, "warm_ttfb_ms": {"max": 0.76, "median": 0.71, "min": 0.67, "n": 5}}
+   },
+   "probe": {
+    "blame": "library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+    "blob": "library/stdarch/crates/core_arch/src/aarch64/neon/generated.rs",
+    "commit": "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8",
+    "deep_tree": "src/tools/rustfmt/tests/cargo-fmt/source/workspaces/path-dep-above/ws/a/d/f/src"
+   },
+   "sha": "f90a2d27c2a1e18f10f4fd84c0dcd02710c37de8"
+  }
+ },
+ "runs": 5,
+ "when": "2026-11-22"
+}
