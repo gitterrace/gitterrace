@@ -1,4 +1,5 @@
 // The log's one filter field. Imported by browser-check.mjs, not run alone.
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -8,9 +9,8 @@ export function checks(env) {
   // shows one chip per term; a chip's cross removes its term alone; a refused filter keeps its
   // text with the reason under the field; the head has no Compare and nothing scrolls sideways.
   async function logFilter() {
-    for (const name of browsers) {
-      for (const js of [true, false]) {
-        const { b, ctx } = await context(name, { javaScriptEnabled: js });
+    for (const js of [true, false]) {
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const width of [1440, 390]) {
           const where = `log-filter ${name} ${js ? 'js' : 'no-js'} ${width}`;
@@ -59,8 +59,7 @@ export function checks(env) {
             else r.fail(`${where}: ${JSON.stringify(got)}`);
           } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
         }
-        await b.close();
-      }
+      }, { javaScriptEnabled: js });
     }
   }
   // The "?" at the field's right end opens a short help that lists every keyword, with and
@@ -68,9 +67,8 @@ export function checks(env) {
   // closes it (script only: without script a details only toggles).
   async function logFilterHelp() {
     const names = ['type', 'scope', 'author', 'path', 'after', 'before', 'merge'];
-    for (const name of browsers) {
-      for (const js of [true, false]) {
-        const { b, ctx } = await context(name, { javaScriptEnabled: js });
+    for (const js of [true, false]) {
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const width of [1440, 390]) {
           const where = `log-filter-help ${name} ${js ? 'js' : 'no-js'} ${width}`;
@@ -122,8 +120,7 @@ export function checks(env) {
             }
           } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
         }
-        await b.close();
-      }
+      }, { javaScriptEnabled: js });
     }
   }
   return { logFilter, logFilterHelp };

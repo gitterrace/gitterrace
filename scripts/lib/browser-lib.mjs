@@ -17,6 +17,10 @@ export const RESCAN_SECS = 5;
 /** How long a working tree change may take to show: the documented rescan bound plus a margin. */
 export const WATCH_BOUND_MS = (RESCAN_SECS + 5) * 1000;
 
+/** The insights pages, one per tab of the /stats row. */
+export const STATS = ['/stats', '/stats/hotspots', '/stats/contributors', '/stats/ownership',
+  '/stats/languages'];
+
 export const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 
 /** How to get the browser check dependencies, named in every early failure. */
@@ -195,6 +199,35 @@ export async function sweep(opts, fn) {
         }
       }
     }
+    await b.close();
+  }
+}
+
+/**
+ * Relative luminance of a CSS color: an [r, g, b] array in 0-255, or an `rgb()` or
+ * `color(srgb ...)` string as getComputedStyle prints it.
+ */
+export function lum(c) {
+  const k = typeof c === 'string' && c.startsWith('color(') ? 255 : 1;
+  const v = typeof c === 'string' ? (c.match(/[\d.]+/g) || []).map((x) => Number(x) * k) : c;
+  const f = (x) => ((x /= 255) <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * f(v[0]) + 0.7152 * f(v[1]) + 0.0722 * f(v[2]);
+}
+
+/** Runs `fn(ctx, name, opts)` in a fresh context of each browser, closing the browser after it. */
+export async function eachBrowser(browsers, context, fn, opts) {
+  for (const name of browsers) {
+    const { b, ctx } = await context(name, opts);
+    await fn(ctx, name);
+    await b.close();
+  }
+}
+
+/** Runs `fn(browser, name)` in a freshly launched browser of each name, closing it after. */
+export async function eachLaunch(pw, browsers, fn) {
+  for (const name of browsers) {
+    const b = await launch(pw, name);
+    await fn(b, name);
     await b.close();
   }
 }

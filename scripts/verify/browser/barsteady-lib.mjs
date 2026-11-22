@@ -1,6 +1,6 @@
 // No button in the site's top bar moves. Imported by scripts/verify/browser/browser-check.mjs.
 import { serve, pages } from './sitebar-lib.mjs';
-import { launch } from '../../lib/browser-lib.mjs';
+import { eachLaunch } from '../../lib/browser-lib.mjs';
 
 const WIDTHS = [390, 600, 768, 1024, 1280];
 const SLACK = 0.5;
@@ -41,8 +41,7 @@ export function checks(env) {
     const { server, url } = await serve();
     const all = pages().filter((p) => p === '/' || (p.startsWith('/docs/') && p !== '/docs/'));
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         for (const scheme of ['light', 'dark']) {
           for (const width of WIDTHS) {
             const viewport = { width, height: 900 };
@@ -98,8 +97,7 @@ export function checks(env) {
             await ctx.close();
           }
         }
-        await b.close();
-      }
+      });
     } finally { server.close(); }
   }
 

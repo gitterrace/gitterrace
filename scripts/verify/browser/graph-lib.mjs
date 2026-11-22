@@ -5,7 +5,7 @@
 import { mkdtempSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh, serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, sh, serve } from '../../lib/browser-lib.mjs';
 
 /** Branches open at once in the fixture: more than a narrow screen shows. */
 const OPEN = 5;
@@ -162,8 +162,7 @@ export function checks(env) {
   async function graphView() {
     const srv = await serve(bin, wideRepo());
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const width of [390, 1440]) {
           const where = `graph-view ${name} ${width}`;
@@ -205,15 +204,13 @@ export function checks(env) {
             else r.ok(`${where}: switching to ${to} keeps the page at the top`);
           }
         }
-        await b.close();
-      }
+      });
     } finally {
       srv.stop();
     }
     const lin = await serve(bin, linearRepo());
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         await p.setViewportSize({ width: 1280, height: 900 });
         await p.goto(lin.base + '/log/HEAD?view=graph', { waitUntil: 'load' });
@@ -223,15 +220,13 @@ export function checks(env) {
         if (z.cell > 2 * LANE) r.fail(`${where}: cell ${z.cell}px wide for one lane`);
         else if (z.gap > 6 * LANE) r.fail(`${where}: ${z.gap}px of empty gutter beside the lane`);
         else r.ok(`${where}: one lane gets a ${z.cell}px cell and a ${z.gap}px gutter`);
-        await b.close();
-      }
+      });
     } finally {
       lin.stop();
     }
     const fan = await serve(bin, wideRepo(FAN));
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const width of [390, 1440]) {
           const where = `graph-view ${name} ${width} ${FAN}-branch fan-in`;
@@ -245,8 +240,7 @@ export function checks(env) {
           if (m.rep.length) r.fail(`${where}: ${m.rep.length} "+N" repeat the row above: ${rep}`);
           else r.ok(`${where}: a "+N" count shows only where it changes`);
         }
-        await b.close();
-      }
+      });
     } finally {
       fan.stop();
     }

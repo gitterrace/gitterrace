@@ -4,7 +4,7 @@ import { readFileSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { root, launch, makeRepo, sh } from '../../lib/browser-lib.mjs';
+import { eachLaunch, eachBrowser, root, launch, makeRepo, sh } from '../../lib/browser-lib.mjs';
 import { serve } from './sitebar-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
@@ -15,8 +15,7 @@ async function markSeam() {
     .filter((f) => /^mark-(light|dark)\.svg$/.test(f))
     .map((f) => ({ name: f, svg: readFileSync(join(root, 'docs/brand', f), 'utf8') }));
   const sizes = [16, 19, 21, 23, 27, 31, 37, 45, 53, 61, 77, 101, 133];
-  for (const browser of browsers) {
-    const b = await launch(pw, browser);
+  await eachLaunch(pw, browsers, async (b, browser) => {
     for (const m of marks) {
       const bg = m.name.includes('dark') ? '#1e2023' : '#ffffff';
       const src = 'data:image/svg+xml,' + encodeURIComponent(m.svg);
@@ -59,15 +58,13 @@ async function markSeam() {
         await p.close();
       }
     }
-    await b.close();
-  }
+  });
 }
 
 // The overview's About box: one place per layout, never moving between nearby widths. With two
 // columns it is beside the files, with one it is above them, never below.
 async function aboutPlace() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     for (const width of [1440, 1200, 1101, 1100, 1000, 900, 861, 860, 760, 600, 375, 320]) {
       await p.setViewportSize({ width, height: 900 });
@@ -83,8 +80,7 @@ async function aboutPlace() {
       else if (m.beside || m.above) r.ok(`about-place ${where}: ${m.beside ? 'beside' : 'above'} the files`);
       else r.fail(`about-place ${where}: About is below the files`);
     }
-    await b.close();
-  }
+  });
 }
 
 async function siteTheme() {
@@ -100,8 +96,7 @@ async function siteTheme() {
     return { theme: document.documentElement.dataset.theme || 'system', logo: shown('.hero h1 img'), pic: img, media, shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
   });
   try {
-    for (const browser of browsers) {
-      const b = await launch(pw, browser);
+    await eachLaunch(pw, browsers, async (b, browser) => {
       for (const scheme of ['light', 'dark']) {
         const where = `${browser} ${scheme} system`;
         const ctx = await b.newContext({ colorScheme: scheme, viewport: { width: 1100, height: 900 } });
@@ -182,8 +177,7 @@ async function siteTheme() {
         }
         await ctx.close();
       }
-      await b.close();
-    }
+    });
   } finally { server.close(); }
 }
 // An export opened from disk (a file:// URL, no server): the forwarding index lands on the
@@ -262,8 +256,7 @@ async function installTabs() {
   const { server, url: root_ } = await serve(false);
   const url = `${root_}/`;
   try {
-    for (const browser of browsers) {
-      const b = await launch(pw, browser);
+    await eachLaunch(pw, browsers, async (b, browser) => {
       for (const scheme of ['light', 'dark']) for (const width of [390, 1440]) {
         const where = `install-tabs ${browser} ${scheme} ${width}`;
         const ctx = await b.newContext({ colorScheme: scheme, viewport: { width, height: 900 } });
@@ -322,8 +315,7 @@ async function installTabs() {
           r.fail(`${where}: ${String(e.message).split('\n')[0]}`);
         } finally { await ctx.close(); }
       }
-      await b.close();
-    }
+    });
   } finally { server.close(); }
 }
 // The repository switcher of an export of two repositories, opened from disk: it shows, ticks

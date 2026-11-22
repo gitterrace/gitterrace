@@ -1,4 +1,6 @@
 // The Send to window and image diffs, as a reader meets them. Imported by
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
@@ -8,8 +10,7 @@ export function checks(env) {
   // The window names itself and its fields, closes with Cancel, and on a phone sits along the
   // bottom edge with its footer in view.
   async function sendDialog() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       for (const width of [1440, 390]) {
         await p.setViewportSize({ width, height: 800 });
@@ -48,8 +49,7 @@ export function checks(env) {
         if (await p.$('.ov.send')) r.fail(`${where}: Cancel left the window open`);
         else r.ok(`${where}: Cancel closes`);
       }
-      await b.close();
-    }
+    });
   }
   return { sendDialog };
 }

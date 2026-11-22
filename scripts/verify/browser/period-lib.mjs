@@ -1,12 +1,8 @@
 // The period picker of the insights pages. Imported by browser-check.mjs, not run alone.
 
-const PAGES = [
-  '/stats',
-  '/stats/hotspots',
-  '/stats/ownership',
-  '/stats/contributors',
-  '/stats/languages',
-];
+import { STATS, eachBrowser } from '../../lib/browser-lib.mjs';
+
+const PAGES = STATS;
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -16,8 +12,7 @@ export function checks(env) {
   // lands with Week as the current period. A link form the page or its memo ignores lands
   // on All.
   async function periodClick() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const page of PAGES) {
         const where = `period-click ${name} ${page}`;
         const p = await ctx.newPage();
@@ -38,15 +33,13 @@ export function checks(env) {
         }
         await p.close();
       }
-      await b.close();
-    }
+    });
   }
 
   // Dragging over the lines-of-code chart sets the range and redraws the chart on just that
   // span: the plotted commits run from the first dragged position to the last.
   async function rangeGraph() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const where = `range-graph ${name}`;
       const p = await ctx.newPage();
       await p.setViewportSize({ width: 1400, height: 700 });
@@ -56,8 +49,7 @@ export function checks(env) {
       const box = await p.locator('#loc').boundingBox();
       if (!box || before.i.length < 3) {
         r.fail(`${where}: no chart with enough commits (${before.i.length})`);
-        await b.close();
-        continue;
+        return;
       }
       const y = box.y + box.height / 2;
       await p.mouse.move(box.x + box.width * 0.5, y);
@@ -83,8 +75,7 @@ export function checks(env) {
       if (got.x1 - got.x0 > 800) r.ok(`${where}: the range fills the plot`);
       else r.fail(`${where}: the range spans ${got.x1 - got.x0}px of the plot`);
       await p.close();
-      await b.close();
-    }
+    });
   }
 
   return { periodClick, rangeGraph };

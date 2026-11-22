@@ -1,4 +1,6 @@
 // Layout shift between page kinds: moving from one page to another must not move the header,
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // its nav, the content's left edge, the top of the first block or the title inside a head row.
 // Every page kind is measured in the same boxes and compared with the first page walked. The
 // walk reads the nav and the insights tab row, so a new tab is covered without touching the
@@ -59,8 +61,7 @@ export function checks(env) {
     };
   }
   async function layoutShift() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       const all = await pages(p);
       for (const scheme of ['light', 'dark']) for (const width of [1440, 390]) {
@@ -99,8 +100,7 @@ export function checks(env) {
         bad.length ? r.fail(`${where} (${against}): ${bad.join('; ')}`)
           : r.ok(`${where}: ${n} page kinds, header, nav, edge, first block and title hold still`);
       }
-      await b.close();
-    }
+    });
   }
   /**
    * In the page: head-row faults. Every visible child of a head row that is or holds a control
@@ -138,8 +138,7 @@ export function checks(env) {
   }
   async function headAlignCheck() {
     const CTL = 'a[href], button, input:not([type=hidden]), select, summary';
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       const all = await pages(p);
       // The log's switch and Compare link only show with a rev and the graph view.
@@ -156,8 +155,7 @@ export function checks(env) {
         bad.length ? r.fail(`${where}: ${bad.join('; ')}`)
           : r.ok(`${where}: every head row's controls share one centre`);
       }
-      await b.close();
-    }
+    });
   }
   return { layoutShift, headAlign: headAlignCheck };
 }

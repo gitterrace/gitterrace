@@ -3,7 +3,7 @@
 import { writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {
@@ -14,8 +14,7 @@ export function checks(env) {
     writeFileSync(join(dir, 'menu-outline.md'), '# Doc\n\n' + Array.from({ length: 12 }, (_, i) => `## Head ${i}\n\ntext\n`).join('\n'));
     commitAll(dir, 'docs: menu outline fixture');
     await new Promise((ok) => setTimeout(ok, 600));
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       await p.setViewportSize({ width: 900, height: 800 });
       for (const path of ['/blob/HEAD/menu-outline.md']) {
@@ -34,8 +33,7 @@ export function checks(env) {
           else r.fail(`${where}: ${JSON.stringify({ ...v, ...esc })}`);
         } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
       }
-      await b.close();
-    }
+    });
   }
   // A source file's symbols: at 1440 px a rail beside the code, below the pinned path bar; at
   // 390 px no rail, a menu in the path bar inside the viewport. A link selects its line and
@@ -65,8 +63,7 @@ export function checks(env) {
       const d = document.documentElement;
       return d.scrollWidth - d.clientWidth;
     });
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       for (const width of [1440, 390]) {
         const where = `symbols ${name} ${width}`;
@@ -118,8 +115,7 @@ export function checks(env) {
           else r.fail(`${where}: ${JSON.stringify(v)}`);
         } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
       }
-      await b.close();
-    }
+    });
   }
   // A long source file opened at #L<n> in the middle lights the symbol that holds n, and still
   // does after scrolling up and down. The page swaps its code chunks once the highlighted copy
@@ -137,8 +133,7 @@ export function checks(env) {
     const lit = (p) => p.evaluate(
       () => [...document.querySelectorAll('.outline.rail a.on')].map((a) => a.getAttribute('href')),
     );
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       for (const [width, height] of [[1440, 800], [1440, 1200]]) {
         const where = `outline-current ${name} ${width}x${height}`;
@@ -176,8 +171,7 @@ export function checks(env) {
           else r.fail(`${where}: want ${want}, got ${JSON.stringify(seen)}`);
         } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
       }
-      await b.close();
-    }
+    });
   }
   return { outlineMenu, symbols, outlineCurrent };
 }

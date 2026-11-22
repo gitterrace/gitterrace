@@ -1,6 +1,6 @@
 // The docs menus on a narrow screen, and the bar that must not move. Imported by browser-check.mjs.
 import { serve, pages } from './sitebar-lib.mjs';
-import { launch } from '../../lib/browser-lib.mjs';
+import { eachLaunch } from '../../lib/browser-lib.mjs';
 import { checks as steadyChecks } from './barsteady-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, r, browsers, ...) */
@@ -15,8 +15,7 @@ export function checks(env) {
     const { server, url } = await serve();
     const all = pages().filter((p) => p.startsWith('/docs/') && p !== '/docs/');
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         const ctx = await b.newContext({ viewport: { width: 390, height: 900 } });
         const p = await ctx.newPage();
         const bad = [];
@@ -68,8 +67,7 @@ export function checks(env) {
         else r.ok(`${where}: one Docs control on ${all.length} pages, ${outlined} outlines clear`
           + ' of the h1, both menus open and close by keyboard');
         await ctx.close();
-        await b.close();
-      }
+      });
     } finally { server.close(); }
   }
 

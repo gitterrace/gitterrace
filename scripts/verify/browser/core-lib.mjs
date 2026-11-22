@@ -3,7 +3,7 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh, sweep, commitFiles } from '../../lib/browser-lib.mjs';
+import { eachBrowser, STATS, sh, sweep, commitFiles } from '../../lib/browser-lib.mjs';
 import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
@@ -145,14 +145,7 @@ async function tabsOneLine() {
 // and 1440 px, each control shows either one row of choices or its native select, never a
 // second row and never wider than the page.
 async function segOneRow() {
-  const paths = [
-    '/stats',
-    '/stats/contributors',
-    '/stats/hotspots',
-    '/stats/ownership',
-    '/stats/languages',
-    '/blob/HEAD/README.md',
-  ];
+  const paths = [...STATS, '/blob/HEAD/README.md'];
   const sw = { browsers, context, widths: [1440, 360], height: 700, items: paths };
   await sweep(sw, async (p, { name, scheme, width, item: path }) => {
     await p.goto(srv.base + path, { waitUntil: 'load' });
@@ -198,8 +191,7 @@ async function segOneRow() {
 // Tab levels: a page's own tabs never share the header nav's type, and every insights page is
 // one tab of the row: no More, and the open tab is marked in place.
 async function tabLevels() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     for (const width of [1440, 900]) {
       const p = await ctx.newPage();
       await p.setViewportSize({ width, height: 600 });
@@ -230,16 +222,14 @@ async function tabLevels() {
       r.verdict(where, bad, `two tab levels, every tab in the row`, ', ');
       await p.close();
     }
-    await b.close();
-  }
+  });
 }
 // Period steady: the period control sits in one place whatever the filters are. With no
 // filter, a period, and a period plus a path chip, its box starts at the same x and y, at 360
 // and 1400 px, so choosing a period never moves the control under the pointer; and the chips
 // row comes last, below the counting line, at both widths.
 async function periodSteady() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     for (const width of [1400, 360]) {
       const at = [];
       for (const q of ['', '?period=1w', '?period=1w&q=path%3Asrc']) {
@@ -285,8 +275,7 @@ async function periodSteady() {
       }
       r.verdict(where, bad, `the control stays at ${at[0].x},${at[0].y}`, ', ');
     }
-    await b.close();
-  }
+  });
 }
 // Sticky heads: on a commit with three 300-line files, scrolled halfway into the second, its
 // header is pinned at the top and the first's is not; a #L120 link on a source page lands

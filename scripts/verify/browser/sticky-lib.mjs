@@ -5,6 +5,7 @@
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [
@@ -45,8 +46,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
 
   async function stickyLine() {
     await seed();
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const scheme of ['light', 'dark']) for (const width of [1400, 900]) for (const v of VIEWS) {
         if (v.name === 'table' && width < 1101) continue;
         const p = await ctx.newPage();
@@ -138,8 +138,7 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
         r.verdict(where, bad);
         await p.close();
       }
-      await b.close();
-    }
+    });
   }
   return { stickyLine };
 }

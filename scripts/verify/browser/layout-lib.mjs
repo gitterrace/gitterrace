@@ -3,7 +3,7 @@
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, STATS, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (dir, srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -12,8 +12,7 @@ export function checks(env) {
 // line: a trigger that is a pixel shorter or lower than its neighbours reads as a different
 // control. The commit page in light and dark, after the actions script added its trigger.
 async function inlineControls() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     for (const scheme of ['light', 'dark']) {
       const p = await ctx.newPage();
       await p.emulateMedia({ colorScheme: scheme });
@@ -35,16 +34,14 @@ async function inlineControls() {
       r.verdict(where, bad, `${m.length} controls, one size on one line`);
       await p.close();
     }
-    await b.close();
-  }
+  });
 }
 // Every section head on the insights pages keeps space above it: a heading flush against the
 // table before it reads as that table's footer. Sections folded into a page (types and
 // frequency in Activity, patterns in Hotspots) follow the same rule as the page's own.
 async function sectionGaps() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
-    for (const path of ['/stats', '/stats/hotspots', '/stats/contributors', '/stats/ownership', '/stats/languages']) {
+  await eachBrowser(browsers, context, async (ctx, name) => {
+    for (const path of STATS) {
       const p = await ctx.newPage();
       await p.setViewportSize({ width: 1400, height: 800 });
       await p.goto(srv.base + path, { waitUntil: 'load' });
@@ -58,8 +55,7 @@ async function sectionGaps() {
       tight.length ? r.fail(`${where}: ${tight.slice(0, 4).join('; ')}`) : r.ok(`${where}: every section head has room above it`);
       await p.close();
     }
-    await b.close();
-  }
+  });
 }
 // A file path in a table cell breaks only after a slash, never inside a name: gitterrace-web
 // split as "gitterrace-" and "web" reads as two files. Every path cell on the insights pages
@@ -77,8 +73,7 @@ async function pathCells() {
   }
   await new Promise((ok) => setTimeout(ok, 1500));
   const pages = ['/stats/hotspots', '/stats/ownership'];
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     for (const width of [1440, 900, 360]) for (const path of pages) {
       const p = await ctx.newPage();
       await p.setViewportSize({ width, height: 700 });
@@ -107,8 +102,7 @@ async function pathCells() {
       r.verdict(where, bad, `paths break only after a slash`);
       await p.close();
     }
-    await b.close();
-  }
+  });
 }
 
 // The working tree's "View file" links form one column beside the counts, whatever the path
@@ -123,8 +117,7 @@ async function viewFileColumn() {
   writeFileSync(join(dir, files[1]), 'x\n'.repeat(2500));
   await new Promise((ok) => setTimeout(ok, 1500));
   try {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const width of [1440, 900]) {
         const p = await ctx.newPage();
         await p.setViewportSize({ width, height: 700 });
@@ -144,8 +137,7 @@ async function viewFileColumn() {
         else r.ok(`${where}: ${cells.length} links in one column`);
         await p.close();
       }
-      await b.close();
-    }
+    });
   } finally {
     sh(dir, 'git', 'checkout', '-q', '--', '.');
   }
@@ -158,8 +150,7 @@ async function codeRows() {
   writeFileSync(join(dir, 'rows.txt'), 'one\n\nthree\n');
   commitAll(dir, 'docs: rows with an empty line');
   await new Promise((ok) => setTimeout(ok, 600));
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     const seen = {};
     for (const [path, rows, num] of [['/blob/HEAD/rows.txt', '.src .l', '::before'],
@@ -180,8 +171,7 @@ async function codeRows() {
     const where = `code-rows ${name}`;
     if (bad.length) r.fail(`${where}: ${bad.slice(0, 3).join('; ')}`);
     else r.ok(`${where}: ${all.length} rows as tall as their numbers, one code size`);
-    await b.close();
-  }
+  });
 }
 
   return { inlineControls, sectionGaps, pathCells, codeRows, viewFileColumn };

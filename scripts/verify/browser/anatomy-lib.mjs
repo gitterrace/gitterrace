@@ -1,4 +1,6 @@
 // Page anatomy: every page opens with the one page head (pagehead.rs) and keeps its rhythm.
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // The head is main's first child; its slots come in one order (eyebrow, title row, tagline, tab
 // row or divider, toolbar); the page has one h1 and it is in the head; a tab row has two tabs
 // or more and is the page's only one; the tagline says something. Across every page the head
@@ -103,8 +105,7 @@ function order(slots) {
 
 export function checks({ srv, r, browsers, context }) {
   async function anatomy() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const scheme of ['light', 'dark']) for (const width of [1440, 390]) {
         // Every page keeps one title font; the first page's is the one the others must match.
         let first = null;
@@ -138,8 +139,7 @@ export function checks({ srv, r, browsers, context }) {
           r.verdict(where, bad);
         }
       }
-      await b.close();
-    }
+    });
   }
   return { anatomy };
 }

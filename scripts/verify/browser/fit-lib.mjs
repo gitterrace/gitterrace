@@ -3,7 +3,7 @@
 // with symbols and the built site's docs pages, at 1440, 900 and 360 px.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { existsSync, writeFileSync } from 'node:fs';
-import { sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, commitAll } from '../../lib/browser-lib.mjs';
 import { join } from 'node:path';
 import { serve, pages as sitePages } from './sitebar-lib.mjs';
 
@@ -94,8 +94,7 @@ export function checks(env) {
     insights: '/stats', hotspots: '/stats/hotspots',
   };
   async function walk(label, pages, fn) {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const width of WIDTHS) {
         const p = await ctx.newPage();
         await p.setViewportSize({ width, height: 900 });
@@ -113,8 +112,7 @@ export function checks(env) {
         }
         await p.close();
       }
-      await b.close();
-    }
+    });
   }
   /** A Markdown file with headings and a source file with symbols, so both rails are drawn. */
   let made = false;

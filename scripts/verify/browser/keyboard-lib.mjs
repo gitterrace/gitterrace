@@ -1,4 +1,6 @@
 // Keyboard and reflow checks over every page the goldens cover: a Tab walk with a visible ring
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // on every stop, 320 px reflow, WCAG 1.4.12 text spacing, 24 px targets, and the shortcut off
 // switch. Each list of known pages can only shrink: a page green everywhere fails until it is
 // dropped. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
@@ -39,8 +41,7 @@ export function checks(env) {
   /** Runs `probe` on every page in every browser. Findings per page key, against `known`. */
   async function sweep(name, known, setup, probe, arg) {
     const red = new Map();
-    for (const bname of browsers) {
-      const { b, ctx } = await context(bname);
+    await eachBrowser(browsers, context, async (ctx, bname) => {
       const p = await ctx.newPage();
       const all = await pages(p);
       await setup(p);
@@ -55,8 +56,7 @@ export function checks(env) {
         else if (known[key]) r.ok(`${where}: known, ${known[key]} fixes it (${found[0]})`);
         else r.fail(`${where}: ${found.slice(0, 5).join('; ')}`);
       }
-      await b.close();
-    }
+    });
     for (const [key, row] of Object.entries(known)) {
       if (!red.has(key)) r.fail(`${name}: known list names ${key}, which is not walked`);
       else if (!red.get(key).length) r.fail(`${name} ${key}: green now, drop it (${row})`);
@@ -223,16 +223,14 @@ export function checks(env) {
   // With the setting off, g/t/y/b/j/k/slash do nothing; ? still opens the sheet; in an input no
   // shortcut ever fires; the switch in the sheet turns them back on.
   async function keysOff() {
-    for (const bname of browsers) {
-      const { b, ctx } = await context(bname);
+    await eachBrowser(browsers, context, async (ctx, bname) => {
       const p = await ctx.newPage();
       await p.goto(srv.base + '/', { waitUntil: 'load' });
       await p.keyboard.press('?');
       const sw = await p.$('#keys-off');
       if (!sw) {
         r.fail(`keys-off ${bname}: no switch in the shortcut sheet`);
-        await b.close();
-        continue;
+        return;
       }
       await sw.check();
       await p.keyboard.press('Escape');
@@ -260,8 +258,7 @@ export function checks(env) {
       if (typed === 'gtby') {
         r.ok(`keys-off ${bname}: typing in the search box never fires a shortcut`);
       } else r.fail(`keys-off ${bname}: typed 'gtby', field holds '${typed}'`);
-      await b.close();
-    }
+    });
   }
   return { keyboardWalk, reflow, textSpacing, targets, keysOff };
 }

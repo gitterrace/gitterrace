@@ -8,7 +8,7 @@ import { execFileSync } from 'node:child_process';
 import { inflateSync } from 'node:zlib';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve } from '../../lib/browser-lib.mjs';
 
 /** Device pixels per CSS px for the ink screenshots, sub-pixel positions averaged, and the
  * most the ink above may differ from the ink below, in CSS px: a label is centered within a
@@ -227,8 +227,7 @@ export function checks(env) {
   async function insetBalance() {
     const srv = await serve(bin, oneLineRepo());
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name, { deviceScaleFactor: INK_SCALE });
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const scheme of ['light', 'dark']) {
           await p.emulateMedia({ colorScheme: scheme });
@@ -247,8 +246,7 @@ export function checks(env) {
           judge(`inset-balance ${name} ${scheme} title inset`, await p.evaluate(titleInsets));
           judge(`inset-balance ${name} ${scheme} label ink`, await labelInk(p));
         }
-        await b.close();
-      }
+      }, { deviceScaleFactor: INK_SCALE });
     } finally {
       srv.stop();
     }

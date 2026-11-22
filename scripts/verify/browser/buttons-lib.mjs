@@ -1,4 +1,6 @@
 // One button vocabulary, checked where readers meet it: on the log, a file, its blame, a
+
+import { eachBrowser, lum } from '../../lib/browser-lib.mjs';
 // Markdown file, settings (with a list's Add pressed) and the Send to window, in light and dark.
 // Every visible <button> looks at rest like a fresh button with the same variant classes
 // (secondary, .primary, .ghost, .danger) in the same spot, so no component paints its own; one
@@ -99,13 +101,6 @@ function read(id) {
   };
 }
 
-const lum = (c) => {
-  const [r, g, b] = c.slice(0, 3).map((v) => {
-    const x = v / 255;
-    return x <= 0.04045 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-};
 /** WCAG contrast of text `fg` (alpha blended over `bg`) on `bg`. */
 export function contrast(fg, bg) {
   const a = (fg[3] ?? 255) / 255;
@@ -119,8 +114,7 @@ export function checks(env) {
   const { srv, r, browsers, context } = env;
 
   async function buttons() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       for (const scheme of ['light', 'dark']) for (const [label, path, where, before] of PAGES) {
         const p = await ctx.newPage();
         const at = `buttons ${name} ${scheme} ${label}`;
@@ -174,8 +168,7 @@ export function checks(env) {
         } catch (e) { r.fail(`${at}: ${e.message.split('\n')[0]}`); }
         await p.close();
       }
-      await b.close();
-    }
+    });
   }
   return { buttons };
 }

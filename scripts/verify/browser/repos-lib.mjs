@@ -1,6 +1,6 @@
 // The filter on the repositories home. Imported by browser-check.mjs, not run alone.
 import { basename } from 'node:path';
-import { sh, makeRepo, serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, sh, makeRepo, serve } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, ...) */
 export function checks(env) {
@@ -21,8 +21,7 @@ export function checks(env) {
     }
     const target = basename(others[0]);
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const width of [1440, 390]) {
           const where = `repos-filter ${name} ${width}`;
@@ -83,8 +82,7 @@ export function checks(env) {
             }
           } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
         }
-        await b.close();
-      }
+      });
     } finally { one.stop(); }
   }
   return { reposFilter };

@@ -7,7 +7,7 @@
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { sh, serve, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, sh, serve, commitAll } from '../../lib/browser-lib.mjs';
 
 /** A repository with a source file of a few lines, one of them far wider than the card. */
 function hoverRepo() {
@@ -67,8 +67,7 @@ export function checks(env) {
     const on = await serve(bin, dir);
     const off = await serve(bin, dir, offCfg);
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const scheme of ['light', 'dark']) {
           await p.emulateMedia({ colorScheme: scheme });
@@ -93,8 +92,7 @@ export function checks(env) {
             else r.fail(`${where}: blame ${JSON.stringify(bl)}`);
           }
         }
-        await b.close();
-      }
+      });
     } finally {
       on.stop();
       off.stop();

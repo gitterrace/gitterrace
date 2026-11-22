@@ -1,4 +1,6 @@
 // Anchored popups stay usable when the page is scrolled. Imported by browser-check.mjs,
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // not run alone.
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
@@ -9,8 +11,7 @@ export function checks(env) {
   // button are off screen, then press `b` and `.`: each popup lies fully inside the viewport,
   // its focus is in the popup and a typed letter reaches the filter field.
   async function popupPlace() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       const where = `popup-place ${name}`;
       try {
@@ -58,8 +59,7 @@ export function checks(env) {
       } catch (e) {
         r.fail(`${where}: ${e.message.split('\n')[0]}`);
       }
-      await b.close();
-    }
+    });
   }
   // The finder, the sheet and Send to are a modal <dialog>; the pickers and the action menu
   // are a [popover]. A box in a plain backdrop div fails, whichever overlay it is.
@@ -67,8 +67,7 @@ export function checks(env) {
     /** @type {[string[], string][]} */
     const want = [[['t'], 'dialog'], [['?'], 'dialog'], [['.', 's'], 'dialog'],
       [['b'], 'popover'], [['.'], 'popover']];
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       await p.goto(srv.base + '/', { waitUntil: 'load' });
       const bad = [];
@@ -88,8 +87,7 @@ export function checks(env) {
       }
       if (!bad.length) r.ok(`overlay-native ${name}: dialogs are modal, menus are popovers`);
       else r.fail(`overlay-native ${name}: ${bad.join('; ')}`);
-      await b.close();
-    }
+    });
   }
 
   // With scripts off, Code and Preview still switch the README panes: radios and CSS only.

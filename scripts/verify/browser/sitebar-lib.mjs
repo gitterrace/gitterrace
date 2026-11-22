@@ -3,7 +3,7 @@
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { createServer } from 'node:http';
-import { root, launch } from '../../lib/browser-lib.mjs';
+import { eachLaunch, root, launch, lum } from '../../lib/browser-lib.mjs';
 
 const siteDir = join(root, 'target/site');
 const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp',
@@ -59,8 +59,7 @@ export function checks(env) {
     const { server, url } = await serve();
     const all = pages();
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         for (const scheme of ['light', 'dark']) {
           for (const width of [390, 1100, 1440]) {
             const viewport = { width, height: 900 };
@@ -73,16 +72,6 @@ export function checks(env) {
             for (const path of all) {
               await p.goto(url + path, { waitUntil: 'load' });
               const m = await p.evaluate(() => {
-                // rgb() in 0-255, or color(srgb ...) in 0-1 for a mixed, see-through bar.
-                const lum = (c) => {
-                  const k = c.startsWith('color(') ? 255 : 1;
-                  const [r, g, b] = (c.match(/[\d.]+/g) || []).map((v) => Number(v) * k);
-                  const f = (v) => {
-                    v /= 255;
-                    return v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-                  };
-                  return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-                };
                 const bars = document.querySelectorAll('header.top');
                 const top = bars[0];
                 if (!top) return { count: 0 };
@@ -106,8 +95,8 @@ export function checks(env) {
                     return s.borderBottomStyle !== 'none' && parseFloat(s.borderBottomWidth) >= 1
                       && c !== 'transparent' && (a === undefined || Number(a) > 0.5);
                   })(),
-                  bg: lum(getComputedStyle(top).backgroundColor),
-                  fg: lum(getComputedStyle(top.querySelector('.brand')).color),
+                  bg: getComputedStyle(top).backgroundColor,
+                  fg: getComputedStyle(top.querySelector('.brand')).color,
                   docs: inside('a[href="/docs/"]') || inside('.docsmenu>summary'),
                   gh: inside('.gh'), theme: inside('#theme'),
                   scroll: document.documentElement.scrollWidth - innerWidth,
@@ -140,11 +129,12 @@ export function checks(env) {
                 if (Math.abs(m.height - 57) > 1) why.push(`${m.height} px tall`);
                 if (!m.hair) why.push('no hairline under the bar at the top of the page');
                 const dark = scheme === 'dark';
-                if (dark ? m.bg > 0.1 : m.bg < 0.5) {
-                  why.push(`background luminance ${m.bg.toFixed(2)}, not ${scheme}`);
+                const [bg, fg] = [lum(m.bg), lum(m.fg)];
+                if (dark ? bg > 0.1 : bg < 0.5) {
+                  why.push(`background luminance ${bg.toFixed(2)}, not ${scheme}`);
                 }
-                if (dark ? m.fg < 0.5 : m.fg > 0.3) {
-                  why.push(`text luminance ${m.fg.toFixed(2)}, not ${dark ? 'light' : 'dark'}`);
+                if (dark ? fg < 0.5 : fg > 0.3) {
+                  why.push(`text luminance ${fg.toFixed(2)}, not ${dark ? 'light' : 'dark'}`);
                 }
                 if (!m.docs || !m.gh || !m.theme) why.push(`links in view: ${JSON.stringify(m)}`);
                 if (m.scroll > 0) why.push(`page scrolls sideways by ${m.scroll} px`);
@@ -161,8 +151,7 @@ export function checks(env) {
             await ctx.close();
           }
         }
-        await b.close();
-      }
+      });
     } finally { server.close(); }
   }
 
@@ -178,8 +167,7 @@ export function checks(env) {
     const { server, url } = await serve();
     const all = pages().filter((p) => p.startsWith('/docs/') && p !== '/docs/');
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         for (const width of [390, 1100, 1440]) {
           const ctx = await b.newContext({ viewport: { width, height: 900 } });
           const p = await ctx.newPage();
@@ -259,8 +247,7 @@ export function checks(env) {
           else r.ok(`${where}: rail on ${railed} pages with 3+ h2, none elsewhere, follows scroll`);
           await ctx.close();
         }
-        await b.close();
-      }
+      });
     } finally { server.close(); }
   }
 
@@ -272,8 +259,7 @@ export function checks(env) {
     const { server, url } = await serve();
     const all = pages();
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         for (const width of [390, 1440]) {
           const ctx = await b.newContext({ viewport: { width, height: 900 } });
           const p = await ctx.newPage();
@@ -291,8 +277,7 @@ export function checks(env) {
           else r.ok(`${where}: ${tables} tables on ${all.length} pages, none broken or crushed`);
           await ctx.close();
         }
-        await b.close();
-      }
+      });
     } finally {
       server.close();
     }
@@ -318,11 +303,6 @@ export function checks(env) {
   // light in light, its text and brand the other way round.
   async function headerTheme() {
     const { server, url } = await serve();
-    const lum = (c) => {
-      const [r, g, b] = (c.match(/[\d.]+/g) || []).map(Number);
-      const f = (v) => (v /= 255) <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
-      return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b);
-    };
     const read = () => {
       const top = document.querySelector('header.top');
       const brand = top.querySelector('.brand');
@@ -334,8 +314,7 @@ export function checks(env) {
       };
     };
     try {
-      for (const name of browsers) {
-        const b = await launch(pw, name);
+      await eachLaunch(pw, browsers, async (b, name) => {
         for (const [what, base] of [['site', url + '/'], ['app', srv.base + '/']]) {
           const viewport = { width: 1200, height: 800 };
           const ctx = await b.newContext({ colorScheme: 'dark', viewport });
@@ -366,8 +345,7 @@ export function checks(env) {
           else r.ok(`${where}: header follows the theme toggle with the body`);
           await ctx.close();
         }
-        await b.close();
-      }
+      });
     } finally { server.close(); }
   }
 

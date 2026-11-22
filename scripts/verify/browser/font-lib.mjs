@@ -4,7 +4,7 @@
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { root, launch, commitFiles } from '../../lib/browser-lib.mjs';
+import { eachLaunch, root, commitFiles } from '../../lib/browser-lib.mjs';
 
 const FONT = join(
   root, 'vendor/schwarzwald/kit/fonts/jetbrains-mono/jetbrains-mono-latin-wght-normal.woff2',
@@ -18,8 +18,7 @@ export function checks(env) {
       'fonts/mono.woff2': readFileSync(FONT),
       'fonts/bad.ttf': '\0\x01\0\0not a font',
     }, 'refs/heads/font-check', 'Fonts');
-    for (const name of browsers) {
-      const b = await launch(env.pw, name);
+    await eachLaunch(env.pw, browsers, async (b, name) => {
       const p = await (await b.newContext()).newPage();
       const csp = [];
       p.on('console', (m) => /Content Security Policy/i.test(m.text()) && csp.push(m.text()));
@@ -42,8 +41,7 @@ export function checks(env) {
       (await p.locator('.font-preview').count()) === 0
         ? r.ok(`${name}: a broken font shows no sample`)
         : r.fail(`${name}: broken font got a preview`);
-      await b.close();
-    }
+    });
   }
   return { fontSample };
 }

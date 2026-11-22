@@ -13,7 +13,7 @@
 import { mkdtempSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 const RENAMES = 1960;
 const EDITS = 40;
@@ -198,19 +198,15 @@ export function checks(env) {
     const srv = await serve(bin, dir, cfg);
     const id = sh(dir, 'git', 'rev-parse', 'HEAD');
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         await onePage(ctx, `huge-diff ${name} commit`, `${srv.base}/commit/${id}`);
-        await b.close();
-      }
+      });
       // The same change, uncommitted: the working tree page of a big uncommitted rename.
       sh(dir, 'git', 'reset', '-q', '--soft', 'HEAD~1');
       await new Promise((ok) => setTimeout(ok, 1500));
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         await onePage(ctx, `huge-diff ${name} worktree`, `${srv.base}/worktree`);
-        await b.close();
-      }
+      });
     } catch (e) {
       r.fail(`huge-diff: ${e && e.stack}`);
     } finally {

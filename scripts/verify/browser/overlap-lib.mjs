@@ -4,7 +4,7 @@
 // the row's edge, at 1440, 900, 600 and 360 px. Served on the crowded repository of
 // crowded-lib.mjs. Imported by browser-check.mjs, not run on its own.
 
-import { serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve } from '../../lib/browser-lib.mjs';
 import { LONG, LONG_TAG, crowdedRepo } from './crowded-lib.mjs';
 
 /** Pairs of overlapping parts, per row, read in the page. A part is what the row paints: each
@@ -93,8 +93,7 @@ export function checks(env) {
       refs: '/refs', tag: `/tag/${LONG_TAG}`, types: '/stats',
     };
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         const runs = [1440, 900, 600, 360]
           .flatMap((w) => Object.entries(pages).map((e) => [w, ...e]));
@@ -108,8 +107,7 @@ export function checks(env) {
           else if (m.out.length) r.fail(`${where}: ${m.out.slice(0, 3).join('; ')}`);
           else r.ok(`${where}: no two parts of ${m.rows} rows overlap`);
         }
-        await b.close();
-      }
+      });
     } finally {
       srv.stop();
     }

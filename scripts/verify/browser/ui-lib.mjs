@@ -3,7 +3,7 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { WATCH_BOUND_MS, makeRepo, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, WATCH_BOUND_MS, makeRepo, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -69,15 +69,14 @@ async function markedIn() {
     return v;
   };
   const lastLine = (s) => s.replace(/\n+$/, '').split('\n').pop();
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
-    if (!(await p.$('#L3'))) { r.fail(`marked ${name}: no code lines to mark`); await b.close(); continue; }
+    if (!(await p.$('#L3'))) { r.fail(`marked ${name}: no code lines to mark`); return; }
     await p.evaluate(mark, ['lines']);
     await p.waitForTimeout(300);
     const shown = await p.evaluate(() => { const m = document.getElementById('actmark'); return !!m && !m.hidden; });
-    if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); await b.close(); continue; }
+    if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); return; }
     const send = await sendOpen(p, 'button');
     const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
     if (send.ctx.includes('#L2-L3') && send.ctx.includes(line3) && send.title === 'marked.txt: second line third line') r.ok(`marked ${name}: lines 2-3 reach Send to, titled ${JSON.stringify(send.title)}`);
@@ -89,7 +88,7 @@ async function markedIn() {
     else r.fail(`marked ${name}: mid-word mark gave title ${JSON.stringify(mid.title)}`);
     // Rendered Markdown: the wrapped paragraph is lines 5-7 of the file.
     await p.goto(srv.base + '/blob/HEAD/notes/guide.md', { waitUntil: 'networkidle' });
-    if (!(await p.evaluate(mark, ['prose', 'wrapped']))) { r.fail(`marked ${name}: rendered Markdown has no data-line blocks`); await b.close(); continue; }
+    if (!(await p.evaluate(mark, ['prose', 'wrapped']))) { r.fail(`marked ${name}: rendered Markdown has no data-line blocks`); return; }
     const md = await sendOpen(p);
     const want = raw(5, 7);
     const src = lastLine(md.ctx);
@@ -116,16 +115,14 @@ async function markedIn() {
     const ctx2 = (await sendOpen(p)).ctx;
     if (ctx2.includes('\nA sentence worth quoting.\n') && ctx2.includes('README.md#L3-L3')) r.ok(`marked ${name}: README prose arrives as its source line`);
     else r.fail(`marked ${name}: README quote missing in ${JSON.stringify(ctx2)}`);
-    await b.close();
-  }
+  });
 }
 
 // ---- menu-keys --------------------------------------------------------------------------------
 // The letters beside the action menu's items work only while the menu is open: the menu says so
 // itself, and pressing one with the menu closed does nothing (no copy, no dialog, no navigation).
 async function menuKeys() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     await p.goto(srv.base + '/blob/HEAD/README.md', { waitUntil: 'load' });
     await p.keyboard.press('.');
@@ -155,8 +152,7 @@ async function menuKeys() {
       r.fail(`${where}: hint ${JSON.stringify(hint)}, ${stray} stray overlays, `
         + `url moved ${p.url() !== url}, sheet lists ${JSON.stringify(listed)}`);
     }
-    await b.close();
-  }
+  });
 }
 
 // ---- menu-same --------------------------------------------------------------------------------
@@ -169,8 +165,7 @@ async function menuSame() {
     why: li.getAttribute('aria-disabled') === 'true' ? li.getAttribute('data-tip') || '(none)' : '',
   })));
   const open = async (p) => { await p.keyboard.press('.'); await p.waitForSelector('.actmenu li'); const e = await read(p); await p.keyboard.press('Escape'); return e; };
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     const views = {};
     await p.goto(srv.base + '/blob/HEAD/README.md', { waitUntil: 'load' });
@@ -191,8 +186,7 @@ async function menuSame() {
     const anyOff = Object.values(views).some((v) => v.some((e) => e.why));
     if (!off.length && !silent.length && anyOff) r.ok(`menu-same ${name}: preview, code, lines and log list ${views.preview.length} entries alike`);
     else r.fail(`menu-same ${name}: want ${want}; differ ${JSON.stringify(off)}; no reason ${JSON.stringify(silent)}; disabled seen ${anyOff}`);
-    await b.close();
-  }
+  });
 }
 
 // ---- gutter -----------------------------------------------------------------------------------
@@ -244,8 +238,7 @@ async function gutter() {
 
 // ---- overlays ---------------------------------------------------------------------------------
 async function overlays() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     await p.goto(srv.base + '/', { waitUntil: 'load' });
     for (const key of ['t', '?', 'b']) {
@@ -263,8 +256,7 @@ async function overlays() {
       if (opener && named && kept && !after.open && after.back) r.ok(`overlays ${name} ${key}: named, focus kept inside, Escape closes and returns focus`);
       else r.fail(`overlays ${name} ${key}: ${JSON.stringify({ named, kept, ...after })}`);
     }
-    await b.close();
-  }
+  });
 }
 
 // ---- tips -------------------------------------------------------------------------------------
@@ -272,8 +264,7 @@ async function overlays() {
 // so no tip may follow it: for every key-opened overlay, closed by Escape, no tip is on screen.
 // Tab onto a tipped control still shows its tip at once.
 async function tips() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     await p.goto(srv.base + '/', { waitUntil: 'load' });
     const tipOn = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return !!t && t.classList.contains('on') ? t.textContent : ''; });
@@ -293,16 +284,14 @@ async function tips() {
     const tabbed = await tipOn();
     if (!bad.length && tabbed) r.ok(`tips ${name}: no tip after an overlay closes, Tab still shows "${tabbed}"`);
     else r.fail(`tips ${name}: ${JSON.stringify({ bad, tabbed })}`);
-    await b.close();
-  }
+  });
 }
 
 // ---- date tips --------------------------------------------------------------------------------
 // A relative date shows its full date on hover and on keyboard focus: in the tree listing (filled
 // by JS from /api/last) and on the overview's latest commit card.
 async function dateTips() {
-  for (const name of browsers) {
-    const { b, ctx } = await context(name);
+  await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
     const out = {};
     for (const [label, path, sel] of [['tree', '/tree/HEAD', 'table.entries td.ago time[data-tip]'], ['overview', '/', '.latest time[data-tip]']]) {
@@ -326,8 +315,7 @@ async function dateTips() {
     }
     if (Object.values(out).every((v) => v === 'ok')) r.ok(`date tips ${name}: hover and focus show the full date in the tree and on the overview`);
     else r.fail(`date tips ${name}: ${JSON.stringify(out)}`);
-    await b.close();
-  }
+  });
 }
 
 // ---- outline ----------------------------------------------------------------------------------

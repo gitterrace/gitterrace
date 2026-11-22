@@ -7,7 +7,7 @@ import { mkdtempSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve } from '../../lib/browser-lib.mjs';
 
 const WHO = 'Maximilian Featherstonehaugh-Runge';
 
@@ -65,8 +65,7 @@ export function checks(env) {
   async function blameFit() {
     const srv = await serve(bin, blameRepo());
     try {
-      for (const name of browsers) {
-        const { b, ctx } = await context(name);
+      await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
         for (const scheme of ['light', 'dark']) for (const width of [1400, 900]) {
           await p.emulateMedia({ colorScheme: scheme });
@@ -79,8 +78,7 @@ export function checks(env) {
           else if (m.out.length) r.fail(`${where}: ${m.out.slice(0, 3).join('; ')}`);
           else r.ok(`${where}: ${m.cells} gutter cells fit`);
         }
-        await b.close();
-      }
+      });
     } finally {
       srv.stop();
     }

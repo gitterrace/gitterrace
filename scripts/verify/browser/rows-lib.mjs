@@ -1,4 +1,6 @@
 // Control rows above a page's content: a row that holds one control and leaves most of its
+
+import { eachBrowser } from '../../lib/browser-lib.mjs';
 // width empty reads as a stray and pushes the content down. Imported by
 // scripts/verify/browser/browser-check.mjs, not run on its own.
 
@@ -31,8 +33,7 @@ export function checks(env) {
   async function loneRows() {
     /** @type {Map<string, string[]>} page key to its findings, over every browser and width */
     const red = new Map();
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       const all = await pages(p);
       for (const width of [1440, 390]) for (const [key, path] of Object.entries(all)) {
@@ -47,8 +48,7 @@ export function checks(env) {
         else r.fail(`${where}: ${lone.join('; ')}`);
         red.get(key).push(...lone);
       }
-      await b.close();
-    }
+    });
     // Self-test: a paragraph holding only one button is a lone row, a hint with a link is prose.
     const { b: fb, ctx: fctx } = await context(browsers[0]);
     const fp = await fctx.newPage();
@@ -74,8 +74,7 @@ export function checks(env) {
   // wide ones), the sidebar's insights link sits in the Languages heading, and the nav names
   // the refs tab 'Branches' at 390.
   async function smallLayout() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       /** @type {Array<[number, boolean, string]>} */
       const cases = [[1440, false, 'Branches & Tags'], [390, true, 'Branches']];
@@ -111,13 +110,11 @@ export function checks(env) {
         else if (!inHead) r.fail(`${where}: no insights link in the Languages heading`);
         else r.ok(`${where}: insights link sits in the Languages heading`);
       }
-      await b.close();
-    }
+    });
   }
   // Avatar letters: two letters stay inside their disc, in every theme.
   async function avatarFit() {
-    for (const name of browsers) {
-      const { b, ctx } = await context(name);
+    await eachBrowser(browsers, context, async (ctx, name) => {
       const p = await ctx.newPage();
       const all = await pages(p);
       for (const theme of ['light', 'dark']) {
@@ -136,8 +133,7 @@ export function checks(env) {
           else r.ok(`${where}: avatar letters fit`);
         }
       }
-      await b.close();
-    }
+    });
   }
   return { loneRows, smallLayout, avatarFit };
 }
