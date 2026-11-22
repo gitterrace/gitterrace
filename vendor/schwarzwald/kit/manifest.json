@@ -1,7 +1,7 @@
 {
   "schwarzwald": null,
-  "dirty": false,
-  "date": "2026-11-21T03:13:00Z",
+  "dirty": true,
+  "date": "2026-11-22T06:31:42Z",
   "parts": [
     "configs",
     "fonts",
@@ -31,8 +31,11 @@
     "tools/land_test.sh",
     "tools/selftest.py"
   ],
+  "themes": [
+    "kandel"
+  ],
   "files": {
-    "README.md": "1d56935b9cea7d638eadc30d3d06be92fca7d8f1dfca1ef3afa6869c179e0e59",
+    "README.md": "e34d3ea01e8a319604ee0ef82497d1d82413600323e2c00233dc5901c9aca2ea",
     "check.py": "42413a5f2df406126d7ebf142317beb462716825ab16e5804b0e1f28a05a3d95",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -293,7 +296,7 @@
     "rules/deny.toml": "23d5b06ab976d0ac310af02689174f72bdd4c9d0337a4ed4428e35fb07ca9a6b",
     "rules/rules.md": "5991a88e24a27539fd71b89afe536c69feee0d8de7f77d334ad2f1fabb61323d",
     "tokens/design-tokens.json": "39b39ed41d5c6980af8f221260dc0a5e199aebb1f5f5bc4bf29628450ea1bd02",
-    "tokens/theme-tokens.json": "0826a8c8440be38917921555c621f6e997e837e78d6e9f3e977ba8873ea4abdd",
+    "tokens/theme-tokens.json": "95166bbd2fd625ba6a03a3cc832e2261c43c6bea4bea419815c29a135ad21711",
     "tools/changelog-gen.sh": "462757c9fe38bb9065a9853e1b40b79b29a7dd19c6fa0e197ce2b525972a11f2",
     "tools/clone.sh": "eecfd9e40ce57f18ee12a17d241a4dda895a5297de03438942fcddc6a33ad4b6",
     "tools/cross-clippy.sh": "38c2f660b1612dfb62e74741f1798846ef978268a11898165da346ae2b5b1bda",
