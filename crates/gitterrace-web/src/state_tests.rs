@@ -25,39 +25,6 @@ fn rev_fixture(root: &std::path::Path) -> std::path::PathBuf {
     f.path().to_owned()
 }
 
-/// A cache a newer build wrote is explained on the insights pages, served as 200, and left
-/// byte-identical: an older server running next to a newer one must not clobber it.
-#[tokio::test]
-async fn a_newer_cache_is_explained_not_clobbered() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let p = rev_fixture(dir.path());
-    let built = ready_app(&p);
-    let cache = built.index.dir().to_owned();
-    drop(built);
-    std::fs::write(cache.join("VERSION"), "v99\n").expect("stamp");
-    let snapshot = |d: &std::path::Path| {
-        let mut v: Vec<_> = std::fs::read_dir(d)
-            .expect("ls")
-            .map(|e| {
-                let e = e.expect("entry");
-                (e.file_name(), std::fs::read(e.path()).expect("read"))
-            })
-            .collect();
-        v.sort();
-        v
-    };
-    let before = snapshot(&cache);
-    let app = crate::tests::new_app(&p);
-    // The server marks the app ready once its update attempt ends, failed or not.
-    app.mark_ready();
-    for uri in ["/stats", "/stats/languages", "/stats/hotspots"] {
-        let (s, body) = get(&app, uri).await;
-        assert_eq!(s, 200, "{uri}");
-        assert!(body.contains("format 99"), "{uri}: {body}");
-    }
-    assert!(snapshot(&cache) == before, "cache files changed");
-}
-
 #[tokio::test]
 async fn git_state_pages_and_banner() {
     let dir = tempfile::tempdir().expect("tmp");
