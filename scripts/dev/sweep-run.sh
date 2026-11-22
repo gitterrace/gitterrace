@@ -54,11 +54,15 @@ kept_reason() {
     git -C "$c" for-each-ref --format='%(refname)' refs/heads
     echo HEAD
   )
-  command -v lsof >/dev/null 2>&1 || {
-    echo "lsof is missing, cannot tell if it is in use"
+  # lsof where it exists (macOS), else /proc (Linux CI images ship without lsof).
+  if command -v lsof >/dev/null 2>&1; then
+    cwds=$(lsof -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+  elif [ -d /proc/self/cwd ]; then
+    cwds=$(for p in /proc/[0-9]*/cwd; do readlink "$p" 2>/dev/null; done)
+  else
+    echo "no lsof and no /proc, cannot tell if it is in use"
     return
-  }
-  cwds=$(lsof -d cwd -Fn 2>/dev/null | sed -n 's/^n//p')
+  fi
   while IFS= read -r d; do
     case $d in "$c" | "$c"/*)
       echo "a process has its cwd inside"
