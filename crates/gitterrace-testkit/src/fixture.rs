@@ -159,6 +159,14 @@ impl Fixture {
         self
     }
 
+    /// Stages everything and commits it with `msg` as `author` (`"Name <email>"`).
+    #[must_use]
+    pub fn commit_by(self, author: &str, msg: &str) -> Self {
+        self.git(&["add", "-A"]);
+        self.git(&["commit", "-q", "--author", author, "-m", msg]);
+        self
+    }
+
     /// Stages everything and commits it with `msg`.
     #[must_use]
     pub fn commit(self, msg: &str) -> Self {

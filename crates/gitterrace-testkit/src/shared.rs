@@ -74,9 +74,7 @@ fn dated(dir: &Path) {
         ("Bob <bob@y.io>", "2024-03-10T12:00:00Z", "src/a.rs", "fix: a"),
         ("Ann <ann@x.io>", "2024-03-20T12:00:00Z", "docs/guide.md", "docs: guide"),
     ] {
-        f = f.at(date).write(path, &format!("{msg}\nmore\n"));
-        f.git(&["add", "-A"]);
-        f.git(&["commit", "-q", "--author", who, "-m", msg]);
+        f = f.at(date).write(path, &format!("{msg}\nmore\n")).commit_by(who, msg);
     }
 }
 

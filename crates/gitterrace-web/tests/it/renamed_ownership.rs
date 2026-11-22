@@ -75,12 +75,11 @@ async fn src_dir(router: &axum::Router, query: &str) -> serde_json::Value {
 async fn an_author_selection_follows_renames_made_by_others() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = dir.path().join("repo");
-    let f = Fixture::init(&p).at("2024-03-01T12:00:00Z").write("src/old.rs", "a\nb\nc\nd\n");
-    f.git(&["add", "-A"]);
-    f.git(&["commit", "-q", "--author", "Bob <bob@y.io>", "-m", "feat: old"]);
-    let f = f.at("2024-03-02T12:00:00Z");
+    let mut f = Fixture::init(&p).at("2024-03-01T12:00:00Z").write("src/old.rs", "a\nb\nc\nd\n");
+    f = f.commit_by("Bob <bob@y.io>", "feat: old");
+    f = f.at("2024-03-02T12:00:00Z");
     f.git(&["mv", "src/old.rs", "src/new.rs"]);
-    f.git(&["commit", "-q", "--author", "Jane <jane@x.io>", "-m", "refactor: rename"]);
+    f = f.commit_by("Jane <jane@x.io>", "refactor: rename");
     let router = crate::common::ready_router(f.path()).await;
 
     let all = src_dir(&router, "").await;

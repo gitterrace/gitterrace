@@ -8,10 +8,7 @@ async fn contributors_page_caps_rows_and_links_to_all() {
     let root = tempfile::tempdir().expect("tmp");
     let mut f = Fixture::init(root.path());
     for i in 0..105 {
-        f = f.write("f.txt", &format!("{i}\n"));
-        f.git(&["add", "."]);
-        let author = format!("P{i} <p{i}@e.x>");
-        f.git(&["commit", "-q", "--author", &author, "-m", "feat: x"]);
+        f = f.write("f.txt", &format!("{i}\n")).commit_by(&format!("P{i} <p{i}@e.x>"), "feat: x");
     }
     let router = gitterrace_web::app_router(root.path()).expect("router");
     let page = gitterrace_testkit::wait::page_until(

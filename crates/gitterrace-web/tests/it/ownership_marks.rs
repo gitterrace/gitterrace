@@ -10,14 +10,11 @@ async fn lone_owners_warn_and_empty_shares_are_left_out() {
     // Ann writes almost all of solo/, both share shared/ and Bob touches solo/ once, lightly.
     let big = "x\n".repeat(400);
     f = f.write("solo/a.txt", &big).write("shared/b.txt", "a\n");
-    f.git(&["add", "-A"]);
-    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann"]);
+    f = f.commit_by("Ann <ann@x.io>", "feat: ann");
     f = f.write("shared/b.txt", &"b\n".repeat(50)).write("solo/c.txt", "c\n");
-    f.git(&["add", "-A"]);
-    f.git(&["commit", "-q", "--author", "Bob <bob@x.io>", "-m", "feat: bob"]);
+    f = f.commit_by("Bob <bob@x.io>", "feat: bob");
     f = f.write("shared/d.txt", &"d\n".repeat(50));
-    f.git(&["add", "-A"]);
-    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann again"]);
+    f = f.commit_by("Ann <ann@x.io>", "feat: ann again");
     let router = crate::common::ready_router(f.path()).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
@@ -46,8 +43,7 @@ async fn one_owner_everywhere_drops_the_owner_columns() {
     let dir = tempfile::tempdir().expect("tmp");
     let mut f = Fixture::init(dir.path());
     f = f.write("src/a.txt", "a\n").write("docs/b.txt", "b\n");
-    f.git(&["add", "-A"]);
-    f.git(&["commit", "-q", "--author", "Ann <ann@x.io>", "-m", "feat: ann"]);
+    f = f.commit_by("Ann <ann@x.io>", "feat: ann");
     let router = crate::common::ready_router(f.path()).await;
     let (status, body) = page(&router, "/stats/ownership").await;
     assert_eq!(status, 200);
