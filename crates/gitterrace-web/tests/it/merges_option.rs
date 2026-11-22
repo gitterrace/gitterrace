@@ -56,3 +56,16 @@ async fn the_page_follows_the_merges_option_and_lines_and_files_do_not() {
     }
     assert!(on.contains("merges=1"), "the link and the toggle carry it");
 }
+
+/// The overview counts every commit and the stats pages count commits without merges. Both
+/// numbers are right, so each page must say which one it shows, and they must add up.
+#[tokio::test(flavor = "multi_thread")]
+async fn overview_total_is_stats_total_plus_merges_and_both_say_so() {
+    let (_root, r) = router();
+    let stats = page(&r, "/stats").await;
+    let (_, overview) = gitterrace_testkit::page(&r, "/").await;
+    let shown_all = pulse(&overview, "class=\"facts\"");
+    assert_eq!(shown_all, pulse(&stats, "Commits without merges") + 1, "overview = stats + merges");
+    assert!(overview.contains("1 merge"), "overview names its merges");
+    assert!(stats.contains("Merges are left out"), "stats says it leaves merges out");
+}

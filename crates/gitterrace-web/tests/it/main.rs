@@ -7,7 +7,6 @@ mod appended_pages;
 mod blob_tables_and_archives;
 mod chart_tips_carry_totals;
 mod charts_have_tables;
-mod commit_totals;
 mod common;
 mod compare_branches;
 mod contributors_cap;
