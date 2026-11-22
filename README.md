@@ -39,8 +39,8 @@ for great tools.
 
 <!-- BEGIN GENERATED: install -->
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 brew install gitterrace/tap/gitterrace
+curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 

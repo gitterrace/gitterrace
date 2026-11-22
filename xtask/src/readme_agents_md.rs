@@ -138,19 +138,20 @@ pub fn install_md(ws: &Workspace) -> String {
     install
 }
 
-/// The install commands as (way, command): curl, brew and cargo, each only when its source
-/// exists. The README and the site both read this, so they cannot disagree.
+/// The install commands as (way, command): brew, the prebuilt download (curl) and cargo last,
+/// each only when its source exists. The README and the site both read this, so they cannot
+/// disagree.
 pub fn install_lines(ws: &Workspace) -> Vec<(&'static str, String)> {
     let mut lines = Vec::new();
     let Some(p) = ws.packages.get("gitterrace") else {
         return lines;
     };
-    if !p.homepage.is_empty() {
-        lines.push(("curl", curl_install(&p.homepage)));
-    }
     // `owner/homebrew-tap` installs as `owner/tap/<formula>`.
     if let Some(tap) = ws.tap.strip_suffix("/homebrew-tap").map(|o| format!("{o}/tap")) {
         lines.push(("brew", format!("brew install {tap}/{}", p.name)));
+    }
+    if !p.homepage.is_empty() {
+        lines.push(("curl", curl_install(&p.homepage)));
     }
     lines.push(("cargo", format!("cargo install --locked --git {} {}", p.repository, p.name)));
     lines

@@ -6,8 +6,8 @@ Install gitterrace, open your first repository, and upgrade or remove it later.
 
 <!-- BEGIN GENERATED: install -->
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 brew install gitterrace/tap/gitterrace
+curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 cargo install --locked --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
@@ -65,8 +65,8 @@ Upgrade the same way you installed:
 
 <!-- BEGIN GENERATED: upgrade -->
 ```bash
-curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 brew update && brew upgrade gitterrace
+curl --proto '=https' --tlsv1.2 -fsSL https://gitterrace.dev/install.sh | sh
 cargo install --locked --force --git https://github.com/gitterrace/gitterrace gitterrace
 ```
 
@@ -80,7 +80,7 @@ again. A new cache format rebuilds the cache by itself.
 1. If you ran `git terrace install-handler`, run
    `git terrace install-handler --uninstall` first.
 2. Remove the binary the way you installed it: `brew uninstall gitterrace`,
-   `cargo uninstall gitterrace`, or delete `git-terrace` from the folder the
+   `cargo uninstall gitterrace`, or delete the binary from the folder the
    shell installer reported (`~/.cargo/bin` by default).
 3. Delete what it wrote, if you want it gone too: the config folder
    (`~/.config/gitterrace`, `%APPDATA%\gitterrace` on Windows), the repository
