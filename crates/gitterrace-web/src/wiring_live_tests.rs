@@ -13,6 +13,7 @@ use http_body_util::BodyExt;
 use tower::ServiceExt;
 
 use crate::app::Env;
+use crate::wiring_fs_tests::{scanned_after, scans};
 use crate::wiring_tests::{app, repo, router, with};
 
 /// Reads SSE text from a response body until `want` appears or the time is up.
@@ -176,15 +177,6 @@ async fn working_tree_is_scanned_only_for_a_subscriber() {
     while rx.try_recv().is_ok() {}
     let quiet = tokio::time::timeout(Duration::from_millis(900), rx.recv()).await;
     assert!(quiet.is_err(), "an untouched tree sends nothing");
-}
-
-fn scans(a: &crate::app::App) -> u64 {
-    a.wt_scans.load(std::sync::atomic::Ordering::Acquire)
-}
-
-/// Waits until a scan finished after the count read `before`.
-async fn scanned_after(a: &crate::app::App, before: u64, within: Duration) -> bool {
-    gitterrace_testkit::wait::within(within, || async { scans(a) > before }).await
 }
 
 /// Returns once a second passes without a scan.

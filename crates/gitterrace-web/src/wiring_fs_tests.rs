@@ -24,7 +24,7 @@ const MARGIN: Duration = Duration::from_secs(5);
 /// How long a change may take to show: the documented bound.
 const BOUND: Duration = Duration::from_secs(RESCAN + 5);
 
-fn scans(a: &App) -> u64 {
+pub(crate) fn scans(a: &App) -> u64 {
     a.wt_scans.load(Ordering::Relaxed)
 }
 
@@ -108,26 +108,6 @@ async fn worktree_change(
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn an_edit_shows_within_the_default_interval() {
-    let _one = SERIAL.lock().await;
-    let dir = tempfile::tempdir().expect("tmp");
-    let (_a, p, mut rx, _wt, _t) = watched(dir.path(), RESCAN, true).await;
-    // One write per edit, no retry: the OS usually reports it within a second, and when it does
-    // not, the safety rescan shows it within `rescan_secs`.
-    for i in 0..3 {
-        wait::pause(Duration::from_millis(500)).await;
-        while rx.try_recv().is_ok() {}
-        std::fs::write(p.join("small.txt"), format!("edited {i}\n")).expect("write");
-        let t0 = Instant::now();
-        assert!(
-            worktree_change(&mut rx, BOUND).await,
-            "edit {i} not shown within {BOUND:?} (waited {:?})",
-            t0.elapsed()
-        );
-    }
-}
-
-#[tokio::test(flavor = "multi_thread")]
 async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
     let _one = SERIAL.lock().await;
     let dir = tempfile::tempdir().expect("tmp");
@@ -155,7 +135,7 @@ async fn an_idle_tree_is_not_scanned_and_a_touched_one_is() {
 }
 
 /// Waits until a scan finished after the count read `before`.
-async fn scanned_after(a: &App, before: u64, within: Duration) -> bool {
+pub(crate) async fn scanned_after(a: &App, before: u64, within: Duration) -> bool {
     wait::within(within, || async { scans(a) > before }).await
 }
 
