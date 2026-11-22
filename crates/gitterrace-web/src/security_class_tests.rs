@@ -366,8 +366,18 @@ async fn no_path_route_reads_outside_the_tree() {
     assert!(checked > 400, "only {checked} path requests");
 }
 
+/// The routes that take a write, as (pattern, method): a write is an owner decision recorded
+/// here, never an accident. Each is mounted only when its feature is configured.
+const WRITES: [(&str, &str); 5] = [
+    (crate::actions::RUN_PATH, "POST"),
+    ("/_repos", "POST"),
+    ("/_repos", "DELETE"),
+    ("/_settings/file", "PUT"),
+    ("/_settings/check", "POST"),
+];
+
 /// Class: no route changes state for a same-origin request without its token. Every method
-/// but GET and HEAD on every route answers 403, 404, 405 or 415, never success.
+/// but GET and HEAD answers 405 on every route, and 403 on the listed write routes.
 #[tokio::test(flavor = "multi_thread")]
 async fn no_write_succeeds_without_the_token() {
     let tmp = tempfile::tempdir().expect("tmp");
@@ -376,7 +386,12 @@ async fn no_write_succeeds_without_the_token() {
         let u = uri(scope, &route, "a.txt");
         for m in ["POST", "PUT", "DELETE", "PATCH"] {
             let got = send(&b.router, m, &u, &page(None)).await.status;
-            assert!(matches!(got, 403 | 404 | 405 | 415), "{m} {u} answered {got} without a token");
+            let writes = WRITES.contains(&(route.as_str(), m));
+            // 405 is a route that exists for GET only. A URL GET cannot find either may answer
+            // 404. Any other status means a handler took the write.
+            let missing = send(&b.router, "GET", &u, &page(None)).await.status == 404;
+            let want = if writes { 403 } else { 405 };
+            assert!(got == want || (missing && got == 404), "{m} {u} answered {got}, not {want}");
         }
     }
     let after = std::fs::read_to_string(b.dirs.1.path().join("config.toml")).expect("r");

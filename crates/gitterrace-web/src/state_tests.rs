@@ -101,92 +101,15 @@ async fn rev_is_preserved_by_every_link() {
     assert!(lost.is_empty(), "links drop ?rev=:\n{}", lost.join("\n"));
 }
 
-/// Methods a route may answer besides GET and HEAD, as (path, method). gitterrace is
-/// read-only, so a write route is an owner decision recorded here, never an accident.
-/// The one entry is the action runner, mounted only when the user configured actions.
-#[cfg(unix)]
-const WRITE_ALLOWLIST: [(&str, &str); 1] = [(crate::actions::RUN_PATH, "POST")];
-
-/// Every page a crawl reaches, the API and the assets refuse any method but GET and HEAD,
-/// with actions off and on. With them off the allowlisted route does not exist at all.
+/// The action runner is the one write route, mounted only when the user configured actions.
 #[cfg(unix)]
 #[tokio::test]
-async fn every_route_is_read_only() {
+async fn the_run_route_does_not_exist_with_actions_off() {
     let dir = tempfile::tempdir().expect("tmp");
-    let a = fixture("alpha", dir.path());
-    let b = fixture("beta", dir.path());
-    let cfg = actions_tests::config_dir(actions_tests::ECHO);
-    let off = crate::multi_router(vec![a.clone(), b.clone()]).expect("router");
-    let on = crate::build_multi(
-        vec![a, b],
-        None,
-        Some(&cfg.path().join("actions.toml")),
-        &crate::app::Env::new(gitterrace_config::Config::default()),
-    )
-    .expect("router")
-    .0;
-    for (router, actions) in [(off.clone(), false), (on, true)] {
-        crawl_read_only(&router, actions).await;
-    }
-    let res = off
-        .oneshot(
-            Request::post(crate::actions::RUN_PATH)
-                .header("host", "localhost")
-                .body(Body::empty())
-                .expect("req"),
-        )
-        .await
-        .expect("res");
+    let off = crate::multi_router(vec![fixture("alpha", dir.path())]).expect("router");
+    let req = Request::post(crate::actions::RUN_PATH).header("host", "localhost");
+    let res = off.oneshot(req.body(Body::empty()).expect("req")).await.expect("res");
     assert_eq!(res.status(), 404, "run route exists with actions off");
-}
-
-#[cfg(unix)]
-async fn crawl_read_only(router: &axum::Router, actions: bool) {
-    let router = router.clone();
-    let mut todo = vec!["/".to_owned(), "/r/alpha/".to_owned(), "/api/repos".to_owned()];
-    todo.extend(
-        ["/api/v1/repo", "/api/v1/refs", "/api/progress", "/api/refs", "/api/files/HEAD"]
-            .map(|p| format!("/r/alpha{p}")),
-    );
-    let mut seen = std::collections::HashSet::new();
-    let mut writable = Vec::new();
-    // The run route renders no link, so the crawl is seeded with it; GET on it is 405.
-    todo.push(crate::actions::RUN_PATH.to_owned());
-    while let Some(u) = todo.pop() {
-        if !seen.insert(u.clone()) || seen.len() > 300 {
-            continue;
-        }
-        let (get_status, body) = fetch(&router, &u, "localhost").await;
-        for l in links(&body) {
-            todo.push(l.split('#').next().unwrap_or_default().to_owned());
-        }
-        for m in ["POST", "PUT", "PATCH", "DELETE"] {
-            let res = router
-                .clone()
-                .oneshot(
-                    Request::builder()
-                        .method(m)
-                        .uri(&u)
-                        .header("host", "localhost")
-                        .body(Body::empty())
-                        .expect("req"),
-                )
-                .await
-                .expect("res");
-            let path = u.split('?').next().unwrap_or_default();
-            let allowed = actions && WRITE_ALLOWLIST.iter().any(|(p, am)| *p == path && *am == m);
-            // 405 is a route that exists for GET only. A URL that GET cannot find either
-            // (a `data-last` prefix) may answer 404; any other status means a handler took
-            // the write.
-            let code = res.status().as_u16();
-            let refused = code == 405 || (code == 404 && get_status == 404);
-            if !refused && !allowed {
-                writable.push(format!("{m} {u}: {}", res.status()));
-            }
-        }
-    }
-    assert!(seen.len() > 20, "crawl too shallow: {}", seen.len());
-    assert!(writable.is_empty(), "routes accept writes:\n{}", writable.join("\n"));
 }
 
 #[cfg(unix)]
