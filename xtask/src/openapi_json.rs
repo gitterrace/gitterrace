@@ -54,7 +54,7 @@ pub fn render(ws: &Workspace) -> Out {
             }
         }
     });
-    let mut body = serde_json::to_string_pretty(&doc).unwrap_or_default();
+    let mut body = serde_json::to_string(&doc).unwrap_or_default();
     body.push('\n');
     Out::file(PATH, body)
 }
