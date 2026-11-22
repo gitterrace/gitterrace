@@ -147,10 +147,9 @@ names:
 	python3 scripts/lint/names-check.py --self-test
 	python3 scripts/lint/names-check.py
 
-# size: Line count per area and kind, against the 100k target
+# size: Lines per language at HEAD, the size metric (the languages insight)
 size:
-	python3 scripts/dev/size-report.py --self-test
-	python3 scripts/dev/size-report.py
+	cargo run -q -p gitterrace -- insights languages .
 
 # lines: Source files stay under 600 lines, comments carry no process labels, and a release
 # section about to be tagged is exactly what git-cliff makes
@@ -159,7 +158,6 @@ lines:
 	python3 scripts/lint/text-check.py --self-test && python3 scripts/lint/text-check.py
 	python3 scripts/lint/stubs-check.py --self-test && python3 scripts/lint/stubs-check.py
 	python3 scripts/lint/types-check.py --self-test && python3 scripts/lint/types-check.py
-	python3 scripts/dev/keep-report.py --self-test
 	python3 scripts/lint/changelog-check.py --self-test && python3 scripts/lint/changelog-check.py
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
@@ -338,17 +336,12 @@ shipped:
 		git status --short; exit 1; }
 
 ##@ Maintenance
-.PHONY: gc keep
+.PHONY: gc
 
 # DRY=1 only reports. BENCH=1 also removes the cached benchmark clones.
 ## gc: Prune cargo units and scratch output unused for DAYS (default 7, DRY=1, BENCH=1)
 gc:
 	python3 scripts/dev/target-run.py --days $(or $(DAYS),7) \
 		$(if $(filter 1,$(DRY)),--dry-run) $(if $(filter 1,$(BENCH)),--bench)
-
-## keep: Every item with its prod and test callers, as TSV in target/keep-inventory.tsv
-keep:
-	python3 scripts/dev/keep-report.py . --config schwarzwald/config/keep-inventory.json \
-		--out target/keep-inventory.tsv
 
 include vendor/schwarzwald/kit/configs/help.mk

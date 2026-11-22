@@ -28,6 +28,9 @@ and `make bench` refuses to run without it. A build failure on a clean checkout
 is a bug worth reporting. In-checkout builds read `.cargo/config.toml` (one
 allocator arena), so `cargo install --git` idles a few MB higher.
 
+The size metric is `git-terrace insights languages --json .` (`total_lines`), the
+numbers of the Languages page for the HEAD tree. `make size` prints it.
+
 ## Rules
 
 - Read [AGENTS.md](AGENTS.md) for the code conventions. `make check` enforces

@@ -89,7 +89,6 @@
     "scripts/guards/tests/cases-gitterrace.sh": 13,
     "scripts/release/site/icon-render.mjs": 5,
     "scripts/bench/indexing-run.py": 2,
-    "scripts/dev/keep-report.py": 2,
     "scripts/land-check.sh": 1,
     "scripts/dev/linux-run.sh": 3,
     "scripts/dev/macos-run.sh": 3,
