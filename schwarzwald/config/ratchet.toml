@@ -7,6 +7,11 @@
 # [counts]     named integers kept in this file itself
 # [retired]    entries = ["<file> <path>"]: a ratchet removed on purpose, its reason beside it
 
+# Fixed sleeps left in the browser checks, per file (scripts/lint/sleeps-check.py), toward none.
+[[ratchet]]
+file = "scripts/guards/browser-sleeps.json"
+path = "browser_sleeps"
+
 [[ratchet]]
 file = "schwarzwald/config/wide-allowed.json"
 path = "wide_allowed"

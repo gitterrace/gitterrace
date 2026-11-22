@@ -1,0 +1,24 @@
+{
+  "browser_sleeps": {
+    "access-lib.mjs": 2,
+    "anchor-lib.mjs": 8,
+    "buttons-lib.mjs": 1,
+    "core-lib.mjs": 3,
+    "diff-lib.mjs": 6,
+    "fit-lib.mjs": 1,
+    "inset-lib.mjs": 2,
+    "keyboard-lib.mjs": 1,
+    "layout-lib.mjs": 3,
+    "outline-lib.mjs": 10,
+    "pages-lib.mjs": 6,
+    "popup-lib.mjs": 5,
+    "reap-check.mjs": 2,
+    "repos-lib.mjs": 1,
+    "scroll-lib.mjs": 15,
+    "send-lib.mjs": 1,
+    "site-lib.mjs": 5,
+    "sitebar-lib.mjs": 2,
+    "sticky-lib.mjs": 4,
+    "ui-lib.mjs": 22
+  }
+}
