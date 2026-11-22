@@ -1,24 +1,25 @@
 //! Colours live in `static/tokens.css` only, and it is generated from the snapshot.
+#![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-/// Every stylesheet but tokens.css: a new file added here is checked by every rule below.
-const SHEETS: [(&str, &str); 11] = [
-    ("syntax.css", include_str!("../../static/syntax.css")),
-    ("app.css", include_str!("../../static/app.css")),
-    ("markdown.css", include_str!("../../static/markdown.css")),
-    ("media.css", include_str!("../../static/media.css")),
-    ("send.css", include_str!("../../static/send.css")),
-    ("buttons.css", include_str!("../../static/buttons.css")),
-    ("docnav.css", include_str!("../../static/docnav.css")),
-    ("diffview.css", include_str!("../../static/diffview.css")),
-    ("graph.css", include_str!("../../static/graph.css")),
-    ("insights.css", include_str!("../../static/insights.css")),
-    ("charts.css", include_str!("../../static/charts.css")),
-];
+/// Every stylesheet but tokens.css, found on disk: a new file is checked by every rule below.
+fn sheets() -> Vec<(String, String)> {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let sheets: Vec<_> = gitterrace_testkit::scan::files_in(root, &["static"], &["css"])
+        .into_iter()
+        .filter(|p| p.file_name().is_some_and(|n| n != "tokens.css"))
+        .map(|p| {
+            let name = p.file_name().expect("name").to_string_lossy().into_owned();
+            (name, std::fs::read_to_string(&p).expect("read"))
+        })
+        .collect();
+    assert!(sheets.len() >= 10, "the scan found only {} stylesheets", sheets.len());
+    sheets
+}
 
 /// Any stylesheet besides tokens.css must reach colors through a token.
 #[test]
 fn stylesheets_hold_no_raw_colors() {
-    for (name, css) in SHEETS {
+    for (name, css) in sheets() {
         for (i, line) in css.lines().enumerate() {
             let raw = line.contains("rgb(") || line.contains("rgba(") || {
                 line.match_indices('#').any(|(at, _)| {
@@ -35,7 +36,7 @@ fn stylesheets_hold_no_raw_colors() {
 /// the bottom of g, j, p, q and y is cut off.
 #[test]
 fn clipped_text_keeps_room_for_descenders() {
-    for (name, css) in SHEETS {
+    for (name, css) in sheets() {
         for rule in css.split('}') {
             let tight = rule.contains("/1 ") || rule.contains("line-height:1;");
             assert!(
@@ -74,7 +75,7 @@ fn unset_resets_cover_hover() {
 /// message uses the one `.subj` class, so that is the only selector allowed to truncate.
 #[test]
 fn only_commit_messages_truncate() {
-    for (name, css) in SHEETS {
+    for (name, css) in sheets() {
         for rule in css.split('}') {
             let squeezed: String = rule.split_whitespace().collect();
             if squeezed.contains("text-overflow:ellipsis") {
@@ -96,7 +97,7 @@ fn only_commit_messages_truncate() {
 /// rounded boxes. Text-field rules name the inputs they style; toggles keep one shared rule.
 #[test]
 fn text_field_rules_skip_toggles() {
-    for (name, css) in SHEETS {
+    for (name, css) in sheets() {
         for rule in css.split('}') {
             let Some((sel, body)) = rule.split_once('{') else {
                 continue;
