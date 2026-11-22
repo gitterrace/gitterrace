@@ -51,17 +51,11 @@ fn corrupt(cache: &Path) {
     }
 }
 
-/// Waits until the server says its index is ready, without reading any insights.
-async fn ready(router: &axum::Router) {
-    gitterrace_testkit::wait::page_until(router, "/api/progress", |b| b.contains("\"ready\":true"))
-        .await;
-}
-
 /// Every target's answer from a fresh server over `repo`, once it is ready. Fresh, so no block
 /// read before is still in memory.
 async fn answers(repo: &Path) -> BTreeMap<String, (u16, String)> {
     let router = gitterrace_web::app_router(repo).expect("router");
-    ready(&router).await;
+    oracle::ready(&router).await;
     let mut out = BTreeMap::new();
     for t in targets() {
         let (status, body) = page(&router, &t).await;
@@ -78,7 +72,7 @@ async fn first_answer(repo: &Path, at: &Path, target: &str) -> (u16, String) {
     copy_dir(repo, &copy);
     corrupt(&copy.join(".git/gitterrace"));
     let router = gitterrace_web::app_router(&copy).expect("router");
-    ready(&router).await;
+    oracle::ready(&router).await;
     let (status, body) = page(&router, target).await;
     (status, normalize(&body))
 }

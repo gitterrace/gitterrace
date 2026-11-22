@@ -466,22 +466,7 @@ pub(crate) fn fixture(name: &str, root: &std::path::Path) -> std::path::PathBuf 
     Fixture::standard(&root.join(name)).path().to_owned()
 }
 
-pub(crate) use gitterrace_testkit::get_as as fetch;
-
-/// Same-origin `href`, `src`, `action` and `data-last` values in a page.
-pub(crate) fn links(html: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for attr in ["href=\"", "src=\"", "action=\"", "data-last=\""] {
-        for (i, _) in html.match_indices(attr) {
-            let rest = &html[i + attr.len()..];
-            let v = &rest[..rest.find('"').unwrap_or(0)];
-            if v.starts_with('/') && !v.starts_with("//") {
-                out.push(v.replace("&amp;", "&").replace("&#38;", "&"));
-            }
-        }
-    }
-    out
-}
+pub(crate) use gitterrace_testkit::{get_as as fetch, links};
 
 /// A repository with one commit, as a ready app, and its head.
 pub(crate) fn one_commit_app() -> (tempfile::TempDir, Arc<App>, String) {

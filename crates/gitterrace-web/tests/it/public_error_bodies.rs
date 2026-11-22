@@ -4,7 +4,7 @@
 
 use axum::body::Body;
 use axum::http::Request;
-use gitterrace_testkit::Fixture;
+use gitterrace_testkit::{Fixture, links};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
@@ -17,20 +17,6 @@ async fn fetch(router: &axum::Router, uri: &str) -> (u16, String) {
     let s = res.status().as_u16();
     let b = res.into_body().collect().await.expect("body").to_bytes();
     (s, String::from_utf8_lossy(&b).into_owned())
-}
-
-fn links(body: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for attr in ["href=\"", "src=\""] {
-        for (i, _) in body.match_indices(attr) {
-            let rest = &body[i + attr.len()..];
-            let v = &rest[..rest.find('"').unwrap_or(0)];
-            if v.starts_with('/') && !v.starts_with("//") {
-                out.push(v.replace("&amp;", "&"));
-            }
-        }
-    }
-    out
 }
 
 #[tokio::test]

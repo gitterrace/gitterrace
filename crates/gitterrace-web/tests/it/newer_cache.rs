@@ -6,7 +6,7 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
-use gitterrace_testkit::{Fixture, base, get};
+use gitterrace_testkit::{Fixture, base, get, links};
 
 fn folder(dir: &Path) -> BTreeMap<String, Vec<u8>> {
     std::fs::read_dir(dir)
@@ -19,20 +19,6 @@ fn folder(dir: &Path) -> BTreeMap<String, Vec<u8>> {
             (n, b)
         })
         .collect()
-}
-
-fn links(body: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for attr in ["href=\"", "src=\""] {
-        for (i, _) in body.match_indices(attr) {
-            let rest = &body[i + attr.len()..];
-            let v = &rest[..rest.find('"').unwrap_or(0)];
-            if v.starts_with('/') && !v.starts_with("//") {
-                out.push(v.replace("&amp;", "&"));
-            }
-        }
-    }
-    out
 }
 
 #[tokio::test(flavor = "multi_thread")]

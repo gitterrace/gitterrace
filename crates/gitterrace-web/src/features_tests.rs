@@ -6,7 +6,7 @@ use std::path::Path;
 
 use axum::{Router, body::Body, http::Request};
 use gitterrace_config::{Config, Feature, INSIGHT_PAGES, keys, parse};
-use gitterrace_testkit::{Fixture, base, get};
+use gitterrace_testkit::{Fixture, base, get, links};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
@@ -160,17 +160,6 @@ fn links_to(link: &str, route: &str) -> bool {
         None => path == route,
         Some((lit, _)) => path.starts_with(lit) && path.len() > lit.len(),
     }
-}
-
-/// Every `href`, `src` and `action` value of a page.
-fn links(html: &str) -> Vec<String> {
-    let mut out = Vec::new();
-    for attr in ["href=\"", "src=\"", "action=\""] {
-        for rest in html.split(attr).skip(1) {
-            out.push(rest.split('"').next().unwrap_or("").replace("&amp;", "&"));
-        }
-    }
-    out
 }
 
 fn fixture(dir: &Path) -> std::path::PathBuf {
