@@ -15,7 +15,7 @@ use serde::Deserialize;
 
 use crate::core::ApiState;
 use crate::error::{ApiError, SERVER_ERROR_MESSAGE};
-use crate::insights::Params;
+use crate::insights::{INSIGHTS, Params};
 use crate::mcp::bounded::{LineBound, MAX_LINE_BYTES};
 pub use crate::mcp::docs::ToolDoc;
 pub use crate::mcp::repos::McpRepo;
@@ -43,11 +43,9 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("read_file", &[], None),
     ("list_tree", &[], None),
     ("blame", &[Feature::Blame], None),
-    ("hotspots", &[Feature::Insights], None),
     ("contributors", &[Feature::Insights], Some("contributors")),
-    ("activity", &[Feature::Insights], None),
-    ("languages", &[Feature::Insights], None),
-    ("ownership", &[Feature::Insights], None),
+    ("insight", &[Feature::Insights], None),
+    ("list_insights", &[Feature::Insights], None),
 ];
 
 /// Whether MCP tool `tool` is served for `repo` under `cfg`: `[features]` (`api_enabled`
@@ -221,33 +219,35 @@ args! {
         /// Repository-relative file path.
         path: String,
     }
-    HotspotArgs {
-        rev: Option<String>,
-        /// `1w`, `1m`, `3m`, `1y` or `all` (default): only changes in that window count.
-        period: Option<String>,
-        #[schemars(schema_with = "query_schema")]
-        query: Option<String>,
-        /// Files to return. Defaults to 20.
-        limit: Option<usize>,
-    }
-    OwnershipArgs {
-        rev: Option<String>,
-        #[schemars(schema_with = "query_schema")]
-        query: Option<String>,
-    }
-    LanguagesArgs {
-        rev: Option<String>,
-        #[schemars(schema_with = "query_schema")]
-        query: Option<String>,
-    }
-    ActivityArgs {
+    InsightArgs {
+        /// Which insight: one of the names `list_insights` gives.
+        #[schemars(schema_with = "name_schema")]
+        name: String,
         rev: Option<String>,
         /// `1w`, `1m`, `3m`, `1y` or `all` (default). The period sets the bucket unit: days up to
         /// a month, weeks up to a year, then months, quarters or years.
         period: Option<String>,
         #[schemars(schema_with = "query_schema")]
         query: Option<String>,
+        /// `kind` (default) or `scope`, for the label insights.
+        label: Option<String>,
+        /// `commits` (default), `added`, `deleted` or `net`, for `contributors`.
+        metric: Option<String>,
+        /// Most rows, for the insights that list rows.
+        limit: Option<usize>,
     }
+}
+
+/// The `name` argument: an enum of the registry's names, each with its summary, so the model
+/// is told what exists and a new insight shows up here without another list.
+fn name_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+    let list: Vec<String> =
+        INSIGHTS.iter().map(|i| format!("`{}`: {}", i.name, i.summary)).collect();
+    schemars::json_schema!({
+        "type": "string",
+        "enum": INSIGHTS.iter().map(|i| i.name).collect::<Vec<_>>(),
+        "description": format!("The insight to compute. {}", list.join(" ")),
+    })
 }
 
 /// The `query` argument: the commit filter of the web page, its grammar read from the keyword
@@ -408,24 +408,6 @@ impl McpServer {
         self.run("blame", a.repo.clone(), move |s| s.blame(a.rev.as_deref(), &a.path)).await
     }
 
-    /// Files of the head tree that change most for their size (changes, lines, authors, last
-    /// change, score = changes times the square root of lines), the web Hotspots page's numbers.
-    /// Use to find risky or central code and where to look first.
-    #[tool(name = "hotspots", annotations(read_only_hint = true))]
-    async fn hotspots(
-        &self,
-        Parameters(a): Parameters<HotspotArgs>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let p = Params {
-            period: a.period,
-            limit: a.limit,
-            select: gitterrace_index::Selection { q: a.query },
-            ..Params::default()
-        };
-        self.run("hotspots", a.repo.clone(), move |s| s.insight("hotspots", a.rev.as_deref(), &p))
-            .await
-    }
-
     /// Contributors (identities merged, bots left out) with commits, lines, first and last commit
     /// and active days, most active first, plus `bus_factor` (the fewest people who made half of
     /// all commits). Use for ownership and knowledge-concentration questions.
@@ -440,46 +422,29 @@ impl McpServer {
         .await
     }
 
-    /// Lines and files per language in the head tree plus `total_lines`, the web Languages page's
-    /// numbers and the one measure of project size. Use for "how big is this project" and "what
-    /// is it written in".
-    #[tool(name = "languages", annotations(read_only_hint = true))]
-    async fn languages(
-        &self,
-        Parameters(a): Parameters<LanguagesArgs>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let p = Params { select: gitterrace_index::Selection { q: a.query }, ..Params::default() };
-        self.run("languages", a.repo.clone(), move |s| s.insight("languages", a.rev.as_deref(), &p))
-            .await
+    /// The insights this server computes, each with a summary. Every one is a value of `name`
+    /// for `insight`.
+    #[tool(name = "list_insights", annotations(read_only_hint = true))]
+    async fn list_insights(&self) -> Result<CallToolResult, ErrorData> {
+        if !self.cfg.feature_on(Feature::Api, None) || !self.cfg.feature_on(Feature::Insights, None)
+        {
+            return Ok(refuse("the list_insights tool is switched off in [features]"));
+        }
+        ok_json(&crate::insights::index())
     }
 
-    /// Knowledge share and bus factor per directory two levels deep, weighted by size now, the
-    /// web Ownership page's numbers. Use to find directories one person holds alone.
-    #[tool(name = "ownership", annotations(read_only_hint = true))]
-    async fn ownership(
+    /// One statistic of the repository's history or head tree, the numbers of the web insights
+    /// pages: activity per period, contributors, hotspots, languages (lines per language and the
+    /// project's size), ownership, churn per file or directory, commit types and frequency.
+    /// `name` picks it, `period` and `query` select the commits. Use for "how active", "how big",
+    /// "who owns" and "where is the risk" questions.
+    #[tool(name = "insight", annotations(read_only_hint = true))]
+    async fn insight(
         &self,
-        Parameters(a): Parameters<OwnershipArgs>,
+        Parameters(a): Parameters<InsightArgs>,
     ) -> Result<CallToolResult, ErrorData> {
-        let p = Params { select: gitterrace_index::Selection { q: a.query }, ..Params::default() };
-        self.run("ownership", a.repo.clone(), move |s| s.insight("ownership", a.rev.as_deref(), &p))
-            .await
-    }
-
-    /// Commits and lines changed per bucket (day, week, month, quarter or year, chosen by
-    /// `period`) and a weekday-by-hour punch card. Use for "how active is this project" and
-    /// trend questions.
-    #[tool(name = "activity", annotations(read_only_hint = true))]
-    async fn activity(
-        &self,
-        Parameters(a): Parameters<ActivityArgs>,
-    ) -> Result<CallToolResult, ErrorData> {
-        let p = Params {
-            period: a.period,
-            select: gitterrace_index::Selection { q: a.query },
-            ..Params::default()
-        };
-        self.run("activity", a.repo.clone(), move |s| s.insight("activity", a.rev.as_deref(), &p))
-            .await
+        let p = Params::new(a.period, a.query, a.label, a.metric, a.limit);
+        self.run("insight", a.repo.clone(), move |s| s.insight(&a.name, a.rev.as_deref(), &p)).await
     }
 }
 

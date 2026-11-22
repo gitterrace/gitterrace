@@ -248,10 +248,10 @@ fn mcp_lists_read_only_tools() {
     assert!(docs.iter().all(|t| t.read_only), "every tool must be read only");
     let names: Vec<String> = docs.into_iter().map(|t| t.name).collect();
     for want in [
-        "activity",
         "blame",
         "contributors",
-        "hotspots",
+        "insight",
+        "list_insights",
         "list_tree",
         "log",
         "read_file",

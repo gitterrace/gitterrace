@@ -6,8 +6,8 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    EndpointDoc, IndexResponse, InsightList, InsightResponse, InsightRow, LogResponse, ParamDoc,
-    RefsResponse, RepoResponse, TreeResponse, WorktreeResponse,
+    EndpointDoc, IndexResponse, InsightList, InsightResponse, LogResponse, ParamDoc, RefsResponse,
+    RepoResponse, TreeResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -114,12 +114,6 @@ async fn etag(
     res
 }
 
-fn insight_rows() -> Vec<InsightRow> {
-    insights::list()
-        .map(|(name, summary)| InsightRow { name: name.to_owned(), summary: summary.to_owned() })
-        .collect()
-}
-
 pub(crate) async fn index() -> Json<IndexResponse> {
     Json(index_body(|_| true, true))
 }
@@ -138,7 +132,7 @@ pub fn index_body(keep: impl Fn(&str) -> bool, insights: bool) -> IndexResponse 
             summary: e.summary.to_owned(),
         })
         .collect();
-    let insights = if insights { insight_rows() } else { Vec::new() };
+    let insights = if insights { insights::index().insights } else { Vec::new() };
     IndexResponse { endpoints, insights, version: 1 }
 }
 
@@ -268,7 +262,7 @@ pub(crate) async fn contributors(
 }
 
 pub(crate) async fn insight_list() -> Json<InsightList> {
-    Json(InsightList { insights: insight_rows() })
+    Json(insights::index())
 }
 
 #[derive(Deserialize)]

@@ -19,7 +19,7 @@ pub use error::{ApiError, ERROR_CODES, RETRY_AFTER_SECS, SERVER_ERROR_MESSAGE};
 pub use gitterrace_types::api::ParamDoc as Param;
 pub use http::{index_body, router};
 pub use insights::{
-    HEAD_INSIGHTS, INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, list as insight_list,
+    INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, index as insight_index, list as insight_list,
 };
 pub use mcp::{McpRepo, McpServer, ToolDoc, serve_mcp, serve_mcp_repos, tool_on};
 

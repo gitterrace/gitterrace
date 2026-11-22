@@ -174,44 +174,33 @@ fn concurrent_first_calls_on_a_cold_repo_open_it_once() {
     assert_eq!(s.repos.opens(), 1);
 }
 
-/// The `query` argument and the older keys say one thing: the same JSON either way, for both
-/// tools that take it. A key that folded differently from its keyword would split them.
+/// The `query` argument and `period` say one thing: the same JSON either way, for every
+/// insight. A key that folded differently from its keyword would split them.
 #[tokio::test]
-async fn query_and_the_older_keys_give_equal_json() {
+async fn query_and_period_give_equal_json_for_every_insight() {
     use rmcp::handler::server::wrapper::Parameters;
     let (_d, s) = server("");
-    let hot = |period: Option<&str>, query: Option<&str>| {
-        Parameters(super::HotspotArgs {
-            repo: None,
-            rev: None,
+    let ask = |name: &str, period: Option<&str>, query: Option<&str>| {
+        Parameters(super::InsightArgs {
+            name: name.to_owned(),
             period: period.map(str::to_owned),
             query: query.map(str::to_owned),
-            limit: None,
+            ..super::InsightArgs::default()
         })
     };
-    let act = |period: Option<&str>, query: Option<&str>| {
-        Parameters(super::ActivityArgs {
-            repo: None,
-            rev: None,
-            period: period.map(str::to_owned),
-            query: query.map(str::to_owned),
-        })
-    };
-    let (a, b) = (
-        s.hotspots(hot(Some("1m"), None)).await.expect("a"),
-        s.hotspots(hot(None, Some("after:1m"))).await.expect("b"),
-    );
-    assert_ne!(a.is_error, Some(true), "{}", text(&a));
-    assert_eq!(text(&a), text(&b));
-    let (a, b) = (
-        s.activity(act(Some("1m"), None)).await.expect("a"),
-        s.activity(act(None, Some("after:1m"))).await.expect("b"),
-    );
-    assert_ne!(a.is_error, Some(true), "{}", text(&a));
-    assert_eq!(text(&a), text(&b));
-    // A bad query is a readable error naming the span, not a panic.
-    let bad = s.activity(act(None, Some("nope:x"))).await.expect("bad");
-    assert_eq!(bad.is_error, Some(true), "{}", text(&bad));
+    for ins in crate::INSIGHTS {
+        let (a, b) = (
+            s.insight(ask(ins.name, Some("1m"), None)).await.expect("a"),
+            s.insight(ask(ins.name, None, Some("after:1m"))).await.expect("b"),
+        );
+        assert_ne!(a.is_error, Some(true), "{}: {}", ins.name, text(&a));
+        assert_eq!(text(&a), text(&b), "{}", ins.name);
+    }
+    // A bad query or name is a readable error, not a panic.
+    for (name, q) in [("activity", Some("nope:x")), ("nope", None)] {
+        let bad = s.insight(ask(name, None, q)).await.expect("bad");
+        assert_eq!(bad.is_error, Some(true), "{}", text(&bad));
+    }
 }
 
 #[test]
@@ -222,15 +211,15 @@ fn mcp_tool_error_emits_server_error_message_for_5xx() {
     assert_eq!(super::tool_error_text(&client), client.to_string());
 }
 
-/// A tool argument the schema does not list is refused, never dropped: `path` on `hotspots`
-/// was an older form of `query`'s `path:` and would otherwise answer unfiltered numbers.
+/// A tool argument the schema does not list is refused, never dropped: an old `path` key would
+/// otherwise answer unfiltered numbers.
 #[test]
 fn unknown_tool_arguments_are_refused() {
-    let hot = serde_json::json!({ "path": "src" });
-    let e = serde_json::from_value::<super::HotspotArgs>(hot).err();
+    let bad = serde_json::json!({ "name": "hotspots", "path": "src" });
+    let e = serde_json::from_value::<super::InsightArgs>(bad).err();
     assert!(e.is_some_and(|e| e.to_string().contains("unknown field `path`")));
-    let ok = serde_json::json!({ "query": "path:src" });
-    assert!(serde_json::from_value::<super::HotspotArgs>(ok).is_ok());
+    let ok = serde_json::json!({ "name": "hotspots", "query": "path:src" });
+    assert!(serde_json::from_value::<super::InsightArgs>(ok).is_ok());
 }
 
 /// The prompt is listed and names the tools it tells the agent to call, whichever form.

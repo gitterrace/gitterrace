@@ -489,7 +489,7 @@ impl ApiState {
             commits_indexed = all.len();
             let ins = self.insights(&tip, all, scope.options().clone());
             let counted = insights::counted(&ins, &scope, &**all);
-            insights::compute(name, &counted, params, || self.head_lines(&tip))
+            insights::compute(name, &counted, params, &|| self.head_lines(&tip))
         })??;
         let data = insights::with_links(name, data, |p| self.links(&tip, Some(p), None));
         let data = insights::typed(name, data)?;

@@ -43,8 +43,9 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
         "Review a change using only this server's read-only tools.{repo}\n\
          1. {first} If `truncated` is true, narrow it with `path` or read the file with \
          `read_file`.\n\
-         2. Call `hotspots` and `contributors` (ownership): files that change often, are large, \
-         or have one owner are riskier to change.\n\
+         2. Call `insight` with name `hotspots` or `ownership`, and \
+         `contributors`: files that change often, are large, or have one owner are riskier to \
+         change.\n\
          3. For the files with the most added and deleted lines, call `blame` on the lines the \
          change touches to see who knows the code, and `read_file` for the surrounding code.\n\
          4. Order the files: highest risk first (hotspot score, single owner, large change, no \
@@ -57,7 +58,7 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
 #[prompt_router(vis = "pub(super)")]
 impl McpServer {
     /// Review a change: the steps to order its files by risk with `compare` or `worktree_diff`,
-    /// `hotspots`, ownership, `blame` and `read_file`.
+    /// the `hotspots` and ownership insights, `blame` and `read_file`.
     #[prompt(name = "review_change")]
     async fn review_change(
         &self,

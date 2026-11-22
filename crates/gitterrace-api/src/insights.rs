@@ -1,11 +1,13 @@
 //! Registry of the statistics the API serves, each one call on [`Insights`], the layer the web
-//! pages read too. To expose a new one, add an entry to [`INSIGHTS`]; the HTTP route
-//! `/insights/{name}` and the docs list pick it up.
+//! pages read too. To expose a new one, add an entry to [`INSIGHTS`]: the HTTP route
+//! `/insights/{name}`, the MCP `insight` tool, the `insights` command and the docs pick it up.
+
+use std::sync::Arc;
 
 use gitterrace_index::{
-    Counted, Label, Metric, OptionParams, Period, Scope, ScopeParams, Selection,
+    Counted, HeadFile, Label, Metric, OptionParams, Period, Scope, ScopeParams, Selection,
 };
-use gitterrace_types::api::InsightData;
+use gitterrace_types::api::{InsightData, InsightList, InsightRow};
 use serde::Deserialize;
 use serde_json::{Value, to_value};
 
@@ -33,89 +35,137 @@ pub struct Params {
     pub options: OptionParams,
 }
 
-type Compute = fn(&Counted<'_>, &Params) -> Result<Value, ApiError>;
+/// The head tree's files, read on first use: only the head-tree insights ask for them.
+type Head<'a> = &'a dyn Fn() -> Arc<Vec<HeadFile>>;
+
+impl Params {
+    /// The parameters the MCP tool and the command line take, as the query string gives them.
+    pub fn new(
+        period: Option<String>,
+        q: Option<String>,
+        label: Option<String>,
+        metric: Option<String>,
+        limit: Option<usize>,
+    ) -> Self {
+        Self { period, label, metric, limit, select: Selection { q }, ..Self::default() }
+    }
+}
+
+type Compute = fn(&Counted<'_>, &Params, Head<'_>) -> Result<Value, ApiError>;
 
 /// One named statistic.
 pub struct Insight {
     pub name: &'static str,
     pub summary: &'static str,
     compute: Compute,
+    /// Reads the computed value back as the typed `data` the schema is made from.
+    typed: fn(Value) -> Result<InsightData, ApiError>,
 }
 
-/// Every statistic exposed over HTTP.
+/// Every statistic, served over HTTP (`/insights/{name}`), MCP (the `insight` tool) and the
+/// command line (`insights <name>`) from this one list, in documentation order.
 pub const INSIGHTS: &[Insight] = &[
     Insight {
         name: "summary",
         summary: "Commits, authors, files and lines in the period, and in the period before it.",
-        compute: |c, _| val(&c.summary()),
+        compute: |c, _, _| val(&c.summary()),
+        typed: |v| Ok(InsightData::Summary(read(v)?)),
     },
     Insight {
         name: "activity",
         summary: "Commits and lines per bucket, empty ones included, plus the weekday-by-hour \
             punch card. The period sets the unit.",
-        compute: |c, _| val(&c.rhythm()),
+        compute: |c, _, _| val(&c.rhythm()),
+        typed: |v| Ok(InsightData::Activity(Box::new(read(v)?))),
     },
     Insight {
         name: "contributors",
         summary: "People with commits, lines, active days and a per-bucket series, bots flagged. \
             Takes `metric` and `limit`.",
-        compute: |c, q| {
+        compute: |c, q, _| {
             let m = q.metric.as_deref().map_or_else(Default::default, Metric::parse);
             let mut r = c.contributors(m);
             r.contributors.truncate(q.limit.unwrap_or(usize::MAX));
             val(&r)
         },
+        typed: |v| Ok(InsightData::Contributors(read(v)?)),
     },
     Insight {
         name: "file_churn",
         summary: "Per-file commits and lines changed. Takes `limit`.",
-        compute: |c, q| val(&limited(c.per_file(), q)),
+        compute: |c, q, _| val(&limited(c.per_file(), q)),
+        typed: |v| Ok(InsightData::FileChurn(read(v)?)),
     },
     Insight {
         name: "dir_churn",
         summary: "Per-directory commits and lines changed. Takes `limit`.",
-        compute: |c, q| val(&limited(c.per_dir(), q)),
+        compute: |c, q, _| val(&limited(c.per_dir(), q)),
+        typed: |v| Ok(InsightData::DirChurn(read(v)?)),
     },
     Insight {
         name: "label_breakdown",
         summary: "Conventional-commit type or scope counts. Takes `label`.",
-        compute: |c, q| val(&c.per_label(label(q)?).0),
+        compute: |c, q, _| val(&c.per_label(label(q)?).0),
+        typed: |v| Ok(InsightData::LabelBreakdown(read(v)?)),
     },
     Insight {
         name: "label_over_time",
         summary: "Type or scope counts per bucket, empty ones included. Takes `label`.",
-        compute: |c, q| val(&c.per_label(label(q)?).1),
+        compute: |c, q, _| val(&c.per_label(label(q)?).1),
+        typed: |v| Ok(InsightData::LabelOverTime(read(v)?)),
     },
     Insight {
         name: "frequency",
         summary: "Lines added, removed and rewritten per bucket.",
-        compute: |c, _| val(&c.frequency().1),
+        compute: |c, _, _| val(&c.frequency().1),
+        typed: |v| Ok(InsightData::Frequency(read(v)?)),
+    },
+    Insight {
+        name: "hotspots",
+        summary: "Files of the head tree by changes times the square root of their size. Takes \
+            `limit`.",
+        compute: |c, q, head| {
+            let mut r = c.insights().hotspots_in(&head(), c);
+            r.files.truncate(q.limit.unwrap_or(20));
+            val(&r)
+        },
+        typed: |v| Ok(InsightData::Hotspots(read(v)?)),
+    },
+    Insight {
+        name: "languages",
+        summary: "Lines and files per language in the head tree, and their total: the project's \
+            size, as the web Languages page counts it.",
+        compute: |c, _, head| val(&c.insights().languages_in(&head(), c)),
+        typed: |v| Ok(InsightData::Languages(read(v)?)),
+    },
+    Insight {
+        name: "ownership",
+        summary: "Knowledge share and bus factor per directory two levels deep, weighted by size \
+            now.",
+        compute: |c, _, head| val(&c.insights().ownership_in(&head(), c, OWNERSHIP_DEPTH)),
+        typed: |v| Ok(InsightData::Ownership(read(v)?)),
     },
 ];
 
 /// Directory depth ownership groups by: two levels, as the web Ownership page shows it.
 pub const OWNERSHIP_DEPTH: usize = 2;
 
-/// Statistics that also read the head tree's files and line counts.
-pub const HEAD_INSIGHTS: &[(&str, &str)] = &[
-    (
-        "hotspots",
-        "Files of the head tree by changes times the square root of their size. Takes `limit`.",
-    ),
-    (
-        "languages",
-        "Lines and files per language in the head tree, and their total: the project's size, as \
-         the web Languages page counts it.",
-    ),
-    (
-        "ownership",
-        "Knowledge share and bus factor per directory two levels deep, weighted by size now.",
-    ),
-];
-
 /// Every insight name with its summary, in documentation order.
 pub fn list() -> impl Iterator<Item = (&'static str, &'static str)> {
-    INSIGHTS.iter().map(|i| (i.name, i.summary)).chain(HEAD_INSIGHTS.iter().copied())
+    INSIGHTS.iter().map(|i| (i.name, i.summary))
+}
+
+/// The `/insights` answer: every insight with its summary. HTTP, MCP and the command line list
+/// from here.
+pub fn index() -> InsightList {
+    InsightList {
+        insights: list()
+            .map(|(name, summary)| InsightRow {
+                name: name.to_owned(),
+                summary: summary.to_owned(),
+            })
+            .collect(),
+    }
 }
 
 /// The request's [`Scope`]: the period (default `all`), the selection and the options over
@@ -149,47 +199,26 @@ pub fn compute(
     name: &str,
     c: &Counted<'_>,
     params: &Params,
-    head: impl FnOnce() -> std::sync::Arc<Vec<gitterrace_index::HeadFile>>,
+    head: Head<'_>,
 ) -> Result<Value, ApiError> {
-    let ins = c.insights();
-    match name {
-        "hotspots" => {
-            let mut r = ins.hotspots_in(&head(), c);
-            r.files.truncate(params.limit.unwrap_or(20));
-            val(&r)
-        }
-        "languages" => val(&ins.languages_in(&head(), c)),
-        "ownership" => val(&ins.ownership_in(&head(), c, OWNERSHIP_DEPTH)),
-        _ => {
-            let insight = INSIGHTS
-                .iter()
-                .find(|i| i.name == name)
-                .ok_or_else(|| ApiError::BadRequest(format!("unknown insight: {name}")))?;
-            (insight.compute)(c, params)
-        }
-    }
+    (find(name)?.compute)(c, params, head)
 }
 
 /// The typed `data` of insight `name`, read back from the value `compute` and [`with_links`]
 /// built, so the answer's shape is the one type the schema is made from.
 pub(crate) fn typed(name: &str, data: Value) -> Result<InsightData, ApiError> {
-    fn read<T: serde::de::DeserializeOwned>(v: Value) -> Result<T, ApiError> {
-        serde_json::from_value(v).map_err(|e| ApiError::Task(e.to_string()))
-    }
-    Ok(match name {
-        "summary" => InsightData::Summary(read(data)?),
-        "activity" => InsightData::Activity(Box::new(read(data)?)),
-        "contributors" => InsightData::Contributors(read(data)?),
-        "file_churn" => InsightData::FileChurn(read(data)?),
-        "dir_churn" => InsightData::DirChurn(read(data)?),
-        "label_breakdown" => InsightData::LabelBreakdown(read(data)?),
-        "label_over_time" => InsightData::LabelOverTime(read(data)?),
-        "frequency" => InsightData::Frequency(read(data)?),
-        "hotspots" => InsightData::Hotspots(read(data)?),
-        "ownership" => InsightData::Ownership(read(data)?),
-        "languages" => InsightData::Languages(read(data)?),
-        other => return Err(ApiError::BadRequest(format!("unknown insight: {other}"))),
-    })
+    (find(name)?.typed)(data)
+}
+
+fn find(name: &str) -> Result<&'static Insight, ApiError> {
+    INSIGHTS
+        .iter()
+        .find(|i| i.name == name)
+        .ok_or_else(|| ApiError::BadRequest(format!("unknown insight: {name}")))
+}
+
+fn read<T: serde::de::DeserializeOwned>(v: Value) -> Result<T, ApiError> {
+    serde_json::from_value(v).map_err(|e| ApiError::Task(e.to_string()))
 }
 
 /// Adds `permalink` and `link` from `links` to every row of the per-file insights.
