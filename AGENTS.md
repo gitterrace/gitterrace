@@ -67,6 +67,9 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance checks below.
   Without `HARNESS_KIT` its link check is skipped with a note.
   `cargo test -p <crate>` while working on one crate.
+- Landing: `bash scripts/dev/land-run.sh <repo> <clone> <sha>` wraps `land.sh` and then
+  sweeps the clone with `scripts/dev/sweep-run.sh`, which removes a `.wt/` clone only when it
+  is clean, landed and idle. `make lint` fails on a pile of landed clones.
 - Commits: as in [CONTRIBUTING](CONTRIBUTING.md#commits). Commit by pathspec,
   never `git add -A`.
 - One change, one commit, squashed in its own clone, made with
