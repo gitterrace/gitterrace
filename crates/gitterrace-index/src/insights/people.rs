@@ -115,9 +115,9 @@ impl People {
         Self { list, index }
     }
 
-    /// Person for an author pair; pairs never seen map to person 0.
-    pub fn index_of(&self, name: &str, email: &str) -> usize {
-        self.index.get(&(name.to_owned(), email.to_owned())).copied().unwrap_or(0)
+    /// Person for an author pair; `None` for a pair no commit carries.
+    pub fn index_of(&self, name: &str, email: &str) -> Option<usize> {
+        self.index.get(&(name.to_owned(), email.to_owned())).copied()
     }
 }
 

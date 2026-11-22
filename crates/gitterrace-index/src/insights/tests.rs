@@ -65,3 +65,116 @@ mod decide {
         });
     }
 }
+
+/// A source whose first full commit pass fails: it streams nothing and reports the failure, as
+/// a block that fails its crc does, and every later call reads whole. Which read fails is the
+/// only thing a run of the web test leaves to chance, so this fixes it.
+struct FailsFirstPass<'a> {
+    inner: crate::feed::MemorySource<'a>,
+    failed: std::sync::atomic::AtomicBool,
+}
+
+impl crate::feed::InsightsSource for FailsFirstPass<'_> {
+    fn len(&self) -> usize {
+        self.inner.len()
+    }
+    fn commit(&self, r: crate::feed::Rank) -> Option<crate::feed::CommitRow> {
+        self.inner.commit(r)
+    }
+    fn commits_in(
+        &self,
+        r: crate::feed::CommitRange,
+    ) -> crate::feed::Stream<'_, crate::feed::CommitRow> {
+        if !self.failed.swap(true, std::sync::atomic::Ordering::SeqCst) {
+            return Box::new(std::iter::empty());
+        }
+        self.inner.commits_in(r)
+    }
+    fn rows_for(
+        &self,
+        c: Vec<crate::feed::Rank>,
+    ) -> crate::feed::Stream<'_, (crate::feed::Rank, Vec<crate::feed::FileRow>)> {
+        self.inner.rows_for(c)
+    }
+    fn commit_id(&self, r: crate::feed::Rank) -> Option<std::sync::Arc<str>> {
+        self.inner.commit_id(r)
+    }
+    fn parent_ids(&self, r: crate::feed::Rank) -> Vec<std::sync::Arc<str>> {
+        self.inner.parent_ids(r)
+    }
+    fn find_commit(&self, id: &str) -> Result<Option<crate::feed::Rank>, crate::feed::SourceError> {
+        self.inner.find_commit(id)
+    }
+    fn agg_author_day(
+        &self,
+        d: std::ops::Range<i64>,
+    ) -> crate::feed::Stream<'_, crate::feed::AuthorDayRow> {
+        self.inner.agg_author_day(d)
+    }
+    fn agg_path_author(&self, p: &str) -> crate::feed::Stream<'_, crate::feed::PathAuthorRow> {
+        self.inner.agg_path_author(p)
+    }
+    fn postings(&self, k: crate::feed::Posting) -> crate::feed::Stream<'_, crate::feed::Hit> {
+        self.inner.postings(k)
+    }
+    fn rename_edges(&self) -> crate::feed::Stream<'_, crate::feed::RenameEdge> {
+        self.inner.rename_edges()
+    }
+    fn path(&self, id: crate::feed::PathId) -> Option<std::sync::Arc<str>> {
+        self.inner.path(id)
+    }
+    fn find_path(&self, p: &str) -> Result<Option<crate::feed::PathId>, crate::feed::SourceError> {
+        self.inner.find_path(p)
+    }
+    fn paths(&self) -> usize {
+        self.inner.paths()
+    }
+    fn ident(
+        &self,
+        id: crate::feed::IdentId,
+    ) -> Option<(std::sync::Arc<str>, std::sync::Arc<str>)> {
+        self.inner.ident(id)
+    }
+    fn idents(&self) -> usize {
+        self.inner.idents()
+    }
+    fn label(&self, id: crate::feed::LabelId) -> Option<std::sync::Arc<str>> {
+        self.inner.label(id)
+    }
+    fn find_label(
+        &self,
+        n: &str,
+    ) -> Result<Option<crate::feed::LabelId>, crate::feed::SourceError> {
+        self.inner.find_label(n)
+    }
+    fn failure(&self) -> Option<crate::feed::SourceError> {
+        self.failed
+            .load(std::sync::atomic::Ordering::SeqCst)
+            .then(|| crate::feed::SourceError("block crc".into()))
+    }
+}
+
+/// Guard class: tables built while a read failed have a short people table, and no page
+/// reads them. The read that fails may be any of the ones the build makes, so the first pass
+/// is the one that fails here, every run. Red before: the next read of commits found an author
+/// the empty table had no row for and indexed past it (a panic), and the shared store kept
+/// the short tables for the next page over the same key. The second defect: a failed build
+/// that is cached, which serves the next page with data from the failed read.
+#[test]
+fn tables_built_over_a_failed_read_are_never_indexed_or_kept() {
+    let recs = fixtures::chain();
+    let src = FailsFirstPass {
+        inner: crate::feed::MemorySource::new(&recs),
+        failed: std::sync::atomic::AtomicBool::new(false),
+    };
+    let store = super::SharedTables::new();
+    let ins = Insights::shared_source(&store, &src, Options::default(), "t\u{0}1", || None);
+    assert!(store.is_empty(), "tables built over a failed read were kept");
+    let _ = ins.every_totals();
+    let row = crate::feed::InsightsSource::commits_in(&src, crate::feed::CommitRange::All)
+        .next()
+        .expect("a commit");
+    assert_eq!(ins.person_of(row.ident), None);
+    assert!(!ins.counted_row(&row));
+    assert!(crate::feed::InsightsSource::failure(&src).is_some());
+}

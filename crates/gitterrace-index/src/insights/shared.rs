@@ -82,6 +82,12 @@ impl SharedTables {
             return d;
         }
         let d = Arc::new(Derived::build(src, opts, ignore()));
+        // Tables built while a read failed hold a short people table. They serve this caller,
+        // whose `Checked::run` refuses the page, and are never kept: a later page over blocks
+        // that do read would index into them.
+        if src.failure().is_some() {
+            return d;
+        }
         if let Ok(mut g) = self.sets.lock() {
             g.retain(|e| !(e.key == key && e.opts == *opts));
             if g.len() >= SHARED_SETS {

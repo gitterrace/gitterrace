@@ -128,7 +128,7 @@ struct Derived {
     filter: PathFilter,
     people: People,
     /// Person index per raw identity id: sized by identities, not by history.
-    ident_person: Vec<usize>,
+    ident_person: Vec<Option<usize>>,
     /// Newest commit time per person (all commits, bots included).
     last_seen: Vec<i64>,
     /// Per path id: whether path statistics leave the path out. Built on first use, each
@@ -312,15 +312,26 @@ impl<'a> Insights<'a> {
         Lines { add, del, rewritten }
     }
 
-    /// Person index of a raw identity.
-    pub fn person_of(&self, id: IdentId) -> usize {
-        self.d.ident_person.get(id.0 as usize).copied().unwrap_or(0)
+    /// Person index of a raw identity, `None` for one the tables hold no person for: a source
+    /// that failed a read while they were built streamed too few commits.
+    pub fn person_of(&self, id: IdentId) -> Option<usize> {
+        self.d.ident_person.get(id.0 as usize).copied().flatten()
+    }
+
+    /// The person at index `p` of the people table.
+    pub fn person_at(&self, p: usize) -> Option<&Person> {
+        self.d.people.list.get(p)
+    }
+
+    /// Whether the person of a raw identity is a bot, `None` when it has no person.
+    pub fn is_bot(&self, id: IdentId) -> Option<bool> {
+        self.person_of(id).and_then(|p| self.person_at(p)).map(|p| p.bot)
     }
 
     /// Commit by someone who counts under the options: a merge only with `include_merges`.
     pub fn counted_row(&self, c: &CommitRow) -> bool {
         (!c.merge || self.opts.include_merges)
-            && (self.opts.include_bots || !self.d.people.list[self.person_of(c.ident)].bot)
+            && (self.opts.include_bots || self.is_bot(c.ident) == Some(false))
     }
 
     /// Lines changed by commit `c` over counted files. Takes the row the caller holds: a
@@ -412,11 +423,12 @@ impl Derived {
                 .filter(|(_, n)| **n > 0)
                 .map(|((a, e), n)| ((&**a, &**e), *n)),
         );
-        let ident_person: Vec<usize> = names.iter().map(|(a, e)| people.index_of(a, e)).collect();
+        let ident_person: Vec<Option<usize>> =
+            names.iter().map(|(a, e)| people.index_of(a, e)).collect();
         let mut last_seen = vec![i64::MIN; people.list.len()];
         for (i, &t) in newest.iter().enumerate() {
-            let p = ident_person.get(i).copied().unwrap_or(0);
-            if let Some(s) = last_seen.get_mut(p) {
+            let p = ident_person.get(i).copied().flatten();
+            if let Some(s) = p.and_then(|p| last_seen.get_mut(p)) {
                 *s = (*s).max(t);
             }
         }

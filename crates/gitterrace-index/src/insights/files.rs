@@ -408,7 +408,10 @@ impl Insights<'_> {
         let Some(tip) = tip else {
             for (i, list) in self.touches_in(paths, c).into_iter().enumerate() {
                 for (t, row) in list {
-                    if !each(i, t.lines, self.person_of(row.ident), &row) {
+                    let Some(p) = self.person_of(row.ident) else {
+                        continue;
+                    };
+                    if !each(i, t.lines, p, &row) {
                         break;
                     }
                 }
@@ -424,7 +427,7 @@ impl Insights<'_> {
             .iter()
             .map(|row| {
                 if c.contains_columns(row) {
-                    u32::try_from(self.person_of(row.ident)).unwrap_or(skip)
+                    self.person_of(row.ident).and_then(|p| u32::try_from(p).ok()).unwrap_or(skip)
                 } else {
                     skip
                 }
@@ -491,7 +494,11 @@ impl Insights<'_> {
                     Touch {
                         commit: src.commit_id(t.commit).map(|s| s.to_string()).unwrap_or_default(),
                         time: c.time,
-                        author: self.d.people.list[self.person_of(c.ident)].name.clone(),
+                        author: self
+                            .person_of(c.ident)
+                            .and_then(|p| self.person_at(p))
+                            .map(|p| p.name.clone())
+                            .unwrap_or_default(),
                         lines: t.lines,
                         path: src.path(t.path).map(|s| s.to_string()).unwrap_or_default(),
                     },

@@ -272,7 +272,8 @@ fn ownership_from_the_aggregate_equals_the_touches() {
             .map(|t| {
                 let mut m = std::collections::BTreeMap::new();
                 for (t, c) in t {
-                    *m.entry(ins.person_of(c.ident)).or_default() += u64::from(t.lines);
+                    *m.entry(ins.person_of(c.ident).unwrap_or(usize::MAX)).or_default() +=
+                        u64::from(t.lines);
                 }
                 m
             })
@@ -303,13 +304,14 @@ fn a_reused_name_takes_the_touches_not_the_aggregate() {
         .map(|t| {
             let mut m = std::collections::BTreeMap::new();
             for (t, c) in t {
-                *m.entry(ins.person_of(c.ident)).or_default() += u64::from(t.lines);
+                *m.entry(ins.person_of(c.ident).unwrap_or(usize::MAX)).or_default() +=
+                    u64::from(t.lines);
             }
             m
         })
         .collect();
     assert_eq!(fast, slow);
-    let ann = ins.person_of(crate::feed::IdentId(0));
+    let ann = ins.person_of(crate::feed::IdentId(0)).unwrap_or(usize::MAX);
     assert!(!fast[0].contains_key(&ann), "the new a.rs has only Bob's lines");
 }
 

@@ -59,7 +59,7 @@ impl Insights<'_> {
         for c in self.source().commits_in(CommitRange::All) {
             all += 1;
             merges += u64::from(c.merge);
-            bots += u64::from(!c.merge && self.d.people.list[self.person_of(c.ident)].bot);
+            bots += u64::from(!c.merge && self.is_bot(c.ident) == Some(true));
         }
         EveryTotals {
             commits: Figure::new(all, Population::Every),

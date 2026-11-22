@@ -138,9 +138,9 @@ impl PersonTallies {
         let mut out: Vec<PersonTally> = self
             .acc
             .into_iter()
-            .map(|(p, a)| {
-                let person = &c.ins.d.people.list[p];
-                PersonTally {
+            .filter_map(|(p, a)| {
+                let person = c.ins.person_at(p)?;
+                Some(PersonTally {
                     name: person.name.clone(),
                     bot: person.bot,
                     commits: a.commits,
@@ -148,7 +148,7 @@ impl PersonTallies {
                     deletions: a.del,
                     active_days: a.days.len(),
                     series: a.series,
-                }
+                })
             })
             .collect();
         out.sort_by(|a, b| b.commits.cmp(&a.commits).then_with(|| a.name.cmp(&b.name)));

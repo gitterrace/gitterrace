@@ -105,8 +105,10 @@ impl Insights<'_> {
                 let Some(&i) = at.get(&row.path) else {
                     continue;
                 };
-                let p = self.person_of(row.ident);
-                if !bots && self.d.people.list[p].bot {
+                let Some(p) = self.person_of(row.ident) else {
+                    continue;
+                };
+                if !bots && self.person_at(p).is_none_or(|x| x.bot) {
                     continue;
                 }
                 let s = &row.sums;
@@ -204,7 +206,8 @@ impl Insights<'_> {
             if top_w / f64::from(f.lines) >= SOLO_SHARE {
                 solo += u64::from(f.lines);
             }
-            if self.d.last_seen[top_p] < self.now.saturating_sub(STALE_SECS) {
+            if self.d.last_seen.get(top_p).is_some_and(|&t| t < self.now.saturating_sub(STALE_SECS))
+            {
                 stale += u64::from(f.lines);
             }
         }
@@ -221,7 +224,7 @@ impl Insights<'_> {
                 owners: owners
                     .into_iter()
                     .map(|(p, w)| Owner {
-                        name: self.d.people.list[p].name.clone(),
+                        name: self.person_at(p).map(|x| x.name.clone()).unwrap_or_default(),
                         share: w / total,
                     })
                     .collect(),
@@ -441,8 +444,8 @@ impl Insights<'_> {
     /// Ties in a ranked list of people: display name, then the first e-mail. Never the person
     /// index, which follows commit counts of whatever history the tables were built over.
     fn person_order(&self, a: usize, b: usize) -> std::cmp::Ordering {
-        let (x, y) = (&self.d.people.list[a], &self.d.people.list[b]);
-        x.name.cmp(&y.name).then_with(|| x.emails.cmp(&y.emails))
+        let key = |i| self.person_at(i).map(|x| (&x.name, &x.emails));
+        key(a).cmp(&key(b))
     }
 }
 

@@ -213,7 +213,7 @@ impl<'a> Counted<'a> {
                     return None;
                 }
                 if !need {
-                    buf.extend(chunk.into_iter().map(|c| self.item(c, Vec::new(), None)));
+                    buf.extend(chunk.into_iter().filter_map(|c| self.item(c, Vec::new(), None)));
                     continue;
                 }
                 let ranks: Vec<Rank> = chunk.iter().map(|c| c.rank).collect();
@@ -232,21 +232,23 @@ impl<'a> Counted<'a> {
                         continue;
                     }
                     let lines = path.then(|| self.lines_of(&kept));
-                    buf.push_back(self.item(c, kept, lines));
+                    buf.extend(self.item(c, kept, lines));
                 }
             }
         })
     }
 
-    fn item(&self, c: CommitRow, rows: Vec<FileRow>, lines: Option<Lines>) -> Item {
-        Item {
-            person: self.ins.person_of(c.ident),
+    /// The item of a commit, `None` when its author has no person in the tables: only a source
+    /// that failed a read has such a commit, and nothing built over it is shown.
+    fn item(&self, c: CommitRow, rows: Vec<FileRow>, lines: Option<Lines>) -> Option<Item> {
+        Some(Item {
+            person: self.ins.person_of(c.ident)?,
             day: crate::feed::local_day_of(c.time, c.offset),
             hour: self.cx.local_hour(c.time, c.offset),
             lines: lines.unwrap_or_else(|| self.ins.commit_sums(&c)),
             rows,
             commit: c,
-        }
+        })
     }
 
     fn lines_of(&self, rows: &[FileRow]) -> Lines {

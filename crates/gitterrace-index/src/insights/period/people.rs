@@ -97,7 +97,9 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
             Scope::from_params(&ScopeParams::default(), set.scope().options().clone(), Period::All)
                 .unwrap_or_else(|_| unreachable!("an empty query is always a valid scope"));
         for row in ins.counted(&ever, *set.context()).stream() {
-            let who = ins.person_of(row.ident);
+            let Some(who) = ins.person_of(row.ident) else {
+                continue;
+            };
             if !people.acc.contains_key(&who) {
                 continue;
             }
@@ -109,9 +111,9 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
     let mut out: Vec<Contributor> = people
         .acc
         .into_iter()
-        .map(|(who, acc)| {
-            let person = &ins.d.people.list[who];
-            Contributor {
+        .filter_map(|(who, acc)| {
+            let person = ins.person_at(who)?;
+            Some(Contributor {
                 name: person.name.clone(),
                 emails: person.emails.clone(),
                 bot: person.bot,
@@ -127,7 +129,7 @@ fn report(people: ContributorTally, set: &Counted<'_>) -> ContributorReport {
                     acc.series
                 },
                 first_time: fixed && first_day.get(&who).is_some_and(|d| *d >= start),
-            }
+            })
         })
         .collect();
     let key = |row: &Contributor| metric.of(row.commits, row.additions, row.deletions);

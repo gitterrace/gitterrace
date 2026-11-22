@@ -111,13 +111,15 @@ impl Insights<'_> {
             .copied()
             .filter(|r| {
                 src.commit(*r).is_some_and(|c| {
-                    who.insert(c.rank, self.person_of(c.ident));
+                    if let Some(p) = self.person_of(c.ident) {
+                        who.insert(c.rank, p);
+                    }
                     !c.merge
                 })
             })
             .collect();
         for (rank, rows) in src.rows_for(live) {
-            people.insert(who.get(&rank).copied().unwrap_or(0));
+            people.extend(who.get(&rank).copied());
             for row in &rows {
                 let Some(l) = self.row_lines(row) else {
                     continue;
