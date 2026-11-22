@@ -1,23 +1,10 @@
 //! A public server whose insights cache is broken answers 5xx, and no body it sends, page or
 //! API, names the folder the repository lives in.
-#![expect(clippy::expect_used, reason = "test setup")]
 
-use axum::body::Body;
-use axum::http::Request;
 use gitterrace_testkit::{Fixture, links};
-use http_body_util::BodyExt;
-use tower::ServiceExt;
 
 const HOST: &str = "git.example.com";
 const MARKER: &str = "host-folder-marker";
-
-async fn fetch(router: &axum::Router, uri: &str) -> (u16, String) {
-    let req = Request::get(uri).header("host", HOST).body(Body::empty()).expect("req");
-    let res = router.clone().oneshot(req).await.expect("res");
-    let s = res.status().as_u16();
-    let b = res.into_body().collect().await.expect("body").to_bytes();
-    (s, String::from_utf8_lossy(&b).into_owned())
-}
 
 #[tokio::test]
 async fn public_error_bodies_never_name_host_folders() {
@@ -35,7 +22,7 @@ async fn public_error_bodies_never_name_host_folders() {
     let manifest = p.join(".git/gitterrace/MANIFEST");
     std::fs::remove_file(&manifest).ok();
     std::fs::create_dir_all(&manifest).expect("mkdir");
-    let mut todo: Vec<String> = ["/", "/r/repo/", "/r/repo/stats", "/r/repo/api/v1/"]
+    let seeds: Vec<String> = ["/", "/r/repo/", "/r/repo/stats", "/r/repo/api/v1/"]
         .into_iter()
         .map(str::to_owned)
         .chain(gitterrace_api::ENDPOINTS.iter().map(|e| {
@@ -48,28 +35,17 @@ async fn public_error_bodies_never_name_host_folders() {
             )
         }))
         .collect();
-    let mut seen = std::collections::HashSet::new();
     let mut bad = Vec::new();
     let mut server_errors = 0;
-    while let Some(u) = todo.pop() {
-        if !seen.insert(u.clone()) || seen.len() > 200 {
-            continue;
-        }
-        let (s, body) = fetch(&router, &u).await;
+    crate::common::crawl(&router, HOST, seeds, 200, links, |u, s, body| {
         if s >= 500 {
             server_errors += 1;
-        }
-        if s == 200 {
-            todo.extend(
-                links(&body)
-                    .into_iter()
-                    .map(|l| l.split('#').next().unwrap_or_default().to_owned()),
-            );
         }
         if body.contains(MARKER) {
             bad.push(format!("{u} ({s})"));
         }
-    }
+    })
+    .await;
     assert!(server_errors > 0, "the broken cache produced no 5xx: the guard tests nothing");
     assert!(bad.is_empty(), "bodies name the host folder:\n{}", bad.join("\n"));
 }

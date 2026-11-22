@@ -2,7 +2,7 @@
 
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::Path;
 
 /// A router over `repo` whose index is built, ready for pages.
@@ -10,6 +10,36 @@ pub(crate) async fn ready_router(repo: impl AsRef<Path>) -> axum::Router {
     let router = gitterrace_web::app_router(repo).expect("router");
     gitterrace_testkit::oracle::ready(&router).await;
     router
+}
+
+/// Fetches `seeds` as a request for `host`, then every link `follow` takes from a 200 body (a
+/// fragment dropped), each path once and at most `limit` of them. `visit` sees the path, status
+/// and body of every fetch. Returns how many paths were reached.
+pub(crate) async fn crawl(
+    router: &axum::Router,
+    host: &str,
+    seeds: Vec<String>,
+    limit: usize,
+    follow: impl Fn(&str) -> Vec<String>,
+    mut visit: impl FnMut(&str, u16, &str),
+) -> usize {
+    let mut todo = seeds;
+    let mut seen = HashSet::new();
+    while let Some(u) = todo.pop() {
+        if !seen.insert(u.clone()) || seen.len() > limit {
+            continue;
+        }
+        let (s, body) = gitterrace_testkit::get_as(router, &u, host).await;
+        visit(&u, s, &body);
+        if s == 200 {
+            todo.extend(
+                follow(&body)
+                    .into_iter()
+                    .map(|l| l.split('#').next().unwrap_or_default().to_owned()),
+            );
+        }
+    }
+    seen.len()
 }
 
 /// The number in the first `<b>` after the row label `label` of a stats page, separators gone.

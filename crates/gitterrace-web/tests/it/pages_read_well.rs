@@ -4,9 +4,9 @@
 //! every link inside the repository, so a new page is checked the day it is linked. Seeds add
 //! what no link reaches: a search with hits, a compare and the working tree.
 
-use std::collections::{BTreeSet, HashSet};
+use std::collections::BTreeSet;
 
-use gitterrace_testkit::{Fixture, base, get};
+use gitterrace_testkit::{Fixture, base};
 
 fn links(html: &str, prefix: &str) -> Vec<String> {
     let mut out = Vec::new();
@@ -46,7 +46,7 @@ async fn every_linked_page_reads_well() {
     let at = base(&router).await;
     gitterrace_testkit::wait::page_until(&router, "/stats", gitterrace_testkit::wait::indexed)
         .await;
-    let mut todo: Vec<String> = [
+    let seeds: Vec<String> = [
         "/",
         "/search?q=main",
         "/search?q=first&kind=commits",
@@ -56,22 +56,23 @@ async fn every_linked_page_reads_well() {
     .iter()
     .map(|p| format!("{at}{p}"))
     .collect();
-    let mut seen = HashSet::new();
     let mut bad = BTreeSet::new();
-    while let Some(u) = todo.pop() {
-        if !seen.insert(u.clone()) || seen.len() > 400 {
-            continue;
-        }
-        let (status, body) = get(&router, &u).await;
-        if status != 200 || !body.contains("<html") {
-            continue;
-        }
-        for p in gitterrace_testkit::a11y::problems(&body) {
-            bad.insert(format!("{u}: {p}"));
-        }
-        todo.extend(links(&body, &at));
-    }
-    assert!(seen.len() > 30, "crawl too shallow: {}", seen.len());
+    let reached = crate::common::crawl(
+        &router,
+        "localhost",
+        seeds,
+        400,
+        |body| links(body, &at),
+        |u, status, body| {
+            if status == 200 && body.contains("<html") {
+                for p in gitterrace_testkit::a11y::problems(body) {
+                    bad.insert(format!("{u}: {p}"));
+                }
+            }
+        },
+    )
+    .await;
+    assert!(reached > 30, "crawl too shallow: {reached}");
     assert!(
         bad.is_empty(),
         "pages a screen reader cannot read:\n{}",

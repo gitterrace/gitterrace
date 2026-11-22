@@ -2,8 +2,6 @@
 //! and API path answers below 500, the insights pages say a newer build wrote the cache, and the
 //! cache folder is byte for byte what it was.
 
-use std::collections::HashSet;
-
 use gitterrace_testkit::{Fixture, base, get, links};
 
 #[tokio::test(flavor = "multi_thread")]
@@ -22,7 +20,7 @@ async fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
     // Give the indexer loop time to try (and refuse) the cache before the sweep.
     gitterrace_testkit::wait::pause(std::time::Duration::from_millis(500)).await;
 
-    let mut todo: Vec<String> = gitterrace_web::WARM_PAGES
+    let seeds: Vec<String> = gitterrace_web::WARM_PAGES
         .iter()
         .map(|p| format!("{prefix}{p}"))
         .chain(gitterrace_api::ENDPOINTS.iter().map(|e| {
@@ -32,25 +30,14 @@ async fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
             )
         }))
         .collect();
-    let mut seen = HashSet::new();
     let mut errors = Vec::new();
-    while let Some(u) = todo.pop() {
-        if !seen.insert(u.clone()) || seen.len() > 300 {
-            continue;
-        }
-        let (s, body) = get(&router, &u).await;
+    let reached = crate::common::crawl(&router, "localhost", seeds, 300, links, |u, s, _| {
         if s >= 500 {
             errors.push(format!("{u} -> {s}"));
         }
-        if s == 200 {
-            todo.extend(
-                links(&body)
-                    .into_iter()
-                    .map(|l| l.split('#').next().unwrap_or_default().to_owned()),
-            );
-        }
-    }
-    assert!(seen.len() > 20, "the sweep reached only {} paths", seen.len());
+    })
+    .await;
+    assert!(reached > 20, "the sweep reached only {reached} paths");
     assert!(errors.is_empty(), "5xx over a newer cache:\n{}", errors.join("\n"));
 
     for p in gitterrace_web::WARM_PAGES.iter().filter(|p| p.starts_with("/stats")) {
