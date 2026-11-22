@@ -1,40 +1,21 @@
 //! A cache written by a newer build is served around, never read, never overwritten: every page
 //! and API path answers below 500, the insights pages say a newer build wrote the cache, and the
 //! cache folder is byte for byte what it was.
-#![expect(clippy::expect_used, reason = "test setup")]
 
-use std::collections::{BTreeMap, HashSet};
-use std::path::Path;
+use std::collections::HashSet;
 
 use gitterrace_testkit::{Fixture, base, get, links};
-
-fn folder(dir: &Path) -> BTreeMap<String, Vec<u8>> {
-    std::fs::read_dir(dir)
-        .expect("dir")
-        .flatten()
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n != "lock")
-        .map(|n| {
-            let b = std::fs::read(dir.join(&n)).expect("read");
-            (n, b)
-        })
-        .collect()
-}
 
 #[tokio::test(flavor = "multi_thread")]
 async fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
     let tmp = tempfile::tempdir().expect("tmp");
     let repo = Fixture::standard(&tmp.path().join("repo")).path().to_owned();
     let cache = repo.join(".git/gitterrace");
-    {
-        let r = gitterrace_git::Repo::discover(&repo).expect("repo");
-        let index = gitterrace_index::Index::open(&r).expect("index");
-        index.update(&r, "HEAD", &|_| {}).expect("build");
-    }
+    crate::common::build_index(&repo);
     let newer = gitterrace_index::FORMAT_VERSION.parse::<u64>().expect("numeric") + 1;
     std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
     std::fs::write(cache.join("future.gts"), b"a newer build's file").expect("w");
-    let before = folder(&cache);
+    let before = crate::common::snapshot(&cache, |n| n == "lock");
 
     let router = gitterrace_web::app_router(&repo).expect("router");
     let prefix = base(&router).await;
@@ -80,5 +61,8 @@ async fn a_newer_cache_serves_every_page_without_a_500_and_stays_untouched() {
             "{p} does not say the cache is newer"
         );
     }
-    assert!(folder(&cache) == before, "the newer cache was changed");
+    assert!(
+        crate::common::snapshot(&cache, |n| n == "lock") == before,
+        "the newer cache was changed"
+    );
 }

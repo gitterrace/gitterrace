@@ -2,6 +2,7 @@
 
 #![expect(clippy::expect_used, reason = "setup failures should panic")]
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 /// A router over `repo` whose index is built, ready for pages.
@@ -29,4 +30,25 @@ pub(crate) fn bars(html: &str) -> u64 {
         .filter_map(|s| s.split('"').next())
         .filter_map(|l| l.split(": ").nth(1)?.split(' ').next()?.parse::<u64>().ok())
         .sum()
+}
+
+/// Builds the insights cache of `repo` up to HEAD, as an indexer would.
+pub(crate) fn build_index(repo: &Path) {
+    let r = gitterrace_git::Repo::discover(repo).expect("repo");
+    let index = gitterrace_index::Index::open(&r).expect("index");
+    index.update(&r, "HEAD", &|_| {}).expect("build");
+}
+
+/// Every file of the cache folder `dir` with its bytes, but the ones `skip` names.
+pub(crate) fn snapshot(dir: &Path, skip: impl Fn(&str) -> bool) -> BTreeMap<String, Vec<u8>> {
+    std::fs::read_dir(dir)
+        .expect("dir")
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|n| !skip(n))
+        .map(|n| {
+            let b = std::fs::read(dir.join(&n)).unwrap_or_default();
+            (n, b)
+        })
+        .collect()
 }

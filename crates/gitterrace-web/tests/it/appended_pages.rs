@@ -31,12 +31,8 @@ async fn pages_are_the_same_built_fresh_or_by_appends() {
     let tmp = tempfile::tempdir().expect("tmp");
     let r = RenameChain::build(tmp.path());
     let cache = r.repo.join(".git/gitterrace");
-    let fresh = {
-        let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");
-        let index = gitterrace_index::Index::open(&repo).expect("index");
-        index.update(&repo, "HEAD", &|_| {}).expect("build");
-        answers(&r.repo).await
-    };
+    crate::common::build_index(&r.repo);
+    let fresh = answers(&r.repo).await;
     std::fs::remove_dir_all(&cache).expect("drop the cache");
     {
         let repo = gitterrace_git::Repo::discover(&r.repo).expect("repo");

@@ -131,11 +131,7 @@ async fn a_running_server_survives_its_cache_being_rewritten_underneath() {
 
 async fn built(tmp: &std::path::Path) -> (std::path::PathBuf, axum::Router, String) {
     let repo = Fixture::standard(&tmp.join("repo")).path().to_owned();
-    {
-        let r = gitterrace_git::Repo::discover(&repo).expect("repo");
-        let index = gitterrace_index::Index::open(&r).expect("index");
-        index.update(&r, "HEAD", &|_| {}).expect("build");
-    }
+    crate::common::build_index(&repo);
     let router = gitterrace_web::app_router(&repo).expect("router");
     let prefix = base(&router).await;
     (repo, router, prefix)
@@ -231,19 +227,6 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         let (s, _) = get(&router, &format!("{prefix}/stats?q=author:warm{i}")).await;
         assert!(s < 500, "/stats -> {s} while warming");
     }
-    let snapshot = |dir: &std::path::Path| {
-        let mut v: Vec<_> = std::fs::read_dir(dir)
-            .expect("dir")
-            .flatten()
-            .filter(|e| {
-                let n = e.file_name().to_string_lossy().into_owned();
-                !n.starts_with('.') && n != "lines.json"
-            })
-            .map(|e| (e.file_name(), std::fs::read(e.path()).unwrap_or_default()))
-            .collect();
-        v.sort();
-        v
-    };
     // The server's own startup update must be done (it removes and rewrites `tip`),
     // or its late write would look like a write after the newer build took over.
     // Waited for, not slept on: a fixed half second lost to a loaded runner.
@@ -256,7 +239,8 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
     // A newer build owns the cache and made it read-only.
     let newer = gitterrace_index::FORMAT_VERSION.parse::<u64>().expect("numeric") + 1;
     std::fs::write(cache.join("VERSION"), format!("v{newer}\n")).expect("w");
-    let before = snapshot(&cache);
+    let snapshot = || crate::common::snapshot(&cache, |n| n.starts_with('.') || n == "lines.json");
+    let before = snapshot();
     // HEAD moves, so the running server wants to index: it must not write.
     let fx = Fixture::init(&repo);
     let _fx = fx.write("late.txt", "late\n").commit("feat: late");
@@ -274,17 +258,8 @@ async fn a_cache_a_newer_build_owns_is_never_written_by_a_running_server() {
         }
         wait::pause(std::time::Duration::from_millis(50)).await;
     }
-    let after = snapshot(&cache);
     assert!(errors.is_empty(), "5xx:\n{}", errors.join("\n"));
-    let names = |v: &Vec<(std::ffi::OsString, Vec<u8>)>| {
-        v.iter().map(|(n, b)| format!("{n:?}:{}", b.len())).collect::<Vec<_>>()
-    };
-    assert!(
-        before == after,
-        "the read-only cache was changed:\n{:?}\n{:?}",
-        names(&before),
-        names(&after)
-    );
+    assert!(before == snapshot(), "the read-only cache was changed");
 }
 
 /// A cache written by the format before rename-aware aggregates (checked-in bytes of format
