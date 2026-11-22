@@ -10,7 +10,7 @@ use gitterrace_testkit::{Fixture, oracle};
 
 /// One file per outlined language, each with a container and its members, a nested function
 /// that is not listed and a decoy keyword in a string.
-const FILES: [(&str, &str); 6] = [
+const FILES: [(&str, &str); 7] = [
     (
         "src/shapes.rs",
         "/// A shape.\npub trait Shape {\n    fn area(&self) -> f64;\n}\n\n\
@@ -46,6 +46,8 @@ const FILES: [(&str, &str); 6] = [
          export function mount(el) {\n  function inner() {}\n  return new View(el);\n}\n",
     ),
     ("src/two.rs", "fn one() {}\n\nfn two() {}\n"),
+    // Plain text has no outline, whatever it says.
+    ("notes.txt", "fn not_code() {}\nfn still_not() {}\n"),
 ];
 
 #[test]

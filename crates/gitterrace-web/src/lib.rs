@@ -73,8 +73,6 @@ mod spark;
 mod state_tests;
 mod switch;
 mod symbols;
-#[cfg(test)]
-mod symbols_wiring_tests;
 mod views;
 mod warm;
 mod when;
