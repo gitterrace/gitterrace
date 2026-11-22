@@ -93,6 +93,7 @@ git terrace [paths]          Browse a git repository in your browser, offline [-
 git terrace serve            Serve the repository in the browser (the default)
 git terrace config           Print the effective configuration and where each value comes from
 git terrace mcp              Run a read-only MCP server over stdio for agents [--served]
+git terrace insights [name]  Print one insight of the first repository as JSON, or list them: the numbers of the web pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for byte. Reads the repository of the current folder, offline [--rev --period --q --label --metric --limit --json]
 git terrace open <link>      Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
 git terrace remove [target]  Take a repository off the running server. Its pages then answer 404
 git terrace install-handler  Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]

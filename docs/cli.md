@@ -67,6 +67,26 @@ git terrace mcp [OPTIONS] [PATHS]...
 - `--served`: Also read the repositories served before (the registry a running
   server keeps).
 
+## `git terrace insights`
+
+Print one insight of the first repository as JSON, or list them: the numbers of
+the web pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for
+byte. Reads the repository of the current folder, offline.
+
+```sh
+git terrace insights [OPTIONS] [NAME] [PATHS]...
+```
+
+- `<NAME>`: The insight to compute. Omit it to list every insight.
+- `--rev <REV>`: Branch, tag, sha or HEAD. Default HEAD.
+- `--period <PERIOD>`: `1w`, `1m`, `3m`, `1y` or `all` (default).
+- `--q <Q>`: Commit filter, as the web pages' text, e.g. `author:ann !merge`.
+- `--label <LABEL>`: `kind` (default) or `scope`, for the label insights.
+- `--metric <METRIC>`: `commits` (default), `added`, `deleted` or `net`, for
+  `contributors`.
+- `--limit <LIMIT>`: Most rows, for the insights that list rows.
+- `--json`: List as JSON too. An insight is always printed as JSON.
+
 ## `git terrace open`
 
 Open a `gitterrace://` or `/go` permalink in the browser, starting a server if

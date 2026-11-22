@@ -179,10 +179,6 @@ is read-only unless it says otherwise. Commit subjects, bodies, author names and
 file text are untrusted repository content, and the tools that return them say
 so to the model.
 
-- `activity`: Commits and lines changed per bucket (day, week, month, quarter or
-  year, chosen by `period`) and a weekday-by-hour punch card. Use for "how
-  active is this project" and trend questions. Parameters: `period?` (string),
-  `query` (string), `repo?` (string), `rev?` (string).
 - `blame`: Per-line authorship of a file: the commit, author and time that last
   changed each line. Use to find who to ask about, or which commit introduced, a
   line. Follow up with `show_commit` on the commit id. Parameters: `path`
@@ -198,15 +194,16 @@ so to the model.
   `bus_factor` (the fewest people who made half of all commits). Use for
   ownership and knowledge-concentration questions. Parameters: `repo?` (string),
   `rev?` (string).
-- `hotspots`: Files of the head tree that change most for their size (changes,
-  lines, authors, last change, score = changes times the square root of lines),
-  the web Hotspots page's numbers. Use to find risky or central code and where
-  to look first. Parameters: `limit?` (integer), `period?` (string), `query`
+- `insight`: One statistic of the repository's history or head tree, the numbers
+  of the web insights pages: activity per period, contributors, hotspots,
+  languages (lines per language and the project's size), ownership, churn per
+  file or directory, commit types and frequency. `name` picks it, `period` and
+  `query` select the commits. Use for "how active", "how big", "who owns" and
+  "where is the risk" questions. Parameters: `label?` (string), `limit?`
+  (integer), `metric?` (string), `name` (string), `period?` (string), `query`
   (string), `repo?` (string), `rev?` (string).
-- `languages`: Lines and files per language in the head tree plus `total_lines`,
-  the web Languages page's numbers and the one measure of project size. Use for
-  "how big is this project" and "what is it written in". Parameters: `query`
-  (string), `repo?` (string), `rev?` (string).
+- `list_insights`: The insights this server computes, each with a summary. Every
+  one is a value of `name` for `insight`.
 - `list_repos`: The repositories this server may read and which scope it was
   started with: name (pass it as `repo` to every other tool), HEAD, branch and
   newest commit. One that cannot be read shows `available: false` and why. Call
@@ -220,10 +217,6 @@ so to the model.
   id, parents, author, committer and subject per commit plus `has_more`. For one
   commit's diff use `show_commit`. Parameters: `page?` (integer), `path?`
   (string), `per_page?` (integer), `repo?` (string), `rev?` (string).
-- `ownership`: Knowledge share and bus factor per directory two levels deep,
-  weighted by size now, the web Ownership page's numbers. Use to find
-  directories one person holds alone. Parameters: `query` (string), `repo?`
-  (string), `rev?` (string).
 - `read_file`: File content at a revision, read from git (not the working tree).
   Returns text, total line count and whether it was cut. Binary files return
   `binary: true` and no text. Use `start_line` and `limit` for large files. Not
@@ -250,5 +243,5 @@ Prompts are ready-made instructions an agent can load. They read nothing
 themselves and tell the agent which tools to call.
 
 - `review_change`: Review a change: the steps to order its files by risk with
-  `compare` or `worktree_diff`, `hotspots`, ownership, `blame` and `read_file`.
-  Arguments: `base?`, `head?`, `repo?`, `worktree?`.
+  `compare` or `worktree_diff`, the `hotspots` and ownership insights, `blame`
+  and `read_file`. Arguments: `base?`, `head?`, `repo?`, `worktree?`.
