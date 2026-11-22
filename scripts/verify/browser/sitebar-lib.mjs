@@ -9,8 +9,9 @@ const siteDir = join(root, 'target/site');
 const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp',
   png: 'image/png', woff2: 'font/woff2' };
 
-/** Serves target/site with its _headers CSP, as the host does. @returns {Promise<any>} */
-export async function serve() {
+/** Serves target/site with its _headers CSP, as the host does, or without it.
+ * @returns {Promise<any>} */
+export async function serve(withCsp = true) {
   const head = readFileSync(join(siteDir, '_headers'), 'utf8');
   const csp = /Content-Security-Policy:\s*(.+)/.exec(head)[1].trim();
   const server = createServer((q, s) => {
@@ -18,7 +19,9 @@ export async function serve() {
     const p = join(siteDir, path);
     if (!p.startsWith(siteDir) || !existsSync(p)) { s.writeHead(404); s.end(); return; }
     const type = types[p.split('.').pop()] || 'application/octet-stream';
-    s.writeHead(200, { 'content-type': type, 'content-security-policy': csp });
+    const h = { 'content-type': type };
+    if (withCsp) h['content-security-policy'] = csp;
+    s.writeHead(200, h);
     s.end(readFileSync(p));
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(undefined)));

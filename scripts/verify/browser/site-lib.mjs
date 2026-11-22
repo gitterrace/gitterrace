@@ -1,11 +1,11 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { readFileSync, readdirSync, existsSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { readFileSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { root, launch, makeRepo, sh } from '../../lib/browser-lib.mjs';
+import { serve } from './sitebar-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -88,17 +88,8 @@ async function aboutPlace() {
 }
 
 async function siteTheme() {
-  const siteDir = join(root, 'target/site');
-  const csp = /Content-Security-Policy:\s*(.+)/.exec(readFileSync(join(siteDir, '_headers'), 'utf8'))[1].trim();
-  const types = { html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png' };
-  const server = createServer((q, s) => {
-    const p = join(siteDir, decodeURIComponent(q.url.split(/[?#]/)[0]).replace(/\/$/, '/index.html'));
-    if (!p.startsWith(siteDir) || !existsSync(p)) { s.writeHead(404); s.end(); return; }
-    s.writeHead(200, { 'content-type': types[p.split('.').pop()] || 'application/octet-stream', 'content-security-policy': csp });
-    s.end(readFileSync(p));
-  });
-  await new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(undefined)));
-  const url = `http://127.0.0.1:${(/** @type {any} */ (server.address())).port}/`;
+  const { server, url: root_ } = await serve();
+  const url = `${root_}/`;
   // What the page shows: data-theme, the visible logo, the visible screenshot images, each by file.
   const state = (p) => p.evaluate(() => {
     const shown = (sel) => [...document.querySelectorAll(sel)].filter((i) => i.offsetParent && getComputedStyle(i).display !== 'none').map((i) => i.getAttribute('src'));
@@ -268,19 +259,8 @@ async function exportFromDisk() {
 // The landing page's install tabs: the selected tab merges into its panel (no line at the seam,
 // the panel's colour), an unselected tab keeps the line so it reads as behind. Pixels at the seam.
 async function installTabs() {
-  const siteDir = join(root, 'target/site');
-  const types = {
-    html: 'text/html', css: 'text/css', svg: 'image/svg+xml', webp: 'image/webp', png: 'image/png',
-  };
-  const server = createServer((q, s) => {
-    const path = decodeURIComponent(String(q.url).split(/[?#]/)[0]);
-    const p = join(siteDir, path.replace(/\/$/, '/index.html'));
-    if (!p.startsWith(siteDir) || !existsSync(p)) { s.writeHead(404); s.end(); return; }
-    s.writeHead(200, { 'content-type': types[p.split('.').pop()] || 'application/octet-stream' });
-    s.end(readFileSync(p));
-  });
-  await new Promise((ok) => server.listen(0, '127.0.0.1', () => ok(undefined)));
-  const url = `http://127.0.0.1:${(/** @type {any} */ (server.address())).port}/`;
+  const { server, url: root_ } = await serve(false);
+  const url = `${root_}/`;
   try {
     for (const browser of browsers) {
       const b = await launch(pw, browser);

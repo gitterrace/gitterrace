@@ -2,32 +2,12 @@
 // whole. Walks every page kind of layout-shift, a Markdown file with an outline, a source file
 // with symbols and the built site's docs pages, at 1440, 900 and 360 px.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { createServer } from 'node:http';
-import { readFileSync, existsSync, statSync, readdirSync, writeFileSync } from 'node:fs';
+import { existsSync, writeFileSync } from 'node:fs';
 import { sh, commitAll } from '../../lib/browser-lib.mjs';
-import { join, extname, resolve } from 'node:path';
+import { join } from 'node:path';
+import { serve, pages as sitePages } from './sitebar-lib.mjs';
 
 const WIDTHS = [1440, 900, 360];
-const TYPES = {
-  '.html': 'text/html', '.css': 'text/css', '.js': 'text/javascript', '.mjs': 'text/javascript',
-  '.svg': 'image/svg+xml', '.png': 'image/png', '.woff2': 'font/woff2',
-  '.json': 'application/json',
-};
-
-/** Serves `dir` on a free port; resolves to its base URL and a close function. */
-function serveDir(dir) {
-  const s = createServer((q, res) => {
-    let f = join(dir, decodeURIComponent(new URL(q.url, 'http://x').pathname));
-    if (existsSync(f) && statSync(f).isDirectory()) f = join(f, 'index.html');
-    if (!existsSync(f)) { res.writeHead(404); res.end(); return; }
-    res.writeHead(200, { 'content-type': TYPES[extname(f)] || 'application/octet-stream' });
-    res.end(readFileSync(f));
-  });
-  return new Promise((ok) => s.listen(0, '127.0.0.1', () => {
-    const { port } = /** @type {import('node:net').AddressInfo} */ (s.address());
-    ok({ base: `http://127.0.0.1:${port}`, close: () => s.close() });
-  }));
-}
 
 /** Regions meant to scroll down that scroll sideways too, in the page. */
 function sideways() {
@@ -153,14 +133,11 @@ export function checks(env) {
     fixtures();
     await new Promise((ok) => setTimeout(ok, 600));
     const pages = Object.fromEntries(Object.entries(repoPages).map(([k, v]) => [k, srv.base + v]));
-    const site = resolve(new URL('..', import.meta.url).pathname, 'target/site');
-    const s = existsSync(join(site, 'docs')) ? await serveDir(site) : null;
-    if (s) for (const d of readdirSync(join(site, 'docs'))) {
-      if (existsSync(join(site, 'docs', d, 'index.html'))) {
-        pages[`site/docs/${d}`] = `${s.base}/docs/${d}/`;
-      }
+    const s = await serve();
+    for (const p of sitePages().filter((p) => p.startsWith('/docs/') && p !== '/docs/')) {
+      pages[`site${p.replace(/\/$/, '')}`] = s.url + p;
     }
-    try { await walk(label, pages, fn); } finally { s?.close(); }
+    try { await walk(label, pages, fn); } finally { s.server.close(); }
   }
   return {
     noSidewaysScroll: () => all('no-sideways-scroll', sideways),
