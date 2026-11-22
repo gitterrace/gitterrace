@@ -213,14 +213,23 @@ t ALLOW git_stash "$REPO" bash '{"command":"python3 .runs/sc-stash.py"}' "a pyth
     done
     printf 'pkill -f "x.app/Contents/MacOS/x"\n'
 } >"$REPO/.runs/sc-big.sh"
-_sc_now() { perl -MTime::HiRes=time -e 'printf "%d\n", time * 1000'; }
-# The faster of two calls per script: a load spike during one call cannot fail the case.
+# CPU time (user+sys, ms) of the waited-for children, from bash's `times`, into _sc_t. Scheduler
+# waits under a parallel build are not CPU, so load cannot inflate the ratio. Not called through
+# $(...): a subshell's `times` starts from zero.
+_sc_now() {
+    times >"$SELFTEST_ROOT/times"
+    _sc_t=$(sed -n 2p "$SELFTEST_ROOT/times" | awk 'function f(x, m, r) { m = index(x, "m"); r = substr(x, m + 1); sub(/s$/, "", r); return substr(x, 1, m - 1) * 60 + r }
+        { printf "%d", (f($1) + f($2)) * 1000 }')
+}
+# The cheaper of two calls per script, still, so one cold start cannot fail the case.
 _sc_best() {
     local best="" a d label="$2"
     for _ in 1 2; do
-        a=$(_sc_now)
+        _sc_now
+        a=$_sc_t
         t ADVISE broad_process_kill "$REPO" bash "{\"command\":\"bash .runs/$1\"}" "$label"
-        d=$(($(_sc_now) - a))
+        _sc_now
+        d=$((_sc_t - a))
         [ -z "$best" ] || [ "$d" -lt "$best" ] && best=$d
         label="$label (again)"
     done
@@ -230,10 +239,10 @@ _sc_best sc-kill.sh "a small script with a broad pkill, the timing baseline"
 _sc_small=$_sc_ms
 _sc_best sc-big.sh "a script near the size cap with a broad pkill on its last line"
 _sc_big=$_sc_ms
-# A ratio, not a wall-clock budget: load slows both calls alike. Linear reading keeps the big
+# A ratio of CPU time, not wall time: a loaded machine cannot inflate it. Linear reading keeps the big
 # script within a few times the small one. The quadratic join ran it 20 times slower and more.
 _assert yes "$([ "$_sc_big" -le $((_sc_small * 8 + 500)) ] && echo yes || echo no)" \
-    "the script near the size cap costs at most 8 times a small one (${_sc_big} ms vs ${_sc_small} ms)"
+    "the script near the size cap costs at most 8 times a small one (${_sc_big} ms cpu vs ${_sc_small} ms cpu)"
 t ADVISE script_content "$REPO" write "$(_sc_in hh-cycle.sh "$_sc_kill")" "writing a .sh with a broad pkill"
 t BLOCK script_content "$REPO" write "$(_sc_in w.sh "$_sc_stash")" "writing a .sh that runs git stash"
 t BLOCK script_content "$REPO" write "$(_sc_in w.zsh $'git reset --hard HEAD\n')" "writing a .zsh that runs git reset --hard"
@@ -671,3 +680,87 @@ t ALLOW read_size "$REPO" bash '{"command":"cat big.log > /tmp/zz-copy"}' "read-
 t ALLOW read_size "$REPO" bash '{"command":"cat big.log lane-accept-out.txt"}' "read-size: a command naming lane-accept output"
 t ALLOW read_size "$REPO" bash '{"command":"cat lane-accept-diff.txt"}' "read-size: a lane-accept diff file by cat"
 t ALLOW read_size "$REPO" bash '{"command":"echo cat big.log"}' "read-size: the verb as data"
+
+echo
+echo "guard friction -- sandboxed test scripts, scratch worktrees, the quote-limit message"
+# (1) A script FILE that sources test-sandbox.sh or carries `# guard: sandboxed` runs git in a
+# throwaway repo: its git add / bare commit is not the shared index. Still caught: the same git
+# typed beside it, a bash -c string, an unmarked script, a marker past line 10, an unreadable file.
+_sb="$REPO/.runs/sbx"
+mkdir -p "$_sb"
+printf '#!/usr/bin/env bash\n. "$(dirname "$0")/../tools/test-sandbox.sh"\ngit add x\ngit commit -m t\n' >"$_sb/a_test.sh"
+printf '#!/usr/bin/env bash\n# guard: sandboxed\ngit add x\n' >"$_sb/b_test.sh"
+printf '#!/usr/bin/env bash\ngit add x\n' >"$_sb/plain.sh"
+printf '#!/usr/bin/env bash\n. tools/test-sandbox.sh\ngit add x\n' >"$_sb/fresh_test.sh"
+printf '#!/usr/bin/env bash\n. tools/test_sandbox.sh\ngit add x\n' >"$_sb/mod_test.sh"
+git -C "$_sb" init -q 2>/dev/null
+git -C "$_sb" add a_test.sh b_test.sh plain.sh mod_test.sh
+git -C "$_sb" -c user.name=t -c user.email=t@t commit -qm sbx 2>/dev/null
+printf 'git add -A\n' >>"$_sb/mod_test.sh"
+t ALLOW shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/a_test.sh"}' "a tracked clean *_test.sh sourcing test-sandbox.sh may git add"
+t BLOCK shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/b_test.sh"}' "a guard: sandboxed marker no longer exempts"
+t BLOCK shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/fresh_test.sh"}' "an untracked script sourcing test-sandbox is not exempt"
+t BLOCK shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/mod_test.sh"}' "a tracked but modified script is not exempt"
+t ALLOW git_commit_index_scope "$REPO" bash '{"command":"bash .runs/sbx/a_test.sh"}' "a sandboxed script's bare commit"
+t BLOCK shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/plain.sh"}' "an unmarked script still blocked"
+t BLOCK shared_index_staging "$REPO" bash '{"command":"bash .runs/sbx/a_test.sh; git add x"}' "git typed beside a sandboxed script"
+t BLOCK git_add_scope "$REPO" bash '{"command":"bash .runs/sbx/b_test.sh; git add -A"}' "git add -A beside a sandboxed script"
+
+# (5) The refusal over the quote bound says what to do.
+_q=$(printf "'a' %.0s" $(seq 1 600))
+t BLOCK destructive_class "$REPO" bash "$(jq -cn --arg c "echo $_q" '{command:$c}')" "over 1000 quote chars is refused"
+if _only "over 1000 quote chars is refused"; then
+    case "$_RUN_ERR" in
+        *'write the command to a file with the write tool and run `bash <file>`'*) _assert OK OK "the quote refusal names the write tool and bash <file>" ;;
+        *) _assert OK BAD "the quote refusal names the write tool and bash <file>" ;;
+    esac
+fi
+
+# (6) A detached worktree under the session scratch dir may checkout/reset. Still refused: the
+# shared checkout, a branch-attached scratch worktree, a symlink out of scratch, chained commands.
+_scr="$SELFTEST_ROOT/scr"
+mkdir -p "$_scr"
+_scr=$(cd "$_scr" && pwd -P)
+git -C "$REPO" worktree add -q --detach "$_scr/wt" HEAD 2>/dev/null
+git -C "$REPO" worktree add -q -b scr-attached "$_scr/att" HEAD 2>/dev/null
+ln -sfn "$REPO" "$_scr/escape"
+printf 'x\n' >"$_scr/wt/f.txt"
+t ALLOW destructive_class "$_scr/wt" bash '{"command":"git checkout -- f.txt"}' "checkout in a detached scratch worktree" GUARD_SCRATCH_DIR="$_scr"
+t ALLOW destructive_class "$_scr/wt" bash '{"command":"git reset --hard HEAD"}' "reset in a detached scratch worktree" GUARD_SCRATCH_DIR="$_scr"
+t ALLOW destructive_class "$REPO" bash '{"command":"git -C '"$_scr"'/wt reset --hard"}' "-C names the detached scratch worktree" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$REPO" bash '{"command":"git reset --hard HEAD"}' "reset on the shared checkout" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$REPO" bash '{"command":"git checkout -- README.md"}' "checkout on the shared checkout" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$REPO" bash '{"command":"git -C '"$_scr"'/att reset --hard"}' "a scratch worktree on a branch" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$_scr/escape" bash '{"command":"git reset --hard"}' "a symlink out of scratch" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$REPO" bash '{"command":"git -C '"$_scr"'/escape reset --hard"}' "-C through a symlink out of scratch" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$_scr/wt" bash '{"command":"git reset --hard; git -C '"$REPO"' reset --hard"}' "chained onto the shared checkout" GUARD_SCRATCH_DIR="$_scr"
+t BLOCK destructive_class "$REPO" bash '{"command":"git -C '"$_scr"'/wt reset --hard"}' "no scratch dir set means no exemption"
+# The allowance is judged by guard_scratch_worktree_git itself: the other rules never refuse a
+# branch-moving checkout, so only the verdict of the function shows a hole. $1=want yes|no.
+_sw() {
+    local want="$1" cwd="$2" cmd="$3" scr="${4-$_scr}" got=no
+    _only "$5" || return 0
+    # shellcheck source=/dev/null
+    if (. "$ENGINE" && GUARD_CMD="$cmd" GUARD_CWD="$cwd" GUARD_SCRATCH_DIR="$scr" guard_scratch_worktree_git); then got=yes; fi
+    _assert "$want" "$got" "$5"
+}
+_sw no "$_scr/wt" "git checkout -B main" "$_scr" "checkout -B refused in scratch"
+_sw no "$_scr/wt" "git checkout -b x" "$_scr" "checkout -b refused in scratch"
+_sw no "$_scr/wt" "git checkout --orphan x" "$_scr" "checkout --orphan refused in scratch"
+_sw no "$_scr/wt" "git checkout scr-attached" "$_scr" "checkout of a branch name refused in scratch"
+_sw no "$_scr/wt" "git reset --keep HEAD" "$_scr" "reset --keep refused in scratch"
+_sw no "$_scr/wt" "git reset --hard HEAD" "" "reset with no scratch dir refused"
+_sw no "$REPO" "git reset --hard HEAD" "$_scr" "reset run outside scratch refused"
+_sw yes "$_scr/wt" "git reset --hard HEAD" "$_scr" "reset --hard allowed in detached scratch"
+_sw yes "$_scr/wt" "git checkout --detach HEAD" "$_scr" "checkout --detach allowed in scratch"
+_sw yes "$_scr/wt" "git checkout HEAD" "$_scr" "checkout <rev> allowed while detached"
+_sw yes "$_scr/wt" "git checkout -- f.txt" "$_scr" "checkout -- paths allowed in scratch"
+# A bash -c string has no file: no path, no exemption.
+_bc=no
+# shellcheck source=/dev/null
+(. "$ENGINE" && _guard_body_sandboxed "" ". tools/test-sandbox.sh") && _bc=yes
+_assert no "$_bc" "a bash -c string is never a sandboxed script"
+git -C "$REPO" worktree remove --force "$_scr/wt" 2>/dev/null
+git -C "$REPO" worktree remove --force "$_scr/att" 2>/dev/null
+git -C "$REPO" branch -qD scr-attached 2>/dev/null
+rm -rf "$_sb" "$_scr"

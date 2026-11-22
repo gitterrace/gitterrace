@@ -8,7 +8,7 @@ Under each ROOT it finds:
                 and the per-lane subdirs of one (each child of target/ that is itself cargo
                 output), not written for N hours (default 6), whose checkout no running cargo
                 or rustc names in its command line or working directory
-  scratch runs  each child of a --scratch DIR (default: scratch.sh's root, $SCRATCH_ROOT, else
+  scratch runs  each child of a --scratch DIR (default: $SCRATCH_ROOT, else
                 $TMPDIR, $XDG_RUNTIME_DIR or ~/.cache, each /schwarzwald-scratch) not
                 written for N hours that no process has open or as its working directory
 
@@ -288,7 +288,7 @@ def human(n: int) -> str:
 
 
 def default_scratch() -> Path:
-    """The scratch root tools/scratch.sh uses: $SCRATCH_ROOT, $TMPDIR, $XDG_RUNTIME_DIR, else
+    """The default scratch root: $SCRATCH_ROOT, $TMPDIR, $XDG_RUNTIME_DIR, else
     ~/.cache, each with schwarzwald-scratch. Never a fixed name in shared /tmp."""
     if os.environ.get("SCRATCH_ROOT"):
         return Path(os.environ["SCRATCH_ROOT"]).resolve()

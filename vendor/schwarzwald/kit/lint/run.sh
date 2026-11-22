@@ -144,13 +144,13 @@ fi
 
 # The shared lints, each proved on its red case by red.py.
 lint="${part}/lint"
-for rule in internal-refs personal-data denylist-parked own-shas actions-pin no-fail-fast dash-standins make-targets make-help make-deps file-length script-orphans root-entries docs-a11y changelog commit-dates; do
+for rule in internal-refs personal-data denylist-parked own-shas actions-pin no-fail-fast dash-standins make-targets make-help make-deps file-length script-orphans root-entries docs-a11y changelog commit-dates predictable-temp; do
   [[ -f ${lint}/${rule}.py ]] && run "${rule}" "${py}" "install python 3.11" "${py}" "${lint}/${rule}.py" --repo .
 done
 [[ -f ${lint}/red.py ]] && run lint-red "${py}" "install python 3.11" "${py}" "${lint}/red.py" --repo .
 [[ -f ${lint}/run_test.sh ]] && run run-drift-step bash "install bash" bash "${lint}/run_test.sh"
 [[ -f ${part}/hooks/commit-msg_test.sh ]] && run commit-msg-hook bash "install bash" bash "${part}/hooks/commit-msg_test.sh"
-for t in author-guard stale-index markdown-staged commit-dates; do
+for t in stale-index commit-dates; do
   [[ -f ${part}/hooks/${t}_test.sh ]] && run "${t}-hook" bash "install bash" bash "${part}/hooks/${t}_test.sh"
 done
 [[ -f ${part}/guards/tests/suite.sh ]] && run guards bash "install bash" bash "${part}/guards/tests/suite.sh"

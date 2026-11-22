@@ -96,7 +96,7 @@ main = "main"
 # root and fails only when that command fails or leaves the list missing or stale: as strict,
 # without blocking on age. The command never comes from this tracked file: it is
 # `argv = ["cmd", "arg", ...]` in denylist-refresh.toml beside the list, run without a shell,
-# its output never printed. It must MERGE (tools/denylist-merge.py: the union of the current
+# its output never printed. It must MERGE (the union of the current
 # list, the tracker's every code, closed and deleted rows too, and history_ids).
 max_age_hours = 168
 mode = "warn"
@@ -141,7 +141,7 @@ given = ["git", "bash", "python3"]
 # markdownlint-cli2 version, x.y.z only ("" skips it).
 # steps are trusted product code: each runs through bash on every `make lint`, so a change to
 # them is a change to the product's scripts and is reviewed as one. CI runs pull requests with
-# the base branch's lint.toml (ci/lint-and-test.yml), so a branch cannot rewrite its own gate.
+# the base branch's lint.toml (the product's CI workflow), so a branch cannot rewrite its own gate.
 steps = []
 shell_exclude = []
 shellcheck_exclude = ["SC2250", "SC2292", "SC2310", "SC2312"]

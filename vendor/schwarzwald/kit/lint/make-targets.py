@@ -47,9 +47,7 @@ def self_test() -> bool:
     ok = (known >= {"build", "lint", "test"} and problems("a.md", "run `make nope`\n", known)
           and not problems("a.md", "run `make lint`, then make nothing\n", known)
           and problems("a.md", "```\nmake nope\n```\n", known))
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: a stale target must fail and a real one pass", file=sys.stderr)
-    return bool(ok)
+    return config.self_check(RULE, ok, "a stale target must fail and a real one pass")
 
 
 def main(argv: list[str]) -> int:
@@ -75,13 +73,7 @@ def main(argv: list[str]) -> int:
             continue
         seen += 1
         bad += problems(rel, text, known)
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} stale make target(s)")
-        for b in bad[:60]:
-            print(f"  {b}")
-        return 1
-    print(f"PASS [{RULE}] every named make target exists ({seen} files)")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} stale make target(s)", f"every named make target exists ({seen} files)")
 
 
 if __name__ == "__main__":

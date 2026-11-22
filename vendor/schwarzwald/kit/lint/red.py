@@ -43,6 +43,10 @@ def run_case(rule: str, case: Path, product: Path | None) -> int:
         root = d
         git(root, "init", "-q")
         shutil.copytree(case, root, dirs_exist_ok=True)
+        long = root / "long.marker"  # marker: becomes a 601-line file, one over the default cap
+        if long.exists():
+            long.unlink()
+            (root / "big.py").write_text("1\n" * 601, encoding="utf-8")
         if product and (product / "schwarzwald/config/lint.toml").exists() and not (root / "schwarzwald/config").exists():
             (root / "schwarzwald/config").mkdir(parents=True)
             # A product's known-problem lists name its own files, which a case does not have.

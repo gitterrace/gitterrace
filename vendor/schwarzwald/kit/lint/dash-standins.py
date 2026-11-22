@@ -128,9 +128,7 @@ def self_test() -> bool:
     good = all(scan("t.md", t) for t in bad) and not any(scan("t.md", t) for t in ok)
     good = good and all(scan("t.py" if t[0] == "#" else "t.rs", t) for t in code_bad)
     good = good and not any(scan("t.py" if t[0] == "x" else "t.rs", t) for t in code_ok)
-    if not good:
-        print(f"FAIL [{RULE}] self-test: a planted stand-in must fail and clean text must pass", file=sys.stderr)
-    return good
+    return config.self_check(RULE, good, "a planted stand-in must fail and clean text must pass")
 
 
 def main(argv: list[str]) -> int:

@@ -90,3 +90,4 @@ script_content_rule	rules/82-script-content.sh	guard_is_script_path "${GUARD_FIL
 script_content_patch	engine.sh	[ -z "${GUARD_PATCH:-}" ] || guard_patch_script_lines	apply_patch adding git stash to a .sh	:	cases-rules
 script_content_class	rules/82-script-content.sh	if [ "$GUARD_VERDICT" != block ] &&{NL}        !	writing a .zsh that runs git reset --hard	if false &&{NL}        !	cases-rules
 containment_per_segment	rules/05-containment.sh	_contain_segment "$cmd" "$org" "$seg" || return 1	a Trash move does not cover an rm in the Trash	_contain_segment "$cmd" "$org" "$seg"; return $?	cases-rules
+script_join_quadratic	engine.sh	kept[${#kept[@]}]="$line"	size cap|timing baseline	kept[${#kept[@]}]="$line"; _q="$_q$line"$'\n'; _q="$_q$line"; _q="$_q$line"	cases-rules

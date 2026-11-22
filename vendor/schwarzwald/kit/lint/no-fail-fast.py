@@ -134,9 +134,7 @@ def self_test() -> bool:
         and not cargo_test_problems("s", quoted_ok) and not make_problems("w", quoted_ok)
         and not cargo_test_problems("s", heredoc_ok) and bool(cargo_test_problems("s", heredoc_red))
     )
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: planted fail-fast runs must fail and the clean ones pass", file=sys.stderr)
-    return ok
+    return config.self_check(RULE, ok, "planted fail-fast runs must fail and the clean ones pass")
 
 
 def main(argv: list[str]) -> int:
@@ -159,14 +157,9 @@ def main(argv: list[str]) -> int:
         bad += cargo_test_problems(rel, text)
         if is_wf:
             bad += strategy_problems(rel, text) + make_problems(rel, text)
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} run(s) stop at the first failure")
-        for b in bad[:60]:
-            print(f"  {b}")
-        print("  Add --no-fail-fast to cargo test, fail-fast: false to the strategy, -k to the make.")
-        return 1
-    print(f"PASS [{RULE}] every test run lists every failure ({seen} files)")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} run(s) stop at the first failure",
+                         f"every test run lists every failure ({seen} files)",
+                         "Add --no-fail-fast to cargo test, fail-fast: false to the strategy, -k to the make.")
 
 
 if __name__ == "__main__":

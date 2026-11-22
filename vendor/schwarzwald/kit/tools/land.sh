@@ -102,7 +102,10 @@ else
   repo=$1 clone=$2 base_arg=$3 plan=$4
   [[ $plan == /* ]] || plan="$PWD/$plan"
 fi
-[[ $clone == /* ]] || clone="$PWD/$clone"
+# A relative <repo> or <clone> is resolved here, before any cd: after the cd into the temporary
+# clone "." would name the clone, and the landing would never reach main.
+repo=$(cd "$repo" 2>/dev/null && pwd) || { echo "refused: no repository at '$repo'" >&2; exit 1; }
+clone=$(cd "$clone" 2>/dev/null && pwd) || { echo "refused: no clone at '$clone'" >&2; exit 1; }
 # Every rev a caller or a plan names is a hex object id, checked before any git call sees it: a
 # word starting with - would be taken as an option (--upload-pack=, --output=).
 is_oid() { [[ $1 =~ ^[0-9a-fA-F]{7,64}$ ]]; }
@@ -320,6 +323,7 @@ if [ "$plan_mode" = 1 ]; then
   [ -z "$(git status --porcelain)" ] || { echo "main tree is dirty" >&2; exit 1; }
   git fetch -q "$tmp/w" "$new"
   git merge -q --ff-only "$new" >/dev/null 2>&1 || { echo "refused: not a fast-forward" >&2; exit 1; }
+  [ "$(git -C "$repo" rev-parse main)" = "$new" ] || { echo "refused: main did not move to $(git rev-parse --short "$new"), nothing recorded" >&2; exit 1; }
   git rev-list "$base..$new" >>"$ledger"
   if [ "$lands_only" = 1 ]; then git rev-parse HEAD >"$tipfile"; fi
   echo "landed plan as $(git rev-parse --short HEAD)"
@@ -342,6 +346,9 @@ if git log --format=%H -200 main | xargs -I{} sh -c 'git show {} | git patch-id 
 fi
 before=$(git rev-parse HEAD)
 git merge-base --is-ancestor "$before" "$full" || { echo "refused: $sha is not based on main's tip $(git rev-parse --short HEAD), rebase onto main first" >&2; exit 1; }
+# The landing cherry-picks one commit: a parent that is not main's tip would be dropped silently.
+parent=$(git rev-parse "$full^")
+[ "$parent" = "$before" ] || { echo "refused: $sha has an ancestor not on main: $(git rev-parse --short "$parent") sits between main's tip $(git rev-parse --short "$before") and it. Land that first, or send a rebased single commit." >&2; exit 1; }
 now=$(date +%s)
 last=$(git log -1 --format=%ct)
 [ "$now" -gt "$last" ] || now=$((last + 1))
@@ -369,6 +376,7 @@ cd "$repo"
 [ -z "$(git status --porcelain)" ] || { echo "main tree is dirty" >&2; exit 1; }
 git fetch -q "$tmp/w" "$landed"
 git merge -q --ff-only "$landed" >/dev/null 2>&1 || { echo "refused: main moved during the gate, not a fast-forward" >&2; exit 1; }
+[ "$(git rev-parse main)" = "$landed" ] || { echo "refused: main did not move to $(git rev-parse --short "$landed"), nothing recorded" >&2; exit 1; }
 new=$(git rev-parse --short HEAD)
 git rev-parse HEAD >>"$ledger"
 if [ "$lands_only" = 1 ]; then git rev-parse HEAD >"$tipfile"; fi

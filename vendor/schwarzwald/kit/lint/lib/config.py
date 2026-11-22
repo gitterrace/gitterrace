@@ -330,7 +330,7 @@ def messages(root: Path, base: str) -> list[str]:
 
 def shallow(root: Path) -> str | None:
     """A refusal when the clone is shallow: a history lint there inspects one commit and passes.
-    CI checks out with fetch-depth 0 and fetch-tags (ci/lint-and-test.yml)."""
+    CI checks out with fetch-depth 0 and fetch-tags (the product's CI workflow)."""
     r = subprocess.run(["git", "-C", str(root), "rev-parse", "--is-shallow-repository"],
                        capture_output=True, text=True)
     if r.returncode != 0 or r.stdout.strip() != "false":
@@ -342,3 +342,23 @@ def message_lines(msg: str) -> list[str]:
     """Subject and body, every line: `git commit -m` and `-F` keep `#` lines, so a committed
     message never skips them. The commit-msg hook strips comments itself when git will."""
     return msg.splitlines()
+
+
+def report(rule: str, bad: list[str], head: str, ok: str, *hint: str) -> int:
+    """The shared verdict: FAIL with the first 60 problems and the hint lines (exit 1), or PASS."""
+    if bad:
+        print(f"FAIL [{rule}] {head}")
+        for b in bad[:60]:
+            print(f"  {b}")
+        for h in hint:
+            print(f"  {h}")
+        return 1
+    print(f"PASS [{rule}] {ok}")
+    return 0
+
+
+def self_check(rule: str, ok: object, why: str) -> bool:
+    """Print the shared self-test failure line when ok is false."""
+    if not ok:
+        print(f"FAIL [{rule}] self-test: {why}", file=sys.stderr)
+    return bool(ok)

@@ -87,10 +87,7 @@ def self_test() -> bool:
         ("IOS_DEPLOYMENT_TARGET = 26.0\n" + good, ["build"], 0),
     ]
     ok = all((len(problems("M", t, c)) > 0) == bool(bad) for t, c, bad in cases)
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: a planted defect must fail and a clean Makefile pass",
-              file=sys.stderr)
-    return ok
+    return config.self_check(RULE, ok, "a planted defect must fail and a clean Makefile pass")
 
 
 def main(argv: list[str]) -> int:
@@ -107,13 +104,8 @@ def main(argv: list[str]) -> int:
     bad = []
     for rel in makes:
         bad += problems(rel, (root / rel).read_text(encoding="utf-8", errors="replace"), core)
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} problem(s) in the Makefile's help")
-        for b in bad[:60]:
-            print(f"  {b}")
-        return 1
-    print(f"PASS [{RULE}] {len(makes)} Makefile(s) print the shared help")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} problem(s) in the Makefile's help",
+                         f"{len(makes)} Makefile(s) print the shared help")
 
 
 if __name__ == "__main__":

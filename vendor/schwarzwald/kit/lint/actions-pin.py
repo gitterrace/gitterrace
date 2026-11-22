@@ -101,9 +101,7 @@ def self_test() -> bool:
     good = [(workflow_problems, f"uses: x/y@{sha} # v4\n"), (workflow_problems, "uses: ./local\n"),
             (docker_problems, f"FROM ubuntu@sha256:{sha}\nRUN curl -fsSL https://e.org/x \\\n && echo '{'0' * 64}  x' | sha256sum -c -\n")]
     ok = all(fn("t", t) for fn, t in bad) and not any(fn("t", t) for fn, t in good)
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: planted unpinned inputs must fail and pinned ones pass", file=sys.stderr)
-    return ok
+    return config.self_check(RULE, ok, "planted unpinned inputs must fail and pinned ones pass")
 
 
 def main(argv: list[str]) -> int:
@@ -119,14 +117,8 @@ def main(argv: list[str]) -> int:
         seen += 1
         text = (root / rel).read_text(encoding="utf-8", errors="replace")
         bad += workflow_problems(rel, text) if wf else docker_problems(rel, text)
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} unpinned input(s)")
-        for b in bad[:60]:
-            print(f"  {b}")
-        print("  Pin by full sha (with a version comment) or sha256 digest.")
-        return 1
-    print(f"PASS [{RULE}] every input pinned ({seen} files)")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} unpinned input(s)", f"every input pinned ({seen} files)",
+                         "Pin by full sha (with a version comment) or sha256 digest.")
 
 
 if __name__ == "__main__":

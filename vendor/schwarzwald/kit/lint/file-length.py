@@ -58,9 +58,7 @@ def self_test() -> bool:
     wide = "code " + "x" * 20 + "\n"
     ok = bool(ok and code_problems("a", wide, 9, 0) and not code_problems("a", wide, 9, 1)
               and code_problems("a", wide, 9, 2) and not code_problems("a", "// " + wide, 9, 0))
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: an over-cap file must fail and an in-cap one pass", file=sys.stderr)
-    return bool(ok)
+    return config.self_check(RULE, ok, "an over-cap file must fail and an in-cap one pass")
 
 
 def main(argv: list[str]) -> int:
@@ -85,13 +83,7 @@ def main(argv: list[str]) -> int:
         bad += problems(rel, text, s["max_lines"], s["max_width"])
         if width:
             bad += code_problems(rel, text, width, allowed.get(rel, 0))
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} over the cap")
-        for b in bad[:60]:
-            print(f"  {b}")
-        return 1
-    print(f"PASS [{RULE}] {seen} files within {s['max_lines']} lines")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} over the cap", f"{seen} files within {s['max_lines']} lines")
 
 
 if __name__ == "__main__":

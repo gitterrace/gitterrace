@@ -76,10 +76,7 @@ def self_test() -> bool:
           and problems(script, "ruff==1.0", runner, steps, deps)
           and problems(script.replace("vale", "vale typos"), "ruff==1.1", runner, steps, deps)
           and problems("RUFF_VERSION=1.0\n", "ruff==1.0", "", [], deps))
-    if not ok:
-        print(f"FAIL [{RULE}] self-test: a missing tool or a drifted pin must fail",
-              file=sys.stderr)
-    return bool(ok)
+    return config.self_check(RULE, ok, "a missing tool or a drifted pin must fail")
 
 
 def main(argv: list[str]) -> int:

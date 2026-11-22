@@ -150,14 +150,9 @@ def self_test(cfg: dict[str, dict]) -> bool:
 
 
 def report(bad: list[str], what: str) -> int:
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} tracker id, planning label or process word(s) in {what}")
-        for b in bad[:60]:
-            print(f"  {b}")
-        print("  Say what the row says, not its id or label. Ids go on the tracker.")
-        return 1
-    print(f"PASS [{RULE}] no tracker ids, planning labels or process words in {what}")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} tracker id, planning label or process word(s) in {what}",
+                         f"no tracker ids, planning labels or process words in {what}",
+                         "Say what the row says, not its id or label. Ids go on the tracker.")
 
 
 def main(argv: list[str]) -> int:

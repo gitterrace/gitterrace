@@ -189,16 +189,11 @@ def main(argv: list[str]) -> int:
     if not args and seen < cfg["scope"]["min_files"]:
         print(f"FAIL [{RULE}] scanned only {seen} file(s): the census is broken")
         return 2
-    if bad:
-        print(f"FAIL [{RULE}] {len(bad)} accessibility problem(s) in the docs")
-        for b in bad[:60]:
-            print(f"  {b}")
-        print("  One h1, no skipped level, alt text that says what the image shows, link text that")
-        print("  makes sense alone, and a language on every fenced block.")
-        return 1
     note = f", {len(used)} known problem(s) left" if used else ""
-    print(f"PASS [{RULE}] headings, alt text, link text and code fences in {seen} file(s){note}")
-    return 0
+    return config.report(RULE, bad, f"{len(bad)} accessibility problem(s) in the docs",
+                         f"headings, alt text, link text and code fences in {seen} file(s){note}",
+                         "One h1, no skipped level, alt text that says what the image shows, link text that",
+                         "makes sense alone, and a language on every fenced block.")
 
 
 if __name__ == "__main__":

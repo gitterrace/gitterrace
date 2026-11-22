@@ -217,7 +217,95 @@ guard_patch_script_lines() {
 # KiB.
 GUARD_SCRIPT_MAX=65536
 GUARD_SCRIPT_BODIES=""
+GUARD_SCRIPT_PLAIN=""
 GUARD_SCRIPT_REFUSE=""
+# A script FILE exempt from the staging rules: its name is *_test.sh, it sources test-sandbox.sh /
+# test_sandbox.sh, and it is tracked and unmodified in its own repo (`git ls-files
+# --error-unmatch` and `git diff --quiet HEAD` both succeed), so a script an agent just wrote or
+# edited never qualifies. There is no marker route. Any check that cannot run fails closed. Only
+# a script path is asked: a `bash -c` string has no file to vouch for it. $1 is the path, $2 the
+# body already in memory.
+_guard_body_sandboxed() {
+    local path="$1" line dir base found=1
+    base="${path##*/}"
+    case "$base" in *_test.sh) ;; *) return 1 ;; esac
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ $line =~ ^[[:space:]]*(\.|source)[[:space:]]+[^#]*test[-_]sandbox\.sh ]] && found=0 && break
+    done <<<"$2"
+    [ "$found" -eq 0 ] || return 1
+    case "$path" in */*) dir="${path%/*}" ;; *) dir=. ;; esac
+    [ -n "$dir" ] || dir=/
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$dir" ls-files --error-unmatch -- "$base" >/dev/null 2>&1 || return 1
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$dir" diff --quiet HEAD -- "$base" >/dev/null 2>&1 || return 1
+    return 0
+}
+# Is GUARD_CMD one plain `git [-C dir] checkout|reset ...` aimed at a DETACHED WORKTREE under the
+# session scratch dir (GUARD_SCRATCH_DIR, the adapter's JCODE_SCRATCH_DIR)? Such a worktree is
+# throwaway, so a discard there costs nobody's work. The target is -C if given, else the cwd,
+# resolved to its real path: a symlink out of scratch, or a `..` escape, lands outside and is
+# refused. It must be its own linked worktree (`.git` a file) with a detached HEAD, never the
+# shared checkout. Any chaining, expansion, redirect, env prefix, `cd`, --git-dir or --work-tree
+# makes the target unknowable, so the answer is no.
+# Only: reset [--hard|--mixed|--soft] [<rev>]; checkout --detach <rev>; checkout <rev> (detached,
+# checked by the caller); checkout [--] <paths>. Never -b/-B/--orphan or any other option.
+_guard_scratch_args_ok() {
+    local -a w
+    local verb i
+    read -r -a w <<<"$1"
+    i=1
+    [ "${w[1]:-}" = -C ] && i=3
+    verb="${w[$i]:-}"
+    i=$((i + 1))
+    local a n=0
+    _GUARD_SCRATCH_ARGS=""
+    case "$verb" in
+        reset)
+            for a in "${w[@]:$i}"; do
+                case "$a" in
+                    --hard | --mixed | --soft) [ "$n" -eq 0 ] || return 1 ;;
+                    -*) return 1 ;;
+                    *) n=$((n + 1)); [ "$n" -le 1 ] || return 1 ;;
+                esac
+            done
+            ;;
+        checkout)
+            [ "${w[$i]:-}" = --detach ] && { [ "${#w[@]}" -eq $((i + 2)) ] || return 1; return 0; }
+            for a in "${w[@]:$i}"; do
+                case "$a" in
+                    --) _GUARD_SCRATCH_ARGS=""; return 0 ;;
+                    -*) return 1 ;;
+                esac
+            done
+            _GUARD_SCRATCH_ARGS="${w[*]:$i}"
+            ;;
+        *) return 1 ;;
+    esac
+    return 0
+}
+guard_scratch_worktree_git() {
+    local c="${GUARD_CMD:-}" scratch dir w d top
+    [ -n "${GUARD_SCRATCH_DIR:-}" ] && [ -d "$GUARD_SCRATCH_DIR" ] || return 1
+    scratch=$(cd "$GUARD_SCRATCH_DIR" 2>/dev/null && pwd -P) || return 1
+    case "$scratch" in "" | / | "$HOME" | "${HOME%/*}") return 1 ;; esac
+    [[ $c =~ ^git([[:space:]]+-C[[:space:]]+([^[:space:]]+))?[[:space:]]+(checkout|reset)([[:space:]]|$) ]] || return 1
+    case "$c" in *[';&|$`()<>"'"'"'\']* | *$'\n'* | *--git-dir* | *--work-tree* | *--exec-path*) return 1 ;; esac
+    dir="${BASH_REMATCH[2]:-${GUARD_CWD:-}}"
+    [ -n "$dir" ] || return 1
+    _guard_scratch_args_ok "$c" || return 1
+    case "$dir" in /*) ;; *) dir="${GUARD_CWD:-}/$dir" ;; esac
+    d=$(cd "$dir" 2>/dev/null && pwd -P) || return 1
+    case "$d" in "$scratch"/*) ;; *) return 1 ;; esac
+    [ -f "$d/.git" ] || return 1
+    top=$(env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" rev-parse --show-toplevel 2>/dev/null) || return 1
+    top=$(cd "$top" 2>/dev/null && pwd -P) || return 1
+    [ "$top" = "$d" ] || return 1
+    env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" symbolic-ref -q HEAD >/dev/null 2>&1 && return 1
+    # `checkout <name>` naming a local branch would attach HEAD to it, and a later reset would move it.
+    for w in $_GUARD_SCRATCH_ARGS; do
+        env -u GIT_DIR -u GIT_WORK_TREE -u GIT_INDEX_FILE git -C "$d" show-ref --verify -q "refs/heads/$w" 2>/dev/null && return 1
+    done
+    return 0
+}
 guard_script_bodies() {
     local -a queue=("$1") seen=() bases=() words=()
     local q=0 text rest path kind w i n=0 out="" size body line first base cdre
@@ -225,6 +313,8 @@ guard_script_bodies() {
     local direct="$GUARD_ANCHOR"'(\.{0,2}/[^[:space:];&|<>()]+)'
     local piped='(^|[;&|[:space:]])cat[[:space:]]+([^[:space:];&|<>()]+)[[:space:]]*\|[[:space:]]*([^[:space:]]*/)?(bash|zsh|dash|ksh|sh)([[:space:]]|$)'
     GUARD_SCRIPT_BODIES=""
+    GUARD_SCRIPT_PLAIN=""
+    local plain=""
     GUARD_SCRIPT_REFUSE=""
     bases=("${GUARD_CWD:-.}")
     cdre='(^|[;&|(]|[[:space:]])(cd|pushd)[[:space:]]+([^[:space:];&|<>()]+)'
@@ -284,6 +374,7 @@ guard_script_bodies() {
             # Written by this same command: what is on disk now is not what runs.
             if _guard_written_body "$path"; then
                 out+="$GUARD_FALLBACK_VALUE"
+                plain+="$GUARD_FALLBACK_VALUE"
                 queue+=("$GUARD_FALLBACK_VALUE")
                 continue
             fi
@@ -334,11 +425,15 @@ guard_script_bodies() {
             if [ "${#kept[@]}" -gt 0 ]; then
                 body=$(printf '%s\n' "${kept[@]}")
                 out+="$body"$'\n'
+                # Sandboxed: every rule still reads it, but the git-staging rules (see
+                # guard_main) are not asked about it. Never an exe/py or a written script.
+                if [ "$kind" = shell ] && _guard_body_sandboxed "$path" "$(<"$path")"; then :; else plain+="$body"$'\n'; fi
                 queue+=("$body")
             fi
         done
     done
     GUARD_SCRIPT_BODIES="$out"
+    GUARD_SCRIPT_PLAIN="$plain"
 }
 
 # Does GUARD_CMD write the script $1 (`> x.sh`, `>> x.sh`, `tee x.sh`)? Returns 1 when not. When it
@@ -477,11 +572,19 @@ guard_main() {
     # GUARD_SCRIPT_MAX either one outruns the hook deadline. `$(...)` has already dropped the
     # trailing newlines. A heredoc inside a script is then read as commands, which can only
     # add a verdict, never hide one.
+    local GUARD_ORIG_CMD="${GUARD_CMD:-}" GUARD_ORIG_HEAD="$GUARD_HEAD_CACHE" GUARD_PLAIN_CMD GUARD_PLAIN_HEAD
     if [ "${GUARD_TOOL:-}" = bash ]; then
         guard_script_bodies "$GUARD_HEAD_CACHE"
         if [ -n "$GUARD_SCRIPT_BODIES" ]; then
             GUARD_CMD="${GUARD_CMD:-}"$'\n'"$GUARD_SCRIPT_BODIES"
             GUARD_HEAD_CACHE="$GUARD_HEAD_CACHE"$'\n'"$GUARD_SCRIPT_BODIES"
+        fi
+        # The command as typed plus the bodies of scripts that are NOT sandboxed.
+        GUARD_PLAIN_CMD="${GUARD_ORIG_CMD:-}"
+        GUARD_PLAIN_HEAD="${GUARD_ORIG_HEAD:-}"
+        if [ -n "$GUARD_SCRIPT_PLAIN" ]; then
+            GUARD_PLAIN_CMD="$GUARD_PLAIN_CMD"$'\n'"$GUARD_SCRIPT_PLAIN"
+            GUARD_PLAIN_HEAD="$GUARD_PLAIN_HEAD"$'\n'"$GUARD_SCRIPT_PLAIN"
         fi
     fi
 
@@ -490,6 +593,11 @@ guard_main() {
         return 0
     }
 
+    # A discard in a detached scratch worktree touches nobody's work: nothing to judge.
+    if [ "${GUARD_TOOL:-}" = bash ] && guard_scratch_worktree_git; then
+        printf 'verdict: allow\n'
+        return 0
+    fi
     # Outside the org tree, only the destructive class: from /tmp,
     # `git -C <repo> stash` destroys the same work.
     case "${GUARD_CWD:-}" in
@@ -522,6 +630,21 @@ guard_main() {
         event="${entry##*:}"
         [ "$event" = "${GUARD_EVENT:-pre_tool}" ] || continue
         GUARD_ACTIVE_RULE="$rule"
+        # The git-staging rules skip the body of a sandboxed script (a throwaway repo), and
+        # only that body: what is typed beside it is judged as always.
+        case " git_add_scope shared_index_staging git_commit_all git_commit_index_scope git_commit_pathspec_discards_hunk " in
+            *" $rule "*)
+                if [ "${GUARD_PLAIN_CMD:-$GUARD_CMD}" != "$GUARD_CMD" ]; then
+                    _sb_cmd="$GUARD_CMD" _sb_head="$GUARD_HEAD_CACHE"
+                    GUARD_CMD="$GUARD_PLAIN_CMD" GUARD_HEAD_CACHE="$GUARD_PLAIN_HEAD"
+                    "guard_rule_$rule" || true
+                    GUARD_CMD="$_sb_cmd" GUARD_HEAD_CACHE="$_sb_head"
+                    GUARD_ACTIVE_RULE=""
+                    [ "$GUARD_VERDICT" = block ] && [ -z "${GUARD_ATTRIBUTION:-}" ] && break
+                    continue
+                fi
+                ;;
+        esac
         "guard_rule_$rule" || true
         GUARD_ACTIVE_RULE=""
         # First block wins: one reason, and no later rule can overturn it. Under attribution
@@ -565,7 +688,17 @@ guard_cwd_repo() {
 }
 
 guard_witness() {
-    : "${GUARD_WITNESS:=/tmp/jc-witness.log}"
+    if [ -z "${GUARD_WITNESS:-}" ]; then
+        # A per-user 0700 dir, never a fixed name in shared temp: another user could pre-create the
+        # log or its temp file as a symlink. The dir must be a real dir this user owns.
+        local wdir="${XDG_RUNTIME_DIR:-${TMPDIR:-/var/tmp}}/guard-witness-$(id -u)"
+        mkdir -p "$wdir" 2>/dev/null && chmod 700 "$wdir" 2>/dev/null
+        if [ -d "$wdir" ] && [ ! -L "$wdir" ] && [ -O "$wdir" ]; then
+            GUARD_WITNESS="$wdir/witness.log"
+        else
+            return 0
+        fi
+    fi
     printf '%s %s %s %s %s\n' "$(date +%H:%M:%S)" \
         "${GUARD_SESSION_ID:-synthetic}" "${GUARD_TOOL:-?}" \
         "${GUARD_ENTRYPOINT:-direct}" "${GUARD_EVENT:-pre_tool}" \
@@ -575,8 +708,10 @@ guard_witness() {
         local n
         n=$(wc -l <"$GUARD_WITNESS" 2>/dev/null || echo 0)
         if [ "${n:-0}" -gt 5000 ]; then
-            tail -n 2500 "$GUARD_WITNESS" >"$GUARD_WITNESS.tmp" 2>/dev/null &&
-                mv "$GUARD_WITNESS.tmp" "$GUARD_WITNESS" 2>/dev/null
+            local tmp
+            tmp=$(mktemp "$GUARD_WITNESS.XXXXXX" 2>/dev/null) || return 0
+            tail -n 2500 "$GUARD_WITNESS" >"$tmp" 2>/dev/null &&
+                mv "$tmp" "$GUARD_WITNESS" 2>/dev/null || rm -f "$tmp"
         fi
     fi
 }

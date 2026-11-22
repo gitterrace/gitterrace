@@ -548,7 +548,7 @@ guard_fallback_too_big() {
     local line_count=$((${#parts[@]} - 1))
     [ -n "$had_noglob" ] || set +f
     if [ "$quotes" -gt "$GUARD_FALLBACK_MAX_QUOTES" ]; then
-        GUARD_FALLBACK_REASON="the command holds $quotes quote characters, over the $GUARD_FALLBACK_MAX_QUOTES a guard can judge in time; put it in a script file and run that."
+        GUARD_FALLBACK_REASON="the command holds $quotes quote characters, over the $GUARD_FALLBACK_MAX_QUOTES a guard can judge in time; write the command to a file with the write tool and run \`bash <file>\`."
         return 0
     fi
     if [ "$line_count" -gt "$GUARD_FALLBACK_MAX_LINES" ]; then
