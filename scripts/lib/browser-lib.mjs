@@ -5,7 +5,14 @@
 // - builds a temp repository and serves it with a given binary on a free port
 // - opens pages at given widths and colour schemes
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync, mkdirSync, readdirSync, readFileSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  writeFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  existsSync,
+} from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir, homedir } from 'node:os';
 import { join, resolve, dirname } from 'node:path';
@@ -95,7 +102,8 @@ function bundles() {
  */
 export async function routeFromDisk(ctx, staticDir = join(root, 'crates/gitterrace-web/static')) {
   const parts = bundles();
-  const files = new Map(readdirSync(staticDir).filter((n) => n.endsWith('.js') || n.endsWith('.css'))
+  const assets = readdirSync(staticDir).filter((n) => /\.(js|css)$/.test(n));
+  const files = new Map(assets
     .map((n) => [n, n.endsWith('.css') ? 'text/css' : 'text/javascript']));
   for (const name of parts.keys()) files.set(name, 'text/css');
   const asset = (u) => /\/static\/([^/?#]+)$/.exec(new URL(u).pathname)?.[1];
@@ -123,7 +131,8 @@ export async function poll(fn, what = 'condition', ms = WATCH_BOUND_MS) {
  * Loads `url` (or reloads the page when none) until `ready(page)` holds: parts of a page appear
  * once the server has built its index or seen a working tree edit. Throws after `ms`.
  */
-export async function reloadUntil(p, ready, url = null, what = 'the page to be ready', ms = WATCH_BOUND_MS) {
+export async function reloadUntil(p, ready, url = null, what = 'the page to be ready',
+  ms = WATCH_BOUND_MS) {
   let first = true;
   await poll(async () => {
     if (url) await p.goto(url, { waitUntil: 'load' });
@@ -140,7 +149,8 @@ export async function reloadUntil(p, ready, url = null, what = 'the page to be r
  */
 export async function synced(srv, dir) {
   const head = sh(dir, 'git', 'rev-parse', 'HEAD');
-  const changed = sh(dir, 'git', 'status', '--porcelain', '-uall').split('\n').filter(Boolean).length;
+  const status = sh(dir, 'git', 'status', '--porcelain', '-uall');
+  const changed = status.split('\n').filter(Boolean).length;
   await poll(async () => {
     const repo = await (await fetch(`${srv.base}/api/v1/repo`)).json();
     if (repo.head !== head) return false;
@@ -157,7 +167,8 @@ async function inFront(p, fn, arg) {
   await p.bringToFront();
   return Promise.race([
     p.evaluate(fn, arg),
-    new Promise((_, no) => setTimeout(() => no(new Error('no animation frames within the bound')), WATCH_BOUND_MS)),
+    new Promise((_, no) => setTimeout(
+      () => no(new Error('no animation frames within the bound')), WATCH_BOUND_MS)),
   ]);
 }
 

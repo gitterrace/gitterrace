@@ -3,7 +3,16 @@
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, sh, commitAll, reloadUntil, domQuiet, scrollSettled, frames, WATCH_BOUND_MS } from '../../lib/browser-lib.mjs';
+import {
+  serve,
+  sh,
+  commitAll,
+  reloadUntil,
+  domQuiet,
+  scrollSettled,
+  frames,
+  WATCH_BOUND_MS,
+} from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
 export function checks(env) {
@@ -279,7 +288,8 @@ export function checks(env) {
               writeFileSync(join(repo, nm(k % 5)), body(`${tag} ${k}`));
               if (k % 2) rmSync(extra, { force: true });
               k++;
-              await p.waitForFunction((x) => window.__n > x, now, { timeout: WATCH_BOUND_MS }).catch(() => {});
+              const more = (x) => /** @type {any} */ (window).__n > x;
+              await p.waitForFunction(more, now, { timeout: WATCH_BOUND_MS }).catch(() => {});
             }
             return false;
           };

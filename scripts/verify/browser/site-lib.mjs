@@ -4,7 +4,16 @@ import { readFileSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
-import { eachLaunch, eachBrowser, root, launch, makeRepo, sh, scrollSettled, frames } from '../../lib/browser-lib.mjs';
+import {
+  eachLaunch,
+  eachBrowser,
+  root,
+  launch,
+  makeRepo,
+  sh,
+  scrollSettled,
+  frames,
+} from '../../lib/browser-lib.mjs';
 import { serve } from './sitebar-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */

@@ -9,14 +9,34 @@
 // Every check is an export of a scripts/verify/browser/*-lib.mjs `checks(env)`, described where it
 // is defined. `--checks` names them in kebab-case; an unknown name prints the list.
 //
-// --from-disk serves crates/gitterrace-web/static/*.js and *.css from the working tree over the (possibly
-// older) binary's copies, to test edits before a rebuild. Playwright comes from $PLAYWRIGHT_CORE
-// or the repo's node_modules, installed by `make browser-deps` (see lib/browser-lib.mjs).
-import { readFileSync, readdirSync, writeFileSync, rmSync, mkdirSync, mkdtempSync, existsSync } from 'node:fs';
+// --from-disk serves crates/gitterrace-web/static/*.js and *.css from the working tree over the
+// (possibly older) binary's copies, to test edits before a rebuild. Playwright comes from
+// $PLAYWRIGHT_CORE or the repo's node_modules, installed by `make browser-deps` (see
+// lib/browser-lib.mjs).
+import {
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  rmSync,
+  mkdirSync,
+  mkdtempSync,
+  existsSync,
+} from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { tmpdir } from 'node:os';
-import { root, RESCAN_SECS, loadPlaywright, launch, routeFromDisk, makeRepo, serve, openPage, reporter, sh } from '../../lib/browser-lib.mjs';
+import {
+  root,
+  RESCAN_SECS,
+  loadPlaywright,
+  launch,
+  routeFromDisk,
+  makeRepo,
+  serve,
+  openPage,
+  reporter,
+  sh,
+} from '../../lib/browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));

@@ -2,7 +2,17 @@
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { root, WATCH_BOUND_MS, launch, openPage, sh, commitAll, reloadUntil, synced, frames } from '../../lib/browser-lib.mjs';
+import {
+  root,
+  WATCH_BOUND_MS,
+  launch,
+  openPage,
+  sh,
+  commitAll,
+  reloadUntil,
+  synced,
+  frames,
+} from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -182,7 +192,8 @@ async function chip() {
   const b = await launch(pw, 'chromium');
   for (const scheme of ['light', 'dark']) {
     const p = await openPage(b, srv.base + '/', { scheme, height: 120 });
-    await reloadUntil(p, async () => !(await p.$eval('#wtchip', (d) => d.hidden).catch(() => true)), null, 'the working tree chip').catch(() => {});
+    const shown = async () => !(await p.$eval('#wtchip', (d) => d.hidden).catch(() => true));
+    await reloadUntil(p, shown, null, 'the working tree chip').catch(() => {});
     const anim = await p.$eval('#wtchip .dot', (d) => getComputedStyle(d).animationName).catch(() => 'no chip');
     const hidden = await p.$eval('#wtchip', (d) => d.hidden).catch(() => 'no chip');
     if (anim === 'no chip' || hidden) r.fail(`chip ${scheme}: chip missing or hidden on a dirty tree`);

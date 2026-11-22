@@ -12,23 +12,35 @@
 import { cpSync, appendFileSync, readdirSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { root, loadPlaywright, launch, makeRepo, serve, routeFromDisk } from '../../lib/browser-lib.mjs';
+import {
+  root,
+  loadPlaywright,
+  launch,
+  makeRepo,
+  serve,
+  routeFromDisk,
+} from '../../lib/browser-lib.mjs';
 
-const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
+const arg = (k, d) => {
+  const i = process.argv.indexOf(k);
+  return i < 0 ? d : process.argv[i + 1];
+};
 const bin = resolve(arg('--bin', join(root, 'target/debug/git-terrace')));
 const name = arg('--browser', 'webkit');
 
 /** What the old route did: a glob on the bare file name, which a `?v=` URL never matches. */
 async function bareNameRoute(ctx, dir) {
   for (const f of readdirSync(dir).filter((n) => /\.(js|css)$/.test(n))) {
-    await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType: f.endsWith('.css') ? 'text/css' : 'text/javascript', body: readFileSync(join(dir, f)) }));
+    const contentType = f.endsWith('.css') ? 'text/css' : 'text/javascript';
+    const body = readFileSync(join(dir, f));
+    await ctx.route(`**/static/${f}`, (q) => q.fulfill({ contentType, body }));
   }
 }
 
 /** In the page: the planted stylesheet rule and script global, as the page sees them. */
 const seen = () => ({
   css: getComputedStyle(document.documentElement).getPropertyValue('--disk-probe').trim(),
-  js: window.__diskProbe === 1,
+  js: /** @type {any} */ (window).__diskProbe === 1,
 });
 
 const pw = await loadPlaywright([name]);
@@ -52,10 +64,12 @@ try {
     return m;
   };
   const disk = await load((ctx) => routeFromDisk(ctx, copy));
-  say(disk.css === 'planted', `from-disk: a disk edit to a stylesheet shows in the page (${disk.css || 'absent'})`);
+  const css = disk.css || 'absent';
+  say(disk.css === 'planted', `from-disk: a disk edit to a stylesheet shows in the page (${css})`);
   say(disk.js, 'from-disk: a disk edit to a script shows in the page');
   const old = await load((ctx) => bareNameRoute(ctx, copy));
-  say(old.css !== 'planted' && !old.js, 'from-disk: the bare-name route never shows the edits, so the probe can go red');
+  say(old.css !== 'planted' && !old.js,
+    'from-disk: the bare-name route never shows the edits, so the probe can go red');
 } finally {
   await b.close();
   srv.stop();

@@ -3,7 +3,19 @@
 import { readFileSync, writeFileSync, rmSync, mkdtempSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { eachBrowser, WATCH_BOUND_MS, makeRepo, serve, sh, commitAll, synced, reloadUntil, frames, scrollSettled, domQuiet } from '../../lib/browser-lib.mjs';
+import {
+  eachBrowser,
+  WATCH_BOUND_MS,
+  makeRepo,
+  serve,
+  sh,
+  commitAll,
+  synced,
+  reloadUntil,
+  frames,
+  scrollSettled,
+  domQuiet,
+} from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
 export function checks(env) {
@@ -25,6 +37,12 @@ async function marked() {
     await synced(srv, dir);
   }
 }
+/** Waits until the shared tip is shown, or hidden, as the pointer or focus moved. */
+const tipWait = (p, on) => p.waitForFunction((want) => {
+  const t = document.getElementById('gt-tip');
+  return !!t && t.classList.contains('on') === want || (!t && !want);
+}, on, { timeout: 5000 }).catch(() => {});
+
 async function markedIn() {
   writeFileSync(join(dir, 'marked.txt'), 'first line\nsecond line\nthird line\nfourth line\n');
   writeFileSync(join(dir, 'README.md'), '# Fixture\n\nA sentence worth quoting.\n');
@@ -74,7 +92,8 @@ async function markedIn() {
     await p.goto(srv.base + '/blob/HEAD/marked.txt', { waitUntil: 'load' });
     if (!(await p.$('#L3'))) { r.fail(`marked ${name}: no code lines to mark`); return; }
     await p.evaluate(mark, ['lines']);
-    const shown = await p.waitForSelector('#actmark:not([hidden])', { timeout: 5000 }).then(() => true, () => false);
+    const shown = await p.waitForSelector('#actmark:not([hidden])', { timeout: 5000 })
+      .then(() => true, () => false);
     if (!shown) { r.fail(`marked ${name}: no trigger appears for marked lines`); return; }
     const send = await sendOpen(p, 'button');
     const line3 = await p.$eval('#L3', (e) => e.textContent.trim());
@@ -303,14 +322,14 @@ async function dateTips() {
       const want = await el.getAttribute('data-tip');
       const shown = () => p.evaluate(() => { const t = document.getElementById('gt-tip'); return t && t.classList.contains('on') ? t.textContent : ''; });
       await el.hover();
-      await p.waitForFunction(() => document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
+      await tipWait(p, true);
       const hover = await shown();
       await p.mouse.move(0, 0);
-      await p.waitForFunction(() => !document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
+      await tipWait(p, false);
       // The tip shows on focus reached by Tab, so mark the last key as Tab, then focus.
       await p.evaluate(() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true })));
       await el.focus();
-      await p.waitForFunction(() => document.getElementById('gt-tip')?.classList.contains('on'), null, { timeout: 5000 }).catch(() => {});
+      await tipWait(p, true);
       const focus = await shown();
       out[label] = hover === want && focus === want && !!want ? 'ok' : { want, hover, focus };
     }

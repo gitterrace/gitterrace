@@ -3,7 +3,16 @@
 
 import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { eachBrowser, STATS, sh, sweep, commitFiles, synced, reloadUntil, scrollSettled } from '../../lib/browser-lib.mjs';
+import {
+  eachBrowser,
+  STATS,
+  sh,
+  sweep,
+  commitFiles,
+  synced,
+  reloadUntil,
+  scrollSettled,
+} from '../../lib/browser-lib.mjs';
 import { varsStep } from './settings-vars-lib.mjs';
 
 let dir, srv, r, browsers, context, arg, cfg;
@@ -26,7 +35,8 @@ async function sideWidth() {
   const sw = { browsers, context, widths: [1440, 1100, 360], height: 900 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     // The sidebar appears once the index is built: reload until it does.
-    await reloadUntil(p, async () => !!(await p.$('.side .langbar')), srv.base + '/', 'the sidebar');
+    const bar = async () => !!(await p.$('.side .langbar'));
+    await reloadUntil(p, bar, srv.base + '/', 'the sidebar');
     const m = await p.evaluate(() => {
       const s = document.querySelector('.side svg.spark'),
         l = document.querySelector('.side .langbar');

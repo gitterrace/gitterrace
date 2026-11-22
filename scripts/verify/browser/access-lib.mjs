@@ -45,7 +45,8 @@ export function checks({ dir, srv, r, browsers, context }) {
   /** Reloads `p` until `sel` is on the page: insights parts appear once the index is built. */
   async function until(p, sel) {
     // Some pages have no such part at all: the checks that follow report what they find.
-    await reloadUntil(p, async () => !!(await p.$(sel)), null, `${sel} on the page`).catch(() => {});
+    const there = async () => !!(await p.$(sel));
+    await reloadUntil(p, there, null, `${sel} on the page`).catch(() => {});
   }
 
   // Every highlight of text (a search match, any <mark>) is one background: no outline, border,

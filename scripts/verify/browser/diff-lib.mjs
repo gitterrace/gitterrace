@@ -203,7 +203,9 @@ export function checks(env) {
       });
       // The same change, uncommitted: the working tree page of a big uncommitted rename.
       sh(dir, 'git', 'reset', '-q', '--soft', 'HEAD~1');
-      await poll(async () => (await (await fetch(`${srv.base}/api/v1/worktree`)).json()).files.length > 0, 'the soft reset to show in the working tree');
+      const tree = async () => (await fetch(`${srv.base}/api/v1/worktree`)).json();
+      const changed = async () => (await tree()).files.length;
+      await poll(async () => (await changed()) > 0, 'the soft reset in the working tree');
       await eachBrowser(browsers, context, async (ctx, name) => {
         await onePage(ctx, `huge-diff ${name} worktree`, `${srv.base}/worktree`);
       });

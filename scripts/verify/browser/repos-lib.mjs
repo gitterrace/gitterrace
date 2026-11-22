@@ -14,7 +14,8 @@ export function checks(env) {
     for (const o of others) {
       sh(o, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, o);
     }
-    await poll(async () => (await (await fetch(one.origin + '/api/repos')).json()).length >= 3, 'three repositories');
+    const count = async () => (await (await fetch(one.origin + '/api/repos')).json()).length;
+    await poll(async () => (await count()) >= 3, 'three repositories');
     const target = basename(others[0]);
     try {
       await eachBrowser(browsers, context, async (ctx, name) => {
