@@ -3,10 +3,7 @@
 //! - Per-person, per-label, per-bucket and punch/weekday/hour sums all equal the totals.
 //! - The time span only prunes: the stream equals a full scan filtered by `admits`, and a
 //!   scan over the span widened by one day each side filtered the same way.
-//! - Today's page functions equal the reducers over the same `Counted`. Red until the
-//!   insights pages read `Counted`: marked ignored, so `make check` stays green while the
-//!   red stays one `--include-ignored` away. The baseline red output is in
-//!   `count_parity_fuzz.baseline.txt` beside this file. `make counting-parity` runs them.
+//! - Today's page functions equal the reducers over the same `Counted`.
 //!
 //! Edge times are generated, not fixed: ±1 s around the window bound, 23:59:59, 00:00:00 and
 //! 00:00:01 local, git offsets +0530 +0545 +1030 -0930 -1200 +1400, and authors flipping

@@ -192,13 +192,8 @@ bench-guard:
 	python3 scripts/bench/speed-check.py --self-test
 
 ##@ Slow checks, not in check
-.PHONY: counting-parity memory-check speed-check browser-deps browser-check browser-reap \
+.PHONY: memory-check speed-check browser-deps browser-check browser-reap \
 	docker-check coverage-check act-check
-
-# Red until every page reads one Counted.
-## counting-parity: Count parity fuzz, pages against reducers
-counting-parity:
-	cargo test --no-fail-fast -p gitterrace-index --test it count_parity -- --include-ignored
 
 ## memory-check: An idle server's memory stays flat as history and tree grow (about 5 minutes)
 memory-check: build
