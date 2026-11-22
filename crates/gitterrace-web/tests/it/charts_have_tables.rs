@@ -4,6 +4,8 @@
 
 use gitterrace_testkit::{Fixture, page};
 
+use crate::chart_tips_carry_totals::{chart_tips, lacks};
+
 /// The text between `start` and the next `end` after it.
 fn between<'a>(s: &'a str, start: &str, end: &str) -> Option<&'a str> {
     let at = s.find(start)? + start.len();
@@ -167,7 +169,7 @@ fn tip_numbers_read_value_and_total() {
 }
 
 #[tokio::test]
-async fn every_chart_on_the_insights_pages_has_a_summary_and_a_table() {
+async fn every_chart_has_a_summary_a_table_and_tips_with_value_share_and_total() {
     let dir = tempfile::tempdir().expect("tmp");
     let mut f = Fixture::init(dir.path())
         .write("src/a.rs", "fn main() {}\n")
@@ -181,7 +183,7 @@ async fn every_chart_on_the_insights_pages_has_a_summary_and_a_table() {
     }
     let router = crate::common::ready_router(f.path()).await;
     let mut bad = Vec::new();
-    let mut charts = 0;
+    let (mut charts, mut tips) = (0, 0);
     for p in ["/stats", "/stats/hotspots", "/stats/languages"] {
         let (status, body) = page(&router, p).await;
         assert_eq!(status, 200, "{p}");
@@ -190,7 +192,12 @@ async fn every_chart_on_the_insights_pages_has_a_summary_and_a_table() {
             assert!(body.contains("aria-label=\"Type by scope\""), "no type by scope grid");
         }
         bad.extend(faults(&body).into_iter().map(|e| format!("{p}: {e}")));
+        for t in chart_tips(&body) {
+            tips += 1;
+            bad.extend(lacks(&t).map(|why| format!("{p}: {why}: {t}")));
+        }
     }
     assert!(charts >= 6, "only {charts} charts");
+    assert!(tips > 20, "only {tips} chart tips");
     assert!(bad.is_empty(), "{}", bad.join("\n"));
 }

@@ -4,10 +4,8 @@
 
 use std::path::Path;
 
-use gitterrace_testkit::{Fixture, page};
-
 /// The `data-tip` values inside the `<svg>` charts and share bars of `body`.
-fn chart_tips(body: &str) -> Vec<String> {
+pub(crate) fn chart_tips(body: &str) -> Vec<String> {
     let mut out = Vec::new();
     let mut scopes: Vec<&str> = body
         .split("<svg class=\"chart")
@@ -28,7 +26,7 @@ fn chart_tips(body: &str) -> Vec<String> {
 }
 
 /// What a tip lacks: a number with a unit, and for a part of a column its share and total.
-fn lacks(tip: &str) -> Option<&'static str> {
+pub(crate) fn lacks(tip: &str) -> Option<&'static str> {
     if !tip.chars().any(|c| c.is_ascii_digit()) {
         return Some("no number");
     }
@@ -48,36 +46,6 @@ fn a_tip_naming_only_its_mark_is_caught() {
     assert_eq!(lacks("Rust 62.0%"), Some("no total"));
     assert_eq!(lacks("Rust, 4 May 2026: 41,230 lines (62%) of 66,500"), None);
     assert_eq!(lacks("Q1 2026: 40 commits: feat 30 (75%), fix 10 (25%)"), None);
-}
-
-#[tokio::test]
-async fn every_chart_tip_carries_value_share_and_total() {
-    let dir = tempfile::tempdir().expect("tmp");
-    let mut f = Fixture::init(dir.path())
-        .write("src/a.rs", "fn main() {}\n")
-        .write("x.py", "a = 1\n")
-        .commit("feat(core): first");
-    for n in 0..3 {
-        f = f
-            .write("src/a.rs", &format!("fn main() {{ {n} }}\n"))
-            .write("x.py", &format!("a = {n}\nb = 2\n"))
-            .commit("fix(core): next");
-    }
-    let router = crate::common::ready_router(f.path()).await;
-    let mut fails = Vec::new();
-    let mut seen = 0;
-    for p in ["/stats", "/stats/hotspots", "/stats/languages"] {
-        let (status, body) = page(&router, p).await;
-        assert_eq!(status, 200, "{p}");
-        for t in chart_tips(&body) {
-            seen += 1;
-            if let Some(why) = lacks(&t) {
-                fails.push(format!("{p}: {why}: {t}"));
-            }
-        }
-    }
-    assert!(seen > 20, "only {seen} chart tips");
-    assert!(fails.is_empty(), "{}", fails.join("\n"));
 }
 
 /// Only the builder writes a chart's `data-tip`.
