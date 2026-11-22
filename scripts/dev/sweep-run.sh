@@ -7,10 +7,11 @@
 # <clone> is a name under .wt/ or a path to one; without it every clone is looked at. A clone is
 # removed only when ALL of these hold, and each clone kept is printed with the reason:
 #   clean     no change and no untracked file, no stash
+#   started   a commit was made in it (its HEAD reflog): a fresh clone is work about to start
 #   landed    every commit of every local branch is on main: `git cherry` shows no `+` line, or
 #             the paths changed since the merge base hold main's content (a squashed landing,
 #             which cherry misses)
-#   idle      no process has its cwd inside the clone (lsof; a missing lsof keeps the clone)
+#   idle      no process has its cwd inside the clone (lsof, else /proc; neither keeps the clone)
 # --ratchet is --dry-run with the limit read from landed_clones in schwarzwald/config/ratchet.toml.
 # --dry-run only reports. --limit N (with --dry-run) exits 1 when more than N clones could be
 # removed: the `make lint` ratchet on piled-up landed clones.
@@ -30,6 +31,15 @@ kept_reason() {
   }
   [ -z "$(git -C "$c" stash list)" ] || {
     echo "has a stash"
+    return
+  }
+  # A clone nobody has committed in yet holds work about to start, not work already landed:
+  # with no commit of its own it would pass every landed check below. The reflog is read whole
+  # first: grep -q stops early, and under pipefail the SIGPIPE to git would read as no commit.
+  local moves
+  moves=$(git -C "$c" log -g --format=%gs HEAD 2>/dev/null) || moves=""
+  grep -qE '^(commit|rebase|cherry-pick|merge|am|revert)' <<<"$moves" || {
+    echo "no commit made in it yet"
     return
   }
   while read -r b; do
@@ -143,7 +153,7 @@ self_test() {
   echo .wt >"$main/.git/info/exclude"
   printf 'one\n' >"$main/a.txt"
   g "$main" add a.txt scripts && g "$main" commit -q -m base
-  for c in dirty untracked unlanded busy cherry squash; do
+  for c in dirty untracked unlanded busy cherry squash fresh; do
     git clone -q --no-local "$main" "$main/.wt/$c"
   done
   printf 'edit\n' >>"$main/.wt/dirty/a.txt"
@@ -151,7 +161,10 @@ self_test() {
   # unlanded: a commit main lacks
   printf 'x\n' >"$main/.wt/unlanded/u.txt"
   g "$main/.wt/unlanded" add u.txt && g "$main/.wt/unlanded" commit -q -m unlanded
-  # busy: a landed-looking clone (no commits) with a process inside
+  # busy: a landed clone with a process inside
+  printf 'b\n' >"$main/.wt/busy/b.txt"
+  g "$main/.wt/busy" add b.txt && g "$main/.wt/busy" commit -q -m busy
+  g "$main" fetch -q "$main/.wt/busy" HEAD && g "$main" cherry-pick FETCH_HEAD >/dev/null
   (cd "$main/.wt/busy" && exec sleep 60) &
   local busy=$!
   # cherry: land the commit by cherry-pick, as land.sh does
@@ -167,10 +180,11 @@ self_test() {
   g "$main" commit -q -am squashed
   sleep 1
   out=$(bash "$sw" --dry-run) || true
-  for c in dirty untracked unlanded busy; do
+  for c in dirty untracked unlanded busy fresh; do
     grep -q "^kept $c: " <<<"$out" || st_fail "red case $c was not kept:\n$out"
     [ -d "$main/.wt/$c" ] || st_fail "red case $c was removed in dry-run"
   done
+  grep -q '^kept fresh: no commit made' <<<"$out" || st_fail "fresh reason missing:\n$out"
   grep -q '^kept dirty: dirty' <<<"$out" || st_fail "dirty reason missing"
   grep -q '^kept untracked: dirty' <<<"$out" || st_fail "untracked reason missing"
   grep -q '^kept unlanded: unlanded' <<<"$out" || st_fail "unlanded reason missing"
@@ -198,7 +212,7 @@ self_test() {
   [ ! -d "$main/.wt/cherry" ] || st_fail "the cherry-landed clone was kept"
   bash "$sw" >/dev/null
   [ ! -d "$main/.wt/squash" ] || st_fail "the squash-landed clone was kept"
-  for c in dirty untracked unlanded busy; do
+  for c in dirty untracked unlanded busy fresh; do
     [ -d "$main/.wt/$c" ] || st_fail "a real run removed red case $c"
   done
   # once the process is gone the busy clone is removable: the lsof condition was the only reason
