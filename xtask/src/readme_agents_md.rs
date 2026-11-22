@@ -96,7 +96,8 @@ fn quickstart_md() -> String {
 
 /// One screenshot, light and dark: the site's own WebP files, from the same list.
 fn shots_md() -> String {
-    let (name, alt, _) = crate::site::SHOTS[0];
+    let (name, alt, _) =
+        crate::site::SHOTS.into_iter().find(|s| s.0 == "send").unwrap_or(crate::site::SHOTS[0]);
     format!(
         "<picture>\n<source media=\"(prefers-color-scheme: \
         dark)\" srcset=\"docs/screenshots/{name}-dark.webp\">\n<img \

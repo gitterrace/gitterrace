@@ -26,6 +26,7 @@ pub mod legal;
 mod shots;
 
 pub use landing::SHOTS;
+pub(crate) use landing::sizes;
 use shots::check_shots;
 
 const FONTS: [(&str, &str); 3] = [
@@ -133,15 +134,7 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
     let h = landing::body(ws, &pitch, &docs::Links::new(repo), &read)?;
     outs.push(Out::file(
         at("index.html"),
-        page(
-            &site,
-            &Body {
-                desc: &pitch,
-                inner: &h,
-                scripts: vec![LIGHTBOX_JS.to_owned()],
-                ..Body::default()
-            },
-        ),
+        page(&site, &Body { desc: &pitch, inner: &h, ..Body::default() }),
     ));
     let (pages, paths) = docs::pages(root, &site)?;
     outs.extend(pages);
@@ -235,11 +228,6 @@ fn versioned(body: &str, sums: &std::collections::BTreeMap<String, String>) -> S
 /// The 404 page's text: where the reader likely meant to go.
 const NOT_FOUND: &str = include_str!("../templates/not_found.html");
 
-/// The one script on the page: Escape closes an open screenshot by going back to `#features`,
-/// the same place a click on the overlay leads. Everything else works without it.
-const LIGHTBOX_JS: &str = "addEventListener('keydown',\n\
-function(e){if(e.key==='Escape'&&location.hash.indexOf('#shot-')===0)location.hash='features'})";
-
 /// In the head, before first paint: a theme the visitor picked earlier (the app's own key, so
 /// both remember one choice), else none and the system decides. No flash of the wrong scheme.
 const THEME_INIT_JS: &str = "(function(){try{var t=localStorage.getItem('gitterrace-theme');\n\
@@ -271,7 +259,7 @@ d.addEventListener('click',function(e){if(e.target.closest('a'))d.open=false});\
 document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d.open=false})})";
 
 /// Every inline script on the page, so the CSP lists exactly these by hash.
-const SCRIPTS: [&str; 4] = [THEME_INIT_JS, THEME_TOGGLE_JS, LIGHTBOX_JS, MENU_JS];
+const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, MENU_JS];
 
 /// The body of the outline's inline script on a docs page with a rail: the app's own script,
 /// from a fresh line so its first line fits the page's line width. Its whole-line comments stay

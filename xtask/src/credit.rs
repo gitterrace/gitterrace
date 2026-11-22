@@ -120,6 +120,6 @@ mod tests {
             g.contains("Shows [jq jq-1.8.2](https://github.com/jqlang/jq/tree/jq-1.8.2)"),
             "{g}"
         );
-        assert_eq!(g.matches("Shows [").count(), 6, "{g}");
+        assert_eq!(g.matches("Shows [").count(), crate::site::SHOTS.len(), "{g}");
     }
 }

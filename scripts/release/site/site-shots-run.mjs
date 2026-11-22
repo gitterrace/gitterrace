@@ -43,6 +43,10 @@ mkdirSync(out, { recursive: true });
 // Stable frames: no animation, no caret, no live-update pulse.
 const FREEZE = '*,*::before,*::after{animation:none!important;transition:none!important;caret-color:transparent!important}';
 
+/**
+ * @typedef {{ width: number, height: number }} Size
+ * @type {{ name: string, path: string, viewport?: Size, prepare?: (p: any) => Promise<void> }[]}
+ */
 const SHOTS = [
   { name: 'overview', path: '/r/ripgrep/' },
   // Hotspots has the page header, tab bar, key numbers and the scatter above the fold.
@@ -82,6 +86,31 @@ const SHOTS = [
   },
 ];
 
+SHOTS.push(
+  // The repository page on a phone: the 390 px layout, 2x like the rest.
+  { name: 'narrow', path: '/r/ripgrep/', viewport: { width: 390, height: 780 } },
+  {
+    // The actions menu on a marked line, with the coding agent entry beside the other targets.
+    name: 'agent',
+    path: '/r/ripgrep/blob/release/crates/core/main.rs#L14-L17',
+    async prepare(p) {
+      await p.waitForSelector('#actsel');
+      await p.click('#actsel');
+      await p.waitForSelector('.actmenu');
+      const text = await p.evaluate(() => {
+        return /** @type {HTMLElement} */ (document.querySelector('.actmenu')).innerText;
+      });
+      if (!/Ask Claude Code/.test(text)) {
+        throw new Error(`agent shot: no "Ask Claude Code" action, got ${JSON.stringify(text)}`);
+      }
+      // No tooltip over the menu: the pointer rests in a corner.
+      await p.mouse.move(5, 5);
+      await p.evaluate(() => /** @type {HTMLElement} */ (document.activeElement)?.blur());
+      await p.evaluate(() => window.scrollTo(0, 0));
+    },
+  },
+);
+
 const todo = SHOTS.filter((s) => !only.length || only.includes(s.name));
 const pw = await loadPlaywright();
 const browser = await launch(pw, 'chromium');
@@ -89,6 +118,7 @@ for (const scheme of ['light', 'dark']) {
   const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
   for (const s of todo) {
     const p = await ctx.newPage();
+    if (s.viewport) await p.setViewportSize(s.viewport);
     await p.goto(base + s.path, { waitUntil: 'networkidle', timeout: 60000 });
     await p.addStyleTag({ content: FREEZE });
     await p.evaluate(() => document.fonts.ready);

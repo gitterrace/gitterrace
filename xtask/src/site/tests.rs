@@ -7,44 +7,48 @@ fn landing() -> String {
     pages.into_iter().find(|p| p.0 == "index.html").map(|p| p.1).expect("landing page")
 }
 
-/// One figure per shot, a light/dark pair inside it, and a lightbox that is labelled, takes
-/// focus and does not announce its image twice: per shot only the tile's light image has
-/// an alt, every dark copy and both lightbox images are decorative.
+/// One figure per gallery and hand-off shot, each one picture whose dark source follows the
+/// system, with its own close link: no second copy of the image for the overlay.
 #[test]
-fn gallery_has_one_figure_per_shot_and_an_accessible_lightbox() {
+fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
     let page = landing();
-    let g = page
-        .split_once("<div class=\"shots\">")
-        .and_then(|(_, r)| r.split_once("</div>"))
-        .map(|(g, _)| g)
-        .expect("gallery");
-    assert!(!g.contains("<figure><figure"), "nested figure");
-    assert_eq!(g.matches("<figure>").count(), SHOTS.len());
-    assert_eq!(g.matches("<span class=\"shot\">").count(), SHOTS.len() * 2);
-    assert_eq!(g.matches("class=\"on-dark\"").count(), SHOTS.len() * 2);
-    assert_eq!(g.matches("alt=\"\"").count(), SHOTS.len() * 3);
-    assert_eq!(g.matches("tabindex=\"-1\"").count(), SHOTS.len());
-    assert_eq!(g.matches("aria-label=\"Close ").count(), SHOTS.len());
+    let shown = ["insights", "ownership", "commit", "blame", "narrow", "send", "agent"];
+    assert_eq!(page.matches("<figure ").count(), shown.len());
+    assert_eq!(page.matches("class=\"x\"").count(), shown.len());
+    for name in shown {
+        assert!(page.contains(&format!("id=\"shot-{name}\"")), "{name}");
+        assert_eq!(page.matches(&format!("screenshots/{name}-light.thumb.webp")).count(), 1);
+        assert_eq!(page.matches(&format!("screenshots/{name}-dark.thumb.webp")).count(), 1);
+    }
+    assert!(!page.contains("class=\"lightbox\""));
 }
 
-/// A tile loads only its thumbnail, and the full-size file is left to the lightbox.
+/// Only the hero loads at once, and it is the one marked high priority.
 #[test]
-fn tiles_never_reference_the_full_size_screenshot() {
+fn only_the_hero_picture_is_eager() {
+    let page = landing().replace('\n', " ");
+    let eager = page.matches("<img ").count() - page.matches("loading=\"lazy\"").count();
+    assert_eq!(eager, 1);
+    assert!(page.contains("fetchpriority=\"high\""));
+}
+
+/// The hero names the brew command first with `git terrace` under it, and the buttons go to
+/// the install section, the demo and the repository.
+#[test]
+fn the_hero_shows_brew_and_git_terrace_above_the_fold() {
     let page = landing();
-    for (name, ..) in SHOTS {
-        let at = page.find(&format!("href=\"#shot-{name}\"")).expect("tile");
-        let rest = &page[at..];
-        let (tile, after) = rest.split_once("<a class=\"lightbox\"").expect("lightbox");
-        let lightbox = after.split_once("</a>").map_or(after, |l| l.0);
-        assert!(!rest.split("</figure>").next().unwrap_or("").contains(".png"));
-        for c in ["light", "dark"] {
-            assert!(!tile.contains(&format!("screenshots/{name}-{c}.webp")));
-            assert!(tile.contains(&format!("screenshots/{name}-{c}.thumb.webp")));
-            assert!(!lightbox.contains(".thumb."), "lightbox {name} loads a thumbnail");
-        }
-        assert!(lightbox.contains(&format!("screenshots/{name}-dark.webp")));
-        assert!(tile.contains("width=\"1280\" height=\"800\" loading=\"lazy\""));
-    }
+    let hero = page.split_once("<div class=\"trust\"").map_or("", |h| h.0);
+    let plain = hero.split('<').map(|s| s.split_once('>').map_or(s, |x| x.1)).collect::<String>();
+    let brew = plain.find("brew install").expect("brew in hero");
+    assert!(plain[brew..].contains("git terrace"));
+    assert!(hero.contains("href=\"#install\""));
+    assert!(hero.contains(">GitHub</a>"));
+}
+
+/// The hand-off section shows the MCP registration the docs name.
+#[test]
+fn the_hand_off_names_the_mcp_command() {
+    assert!(landing().contains("git terrace mcp --served"));
 }
 
 #[test]
@@ -73,8 +77,10 @@ fn a_missing_unreferenced_or_wrongly_sized_screenshot_fails() {
     assert!(err.contains("is missing (make site-shots)"), "{err}");
     for (n, ..) in SHOTS {
         for c in ["light", "dark"] {
-            std::fs::write(site.join(format!("{n}-{c}.webp")), webp(2560, 1600)).expect("write");
-            std::fs::write(site.join(format!("{n}-{c}.thumb.webp")), webp(1280, 800))
+            let (thumb, full) = sizes(n);
+            std::fs::write(site.join(format!("{n}-{c}.webp")), webp(full.0, full.1))
+                .expect("write");
+            std::fs::write(site.join(format!("{n}-{c}.thumb.webp")), webp(thumb.0, thumb.1))
                 .expect("write");
         }
     }
@@ -103,7 +109,7 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
     assert_eq!(docs::page_path("architecture"), "docs/architecture/");
 }
 
-/// The install tabs show every way, with the first open, and each way has a radio, a label
+/// The install tabs show every way, brew first and open, and each way has a radio, a label
 /// and a panel the CSS can reach.
 #[test]
 fn install_tabs_pair_every_radio_with_a_panel() {

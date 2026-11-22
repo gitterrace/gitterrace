@@ -23,24 +23,7 @@ const CACHE_DIR: &str = ".git/gitterrace/";
 /// The screenshots, in gallery order (pairs side by side): file stem, alt text ("Caption: what
 /// it shows"), caption. The site has a WebP pair per entry; the README shows the first, and
 /// `docs/screenshots/` keeps only the PNG files the README links.
-pub const SHOTS: [(&str, &str, &str); 6] = [
-    (
-        "send",
-        "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
-         your task list.",
-        "Send to",
-    ),
-    (
-        "overview",
-        "Browse: the repository page with README, last commit, file list and key numbers.",
-        "Browse",
-    ),
-    ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
-    (
-        "blame",
-        "Blame: who last changed each line, with the commit and its age beside the code.",
-        "Blame",
-    ),
+pub const SHOTS: [(&str, &str, &str); 8] = [
     (
         "insights",
         "Hotspots: the files that change most, against how many people touch them.",
@@ -51,11 +34,44 @@ pub const SHOTS: [(&str, &str, &str); 6] = [
         "Ownership: bus factor, solo and stale lines, and who holds each directory.",
         "Ownership",
     ),
+    ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
+    (
+        "blame",
+        "Blame: who last changed each line, with the commit and its age beside the code.",
+        "Blame",
+    ),
+    ("narrow", "Phone: the repository page on a 390 px wide screen.", "Phone"),
+    (
+        "send",
+        "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
+         your task list.",
+        "Send to",
+    ),
+    (
+        "agent",
+        "Actions: a marked line offered to a coding agent beside the other targets.",
+        "Agent",
+    ),
+    (
+        "overview",
+        "Browse: the repository page with README, last commit, file list and key numbers.",
+        "Browse",
+    ),
 ];
 
-/// The alt text of the hero under the pitch: Send to, the hand-off that sets gitterrace apart.
-const HERO_ALT: &str =
-    "Marked lines with their context and source line, ready to send to mail, an issue or a task.";
+/// The gallery's stems, in order, and the hand-off's: the rest of `SHOTS` is the hero.
+const GALLERY: [&str; 5] = ["insights", "ownership", "commit", "blame", "narrow"];
+const HAND: [&str; 2] = ["send", "agent"];
+const HERO: &str = "overview";
+
+/// The pixel size of a shot's thumbnail and of its full-size file. The phone crop is a 390 px
+/// wide screen at 2x, the rest a 1280x800 window at 2x.
+pub(crate) fn sizes(stem: &str) -> ((u32, u32), (u32, u32)) {
+    if stem == "narrow" { ((390, 780), (780, 1560)) } else { ((1280, 800), (2560, 1600)) }
+}
+
+/// The alt text of the hero under the pitch: the repository page, which shows what it is.
+const HERO_ALT: &str = "The repository page: README, last commit, file list and key numbers.";
 
 /// What the screenshots cannot show, one line each: (title, docs page, docs section whose
 /// first paragraph is the line). The text is the doc's own, so the landing page says nothing
@@ -76,17 +92,25 @@ const DESTINATIONS: [(&str, &str); 6] = [
     ("API and MCP", "docs/api/"),
 ];
 
+/// A gallery tile: stem, alt, caption, description, thumbnail width and height, and the
+/// anchor its close link returns to.
+type Shot<'a> = (&'a str, &'a str, &'a str, &'a str, u32, u32, &'a str);
+
 #[derive(Template)]
 #[template(path = "landing.html")]
 struct Landing<'a> {
-    name: &'a str,
     pitch: &'a str,
     install: Vec<(&'static str, String)>,
     bin: &'a str,
     requires: Vec<String>,
     quickstart: String,
-    shots: Vec<(&'a str, &'a str, &'a str, &'a str)>,
+    shots: Vec<Shot<'a>>,
+    hand: Vec<Shot<'a>>,
     hero: (&'a str, &'a str),
+    hero_cmds: String,
+    handoff: String,
+    demo: &'a str,
+    repo: &'a str,
     lines: Vec<(&'a str, String, String)>,
     promises: &'a str,
     story: &'a str,
@@ -119,25 +143,40 @@ pub(crate) fn body(
         let path = crate::site::docs::page_path(crate::site::docs::stem(doc));
         rows.push((title, format!("{path}#{}", crate::site::docs::slug(head)), plain(para)));
     }
-    let shots = SHOTS
-        .iter()
-        .map(|(file, alt, cap)| {
-            let what = alt.split_once(": ").map_or(*alt, |(_, rest)| rest);
-            (*file, *alt, *cap, what)
-        })
-        .collect();
+    let tile = |stem: &str, back: &'static str| -> anyhow::Result<Shot<'static>> {
+        let (file, alt, cap) = SHOTS
+            .iter()
+            .find(|s| s.0 == stem)
+            .copied()
+            .ok_or_else(|| anyhow::anyhow!("no shot {stem}"))?;
+        let what = alt.split_once(": ").map_or(alt, |(_, rest)| rest);
+        let (w, h) = sizes(file).0;
+        Ok((file, alt, cap, what, w, h, back))
+    };
+    let shots = GALLERY.iter().map(|s| tile(s, "gallery")).collect::<anyhow::Result<Vec<_>>>()?;
+    let hand = HAND.iter().map(|s| tile(s, "sends")).collect::<anyhow::Result<Vec<_>>>()?;
+    let handoff = section(&copy, "Hand-off")
+        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## Hand-off' section"))?;
+    let install = readme_agents_md::install_lines(ws);
     let html = Landing {
-        name: &pkg.name,
         pitch,
-        install: readme_agents_md::install_lines(ws)
-            .into_iter()
-            .map(|(way, line)| (way, code_block(&format!("{line}\n"), "bash")))
+        install: install
+            .iter()
+            .map(|(way, line)| (*way, code_block(&format!("{line}\n"), "bash")))
             .collect(),
         bin: pkg.bins.first().map_or("", String::as_str),
         requires: requirements(ws),
         quickstart: code_block(&readme_agents_md::quickstart(), "bash"),
         shots,
-        hero: (SHOTS[0].0, HERO_ALT),
+        hero: (HERO, HERO_ALT),
+        hero_cmds: code_block(
+            &format!("{}\ngit terrace\n", install.first().map_or("", |(_, l)| l.as_str())),
+            "bash",
+        ),
+        handoff: md(handoff, links),
+        hand,
+        demo: &ws.demo,
+        repo: &pkg.repository,
         lines: rows,
         promises: &md(promises, links),
         story: &md(story, links),

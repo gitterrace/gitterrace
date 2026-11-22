@@ -2,14 +2,14 @@
 
 use crate::site::tests::generated;
 
-/// Whether the landing page has the safety section, with the default address the code uses and
+/// Whether the landing page has the trust strip, with the default address the code uses and
 /// a link to the security model page.
 fn safety_problems(landing: &str, addr: &str) -> Vec<String> {
     let mut bad = Vec::new();
-    let Some((_, rest)) = landing.split_once(">What it does with your code</h2>") else {
-        return vec!["the landing page has no \"What it does with your code\" section".to_owned()];
+    let Some((_, rest)) = landing.split_once("id=\"your-code\">") else {
+        return vec!["the landing page has no trust strip (#your-code)".to_owned()];
     };
-    let section = rest.split("<h2>").next().unwrap_or("");
+    let section = rest.split("</div>").next().unwrap_or("");
     if !section.contains(&format!("<code>{addr}</code>")) {
         bad.push(format!("the safety section does not name {addr}"));
     }
@@ -35,7 +35,7 @@ fn the_built_landing_page_has_the_safety_section_with_the_real_address() {
 fn a_landing_page_without_the_section_or_with_another_address_is_reported() {
     let (pages, _) = generated();
     let landing = &pages.iter().find(|p| p.0 == "index.html").expect("landing").1;
-    let gone = landing.replace("What it does with your code", "Safety");
+    let gone = landing.replace("id=\"your-code\"", "id=\"safety\"");
     assert!(safety_problems(&gone, "127.0.0.1:4242")[0].contains("has no"));
     let bad = safety_problems(landing, "127.0.0.1:9");
     assert!(bad[0].contains("does not name 127.0.0.1:9"), "{bad:?}");

@@ -1,49 +1,29 @@
-{#- The landing page body: the pitch, why it exists, what it looks like, what it does with
-your code, then how to start. Value comes before install, so a visitor sees the hand-off
-first. Its prose comes from docs/landing.md, each sentence once, and
-the rest from the code. The bar holds the Demo link, so the page does not repeat it. The
-install tabs are radio inputs and CSS, so they need no script, and with
-CSS off every command still shows. A screenshot opens as a :target overlay, also without
-script; its full-size image is a decorative copy, so the description is read once. Light
-and dark are two lazy images, one hidden by the theme, so only the shown one loads. The
-hero shot under the pitch is above the fold, so it loads at once: one picture whose dark
-source follows the system, and the theme button points that source's media at its choice. -#}
+{#- The landing page body: a hero with the install command and the pitch, a trust strip,
+what the insights show, the hand-off, then install and quickstart. Its prose comes from
+docs/landing.md, each sentence once, the rest from the code. The h1 is text, because the bar
+already draws the wordmark, so the page loads one image: the overview, eager. The install tabs
+are radio inputs and CSS, so they need no script, and with CSS off every command still shows.
+A screenshot opens as a :target overlay on its own figure, also without script. Every image is
+one picture whose dark source follows the system, and the theme button points that source's
+media at its choice. -#}
 <div class="hero">
-<h1><img class="on-light" src="/assets/logo-light.svg" alt="{{ name }}" width="540" height="120"
-loading="lazy">
-<img class="on-dark" src="/assets/logo-dark.svg" alt="" width="540" height="120"
-loading="lazy"></h1>
-<p class="lead">{{ pitch }}</p>
-<ul class="destinations" aria-label="Where a finding goes">
-{%- for d in destinations %}
-<li><a href="/{{ d.1 }}">{{ d.0 }}</a></li>
-{%- endfor %}
-</ul>
-<section class="why-row">
-<h2 id="why">Why</h2>
+<h1>{{ pitch }}</h1>
 <div class="story">{{ story|safe }}</div>
+<div class="cmd">{{ hero_cmds|safe }}</div>
+<p class="cta"><a class="btn" href="#install">Install</a>
+{%- if !demo.is_empty() %} <a class="btn" href="{{ demo }}">Demo</a>{% endif %}
+<a class="btn" href="{{ repo }}">GitHub</a></p>
 <picture class="overview"><source media="(prefers-color-scheme: dark)"
-srcset="/assets/screenshots/{{ hero.0 }}-dark.webp">
-<img src="/assets/screenshots/{{ hero.0 }}-light.webp" alt="{{ hero.1 }}" width="1280"
-height="800" loading="eager" decoding="async"></picture>
-</section>
+srcset="/assets/screenshots/{{ hero.0 }}-dark.thumb.webp">
+<img src="/assets/screenshots/{{ hero.0 }}-light.thumb.webp" alt="{{ hero.1 }}" width="1280"
+height="800" loading="eager" fetchpriority="high" decoding="async"></picture>
 </div>
+<div class="trust" id="your-code">{{ promises|safe }}</div>
 <section id="features">
-<h2>What it does</h2>
-<div class="shots">
+<h2>Find what a diff never shows</h2>
+<div class="shots" id="gallery">
 {%- for s in shots %}
-<figure><a href="#shot-{{ s.0 }}"><span class="shot">
-<img class="on-light" src="/assets/screenshots/{{ s.0 }}-light.thumb.webp" alt="{{ s.1 }}"
-width="1280" height="800" loading="lazy" decoding="async">
-<img class="on-dark" src="/assets/screenshots/{{ s.0 }}-dark.thumb.webp" alt=""
-width="1280" height="800" loading="lazy" decoding="async"></span></a>
-<a class="lightbox" id="shot-{{ s.0 }}" href="#features" aria-label="Close {{ s.2 }}"
-tabindex="-1"><span class="shot">
-<img class="on-light" src="/assets/screenshots/{{ s.0 }}-light.webp" alt=""
-width="1280" height="800" loading="lazy" decoding="async">
-<img class="on-dark" src="/assets/screenshots/{{ s.0 }}-dark.webp" alt=""
-width="1280" height="800" loading="lazy" decoding="async"></span></a>
-<figcaption><b>{{ s.2 }}.</b> {{ s.3 }}</figcaption></figure>
+{% include "landing-figure.html" %}
 {%- endfor %}
 </div>
 <ul class="lines" data-from="docs">
@@ -52,9 +32,19 @@ width="1280" height="800" loading="lazy" decoding="async"></span></a>
 {%- endfor %}
 </ul>
 </section>
-<section>
-<h2 id="your-code">What it does with your code</h2>
-<div>{{ promises|safe }}</div>
+<section class="handoff">
+<h2 id="hand-off">Mark lines. Send the finding.</h2>
+<div class="shots" id="sends">
+{%- for s in hand %}
+{% include "landing-figure.html" %}
+{%- endfor %}
+</div>
+<div class="snip">{{ handoff|safe }}</div>
+<ul class="destinations" aria-label="Where a finding goes">
+{%- for d in destinations %}
+<li><a href="/{{ d.1 }}">{{ d.0 }}</a></li>
+{%- endfor %}
+</ul>
 <p class="more"><a href="/docs/why/#compared-with">How it compares</a> with the
 tools you know.</p>
 </section>

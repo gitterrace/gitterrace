@@ -6,12 +6,9 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 
 use crate::out::Out;
-use crate::site::{SHOTS, at};
+use crate::site::{SHOTS, at, sizes};
 
 pub(super) const SHOT_DIR: &str = "docs/screenshots";
-/// Pixel size of the lightbox WebP and of the tile thumbnail.
-const FULL: (u32, u32) = (2560, 1600);
-const THUMB: (u32, u32) = (1280, 800);
 
 /// Checks the screenshots without copying them. `docs/screenshots/` holds exactly a
 /// full-size WebP at 2560x1600 and a 1280x800 thumbnail for every entry in `SHOTS`, all from
@@ -20,9 +17,10 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
     let have = list(root, SHOT_DIR, "make site-shots")?;
     let mut want: Vec<(String, (u32, u32))> = Vec::new();
     for (n, ..) in SHOTS {
+        let (thumb, full) = sizes(n);
         for c in ["light", "dark"] {
-            want.push((format!("{n}-{c}.webp"), FULL));
-            want.push((format!("{n}-{c}.thumb.webp"), THUMB));
+            want.push((format!("{n}-{c}.webp"), full));
+            want.push((format!("{n}-{c}.thumb.webp"), thumb));
         }
     }
     if let Some((f, _)) = want.iter().find(|(f, _)| !have.contains(f)) {
@@ -48,18 +46,18 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The site's copy of every WebP in `SHOTS`, under `assets/screenshots/`. Run after
-/// `check_shots`, so each one is there at its size.
+/// The site's copy of every thumbnail in `SHOTS`, under `assets/screenshots/`: a screenshot
+/// opens as its own thumbnail, so the full-size files stay in the repository for the README.
+/// Run after `check_shots`, so each one is there at its size.
 pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
     for (n, ..) in SHOTS {
         for c in ["light", "dark"] {
-            for f in [format!("{n}-{c}.webp"), format!("{n}-{c}.thumb.webp")] {
-                let path = format!("{SHOT_DIR}/{f}");
-                let body =
-                    std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
-                outs.push(Out::bytes(at(&format!("assets/screenshots/{f}")), body));
-            }
+            let f = format!("{n}-{c}.thumb.webp");
+            let path = format!("{SHOT_DIR}/{f}");
+            let body =
+                std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
+            outs.push(Out::bytes(at(&format!("assets/screenshots/{f}")), body));
         }
     }
     Ok(outs)

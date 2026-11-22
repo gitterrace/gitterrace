@@ -4,6 +4,16 @@
 
 version = 1
 
+# A coding agent beside the targets. The shot opens the menu and never runs it, so the
+# command is a stand-in that exists on every machine.
+[[action]]
+id      = "claude"
+label   = "Ask Claude Code"
+kinds   = ["line", "file", "hunk", "commit", "blame", "search-hit", "insight"]
+command = ["/usr/bin/true"]
+stdin   = "markdown"
+cwd     = "repo"
+
 [[send]]
 id    = "mail"
 label = "Mail draft"

@@ -6,30 +6,32 @@ tagline. Each sentence lives here once.
 
 ## Why
 
-We built gitterrace to read a repository before pushing it. Does the README say
-what the code does? Do the docs and diagrams render? Is the history one you
-would want to read? A code host answers only once it is public, and your editor
-shows the code, not the page a reader sees. Now agents write much of the code,
-so that reading matters more. Review what they wrote, then pass each finding on
-with its context. Changes, unpushed branches and worktrees, all in one place,
-in your browser, on your machine.
-
-A finding is plain text with a source line, so it goes to the agent, editor,
-tracker or script you already use. Any page is a link you can paste anywhere,
-and agents can read the same data over the API or MCP without opening a
-browser.
+Read a repository the way a reviewer will, before you push it. Review what your
+agents wrote, then pass each finding on with its context.
 
 ## What it does with your code
 
-- It serves on `127.0.0.1:4242` by default, so only your machine can reach it.
-  Serving beyond loopback needs `--public`, which is read-only
-  ([running it online](online.md)).
-- It sends nothing anywhere: no telemetry, no update check, nothing loaded from
-  outside.
-- It never changes the repository's files or history.
-- It writes only a disposable cache under `.git/gitterrace/` (plus one line in
-  `.git/info/exclude` when you export into the worktree), your config and a
-  state folder.
+- **Local.** Serves on `127.0.0.1:4242`, so only your machine reaches it.
+- **Read-only.** Never changes your files or history.
+- **No telemetry.** No update check, nothing loaded from outside.
+- **Open source.** Read the [security model](security.md).
 
-See the [security model](security.md), and [SECURITY.md](../SECURITY.md) to
-report a vulnerability.
+## Hand-off
+
+A finding is plain text with a source line, so it goes to the agent, editor,
+tracker or script you already use. One entry in `actions.toml` adds a target.
+
+```toml
+[[action]]
+id      = "claude"
+label   = "Ask Claude Code"
+command = ["~/.config/gitterrace/agent.sh", "claude"]
+stdin   = "markdown"
+```
+
+Agents can also read the repository themselves, over a read-only MCP server.
+Register it once.
+
+```bash
+claude mcp add gitterrace -- git terrace mcp --served
+```
