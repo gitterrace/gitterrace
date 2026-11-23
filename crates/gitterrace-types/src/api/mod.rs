@@ -29,7 +29,10 @@ pub use insights::{
     InsightPeriod, InsightPeriodStats, InsightPeriodSummary, InsightResponse, InsightRhythm,
     InsightSeriesPoint, InsightUnit,
 };
-pub use review::{CheckpointItem, CheckpointsResponse, ViewedItem, ViewedResponse};
+pub use review::{
+    CheckpointItem, CheckpointsResponse, Finding, FindingAnchor, FindingLines, FindingsResponse,
+    NewFinding, ViewedItem, ViewedResponse,
+};
 
 /// Who did something and when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]

@@ -19,7 +19,7 @@ fn now() -> i64 {
 
 impl ApiState {
     /// These are this machine's, so a committed-only (public) handle refuses them.
-    fn only_here(&self, what: &'static str) -> Result<(), ApiError> {
+    pub(super) fn only_here(&self, what: &'static str) -> Result<(), ApiError> {
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden(what));
         }

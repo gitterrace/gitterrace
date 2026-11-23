@@ -1,0 +1,57 @@
+[
+  {
+    "name": "line range with a note and a plain file without one",
+    "repo": "r",
+    "short": "aaaaaaaa",
+    "findings": [
+      {
+        "n": 1,
+        "kind": "line",
+        "path": "src/a.rs",
+        "lines": [
+          10,
+          12
+        ],
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "permalink": "gitterrace://id/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/src/a.rs#L10-L12",
+        "note": "why this matters",
+        "status": "untouched",
+        "text": null
+      },
+      {
+        "n": 2,
+        "kind": "file",
+        "path": "b.txt",
+        "lines": null,
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "permalink": "gitterrace://id/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/b.txt",
+        "note": "",
+        "status": "file gone",
+        "text": null
+      }
+    ],
+    "markdown": "**Review of 2 findings** @ aaaaaaaa\n1. **src/a.rs#L10-L12** [untouched]: why this matters\n   gitterrace://id/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/src/a.rs#L10-L12\n   source: r@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:src/a.rs#L10-L12\n2. **b.txt** [file gone]\n   gitterrace://id/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/b.txt\n   source: r@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:b.txt\n"
+  },
+  {
+    "name": "a note with a line break, a fence in the text and a path with a hash",
+    "repo": "r",
+    "short": "aaaaaaaa",
+    "findings": [
+      {
+        "n": 1,
+        "kind": "line",
+        "path": "d/x#y.md",
+        "lines": [
+          1,
+          2
+        ],
+        "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "permalink": "p1",
+        "note": "line one\nline two",
+        "status": "lines changed",
+        "text": "a ```` b\nc\n"
+      }
+    ],
+    "markdown": "**Review of 1 finding** @ aaaaaaaa\n1. **d/x#y.md#L1-L2** [lines changed]: line one line two\n   p1\n   `````md\n   a ```` b\n   c\n   `````\n   source: r@aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:d/x%23y.md#L1-L2\n"
+  }
+]

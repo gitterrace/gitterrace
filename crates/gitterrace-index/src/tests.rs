@@ -261,8 +261,18 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
     idx.save_state(crate::StateFile::Chain, 1, b"x")?;
     idx.checkpoint_add(&[], "abc", false, "", 1 << 20, 1)?;
     idx.viewed_set(&[("a".to_owned(), "h".to_owned())], true, 1)?;
-    // The review basket is written by a later build: its file is named here, not made.
-    std::fs::write(idx.dir().join("findings"), "[]")?;
+    let one = crate::StoredFinding {
+        id: String::new(),
+        kind: "file".into(),
+        rev: "main".into(),
+        sha: "abc".into(),
+        path: Some("a".into()),
+        lines: None,
+        query: None,
+        note: "n".into(),
+        added: 1,
+    };
+    idx.findings_add(&one.sealed(), 500)?;
     let mut have: Vec<String> = std::fs::read_dir(idx.dir())?
         .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<io::Result<_>>()?;
@@ -483,6 +493,20 @@ fn an_inline_merge_past_the_segment_limit_finishes_the_update() -> io::Result<()
     Ok(())
 }
 
+fn sample() -> crate::StoredFinding {
+    crate::StoredFinding {
+        id: String::new(),
+        kind: "file".into(),
+        rev: "main".into(),
+        sha: "abc".into(),
+        path: Some("a.txt".into()),
+        lines: None,
+        query: None,
+        note: String::new(),
+        added: 0,
+    }
+}
+
 /// Class guard: a write escapes `.git/gitterrace/`. Every user-data write runs beside a
 /// repository and a working tree, and afterwards nothing outside the cache folder changed, so a
 /// future cache file written relative to the worktree or the git dir fails here.
@@ -524,11 +548,30 @@ fn every_user_data_write_stays_under_the_cache_dir() -> io::Result<()> {
     };
     idx.checkpoint_add(&[file], "abc", true, "x", 1 << 10, 5)?;
     idx.viewed_set(&[("../../escape".to_owned(), "h".to_owned())], true, 5)?;
+    let finding = crate::StoredFinding {
+        id: String::new(),
+        kind: "file".into(),
+        rev: "main".into(),
+        sha: "abc".into(),
+        path: Some("../../escape".into()),
+        lines: None,
+        query: None,
+        note: "../../escape".into(),
+        added: 5,
+    };
+    idx.findings_add(&finding.clone().sealed(), 1)?;
+    // The cap rewrites the whole file: that path stays inside too.
+    idx.findings_add(&crate::StoredFinding { added: 6, ..finding }.sealed(), 1)?;
+    idx.findings_remove(&[])?;
+    idx.findings_add(&crate::StoredFinding { added: 7, ..sample() }.sealed(), 500)?;
     idx.rebuild()?;
     let mut after = Vec::new();
     outside(&mut after)?;
     assert_eq!(before, after, "something outside .git/gitterrace changed");
     assert!(!tmp.path().join("escape").exists());
-    assert!(cache.join("checkpoints").is_file() && cache.join("viewed").is_file());
+    assert!(
+        ["checkpoints", "viewed", "findings"].iter().all(|n| cache.join(n).is_file()),
+        "a user file was not written"
+    );
     Ok(())
 }

@@ -109,6 +109,22 @@ Checkpoints live in `.git/gitterrace/checkpoints`, hold only changed text
 files that git does not ignore, and are not rebuildable: deleting the folder
 forgets them.
 
+## Review basket
+
+The basket collects findings: a line, file, commit or hunk you flagged, each
+with a note of your own. It lives in `.git/gitterrace/findings`, is capped by
+`review.findings_entries` (500 by default, oldest dropped) and is not
+rebuildable: deleting the folder forgets it. `GET /api/v1/findings` and the
+`list_findings` tool list it, oldest first, and say where the code of each
+finding is now: `untouched`, `lines changed`, `file changed` or `file gone`. A
+status says what happened to the code, never whether the finding was dealt
+with. Lines are looked up as the same text, so moved lines stay `untouched`
+with their new range. When line anchoring is impossible (a binary file, a range
+past the end) the answer is about the whole file. Both are refused on a public
+server, and neither writes: adding and removing is a web action. Pass
+`findings` to the `review_change` prompt to include the basket in the recipe.
+An action of kind `review` hands the whole basket to a script as one payload.
+
 ## Mark files as viewed
 
 Each file of a commit, compare or working tree diff has a **Viewed** box, and

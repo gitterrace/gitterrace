@@ -2,6 +2,10 @@ use gitterrace_testkit::{Fixture, git};
 
 use axum::http::StatusCode;
 
+use gitterrace_types::AnchorBasis;
+use gitterrace_types::AnchorStatus;
+use gitterrace_types::api::{FindingLines, NewFinding};
+
 use crate::ApiState;
 use crate::tests::{fixture, get};
 
@@ -209,4 +213,90 @@ fn checkpoints_are_off_when_the_cap_is_zero() {
     let l = s.checkpoints().expect("list");
     assert!(!l.persisted && l.checkpoints.is_empty() && l.cap_bytes == 0);
     assert!(matches!(s.checkpoint_create("", false), Err(crate::ApiError::BadRequest(_))));
+}
+
+fn new_finding(path: Option<&str>, lines: Option<(u32, u32)>, note: &str) -> NewFinding {
+    NewFinding {
+        kind: if lines.is_some() { "line" } else { "file" }.to_owned(),
+        lines: lines.map(|(start, end)| FindingLines { end, start }),
+        note: note.to_owned(),
+        path: path.map(str::to_owned),
+        query: None,
+        rev: "HEAD".to_owned(),
+        sha: None,
+    }
+}
+
+/// The basket round trip: add, list with anchors computed on read, remove by id, clear.
+#[test]
+fn findings_round_trip_with_anchors_computed_on_read() {
+    let (d, s) = fixture();
+    assert_eq!(s.findings().expect("empty").count, 0);
+    let first = new_finding(Some("a.txt"), Some((1, 1)), "look \u{1b}here");
+    let id = s.finding_add(&first).expect("add");
+    assert!(id.starts_with("f-"));
+    let long = "x".repeat(5000);
+    let big = s.finding_add(&new_finding(Some("a.txt"), None, &long)).expect("add");
+    let r = s.findings().expect("list");
+    assert_eq!((r.count, r.persisted, r.cap_entries), (2, true, 500));
+    assert_eq!(r.findings[0].note, "look here");
+    assert_eq!(r.findings[1].note.len(), 2000);
+    assert_eq!(r.findings[0].anchor.status, AnchorStatus::Untouched);
+    assert_eq!(r.findings[0].anchor.checked_against, AnchorBasis::Worktree);
+    std::fs::write(d.path().join("a.txt"), "edited\n").expect("write");
+    let r = s.findings().expect("list");
+    assert_eq!(r.findings[0].anchor.status, AnchorStatus::LinesChanged);
+    assert_eq!(r.findings[1].anchor.status, AnchorStatus::FileChanged);
+    assert_eq!(s.findings_by_id(std::slice::from_ref(&big)).expect("by id").len(), 1);
+    assert!(s.findings_by_id(&["f-nope".to_owned()]).is_err());
+    assert_eq!(s.findings_remove(&[id]).expect("remove"), 1);
+    assert_eq!(s.findings_remove(&[]).expect("clear"), 1);
+    assert_eq!(s.findings().expect("list").count, 0);
+}
+
+#[test]
+fn findings_refuse_what_the_repository_does_not_hold() {
+    let (_d, s) = fixture();
+    let bad = |n: NewFinding| matches!(s.finding_add(&n), Err(crate::ApiError::BadRequest(_)));
+    assert!(bad(new_finding(Some("nope.txt"), None, "")));
+    assert!(bad(new_finding(Some("../a.txt"), None, "")));
+    assert!(bad(new_finding(None, Some((1, 1)), "")));
+    assert!(bad(new_finding(Some("a.txt"), Some((3, 2)), "")));
+    assert!(bad(NewFinding { kind: "review".into(), ..new_finding(None, None, "") }));
+    assert!(bad(NewFinding { kind: "nonsense".into(), ..new_finding(None, None, "") }));
+    assert!(matches!(
+        s.finding_add(&NewFinding { rev: "no-such-rev".into(), ..new_finding(None, None, "") }),
+        Err(crate::ApiError::Git(_))
+    ));
+    assert_eq!(s.findings().expect("list").count, 0);
+}
+
+#[test]
+fn the_basket_cap_comes_from_the_setting() {
+    let (_d, s) = fixture();
+    let cfg = gitterrace_config::parse("[review]\nfindings_entries = 2\n").expect("parse").config;
+    let s = s.configured(&cfg);
+    for i in 0..3 {
+        s.finding_add(&new_finding(Some("a.txt"), None, &format!("n{i}"))).expect("add");
+    }
+    let r = s.findings().expect("list");
+    assert_eq!(r.cap_entries, 2);
+    assert_eq!(r.findings.iter().map(|f| f.note.as_str()).collect::<Vec<_>>(), ["n1", "n2"]);
+}
+
+/// Findings are this machine's: a public handle refuses the read and every write, and the
+/// route answers 403.
+#[tokio::test]
+async fn findings_are_refused_on_a_public_server() {
+    let (_d, s) = fixture();
+    let s = s.committed_only();
+    assert!(matches!(s.findings(), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(s.findings_by_id(&[]), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(s.findings_remove(&[]), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(
+        s.finding_add(&new_finding(None, None, "")),
+        Err(crate::ApiError::Forbidden(_))
+    ));
+    let (st, v) = get(&s, "/findings").await;
+    assert_eq!(st, StatusCode::FORBIDDEN, "{v}");
 }

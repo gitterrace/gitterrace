@@ -34,6 +34,7 @@ fn payload(repo: &Repo, kind: Kind) -> Payload {
         lines,
         sha: None,
         query: None,
+        findings: None,
     };
     Payload::build(repo, "t", kind, &loc, &gitterrace_testkit::base_url(), LinkStyle::Go)
         .expect("payload")

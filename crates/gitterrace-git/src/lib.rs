@@ -1,6 +1,7 @@
 //! Read-only access to a git repository. Every read is pinned to a commit;
 //! the working tree is never touched.
 
+mod anchor;
 mod atomic;
 mod budget;
 mod diff;
@@ -27,6 +28,7 @@ mod watch;
 mod worker_hook;
 mod worktree;
 
+pub use anchor::{Anchor, AnchorQuery, anchors_now};
 pub use atomic::{
     create_new_no_follow, open_append_no_follow, open_read_no_follow, read_no_follow_bounded,
     refused, synced_files, write_atomic, write_atomic_unsynced,
@@ -76,7 +78,7 @@ pub use watch::{Parts, Watcher};
 pub use worker_hook::{WorkerTime, set_worker_hook};
 pub use worktree::{
     BIG_HASH, Scope, ScopeCounts, SinceDiff, SnapFile, WORKTREE_DIFF_BYTES, WORKTREE_FILES,
-    content_id, is_dirty, worktree_blob, worktree_bytes, worktree_counts, worktree_diff,
-    worktree_diff_scoped, worktree_diff_since, worktree_file_diff, worktree_file_diff_scoped,
-    worktree_signature, worktree_snapshot,
+    WorktreeView, WtFile, content_id, is_dirty, worktree_blob, worktree_bytes, worktree_counts,
+    worktree_diff, worktree_diff_scoped, worktree_diff_since, worktree_file_diff,
+    worktree_file_diff_scoped, worktree_signature, worktree_snapshot,
 };

@@ -293,6 +293,61 @@ pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8
     Ok(matches!(read, Read::Data(_)).then(|| read.bytes().to_vec()))
 }
 
+/// What the working tree holds at one path, against HEAD.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WtFile {
+    /// Not one of the changed files: it reads the same as HEAD (or is not ours to read).
+    Same,
+    /// A changed file that is gone from the disk.
+    Gone,
+    /// A changed file's bytes.
+    Data(Vec<u8>),
+    /// A changed file over the limit: never read.
+    Big,
+}
+
+/// The working tree read once for many paths: the set of changed files is listed a single
+/// time, so asking about each path of a basket does not walk the tree again.
+pub struct WorktreeView {
+    changed: BTreeSet<String>,
+    root: Option<std::path::PathBuf>,
+}
+
+impl WorktreeView {
+    /// Lists the changed files. A bare repository has none.
+    pub fn open(repo: &Repo) -> Result<Self> {
+        let r = open(repo)?;
+        let changed = scoped_paths(&r, Scope::All, repo.worktree_files())?;
+        let root = r.workdir().and_then(|w| w.canonicalize().ok());
+        Ok(Self { changed, root })
+    }
+
+    /// Whether there is a working tree to read.
+    #[must_use]
+    pub const fn is_live(&self) -> bool {
+        self.root.is_some()
+    }
+
+    /// `path` as the disk holds it, read only when it is a changed file and at most `max` bytes.
+    /// The same guard as [`worktree_bytes`]: an ignored file, anything under `.git` or a path
+    /// with `..` is never read.
+    #[must_use]
+    pub fn file(&self, path: &str, max: u64) -> WtFile {
+        let Some(root) = self.root.as_deref().filter(|_| is_plain(path)) else {
+            return WtFile::Same;
+        };
+        if !self.changed.contains(path) {
+            return WtFile::Same;
+        }
+        match &read_worktree(root, path, max) {
+            Read::Data(d) => WtFile::Data(d.clone()),
+            Read::Big => WtFile::Big,
+            Read::Missing => WtFile::Gone,
+            Read::Skip => WtFile::Same,
+        }
+    }
+}
+
 /// One changed file as it is on disk, for the working tree's blob view: the same guard and
 /// `max` as [`worktree_bytes`], with the text decoded under the repository's text limit.
 pub fn worktree_blob(repo: &Repo, path: &str, max: u64) -> Result<Option<(Blob, Vec<u8>)>> {

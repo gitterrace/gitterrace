@@ -279,7 +279,8 @@ Kinds:
 `line` (a line or a range of lines in a file), `file` (a whole file), `commit`
 (a commit), `hunk` (one hunk of a diff), `blame` (one line of a blame view),
 `search-hit` (a code or commit search hit), `insight` (a row of an insights
-page, such as a hotspot), `page` (the page being shown).
+page, such as a hotspot), `page` (the page being shown), `review` (the review
+basket).
 
 <!-- END GENERATED: kinds -->
 
@@ -306,6 +307,7 @@ Absent fields are never `null`. A removed or retyped field bumps the version.
 | `commit` | object | no | `subject`, `author` and `date` (RFC 3339) of `sha`. |
 | `markdown` | string | yes | The same text the Copy as markdown built-in produces. |
 | `vars` | object | yes | The action's `[action.vars]`, possibly empty. Set from `actions.toml` only. |
+| `findings` | array | no | Kind `review`: one entry per finding, with `n`, `status`, `note` and `permalink`. |
 
 <!-- END GENERATED: payload -->
 
@@ -315,7 +317,7 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 `GITTERRACE_PAYLOAD_VERSION`, `GITTERRACE_ACTION`, `GITTERRACE_KIND`,
 `GITTERRACE_REPO`, `GITTERRACE_ROOT`, `GITTERRACE_SHA`, `GITTERRACE_TITLE`,
 `GITTERRACE_URL`, `GITTERRACE_PATH`, `GITTERRACE_LINE_START`,
-`GITTERRACE_LINE_END`.
+`GITTERRACE_LINE_END`, `GITTERRACE_FINDINGS`.
 
 <!-- END GENERATED: env -->
 

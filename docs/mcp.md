@@ -36,7 +36,8 @@ history and find risky code. It needs the
    risk, and note a change with no test file beside it.
 
 The server also offers the `review_change` prompt (`base`, `head`, `repo`,
-`worktree`), which holds the same steps.
+`worktree`, `findings`), which holds the same steps. With `findings` it also lists
+the user's review basket (`list_findings`), notes quoted as data.
 
 ## Explore history
 

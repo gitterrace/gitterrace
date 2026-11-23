@@ -6,6 +6,7 @@ mod cache;
 mod checkpoints;
 mod conventional;
 pub mod feed;
+mod findings;
 pub mod graph;
 mod insights;
 pub mod messages;
@@ -31,6 +32,7 @@ use gitterrace_git::Repo;
 /// Re-exported so the cards crate shares the one date rules without a new dependency.
 pub use checkpoints::{CheckpointInfo, CheckpointList};
 pub use conventional::parse_subject;
+pub use findings::{MAX_NOTE, StoredFinding, cut_note};
 pub use gitterrace_git::{civil_from_days, days_from_civil};
 pub use insights::*;
 #[cfg(any(test, feature = "oracle"))]
@@ -86,14 +88,11 @@ pub const CACHE_FILES: [(&str, &str); 9] = [
         Small, rewritten by atomic rename. Not rebuildable.",
     ),
     (
-        FINDINGS_FILE,
-        "The review basket: findings with notes, capped at 500 entries. Rewritten \
+        findings::FILE,
+        "The review basket: findings with notes, capped by `review.findings_entries`. Rewritten \
         by atomic rename. Not rebuildable.",
     ),
 ];
-
-/// See [`CACHE_FILES`]. Only named here: the basket that fills it is not part of this build.
-const FINDINGS_FILE: &str = "findings";
 
 /// See [`CACHE_FILES`].
 const TIP_FILE: &str = "tip";

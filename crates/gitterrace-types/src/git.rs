@@ -40,10 +40,42 @@ string_enum! {
     }
 }
 
+string_enum! {
+    /// What became of the code a finding points at. A status says what happened to the code,
+    /// never whether the finding was dealt with, so no word here claims that.
+    pub enum AnchorStatus [serde] {
+        Untouched => "untouched",
+        LinesChanged => "lines changed",
+        FileChanged => "file changed",
+        FileGone => "file gone",
+    }
+}
+
+string_enum! {
+    /// What an anchor was checked against.
+    pub enum AnchorBasis [serde] {
+        Head => "head",
+        Worktree => "worktree",
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::codec::assert_round_trip;
-    use crate::{ChangeKind, LineKind, RefKind, TreeEntryKind};
+    use crate::{AnchorBasis, AnchorStatus, ChangeKind, LineKind, RefKind, TreeEntryKind};
+
+    /// Class guard: a status never claims a finding was dealt with. A word like that would turn
+    /// a fact about the code into a claim about the review.
+    #[test]
+    fn no_anchor_status_claims_the_finding_was_dealt_with() {
+        use crate::StringEnum;
+        for s in AnchorStatus::ALL {
+            let t = s.as_str();
+            for word in ["resolved", "fixed", "done", "stale", "open", "closed"] {
+                assert!(!t.contains(word), "{t:?} says {word}");
+            }
+        }
+    }
 
     #[test]
     fn git_kinds_round_trip() {
@@ -51,5 +83,7 @@ mod tests {
         assert_round_trip::<ChangeKind>();
         assert_round_trip::<LineKind>();
         assert_round_trip::<TreeEntryKind>();
+        assert_round_trip::<AnchorStatus>();
+        assert_round_trip::<AnchorBasis>();
     }
 }

@@ -33,6 +33,7 @@ fn loc(path: Option<&str>, lines: Option<(u32, u32)>) -> Locator {
         lines: lines.map(|(start, end)| Lines { start, end }),
         sha: None,
         query: None,
+        findings: None,
     }
 }
 
@@ -154,4 +155,147 @@ fn request_schema_is_strict() {
     ] {
         assert!(serde_json::from_str::<RunRequest>(bad).is_err(), "{bad}");
     }
+}
+
+/// The `review` markdown is the shared vector file's, and the JS side reads the same file for
+/// its `source:` lines.
+#[test]
+fn review_markdown_matches_the_shared_vectors() {
+    use gitterrace_types::AnchorStatus;
+
+    use crate::payload::{ReviewFinding, review_markdown};
+
+    let text = include_str!("../../testdata/review-vectors.json");
+    let rows: Vec<serde_json::Value> = serde_json::from_str(text).expect("vectors");
+    assert_eq!(rows.len(), 2, "both vectors");
+    for row in rows {
+        let entries: Vec<ReviewFinding> = row["findings"]
+            .as_array()
+            .expect("findings")
+            .iter()
+            .map(|f| ReviewFinding {
+                n: f["n"].as_u64().expect("n") as usize,
+                kind: f["kind"].as_str().expect("kind").into(),
+                path: f["path"].as_str().map(Into::into),
+                lines: f["lines"].as_array().map(|l| Lines {
+                    start: l[0].as_u64().expect("start") as u32,
+                    end: l[1].as_u64().expect("end") as u32,
+                }),
+                sha: f["sha"].as_str().expect("sha").into(),
+                permalink: f["permalink"].as_str().expect("link").into(),
+                note: f["note"].as_str().expect("note").into(),
+                status: f["status"].as_str().expect("status").parse::<AnchorStatus>().expect("ok"),
+                text: f["text"].as_str().map(Into::into),
+                text_truncated: f["text"].as_str().map(|_| false),
+            })
+            .collect();
+        let md = review_markdown(
+            row["repo"].as_str().expect("repo"),
+            row["short"].as_str().expect("short"),
+            &entries,
+        );
+        assert_eq!(md, row["markdown"].as_str().expect("markdown"), "{}", row["name"]);
+    }
+}
+
+fn finding(
+    path: Option<&str>,
+    lines: Option<(u32, u32)>,
+    sha: &str,
+    note: &str,
+) -> gitterrace_types::api::Finding {
+    use gitterrace_types::AnchorBasis;
+    use gitterrace_types::api::{Finding, FindingAnchor, FindingLines};
+    Finding {
+        added: 1,
+        anchor: FindingAnchor {
+            checked_against: AnchorBasis::Head,
+            now_lines: None,
+            now_path: path.map(Into::into),
+            status: gitterrace_types::AnchorStatus::Untouched,
+        },
+        id: "f-00000000".into(),
+        kind: if lines.is_some() { "line" } else { "file" }.into(),
+        lines: lines.map(|(start, end)| FindingLines { end, start }),
+        note: note.into(),
+        path: path.map(Into::into),
+        query: None,
+        rev: "main".into(),
+        sha: sha.into(),
+    }
+}
+
+#[test]
+fn a_review_payload_reads_its_text_from_git_and_sets_the_env() {
+    let (t, sha) = hostile_repo();
+    let repo = Repo::discover(t.path()).expect("open");
+    let basket = [
+        finding(Some("src/a.rs"), Some((2, 3)), &sha, "check $(touch pwned)\nnow"),
+        finding(Some("src/a.rs"), None, &sha, ""),
+    ];
+    let p = Payload::build_review(&repo, "x", &basket, "o", LinkStyle::Gitterrace).expect("review");
+    assert_eq!(p.kind, Kind::Review);
+    assert_eq!((p.path.as_deref(), p.lines, p.text.as_deref()), (None, None, None));
+    assert_eq!(p.title, "Review: 2 findings");
+    assert_eq!(p.findings.len(), 2);
+    let want = "line 2 $(touch pwned)\nline 3 $(touch pwned)\n";
+    assert_eq!(p.findings[0].text.as_deref(), Some(want));
+    assert_eq!(p.findings[1].text, None);
+    assert_eq!(p.markdown.matches("source: ").count(), 2, "one source line per finding");
+    assert!(p.markdown.contains("check $(touch pwned) now"), "a note is one line");
+    let json = serde_json::to_value(&p).expect("json");
+    assert_eq!(json["kind"], "review");
+    assert_eq!(json["findings"][0]["n"], 1);
+    assert_eq!(json["findings"][0]["status"], "untouched");
+    let env = p.env();
+    assert_eq!(env["GITTERRACE_FINDINGS"], "2");
+    assert_eq!(env["GITTERRACE_PATH"], "src/a.rs");
+    assert_eq!(env["GITTERRACE_LINE_START"], "2");
+    assert_eq!(env["GITTERRACE_KIND"], "review");
+    assert!(Payload::build_review(&repo, "x", &[], "o", LinkStyle::Go).is_err());
+}
+
+/// Class guard: v1 stays byte for byte. No single-kind payload carries a `findings` key, and a
+/// locator naming findings is refused for every other kind, so the new field cannot leak into
+/// an old kind.
+#[test]
+fn every_single_kind_payload_is_free_of_the_review_fields() {
+    let (t, _) = hostile_repo();
+    let repo = Repo::discover(t.path()).expect("open");
+    for kind in [Kind::File, Kind::Commit, Kind::Page, Kind::SearchHit, Kind::Insight] {
+        let p = Payload::build(
+            &repo,
+            "x",
+            kind,
+            &loc(None, None),
+            &gitterrace_testkit::base_url(),
+            LinkStyle::Go,
+        )
+        .or_else(|_| {
+            Payload::build(
+                &repo,
+                "x",
+                kind,
+                &loc(Some("src/a.rs"), None),
+                &gitterrace_testkit::base_url(),
+                LinkStyle::Go,
+            )
+        })
+        .expect("build");
+        let json = serde_json::to_string(&p).expect("json");
+        assert!(!json.contains("\"findings\""), "{kind:?}: {json}");
+        assert!(!p.env().contains_key("GITTERRACE_FINDINGS"));
+        let mut asked = loc(None, None);
+        asked.findings = Some(vec!["f-1".into()]);
+        assert!(Payload::build(&repo, "x", kind, &asked, "o", LinkStyle::Go).is_err());
+    }
+    let review = Payload::build(&repo, "x", Kind::Review, &loc(None, None), "o", LinkStyle::Go);
+    assert!(matches!(review, Err(PayloadError::BadLocator(_))));
+}
+
+#[test]
+fn a_locator_with_findings_reads_and_an_unknown_field_still_fails() {
+    let ok = r#"{"repo":"r","rev":"main","findings":["f-1"]}"#;
+    assert!(serde_json::from_str::<Locator>(ok).is_ok());
+    assert!(serde_json::from_str::<Locator>(r#"{"repo":"r","rev":"main","note":"x"}"#).is_err());
 }

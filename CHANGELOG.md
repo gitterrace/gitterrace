@@ -22,7 +22,9 @@ All notable changes are listed here. The format follows
 - cli: run the server as a systemd or launchd service
 - site: say what the tool is for in the tagline
 - site: lead the landing page with install, trust and the hand-off
+- harness: run the browser checks in Firefox
 - review: checkpoints of uncommitted work and viewed marks
+- review: a review basket of findings, listed with where their code is now
 
 ### Changed
 
@@ -102,6 +104,7 @@ All notable changes are listed here. The format follows
 - scripts: read size-report's languages from the insights command
 - browser: serve the built site from one helper
 - browser: share the per-browser loop, the luminance and the stats page list
+- dev: one usage branch in the run scripts' argument parser
 
 ### Fixed
 
@@ -129,6 +132,9 @@ All notable changes are listed here. The format follows
 - browser: serve the working tree's assets through --from-disk
 - browser: wait on conditions instead of fixed sleeps
 - browser: keep the wait helpers inside the line and type gates
+- index: bound every stored count by the bytes left before sizing a buffer
+- sweep: trash landed clones and keep any younger than 30 minutes
+- web: honour the shortcut switch in every printable-key handler
 
 ### Performance
 
@@ -147,6 +153,7 @@ All notable changes are listed here. The format follows
 - config: build the key table once per parse and validate
 - xtask: read the cargo metadata once per run
 - git: keep byte budget free for the items near the head of the stream
+- web: cut one element per file from diff headers and file rows
 
 <!-- END GENERATED: unreleased -->
 

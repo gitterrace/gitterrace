@@ -40,6 +40,7 @@ fn payload(full: bool) -> Payload {
         }),
         markdown: "m".into(),
         vars: std::collections::BTreeMap::new(),
+        findings: Vec::new(),
     }
 }
 
@@ -48,20 +49,42 @@ fn keys_of(p: &Payload) -> BTreeSet<String> {
     v.as_object().expect("object").keys().cloned().collect()
 }
 
+/// The fields every single-kind payload can carry: the table less the review-only one.
+fn without_review(doc: &BTreeSet<String>) -> BTreeSet<String> {
+    doc.iter().filter(|n| *n != "findings").cloned().collect()
+}
+
 #[test]
 fn payload_table_is_the_payload() {
-    assert_eq!(keys_of(&payload(true)), names(&PAYLOAD_FIELDS));
+    let doc = names(&PAYLOAD_FIELDS);
+    assert_eq!(keys_of(&payload(true)), without_review(&doc));
     let absent_when_unset: BTreeSet<String> =
-        names(&PAYLOAD_FIELDS).difference(&keys_of(&payload(false))).cloned().collect();
-    let optional: BTreeSet<String> =
-        PAYLOAD_FIELDS.iter().filter(|f| !f.required).map(|f| f.name.to_owned()).collect();
+        without_review(&doc).difference(&keys_of(&payload(false))).cloned().collect();
+    let optional: BTreeSet<String> = PAYLOAD_FIELDS
+        .iter()
+        .filter(|f| !f.required && f.name != "findings")
+        .map(|f| f.name.to_owned())
+        .collect();
     assert_eq!(absent_when_unset, optional);
+}
+
+/// `findings` is documented as optional but only a review carries it: a single-kind payload
+/// never has the key, which `payload_table_is_the_payload` cannot see.
+#[test]
+fn findings_is_the_one_documented_field_a_single_kind_never_has() {
+    let all = names(&PAYLOAD_FIELDS);
+    let mut have = keys_of(&payload(true));
+    assert_eq!(all.difference(&have).collect::<Vec<_>>(), ["findings"]);
+    have.insert("findings".to_owned());
+    assert_eq!(have, all);
 }
 
 #[test]
 fn env_table_is_the_environment() {
     let env: BTreeSet<String> = payload(true).env().keys().map(|k| (*k).to_owned()).collect();
-    let doc: BTreeSet<String> = ENV_VARS.iter().map(|(k, _)| (*k).to_owned()).collect();
+    let mut doc: BTreeSet<String> = ENV_VARS.iter().map(|(k, _)| (*k).to_owned()).collect();
+    // Set only for a review, which the single-kind fixture is not.
+    assert!(doc.remove("GITTERRACE_FINDINGS"));
     assert_eq!(env, doc);
 }
 

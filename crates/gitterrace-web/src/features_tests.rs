@@ -45,6 +45,8 @@ const CORE_ROUTES: &[&str] = &[
     "/api/v1/commits/{id}",
     "/api/v1/tree",
     "/api/v1/blob",
+    // The basket is not a working tree feature: it needs no switch beyond `api_enabled`.
+    "/api/v1/findings",
 ];
 
 /// Every route the server answers: the classified page routes, the API registry and the one
@@ -377,6 +379,7 @@ const TOOL_ROUTES: &[(&str, &str)] = &[
     ("worktree_diff", "/api/v1/worktree"),
     ("list_checkpoints", "/api/v1/checkpoints"),
     ("list_viewed", "/api/v1/viewed"),
+    ("list_findings", "/api/v1/findings"),
     ("read_file", "/api/v1/blob"),
     ("list_tree", "/api/v1/tree"),
     ("blame", "/api/v1/blame"),

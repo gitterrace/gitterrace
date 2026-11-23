@@ -84,6 +84,8 @@ pub enum Kind {
     SearchHit,
     Insight,
     Page,
+    /// The review basket: several findings handed over as one.
+    Review,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

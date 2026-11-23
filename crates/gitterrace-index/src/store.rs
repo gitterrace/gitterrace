@@ -35,7 +35,7 @@ pub(crate) const OWNER_FILE: &str = "owner";
 /// them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test checks
 /// both lists agree.
 pub(crate) const USER_FILES: [&str; 3] =
-    [crate::checkpoints::FILE, crate::viewed::FILE, crate::FINDINGS_FILE];
+    [crate::checkpoints::FILE, crate::viewed::FILE, crate::findings::FILE];
 
 /// Fails when `dir` exists but this process cannot write it: the lock file opens for append.
 pub(crate) fn writable(dir: &Path) -> io::Result<()> {

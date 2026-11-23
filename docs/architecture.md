@@ -115,7 +115,7 @@ config keys lives in `gitterrace_config::naming`.
 | `chain.state` | Languages chain totals, checkpointed every 64 commits; a newer tip walks only new commits. Read only whole, under its rules key. |
 | `checkpoints` | Snapshots of uncommitted work, append-only and checksummed. Capped by `review.checkpoint_mb`, oldest dropped. Not rebuildable. |
 | `viewed` | Viewed marks per file and patch hash, so a mark holds while the patch is the same. Small, rewritten by atomic rename. Not rebuildable. |
-| `findings` | The review basket: findings with notes, capped at 500 entries. Rewritten by atomic rename. Not rebuildable. |
+| `findings` | The review basket: findings with notes, capped by `review.findings_entries`. Rewritten by atomic rename. Not rebuildable. |
 
 The format version is `3`, stored as `v3`.
 

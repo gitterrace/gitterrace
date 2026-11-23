@@ -6,8 +6,9 @@ use std::borrow::Cow;
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
-    ContributorsResponse, IndexResponse, InsightList, InsightResponse, LogResponse,
-    ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse, ViewedResponse, WorktreeResponse,
+    ContributorsResponse, FindingsResponse, IndexResponse, InsightList, InsightResponse,
+    LogResponse, ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse, ViewedResponse,
+    WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
@@ -209,6 +210,14 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[],
         schema: of::<ViewedResponse>,
         route: || get(http::viewed),
+    },
+    Endpoint {
+        path: "/findings",
+        summary: "The review basket: findings with their notes, oldest first, and where the \
+            code of each is now. Refused on a public server.",
+        params: &[],
+        schema: of::<FindingsResponse>,
+        route: || get(http::findings),
     },
     Endpoint {
         path: "/tree",

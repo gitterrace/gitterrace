@@ -258,6 +258,9 @@ Exceptions, each on purpose:
 - `checkpoint_file_kb` (integer, default `256`): Largest changed text file a
   checkpoint copies, in KiB. A larger one is named without a copy, so a review
   since it diffs that file against HEAD and says so.
+- `findings_entries` (integer, default `500`): Most entries the review basket
+  keeps. The oldest go first. The basket lives in `.git/gitterrace/` and holds
+  the notes you wrote.
 
 ## `[multi]`
 

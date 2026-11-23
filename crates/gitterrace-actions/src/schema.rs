@@ -30,7 +30,7 @@ const fn item(
 }
 
 /// Every kind an action can be offered on, with what the selection is.
-pub const KINDS: [(Kind, &str); 8] = [
+pub const KINDS: [(Kind, &str); 9] = [
     (Kind::Line, "A line or a range of lines in a file."),
     (Kind::File, "A whole file."),
     (Kind::Commit, "A commit."),
@@ -39,10 +39,11 @@ pub const KINDS: [(Kind, &str); 8] = [
     (Kind::SearchHit, "A code or commit search hit."),
     (Kind::Insight, "A row of an insights page, such as a hotspot."),
     (Kind::Page, "The page being shown."),
+    (Kind::Review, "The review basket."),
 ];
 
 /// Payload v1, the JSON a script reads on stdin. `required` means always present.
-pub const PAYLOAD_FIELDS: [Item; 16] = [
+pub const PAYLOAD_FIELDS: [Item; 17] = [
     item("v", "integer", true, "", "Payload version, `1`."),
     item("action", "string", true, "", "The action's `id`."),
     item("kind", "string", true, "", "What was selected, one of the kinds below."),
@@ -91,10 +92,17 @@ pub const PAYLOAD_FIELDS: [Item; 16] = [
         "",
         "The action's `[action.vars]`, possibly empty. Set from `actions.toml` only.",
     ),
+    item(
+        "findings",
+        "array",
+        false,
+        "",
+        "Kind `review`: one entry per finding, with `n`, `status`, `note` and `permalink`.",
+    ),
 ];
 
 /// The environment a script gets, besides what the action lists in `env`.
-pub const ENV_VARS: [(&str, &str); 11] = [
+pub const ENV_VARS: [(&str, &str); 12] = [
     ("GITTERRACE_PAYLOAD_VERSION", "The payload version."),
     ("GITTERRACE_ACTION", "The action's `id`."),
     ("GITTERRACE_KIND", "The kind."),
@@ -106,6 +114,7 @@ pub const ENV_VARS: [(&str, &str); 11] = [
     ("GITTERRACE_PATH", "The path, when there is one."),
     ("GITTERRACE_LINE_START", "First line, when there is a range."),
     ("GITTERRACE_LINE_END", "Last line, when there is a range."),
+    ("GITTERRACE_FINDINGS", "The finding count, for kind `review`."),
 ];
 
 /// Placeholders a `command` element may hold. `repo` marks values read from the browsed

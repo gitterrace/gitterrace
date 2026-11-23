@@ -17,7 +17,7 @@ mod registry_tests;
 
 pub use codec::{ParseError, StringEnum};
 pub use config::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period, SettingsFile};
-pub use git::{ChangeKind, LineKind, RefKind, TreeEntryKind};
+pub use git::{AnchorBasis, AnchorStatus, ChangeKind, LineKind, RefKind, TreeEntryKind};
 pub use markup::{esc, esc_text};
 
 // The codec macro names serde through this path, so a crate using it needs no serde of its own.

@@ -123,6 +123,7 @@ fn why_off(kinds: &[gitterrace_actions::Kind]) -> String {
             Kind::SearchHit => "a search hit",
             Kind::Insight => "an insights row",
             Kind::Page => "a page",
+            Kind::Review => "the review basket",
         })
         .collect();
     let list = match names.split_last() {

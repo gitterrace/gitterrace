@@ -6,8 +6,9 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
-    ContributorsResponse, EndpointDoc, IndexResponse, InsightList, InsightResponse, LogResponse,
-    ParamDoc, RefsResponse, RepoResponse, TreeResponse, ViewedResponse, WorktreeResponse,
+    ContributorsResponse, EndpointDoc, FindingsResponse, IndexResponse, InsightList,
+    InsightResponse, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
+    ViewedResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -89,7 +90,7 @@ async fn etag(
 ) -> Response {
     // The working tree, checkpoints and marks change with no ref moving: a tag would answer 304
     // to a stale copy.
-    if matches!(req.uri().path(), "/worktree" | "/checkpoints" | "/viewed") {
+    if matches!(req.uri().path(), "/worktree" | "/checkpoints" | "/viewed" | "/findings") {
         return next.run(req).await;
     }
     let slot = state.job_slot().await;
@@ -121,6 +122,10 @@ async fn etag(
 
 pub(crate) async fn checkpoints(State(s): State<ApiState>) -> Reply<CheckpointsResponse> {
     blocking(&s, ApiState::checkpoints).await
+}
+
+pub(crate) async fn findings(State(s): State<ApiState>) -> Reply<FindingsResponse> {
+    blocking(&s, ApiState::findings).await
 }
 
 pub(crate) async fn viewed(State(s): State<ApiState>) -> Reply<ViewedResponse> {

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // Runs every shared send vector through the JS encoder in send.js, every source-line vector
-// through its sourceLine(), and the title rule through titleOf().
+// through its sourceLine(), and the title rule through titleOf(). The review vectors must hold
+// the same source lines the JS builds, and no status says a finding was dealt with.
 //
 //   node scripts/verify/send-vectors-check.mjs
 import { readFileSync } from 'node:fs';
@@ -38,5 +39,21 @@ for (const p of ['notes/guide/setup.md', 'a/b.rs']) {
   const t = titleOf({ kind: 'line', path: p, lines: { start: 1, end: 1 } }, '');
   if (t === p || t.startsWith(p + ':L')) fail(`title is the bare path: ${t}`);
 }
-console.log(`${v.length} send vectors, ${s.length} source vectors, ${titles.length} titles, ${bad} failed`);
+// Review vectors: one `source:` line per finding, equal to sourceLine(), with a closed set of
+// status words that say what became of the code and never that a finding was dealt with.
+const STATUS = ['untouched', 'lines changed', 'file changed', 'file gone'];
+const r = data('review-vectors.json');
+const asLines = (l) => (l ? { start: l[0], end: l[1] } : null);
+for (const t of r) {
+  const src = t.markdown.split('\n').map((l) => l.trim()).filter((l) => l.startsWith('source: '));
+  const tag = `review ${t.name}`;
+  if (src.length !== t.findings.length) fail(`${tag}: ${src.length} source lines`);
+  t.findings.forEach((f, i) => {
+    const want = sourceLine(t.repo, f.sha, f.path, asLines(f.lines));
+    if (src[i] !== want) fail(`${tag} #${f.n}: ${src[i]} != ${want}`);
+    if (!STATUS.includes(f.status)) fail(`${tag} #${f.n}: status ${f.status}`);
+    if (/resolved|fixed/i.test(f.status)) fail(`${tag} #${f.n}: status claims it was dealt with`);
+  });
+}
+console.log(`${v.length} send, ${s.length} source, ${r.length} review, ${titles.length} titles, ${bad} failed`);
 process.exit(bad ? 1 : 0);

@@ -115,8 +115,8 @@ git terrace export [out]      Write a static copy of the site to a folder, for s
 
 <!-- BEGIN GENERATED: actions -->
 Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`,
-`search-hit`, `insight`, `page`). Examples in `docs/actions/`: `agent.sh`,
-`clipboard.sh`, `editor.sh`, `obsidian.sh`.
+`search-hit`, `insight`, `page`, `review`). Examples in `docs/actions/`:
+`agent.sh`, `clipboard.sh`, `editor.sh`, `obsidian.sh`.
 
 <!-- END GENERATED: actions -->
 
