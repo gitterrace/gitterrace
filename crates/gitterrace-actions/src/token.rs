@@ -1,5 +1,8 @@
-//! The per-process action token. Pages embed it, the run route demands it back: only a
-//! same-origin page can read a gitterrace response, so only it can echo the token.
+//! The per-process owner secret, never shown in a page.
+//!
+//! A browser the owner opened through the launch link holds a value derived from it (`session`)
+//! in an `HttpOnly` cookie, and every write demands that value back. Another OS user can fetch
+//! any page over loopback, but cannot read the 0600 file the secret lives in.
 
 use std::fmt;
 
@@ -25,17 +28,34 @@ impl Token {
 
     /// Constant time in the content: every byte is compared even after a mismatch.
     pub fn verify(&self, offered: &str) -> bool {
-        let (a, b) = (self.0.as_bytes(), offered.as_bytes());
-        if a.len() != b.len() {
-            return false;
-        }
-        a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
+        ct_eq(self.0.as_bytes(), offered.as_bytes())
+    }
+
+    /// What a browser holds after the launch link: a hash of the secret, so the cookie jar
+    /// and a browser history never hold the secret from the 0600 file itself.
+    pub fn session(&self) -> String {
+        proof(&self.0, "session")
+    }
+
+    /// Whether `offered` is this secret's `session` value.
+    pub fn verify_session(&self, offered: &str) -> bool {
+        ct_eq(self.session().as_bytes(), offered.as_bytes())
+    }
+
+    /// The cookie's name. Cookies ignore ports, so two servers on `localhost` must not
+    /// overwrite each other's: the name carries a few hex digits of a hash of the secret.
+    pub fn cookie_name(&self) -> String {
+        format!("gt-owner-{}", &proof(&self.0, "cookie-name")[..8])
     }
 
     /// The answer to a challenge: proves the holder knows the secret without sending it.
     pub fn prove(&self, nonce: &str) -> String {
         proof(&self.0, nonce)
     }
+}
+
+fn ct_eq(a: &[u8], b: &[u8]) -> bool {
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
 /// SHA-256 over `secret:nonce`, lowercase hex.
@@ -130,6 +150,17 @@ mod tests {
         }
         assert_eq!(base64(&[0xfb, 0xff], Base64::UrlSafe), "-_8");
         assert_eq!(base64(&[0xfb, 0xff], Base64::Standard), "+/8=");
+    }
+
+    #[test]
+    fn session_and_cookie_name_derive_from_the_secret_without_revealing_it() {
+        let (a, b) = (Token::generate().expect("rng"), Token::generate().expect("rng"));
+        assert!(a.verify_session(&a.session()));
+        assert!(!a.verify_session(&b.session()));
+        assert!(!a.verify_session(a.as_str()), "the secret itself is not the session");
+        assert!(!a.session().contains(a.as_str()));
+        assert_ne!(a.cookie_name(), b.cookie_name());
+        assert!(a.cookie_name().starts_with("gt-owner-"));
     }
 
     #[test]
