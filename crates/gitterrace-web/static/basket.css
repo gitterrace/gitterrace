@@ -1,0 +1,85 @@
+/* The review basket: the header count, the panel and the note window. */
+#basketbtn{position:relative}
+.basketn{
+  position:absolute;
+  top:0;
+  right:0;
+  min-width:14px;
+  padding:0 3px;
+  border-radius:7px;
+  font:var(--weight-semibold) var(--text-2xs)/14px var(--sans);
+  text-align:center;
+  color:var(--on-accent);
+  background:var(--accent);
+}
+.ov.basket{width:min(560px,94vw);max-height:80vh}
+.basket-head{
+  margin:0;
+  padding:var(--space-3) var(--space-4) 0;
+  font-size:var(--text-base);
+  font-weight:var(--weight-semibold);
+  flex:none;
+}
+.basket-form{display:flex;flex-direction:column;min-height:0}
+.basket-what{
+  margin:0;
+  padding:var(--space-2) var(--space-4) 0;
+  font-family:var(--mono);
+  font-size:var(--text-sm);
+  overflow-wrap:anywhere;
+}
+.basket-lab{
+  display:block;
+  padding:var(--space-3) var(--space-4) 0;
+  font-size:var(--text-xs);
+  color:var(--muted);
+}
+.basket-note{
+  box-sizing:border-box;
+  width:calc(100% - var(--space-4)*2);
+  min-height:6em;
+  margin:var(--space-2) var(--space-4);
+  resize:vertical;
+  font:var(--text-sm)/1.5 var(--sans);
+  background:var(--bg);
+  color:var(--fg);
+  border:var(--border);
+  border-radius:var(--radius);
+  padding:var(--space-2) var(--space-3);
+}
+.basket-list{list-style:none;margin:0;padding:var(--space-2) var(--space-4);overflow:auto;flex:1}
+.basket-row{padding:var(--space-2) 0;border-bottom:var(--border)}
+.basket-top{display:flex;gap:var(--space-3);align-items:center}
+.basket-where{
+  flex:1;
+  min-width:0;
+  font-family:var(--mono);
+  font-size:var(--text-sm);
+  overflow-wrap:anywhere;
+}
+.basket-chip{
+  flex:none;
+  font-size:var(--text-xs);
+  color:var(--muted);
+  border:var(--border);
+  border-radius:var(--radius);
+  padding:1px var(--space-2);
+}
+.basket-text{
+  margin:var(--space-1) 0 0;
+  font-size:var(--text-sm);
+  white-space:pre-wrap;
+  overflow-wrap:anywhere;
+}
+.basket-empty{margin:0;padding:var(--space-3) var(--space-4)}
+.basket-foot{
+  display:flex;
+  gap:var(--space-3);
+  align-items:center;
+  padding:var(--space-2) var(--space-4);
+  border-top:var(--border);
+  background:var(--soft);
+  flex:none;
+}
+.basket-msg{flex:1;min-width:0;font-size:var(--text-xs)}
+.basket-pick{min-width:0;max-width:40%}

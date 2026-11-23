@@ -35,6 +35,7 @@ All notable changes are listed here. The format follows
 - web: give the commit page two header rows and a readable message
 - insights: explore which files change together
 - web: checkpoint button, since tab and server-kept viewed marks
+- web: add findings to the review basket and send them all
 
 ### Changed
 
@@ -150,6 +151,8 @@ All notable changes are listed here. The format follows
 - git: count every worktree tab from the rows its table lists
 - web: put the file list before the sidebar and make phone targets 44px
 - web: tighten the page head, order headings and share the header brand
+- web: touch targets, focus rings inside scrollers and sizes on the tokens
+- web: the page key handlers for b, dot and slash read the shortcuts switch
 
 ### Performance
 

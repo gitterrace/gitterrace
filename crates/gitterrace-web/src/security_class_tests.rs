@@ -371,7 +371,7 @@ async fn no_path_route_reads_outside_the_tree() {
 
 /// The routes that take a write, as (pattern, method): a write is an owner decision recorded
 /// here, never an accident. Each is mounted only when its feature is configured.
-const WRITES: [(&str, &str); 9] = [
+const WRITES: [(&str, &str); 11] = [
     (crate::actions::RUN_PATH, "POST"),
     ("/_launch", "POST"),
     ("/_repos", "POST"),
@@ -381,6 +381,8 @@ const WRITES: [(&str, &str); 9] = [
     ("/_checkpoint", "POST"),
     ("/_viewed", "POST"),
     ("/_viewed/all", "POST"),
+    ("/_findings", "POST"),
+    ("/_findings", "DELETE"),
 ];
 
 /// Class: a plain client on a shared loopback, with every header a non-browser can forge and no
@@ -448,7 +450,10 @@ async fn the_owner_cookie_reaches_every_write_route() {
             continue;
         }
         // The page writes belong to a repository, so they sit under its prefix.
-        let at = if route.starts_with("/_checkpoint") || route.starts_with("/_viewed") {
+        let at = if route.starts_with("/_checkpoint")
+            || route.starts_with("/_viewed")
+            || route.starts_with("/_findings")
+        {
             format!("/r/r{route}")
         } else {
             route.to_owned()

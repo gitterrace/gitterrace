@@ -260,7 +260,7 @@ const BROWSE: [&str; 59] = [
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
-const EXEMPT: [(&str, &str); 22] = [
+const EXEMPT: [(&str, &str); 23] = [
     ("/api/insight/{rev}", "the file card fragment, empty until the index is built"),
     ("/api/insight/{rev}/{*path}", "same fragment, for one path"),
     ("/api/last/{rev}", "a fragment the tree page fetches, filled by the file walk"),
@@ -283,6 +283,7 @@ const EXEMPT: [(&str, &str); 22] = [
     ("/_checkpoint", "takes a checkpoint, a write that answers JSON and never a page"),
     ("/_viewed", "marks one file viewed, a write that answers JSON and never a page"),
     ("/_viewed/all", "marks files viewed, a write that answers JSON and never a page"),
+    ("/_findings", "the review basket, reads and writes that answer JSON and never a page"),
 ];
 
 /// Whether the route literal `route` (`/blob/{rev}/{*path}`) serves the concrete `path`.

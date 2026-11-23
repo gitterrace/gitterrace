@@ -161,7 +161,7 @@ struct SinceNote {
 
 /// Why a write is refused before its body is read: the owner proof and same-origin rules every
 /// write shares, then JSON only.
-fn refused(app: &App, req: &Request) -> Option<Response> {
+pub(crate) fn refused(app: &App, req: &Request) -> Option<Response> {
     let Some(owner) = app.env.owner() else {
         return Some(
             (StatusCode::FORBIDDEN, "forbidden: no owner on this server\n").into_response(),
@@ -176,16 +176,16 @@ fn refused(app: &App, req: &Request) -> Option<Response> {
     None
 }
 
-fn bad() -> Response {
+pub(crate) fn bad() -> Response {
     (StatusCode::BAD_REQUEST, "malformed request\n").into_response()
 }
 
-fn reply(v: &serde_json::Value) -> Response {
+pub(crate) fn reply(v: &serde_json::Value) -> Response {
     guard::no_store(axum::Json(v).into_response())
 }
 
 /// Runs `f` on the API state off the async threads: the stores read and write files.
-async fn with_api<T: Send + 'static>(
+pub(crate) async fn with_api<T: Send + 'static>(
     app: &App,
     f: impl FnOnce(&gitterrace_api::ApiState) -> std::result::Result<T, gitterrace_api::ApiError>
     + Send

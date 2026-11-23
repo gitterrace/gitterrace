@@ -138,6 +138,15 @@ pub const PAGES: &[Page] = &[
         &["/_checkpoint", "/_viewed", "/_viewed/all"],
     ),
     page(
+        "`/_findings`",
+        concat!(
+            "The review basket: `GET` lists it with where each finding's code is now, `POST` ",
+            "adds one, `DELETE` removes some or all. Writes are same-origin with the owner ",
+            "cookie, local servers only, and touch only `.git/gitterrace`"
+        ),
+        &["/_findings"],
+    ),
+    page(
         "`/_launch`",
         "Owner launch: `POST` hands the holder of the 0600 secret a one-time ticket, `GET ?t=` \
         spends it and sets the HttpOnly owner cookie every write needs",

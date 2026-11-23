@@ -5,6 +5,9 @@ mod actions;
 mod activity;
 mod add;
 mod app;
+mod basket_web;
+#[cfg(test)]
+mod basket_web_tests;
 mod bounded;
 mod caches;
 mod card;

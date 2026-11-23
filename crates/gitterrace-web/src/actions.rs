@@ -20,7 +20,8 @@ use axum::{
     routing::{get, post},
 };
 use gitterrace_actions::{
-    Action, Config, Limits, Output, Payload, PayloadError, Reloader, RunError, RunRequest, Runner,
+    Action, Config, Kind, Limits, Output, Payload, PayloadError, Reloader, RunError, RunRequest,
+    Runner,
 };
 use gitterrace_git::Repo;
 
@@ -440,16 +441,39 @@ fn run_blocking(
     origin: &str,
 ) -> Result<(gitterrace_actions::Outcome, Output), Failed> {
     let style = site.link_style();
-    let payload = Payload::build(&t.repo, &action.id, rr.kind, &rr.locator, origin, style)
-        .map_err(|e| match e {
-            PayloadError::BadLocator(why) => Failed::Locator(why),
-            PayloadError::Git(e) => {
-                tracing::warn!("action payload: {e}");
-                Failed::Internal
-            }
-        })?;
+    let built = if rr.kind == Kind::Review {
+        review_payload(site, t, action, rr, origin)?
+    } else {
+        Payload::build(&t.repo, &action.id, rr.kind, &rr.locator, origin, style)
+    };
+    let payload = built.map_err(|e| match e {
+        PayloadError::BadLocator(why) => Failed::Locator(why),
+        PayloadError::Git(e) => {
+            tracing::warn!("action payload: {e}");
+            Failed::Internal
+        }
+    })?;
     let outcome = live.runner.run(action, &payload, &t.repo.root()).map_err(Failed::Run)?;
     Ok((outcome, action.output))
+}
+
+/// The `review` payload of the basket entries a request names. The text of every entry comes
+/// from the server's own basket, so a page cannot send words of its own. A request that names
+/// no entry, an unknown one, or reaches a server that keeps no basket is a bad locator.
+fn review_payload(
+    site: &Site,
+    t: &Target,
+    action: &Action,
+    rr: &RunRequest,
+    origin: &str,
+) -> Result<Result<Payload, PayloadError>, Failed> {
+    let bad = |why: &str| Failed::Locator(why.to_owned());
+    let ids = rr.locator.findings.as_deref().filter(|i| !i.is_empty());
+    let ids = ids.ok_or_else(|| bad("a review names the findings to send"))?;
+    let app = site.env.apps().into_iter().find(|a| a.key == t.key);
+    let api = app.as_ref().and_then(|a| a.api()).ok_or_else(|| bad("no basket here"))?;
+    let found = api.findings_by_id(ids).map_err(|e| bad(&e.to_string()))?;
+    Ok(Payload::build_review(&t.repo, &action.id, &found, origin, site.link_style()))
 }
 
 /// Fixtures shared with the read-only crawl in `lib.rs`.

@@ -134,6 +134,8 @@ pub(crate) struct Chrome {
     pub(crate) off: String,
     /// Whether this server serves the settings page: the gear in the bar and the menu entry.
     pub(crate) settings: bool,
+    /// Whether the page offers the review basket: a local server that has an owner to write for.
+    pub(crate) basket: bool,
     /// Whose page this is: a server's own page (settings) keeps the brand, the switcher, the
     /// theme and the menu, and drops what needs a repository (branch, working tree).
     pub(crate) owner: Owner,
@@ -272,6 +274,9 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
         },
         off: crate::features::scripted_off(),
         settings: app.settings_on() && crate::features::on(Feature::Settings),
+        basket: crate::gitstate::local_state(app)
+            && app.env.owner().is_some()
+            && app.api().is_some(),
         ..Chrome::from_cfg(&app.cfg())
     }
 }

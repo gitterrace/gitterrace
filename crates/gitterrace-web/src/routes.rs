@@ -68,6 +68,12 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/refs", get(refs))
         .route("/search", get(crate::search::search))
         .route("/worktree", get(worktree))
+        .route(
+            "/_findings",
+            get(crate::basket_web::list)
+                .post(crate::basket_web::add)
+                .delete(crate::basket_web::remove),
+        )
         .route("/_checkpoint", post(crate::checkpoints_web::checkpoint))
         .route("/_viewed", post(crate::checkpoints_web::viewed))
         .route("/_viewed/all", post(crate::checkpoints_web::viewed_all))

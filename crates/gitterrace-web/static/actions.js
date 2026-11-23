@@ -310,6 +310,21 @@
       });
       keys.s = 2;
     }
+    // The review basket keeps a note about this selection. Offered only where the server
+    // rendered the basket's button (a local server with an owner).
+    if (document.getElementById("basketbtn") && commit) {
+      head("Review");
+      add("Add to review\u2026", "", function () {
+        closeMenu();
+        window.gtLazy("basket", function () {
+          var label = ref(t) || t.subject || document.title;
+          var c = { kind: t.kind, rev: rev, sha: commit, label: label };
+          if (t.path) c.path = t.path;
+          if (t.lines) c.lines = t.lines;
+          window.gtBasket.add(c);
+        });
+      });
+    }
     // A page may name one place its menu opens (compare: the head commit).
     var open = document.querySelector('meta[name="gt-open"]');
     if (open) {

@@ -144,6 +144,17 @@ server, and neither writes: adding and removing is a web action. Pass
 `findings` to the `review_change` prompt to include the basket in the recipe.
 An action of kind `review` hands the whole basket to a script as one payload.
 
+In the browser the basket is the button in the top bar, with the number of
+entries on it. Select lines (or a file, hunk or commit), press `.` and choose
+**Add to review** to write a note. The button opens the panel: each entry shows
+where its code is now as a chip (`untouched`, `lines changed`, `file changed`
+or `file gone`), with a Remove button, plus **Clear**. **Send all** runs one of
+your actions of kind `review` with every entry in a single payload. The page
+names the entries by id and the server reads the notes from its own basket, so
+a page cannot send words of its own. Notes are plain text and shown as text.
+The button, the notes and Send all are on local servers only, a public server
+leaves them out.
+
 ## Mark files as viewed
 
 Each file of a commit, compare or working tree diff has a **Viewed** box, and
