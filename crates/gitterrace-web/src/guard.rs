@@ -213,7 +213,7 @@ mod tests {
     /// its source is shown to come from an escaping builder and the entry is added.
     #[test]
     fn every_safe_template_site_is_inventoried() {
-        const SITES: [(&str, usize); 19] = [
+        const SITES: [(&str, usize); 20] = [
             ("_base.html", 1),
             ("blame.html", 1),
             ("blob.html", 8),
@@ -226,6 +226,7 @@ mod tests {
             ("notebook.html", 2),
             ("overview.html", 3),
             ("pagehead.html", 2),
+            ("patterns_section.html", 1),
             ("refs.html", 1),
             ("search.html", 1),
             ("side.html", 1),

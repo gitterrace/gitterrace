@@ -215,9 +215,9 @@ fn mcp_tool_error_emits_server_error_message_for_5xx() {
 /// otherwise answer unfiltered numbers.
 #[test]
 fn unknown_tool_arguments_are_refused() {
-    let bad = serde_json::json!({ "name": "hotspots", "path": "src" });
+    let bad = serde_json::json!({ "name": "hotspots", "type": "fix" });
     let e = serde_json::from_value::<super::InsightArgs>(bad).err();
-    assert!(e.is_some_and(|e| e.to_string().contains("unknown field `path`")));
+    assert!(e.is_some_and(|e| e.to_string().contains("unknown field `type`")));
     let ok = serde_json::json!({ "name": "hotspots", "query": "path:src" });
     assert!(serde_json::from_value::<super::InsightArgs>(ok).is_ok());
 }

@@ -73,7 +73,8 @@ pub const PAGES: &[Page] = &[
         "`/stats`, `/stats/{page}`",
         concat!(
             "Insights on the shared filter and period: activity (with commit types and code ",
-            "frequency), contributors, hotspots (with patterns), languages, ownership. ",
+            "frequency), contributors, hotspots (with patterns and coupling), languages, ",
+            "ownership. ",
             "`?rev=` follows any ref",
         ),
         &[

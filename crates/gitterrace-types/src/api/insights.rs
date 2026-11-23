@@ -169,6 +169,52 @@ pub struct InsightHotspots {
     pub total_changes: usize,
 }
 
+/// One pair of `coupling`: two files that changed in the same commits.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightCouplingPair {
+    pub a: String,
+    pub a_changes: usize,
+    pub b: String,
+    pub b_changes: usize,
+    /// `together / a_changes`.
+    pub confidence_ab: f64,
+    /// `together / b_changes`.
+    pub confidence_ba: f64,
+    /// The two files sit in different directories.
+    pub cross_dir: bool,
+    /// `together / min(a_changes, b_changes)`.
+    pub degree: f64,
+    /// Author time of the newest commit that changed both, unix seconds.
+    pub last_together: i64,
+    pub together: usize,
+}
+
+/// Commits that changed files of both top-level directories, `coupling`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightDirPair {
+    pub a: String,
+    pub b: String,
+    pub together: usize,
+}
+
+/// `coupling`: files that change together, for one file or the whole tree.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightCoupling {
+    /// Whether pairs across directories are listed, not only siblings.
+    pub cross_dir: bool,
+    /// Top-level directory pairs, empty when `path` is set.
+    pub matrix: Vec<InsightDirPair>,
+    /// Commits that changed more files than this are left out.
+    pub max_commit_files: usize,
+    /// Shared commits a pair needs.
+    pub min_support: usize,
+    pub pairs: Vec<InsightCouplingPair>,
+    /// The focus file, null for the whole tree.
+    pub path: Option<String>,
+    /// Commits left out for changing more than `max_commit_files` files.
+    pub skipped_commits: usize,
+}
+
 /// One person's share of a directory.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct InsightOwner {
@@ -231,6 +277,7 @@ pub enum InsightData {
     LabelOverTime(Vec<InsightLabelBucket>),
     Frequency(Vec<InsightFrequency>),
     Hotspots(InsightHotspots),
+    Coupling(InsightCoupling),
     Ownership(InsightOwnership),
     Languages(InsightLanguages),
 }

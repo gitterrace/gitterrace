@@ -1,7 +1,9 @@
+mod partners;
 mod path;
 mod reports;
 mod scan;
 
+pub use partners::{CouplingPair, CouplingQuery, CouplingReport, DirPair};
 pub use path::{
     CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, FileFacts, PARTNER_MIN_TOGETHER, Partner, PathCard,
     PathChild, PathKind, RECENT_DAYS,

@@ -67,10 +67,17 @@ Answer with commit ids and dates so the user can check them.
    age. A directory also ranks each direct child. A path the tree lacks
    answers an empty `missing` card. It counts as `hotspots` and `ownership`
    do, so the same `query` and `period` give the same rank.
-4. For the top files, call `log` with `path` to see why they change, and
+4. To see what moves together, call `insight` with name `coupling`. With
+   `path` it lists the partners of one file. Without it, the strongest pairs
+   of the tree plus a matrix of the top level directories. A pair has the
+   shared commits, the confidence both ways and the last shared commit. Pairs
+   are sibling files unless `cross_dir` is `1`, and `min_support` sets the
+   shared commits a pair needs. Commits that changed more than
+   `max_commit_files` files are left out, and `skipped_commits` counts them.
+5. For the top files, call `log` with `path` to see why they change, and
    `blame` to see who holds the lines now.
-5. Call `activity` to see whether the project is speeding up or slowing down.
-6. Report a ranked list. Each entry holds the file, its score, its owners and
+6. Call `activity` to see whether the project is speeding up or slowing down.
+7. Report a ranked list. Each entry holds the file, its score, its owners and
    one reason it changes.
 
 A high score is a question and not a verdict: a changelog or a lockfile

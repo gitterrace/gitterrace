@@ -92,6 +92,8 @@ pub(crate) enum Command {
         /// Most rows, for the insights that list rows.
         #[arg(long)]
         limit: Option<usize>,
+        #[command(flatten)]
+        coupling: CouplingArgs,
         /// List as JSON too. An insight is always printed as JSON.
         #[arg(long)]
         json: bool,
@@ -191,6 +193,27 @@ pub(crate) enum Command {
         #[arg(long, value_name = "NAME=URL")]
         project: Vec<String>,
     },
+}
+
+/// The options only the `coupling` insight reads.
+#[derive(clap::Args, Debug, Clone, Default)]
+pub struct CouplingArgs {
+    /// Focus file, for `coupling`.
+    #[arg(long)]
+    pub path: Option<String>,
+    /// Shared commits a pair needs, for `coupling`. Default 3.
+    #[arg(long = "support")]
+    pub min_support: Option<usize>,
+    /// `1` lists pairs across directories too, for `coupling`.
+    #[arg(long)]
+    pub cross_dir: Option<String>,
+}
+
+impl CouplingArgs {
+    /// `params` with these options set.
+    pub fn apply(self, params: gitterrace_api::Params) -> gitterrace_api::Params {
+        params.coupling(self.path, self.min_support, self.cross_dir)
+    }
 }
 
 #[cfg(test)]

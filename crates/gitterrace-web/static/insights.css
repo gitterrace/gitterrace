@@ -19,3 +19,5 @@ table.own :is(td,th){white-space:nowrap}table.own :is(td,th):first-child{width:3
 @media (max-width:600px){table.own .n{display:none}table.own :is(td,th):first-child{width:auto}}
 .matrix-chart td a:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
 .matrix-chart .m3 a:focus-visible,.matrix-chart .m4 a:focus-visible{outline-color:var(--on-accent)}
+.coupling-bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);
+margin:0 0 var(--space-3)}

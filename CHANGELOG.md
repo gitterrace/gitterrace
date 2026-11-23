@@ -31,6 +31,9 @@ All notable changes are listed here. The format follows
 - api: serve the card of one file or directory
 - api: rank the changed files of a review by risk
 - web: show a card for a file or folder on the blob, tree and history pages
+- web: style the not-found and error pages and say why a repository failed
+- web: give the commit page two header rows and a readable message
+- insights: explore which files change together
 
 ### Changed
 
@@ -111,6 +114,7 @@ All notable changes are listed here. The format follows
 - browser: serve the built site from one helper
 - browser: share the per-browser loop, the luminance and the stats page list
 - dev: one usage branch in the run scripts' argument parser
+- web: move the screen fixes to screens.css and wrap the new lines
 
 ### Fixed
 
@@ -143,6 +147,8 @@ All notable changes are listed here. The format follows
 - web: honour the shortcut switch in every printable-key handler
 - web: require an owner cookie for writes and serve no token in pages
 - git: count every worktree tab from the rows its table lists
+- web: put the file list before the sidebar and make phone targets 44px
+- web: tighten the page head, order headings and share the header brand
 
 ### Performance
 

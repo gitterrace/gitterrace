@@ -454,7 +454,7 @@ impl Insights<'_> {
 }
 
 /// The head files a path selection keeps: a file outside it has no counted change.
-fn under_path(files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
+pub(super) fn under_path(files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
     let m = c.scope().matcher();
     files.iter().filter(|f| m.row(&f.path)).cloned().collect()
 }

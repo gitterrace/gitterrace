@@ -13,7 +13,7 @@ pub(crate) const USER_ID: &str = "user-content-";
 /// `chrome_ids_match_the_sources` test fails when this list and the sources disagree.
 pub(crate) const CHROME_IDS: &str = "\
     about actcommit activity-counts activity-hours activity-series actmark actnote actpage \
-    actsel branches code-age commits coupled files-size formoff frequency gt-main \
+    actsel branches code-age commits coupled coupled-dirs files-size formoff frequency gt-main \
     gt-repolist gt-tip headstate hotspot-files hotspot-map keys-off livenote loc loc-data logq \
     logq-error logq-help logq-list patterns q range refbtn remotes releases repobtn \
     repocount repolink repoq reposwitch searchbtn send-ctx send-head send-title seterrs \

@@ -52,7 +52,7 @@
     "crates/gitterrace-web/templates/outline.html": 3,
     "crates/gitterrace-web/templates/overview.html": 5,
     "crates/gitterrace-web/templates/ownership.html": 5,
-    "crates/gitterrace-web/templates/patterns_section.html": 9,
+    "crates/gitterrace-web/templates/patterns_section.html": 6,
     "crates/gitterrace-web/templates/pending.html": 3,
     "crates/gitterrace-web/templates/refs.html": 6,
     "crates/gitterrace-web/templates/repos.html": 2,

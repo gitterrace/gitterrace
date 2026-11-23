@@ -29,6 +29,13 @@ pub struct Params {
     pub metric: Option<String>,
     #[serde(default, deserialize_with = "number")]
     pub limit: Option<usize>,
+    /// `coupling` only: the focus file.
+    pub path: Option<String>,
+    /// `coupling` only: shared commits a pair needs, default 3.
+    #[serde(default, deserialize_with = "number")]
+    pub min_support: Option<usize>,
+    /// `coupling` only: `1` lists pairs across directories too, `0` (default) only siblings.
+    pub cross_dir: Option<String>,
     #[serde(flatten)]
     pub select: Selection,
     #[serde(flatten)]
@@ -48,6 +55,20 @@ impl Params {
         limit: Option<usize>,
     ) -> Self {
         Self { period, label, metric, limit, select: Selection { q }, ..Self::default() }
+    }
+}
+
+impl Params {
+    /// These parameters with the ones only `coupling` reads set.
+    #[must_use]
+    pub fn coupling(
+        mut self,
+        path: Option<String>,
+        min_support: Option<usize>,
+        cross_dir: Option<String>,
+    ) -> Self {
+        (self.path, self.min_support, self.cross_dir) = (path, min_support, cross_dir);
+        self
     }
 }
 
@@ -132,6 +153,21 @@ pub const INSIGHTS: &[Insight] = &[
         typed: |v| Ok(InsightData::Hotspots(read(v)?)),
     },
     Insight {
+        name: "coupling",
+        summary: "Files that change in the same commits, for one file or the whole tree. \
+            Takes `path`, `min_support`, `cross_dir` and `limit`.",
+        compute: |c, q, head| {
+            let query = gitterrace_index::CouplingQuery {
+                path: q.path.as_deref().map(|p| p.trim_matches('/')).filter(|p| !p.is_empty()),
+                min_support: q.min_support.unwrap_or(COUPLING_MIN_SUPPORT).max(1),
+                cross_dir: q.cross_dir.as_deref() == Some("1"),
+                limit: q.limit.unwrap_or(COUPLING_LIMIT).min(COUPLING_MAX_LIMIT),
+            };
+            val(&c.insights().coupling_report_in(&head(), c, &query))
+        },
+        typed: |v| Ok(InsightData::Coupling(read(v)?)),
+    },
+    Insight {
         name: "languages",
         summary: "Lines and files per language in the head tree, and their total: the project's \
             size, as the web Languages page counts it.",
@@ -146,6 +182,36 @@ pub const INSIGHTS: &[Insight] = &[
         typed: |v| Ok(InsightData::Ownership(read(v)?)),
     },
 ];
+
+/// Shared commits a coupled pair needs when the request names none.
+/// Not configurable: the bar the patterns section has always used.
+const COUPLING_MIN_SUPPORT: usize = 3;
+/// Pairs `coupling` lists when the request names no limit.
+/// Not configurable: a page of the strongest pairs.
+const COUPLING_LIMIT: usize = 50;
+/// Most pairs `coupling` lists, whatever `limit` asks.
+/// Not configurable: it bounds the answer's size.
+const COUPLING_MAX_LIMIT: usize = 500;
+
+/// Refuses the parameters only `coupling` reads on any other insight: an unread key would
+/// answer unfiltered numbers to a caller who thinks they are filtered.
+pub(crate) fn check_params(name: &str, p: &Params) -> Result<(), ApiError> {
+    if name == "coupling" {
+        return Ok(());
+    }
+    let named = [
+        ("path", p.path.is_some()),
+        ("min_support", p.min_support.is_some()),
+        ("cross_dir", p.cross_dir.is_some()),
+    ];
+    match named.iter().find(|(_, set)| *set) {
+        Some((k, _)) => Err(ApiError::BadRequest(format!(
+            "unknown parameter `{k}` for insight {name}: only coupling reads it. Select \
+             commits with `q`"
+        ))),
+        None => Ok(()),
+    }
+}
 
 /// Directory depth ownership groups by: two levels, as the web Ownership page shows it.
 pub const OWNERSHIP_DEPTH: usize = 2;
@@ -201,6 +267,7 @@ pub fn compute(
     params: &Params,
     head: Head<'_>,
 ) -> Result<Value, ApiError> {
+    check_params(name, params)?;
     (find(name)?.compute)(c, params, head)
 }
 

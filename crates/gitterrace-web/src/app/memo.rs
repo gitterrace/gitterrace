@@ -81,7 +81,7 @@ impl App {
     /// The query reduced to what the stats pages read, sorted: unknown parameters and the
     /// order of known ones must not make a new memo entry.
     pub(crate) fn canonical_query(raw: Option<&str>) -> String {
-        const KNOWN: [&str; 15] = [
+        const KNOWN: [&str; 18] = [
             "q",
             "period",
             "page",
@@ -97,6 +97,9 @@ impl App {
             "from",
             "to",
             "mode",
+            "focus",
+            "cross_dir",
+            "min_support",
         ];
         let mut pairs: Vec<&str> = raw
             .unwrap_or_default()

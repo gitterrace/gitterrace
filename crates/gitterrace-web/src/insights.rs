@@ -142,6 +142,15 @@ impl InsightsQuery {
         fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
     }
 
+    /// Link to `base` with the current filters and options and the page's own `set` keys on
+    /// top: the keys a section reads besides the shared filter.
+    pub(crate) fn link_with(&self, d: &Defaults, base: &str, set: &[(&str, &str)]) -> String {
+        let own = self.pairs(d);
+        let pairs: Vec<(&str, &str)> =
+            own.iter().map(|(k, v)| (*k, v.as_str())).chain(set.iter().copied()).collect();
+        fmt::href(&format!("{base}{}", self.filter.query(&pairs)))
+    }
+
     /// Link to `base` with the current filters and options and the days `from` to `to`
     /// (`YYYY-MM-DD`, both inclusive) as the range, written as `?q=` like any filter.
     pub(crate) fn range_link(&self, d: &Defaults, base: &str, from: &str, to: &str) -> String {

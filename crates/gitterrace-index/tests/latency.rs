@@ -11,13 +11,17 @@
 #![cfg(not(debug_assertions))]
 
 use std::io::Write as _;
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
 use gitterrace_index::{
-    Index, Insights, LineCache, Options, Period, Scope, ScopeParams, head_files,
+    CouplingQuery, Index, Insights, LineCache, Options, Period, Scope, ScopeParams, head_files,
 };
 use gitterrace_testkit::synthetic::{self, Shape};
+
+/// One timed test at a time: two 100k builds side by side slow each other past a ceiling.
+static ONE_AT_A_TIME: Mutex<()> = Mutex::new(());
 
 /// Ceilings, in ms, for (hotspots, ownership): measured on an M1 Max (all: 224 and 156, one
 /// year: 121 and 118, load 55 to 85), times 1.5.
@@ -34,6 +38,7 @@ fn ms(d: Duration) -> u64 {
 
 #[test]
 fn file_pages_stay_under_their_ceilings_at_100k_commits() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let path = dir.path().join("r");
     synthetic::build(&path, Shape::sized(100_000));
@@ -93,6 +98,7 @@ const CHUNKS: [usize; 3] = [64, 256, 0];
 
 #[test]
 fn path_cards_stay_under_their_ceilings_at_100k_commits() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
     let dir = tempfile::tempdir().expect("tmp");
     let path = dir.path().join("r");
     synthetic::build(&path, Shape::sized(100_000));
@@ -137,6 +143,46 @@ fn path_cards_stay_under_their_ceilings_at_100k_commits() {
          {CEIL_DIR_CARD}) over {} head files",
         ceilings.0,
         ceilings.1,
+        files.len()
+    );
+}
+
+/// Ceilings, in ms, for the global coupling list and one file's partners over the whole
+/// history: measured on an M1 Max at load 9 to 17 (124 and 82), with room for load.
+/// Quadratic pair growth (every pair of every commit, or a row per file per commit) would put
+/// either far above them.
+const CEIL_COUPLING_ALL: u64 = 300;
+const CEIL_COUPLING_FILE: u64 = 200;
+
+#[test]
+fn coupling_stays_under_its_ceilings_at_100k_commits() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path().join("r");
+    synthetic::build(&path, Shape::sized(100_000));
+    let repo = Repo::discover(&path).expect("repo");
+    let index = Index::open_dir(dir.path().join("cache")).expect("index");
+    index.update(&repo, "HEAD", &|_| {}).expect("update");
+    let tip = repo.resolve("HEAD").expect("tip");
+    let mut lines = LineCache::load(index.dir());
+    let files = head_files(&repo, &tip, &mut lines).expect("head files");
+    let scope = Scope::from_params(&ScopeParams::default(), Options::default(), Period::All)
+        .expect("scope");
+    let run = |path: Option<&str>| {
+        best_of_three(&index, &repo, &tip, |ins| {
+            let c = ins.counted(&scope, ins.context());
+            let q = CouplingQuery { path, min_support: 3, cross_dir: true, limit: 50 };
+            let r = ins.coupling_report_in(&files, &c, &q);
+            assert!(r.pairs.len() <= 50);
+        })
+        .expect("the built tip opens")
+    };
+    let (all, one) = (run(None), run(Some("d0/d0/f0.rs")));
+    writeln!(std::io::stderr(), "coupling all {all} ms, file {one} ms").expect("stderr");
+    assert!(
+        all <= CEIL_COUPLING_ALL && one <= CEIL_COUPLING_FILE,
+        "coupling {all} ms (ceiling {CEIL_COUPLING_ALL}), one file {one} ms (ceiling \
+         {CEIL_COUPLING_FILE}) over {} head files",
         files.len()
     );
 }

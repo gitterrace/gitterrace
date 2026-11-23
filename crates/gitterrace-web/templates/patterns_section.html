@@ -2,12 +2,7 @@
 {%- import "_table.html" as t -%}
 <section class="fold" id="patterns">
 <h2 class="fold-h">Patterns</h2>
-<div class="chart-head" id="coupled"><div><h2>Coupled files</h2><p class="hint">Pairs of files that change in the same commits. Degree is shared commits over the changes of the less-changed file.</p></div></div>
-<div class="card" tabindex="0" role="region" aria-label="Coupled files"><table
-class="entries pair">{% call t::caption("Coupled files") %}{% endcall %}
-<tr class="th"><th scope="col">File</th><th scope="col">Changes with</th><th scope="col" class="r">Together</th><th scope="col" class="r">Degree</th></tr>
-{% for p in pairs %}<tr><th scope="row"><a href="{{ p.a_href }}">{% call paths::path(&p.a) %}{% endcall %}</a></th><td><a href="{{ p.b_href }}">{% call paths::path(&p.b) %}{% endcall %}</a></td><td class="r">{{ p.together }}</td><td class="r"><b>{{ p.degree }}</b></td></tr>{% endfor %}
-</table></div>
+{{ coupled|safe }}
 <div class="chart-head" id="code-age"><div><h2>Code age</h2><p class="hint">Lines now by the year their file last changed.</p></div></div>
 <div class="card pad">{{ age }}</div>
 <div class="chart-head" id="sizes"><div><h2>Commit sizes</h2><p class="hint">Commits by lines added plus removed.</p></div></div>

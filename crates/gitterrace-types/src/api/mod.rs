@@ -29,11 +29,11 @@ pub use file_insight::{
     FileInsightOwner, FileInsightPartner,
 };
 pub use insights::{
-    InsightContributor, InsightContributors, InsightData, InsightDirChurn, InsightDirOwnership,
-    InsightFileChurn, InsightFrequency, InsightHotspot, InsightHotspots, InsightLabelBucket,
-    InsightLabelCount, InsightLanguage, InsightLanguages, InsightOwner, InsightOwnership,
-    InsightPeriod, InsightPeriodStats, InsightPeriodSummary, InsightResponse, InsightRhythm,
-    InsightSeriesPoint, InsightUnit,
+    InsightContributor, InsightContributors, InsightCoupling, InsightCouplingPair, InsightData,
+    InsightDirChurn, InsightDirOwnership, InsightDirPair, InsightFileChurn, InsightFrequency,
+    InsightHotspot, InsightHotspots, InsightLabelBucket, InsightLabelCount, InsightLanguage,
+    InsightLanguages, InsightOwner, InsightOwnership, InsightPeriod, InsightPeriodStats,
+    InsightPeriodSummary, InsightResponse, InsightRhythm, InsightSeriesPoint, InsightUnit,
 };
 pub use review::{
     CheckpointItem, CheckpointsResponse, Finding, FindingAnchor, FindingLines, FindingsResponse,

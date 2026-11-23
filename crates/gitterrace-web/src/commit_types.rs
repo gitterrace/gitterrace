@@ -36,27 +36,27 @@ struct Group {
     rows: Vec<Row>,
 }
 
-struct Cell {
-    n: usize,
-    level: u8,
-    href: String,
-    tip: String,
+pub(crate) struct Cell {
+    pub(crate) n: usize,
+    pub(crate) level: u8,
+    pub(crate) href: String,
+    pub(crate) tip: String,
 }
 
-struct MatrixRow {
-    label: String,
-    href: String,
-    cells: Vec<Cell>,
+pub(crate) struct MatrixRow {
+    pub(crate) label: String,
+    pub(crate) href: String,
+    pub(crate) cells: Vec<Cell>,
 }
 
-struct MatrixCol {
-    label: String,
-    href: String,
+pub(crate) struct MatrixCol {
+    pub(crate) label: String,
+    pub(crate) href: String,
 }
 
-struct Matrix {
-    cols: Vec<MatrixCol>,
-    rows: Vec<MatrixRow>,
+pub(crate) struct Matrix {
+    pub(crate) cols: Vec<MatrixCol>,
+    pub(crate) rows: Vec<MatrixRow>,
 }
 
 /// The type by scope grid as a chart figure: a table of links whose cells are shaded by count,
@@ -64,9 +64,9 @@ struct Matrix {
 /// like every other chart.
 #[derive(Template)]
 #[template(path = "matrix.html")]
-struct MatrixFigure {
-    m: Matrix,
-    fig: charts::view::Fig,
+pub(crate) struct MatrixFigure {
+    pub(crate) m: Matrix,
+    pub(crate) fig: charts::view::Fig,
 }
 
 impl askama::filters::HtmlSafe for MatrixFigure {}
@@ -153,7 +153,7 @@ fn label_rows(v: &[LabelCount], link: impl Fn(&str) -> String) -> Vec<Row> {
 }
 
 /// Shade level 1..=4 of `n` against the matrix maximum, 0 for an empty cell.
-fn level(n: usize, max: usize) -> u8 {
+pub(crate) fn level(n: usize, max: usize) -> u8 {
     if n == 0 || max == 0 {
         return 0;
     }

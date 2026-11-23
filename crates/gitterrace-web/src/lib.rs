@@ -13,6 +13,7 @@ mod charttip;
 mod commit_line;
 mod commit_types;
 mod compare;
+mod coupling;
 #[cfg(test)]
 mod crawl_tests;
 mod diff_find;

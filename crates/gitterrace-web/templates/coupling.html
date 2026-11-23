@@ -1,0 +1,27 @@
+{%- import "_path.html" as paths -%}
+{%- import "_table.html" as t -%}
+<div class="chart-head" id="coupled"><div><h2>Coupled files</h2><p class="hint">Pairs of files that
+change in the same commits. Together is the shared commits, then how much of each file's changes
+came with the other. {{ threshold }}</p></div></div>
+<div class="coupling-bar">{{ kind }}{% if let Some(f) = focus %}<span class="hint"
+data-focus>Changes with {{ f }}. <a href="{{ all_href }}">Show every
+file</a></span>{% endif %}</div>
+{% if let Some(e) = none %}{{ e }}{% else %}<div class="card" tabindex="0" role="region"
+aria-label="Coupled files"><table
+class="entries pair">{% call t::caption("Coupled files") %}{% endcall %}
+<tr class="th"><th scope="col">File</th><th scope="col">Changes with</th><th scope="col"
+class="r">Together</th><th scope="col" class="r">Of file</th><th scope="col" class="r">Of
+partner</th><th scope="col" class="r">Last together</th></tr>
+{% for p in rows %}<tr data-act="insight" data-path="{{ p.path }}"><th scope="row"><a
+href="{{ p.file_href }}">{% call paths::path(&p.file) %}{% endcall %}</a></th><td><a
+href="{{ p.with_href }}">{% call paths::path(&p.with) %}{% endcall %}</a> <a class="muted"
+href="{{ p.focus_href }}" data-focus-link>focus</a>{% if p.cross %}
+{#- -#} <span class="muted">other directory</span>{% endif %}</td><td
+class="r">{{ p.together }}</td><td
+class="r">{{ p.of_file }}</td><td class="r">{{ p.of_with }}</td><td
+class="r muted">{{ p.last }}</td></tr>{% endfor %}
+</table></div>{% endif %}
+{% if let Some(mf) = matrix %}<div class="chart-head" id="coupled-dirs"><div><h2>Directories that
+change together</h2><p class="hint">Commits that changed files of both top-level directories. Darker
+cells have more commits.</p></div></div>
+<div class="card pad">{{ mf }}</div>{% endif %}

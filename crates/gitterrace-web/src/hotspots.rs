@@ -51,6 +51,7 @@ pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
+    Query(coupling): Query<crate::coupling::CouplingParams>,
 ) -> Result<Html<String>> {
     cached(&app, "ho", raw, move |a, r, c| {
         let f = &q.filter;
@@ -101,7 +102,8 @@ pub(crate) async fn page(
                 pct: if max > 0.0 { (h.score / max * 100.0).max(1.0) as u32 } else { 0 },
             })
             .collect();
-        let patterns = crate::features::section("patterns", || crate::patterns::section(a, r, &q));
+        let patterns =
+            crate::features::section("patterns", || crate::patterns::section(a, r, &q, &coupling));
         let empty = set.stream().next().is_none();
         let jump = crate::markdown::outline_menu(
             &crate::markdown::section_jumps(&[

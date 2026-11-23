@@ -79,8 +79,9 @@ async fn main() -> anyhow::Result<()> {
                 gitterrace_api::serve_mcp(&path, &loaded.config).await?;
             }
         }
-        Command::Insights { name, rev, period, q, label, metric, limit, json } => {
+        Command::Insights { name, rev, period, q, label, metric, limit, coupling, json } => {
             let params = gitterrace_api::Params::new(period, q, label, metric, limit);
+            let params = coupling.apply(params);
             let out = tokio::task::block_in_place(|| {
                 insights::run(&path, &loaded.config, name.as_deref(), rev.as_deref(), &params, json)
             })?;

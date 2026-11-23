@@ -18,4 +18,6 @@ extend-ignore-re = [
 unparseable = "unparseable"
 # gix names this field of its worktree status item
 rela = "rela"
+# the reverse direction of a pair, `confidence_ba`, as `a_changes` is its `a` side
+ba = "ba"
 

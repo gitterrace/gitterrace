@@ -85,6 +85,11 @@ git terrace insights [OPTIONS] [NAME] [PATHS]...
 - `--metric <METRIC>`: `commits` (default), `added`, `deleted` or `net`, for
   `contributors`.
 - `--limit <LIMIT>`: Most rows, for the insights that list rows.
+- `--path <PATH>`: Focus file, for `coupling`.
+- `--support <MIN_SUPPORT>`: Shared commits a pair needs, for `coupling`.
+  Default 3.
+- `--cross-dir <CROSS_DIR>`: `1` lists pairs across directories too, for
+  `coupling`.
 - `--json`: List as JSON too. An insight is always printed as JSON.
 
 ## `git terrace open`
