@@ -131,16 +131,30 @@ out="$tmp/export"
 exe --config "$(native "$cfg")" export "$(native "$out")" "$(native "$repo")" >/dev/null 2>&1 && [ -f "$out/index.html" ] && ok "export" || bad "export"
 
 # An action past its timeout is killed, child included.
-page "/blob/HEAD/README.md" >/dev/null
-token=$(sed -n 's/.*name="gitterrace-actions" content="\([^"]*\)".*/\1/p' "$tmp/body" | head -1)
+# Writes need the owner cookie: the launch link is the one way to get it, as a browser does.
 name=$rname
-if [ -z "$token" ]; then
-  bad "no action token in the page"
+jar="$tmp/jar"
+cfgdir=$(native "$cfg")
+launch=$(exe --config "$cfgdir" --addr "127.0.0.1:$port" launch --print 2>/dev/null || true)
+link=$(printf '%s' "$launch" | tr -d '\r')
+code() { curl -sS -o /dev/null -w '%{http_code}' "$@"; }
+if [ -z "$link" ]; then
+  bad "no launch link from the server"
 else
-  req="{\"action\":\"hang\",\"kind\":\"line\",\"locator\":{\"repo\":\"${name:-fixture}\",\"rev\":\"HEAD\",\"path\":\"README.md\",\"lines\":{\"start\":1,\"end\":1}}}"
-  reply=$(curl -sS -X POST "$base/_actions/run" -H 'Content-Type: application/json' \
-    -H 'Sec-Fetch-Site: same-origin' -H "Origin: $base" -H "X-Gitterrace-Token: $token" -d "$req")
-  echo "$reply" | grep -q 'timed out' && ok "action timed out" || bad "action did not time out: $reply"
+  curl -sS -o /dev/null -c "$jar" "$link"
+  grep -q HttpOnly "$jar" && ok "launch sets an HttpOnly cookie" || bad "no HttpOnly cookie"
+  [ "$(code "$link")" = 403 ] && ok "launch link works once" || bad "launch link reused"
+  page "/blob/HEAD/README.md" >/dev/null
+  tokenish='content="[A-Za-z0-9_-]{32,}"'
+  if grep -qE "$tokenish" "$tmp/body"; then bad "a page holds a token"; else ok "pages hold no token"; fi
+  loc="\"repo\":\"${name:-fixture}\",\"rev\":\"HEAD\",\"path\":\"README.md\""
+  req="{\"action\":\"hang\",\"kind\":\"line\",\"locator\":{$loc,\"lines\":{\"start\":1,\"end\":1}}}"
+  run=(-X POST "$base/_actions/run" -H 'Content-Type: application/json')
+  run+=(-H 'Sec-Fetch-Site: same-origin' -H "Origin: $base" -d "$req")
+  reply=$(curl -sS "${run[@]}" -b "$jar")
+  forged=$(code "${run[@]}")
+  [ "$forged" = 403 ] && ok "forged headers are refused" || bad "forged run: $forged"
+  echo "$reply" | grep -q 'timed out' && ok "action timed out" || bad "no timeout: $reply"
   # The kill is asynchronous: give it up to 10 s, polling, before calling the child alive.
   for _ in $(seq 1 50); do
     alive "$image" "$image" || break

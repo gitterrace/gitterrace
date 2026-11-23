@@ -178,7 +178,53 @@ pub(super) fn show(
         println!("{url}");
         return Ok(());
     }
+    browse(&launch_url(addr, state.as_deref(), &target.path).unwrap_or(url))
+}
+
+#[expect(
+    clippy::print_stdout,
+    reason = "user-facing CLI output: this is the command's result, not a log line"
+)]
+/// `git terrace launch`: the running server's front page, opened with the owner cookie.
+pub(crate) fn launch_cmd(addr: SocketAddr, print: bool) -> anyhow::Result<()> {
+    let state = gitterrace_web::state_dir();
+    let addr = loopback(addr);
+    anyhow::ensure!(
+        identify(addr, state.as_deref()) == Listener::Gitterrace,
+        "no gitterrace server of this user is running on {addr}"
+    );
+    let url = launch_url(addr, state.as_deref(), "/")
+        .context("the server gave no launch link (is it an older version?)")?;
+    if print {
+        println!("{url}");
+        return Ok(());
+    }
     browse(&url)
+}
+
+/// The one-time link that hands the browser the owner cookie before it lands on `path`.
+/// The server gives a ticket to whoever holds the secret in our 0600 file, so only this user
+/// gets one. `None` (no state folder, an older server) leaves the plain URL: the pages
+/// read, and writes stay refused until the browser is launched this way.
+fn launch_url(addr: SocketAddr, state: Option<&Path>, path: &str) -> Option<String> {
+    #[derive(serde::Deserialize)]
+    struct Ticket {
+        ticket: String,
+    }
+    let (status, reply) = secret_request(loopback(addr), state, "POST", "/_launch", &()).ok()?;
+    let t: Ticket = serde_json::from_str(&reply.text).ok()?;
+    let ok =
+        status == 200 && t.ticket.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b));
+    ok.then(|| format!("http://{addr}/_launch?t={}&to={}", t.ticket, path_query(path)))
+}
+
+/// `path` as a query value: every byte outside the unreserved set is escaped, so a `?` or `&`
+/// in the link stays inside `to`.
+fn path_query(path: &str) -> String {
+    let plain = |b: &u8| b.is_ascii_alphanumeric() || b"-._~/".contains(b);
+    path.bytes()
+        .map(|b| if plain(&b) { char::from(b).to_string() } else { format!("%{b:02X}") })
+        .collect()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -287,7 +333,7 @@ fn ensure_server(
 /// (202, it opens in the background) and already served (409) both count as added.
 /// The `/r/NAME/` prefix the server serves `root` under, new or already there.
 fn add_repo(addr: SocketAddr, state: Option<&Path>, root: &Path) -> Result<String, ServerError> {
-    match secret_request(addr, state, "POST", &AddBody { path: root })? {
+    match secret_request(addr, state, "POST", "/_repos", &AddBody { path: root })? {
         (202 | 409, v) => Ok(v.base.unwrap_or_else(|| "/".to_owned())),
         (404 | 405, _) => Err(ServerError::NoAdding),
         (status, v) => Err(ServerError::Status { status, reason: v.why() }),
@@ -356,7 +402,7 @@ fn remove_repo(
     state: Option<&Path>,
     body: &RemoveBody<'_>,
 ) -> Result<Removed, ServerError> {
-    match secret_request(addr, state, "DELETE", body)? {
+    match secret_request(addr, state, "DELETE", "/_repos", body)? {
         (200, v) => Ok(Removed::Done(v.name.unwrap_or_default())),
         (404, v) if v.error.is_some() => Ok(Removed::NotServed),
         (404 | 405, _) => Err(ServerError::NoRemoving),
@@ -394,6 +440,7 @@ fn secret_request(
     addr: SocketAddr,
     state: Option<&Path>,
     method: &str,
+    route: &str,
     body: &impl serde::Serialize,
 ) -> Result<(u16, RepoReply), ServerError> {
     let state = state.ok_or(ServerError::NoState)?;
@@ -401,7 +448,7 @@ fn secret_request(
     let body = serde_json::to_string(body).map_err(std::io::Error::from)?;
     let s = TcpStream::connect_timeout(&addr, PROBE_TIMEOUT)?;
     let req = format!(
-        "{method} /_repos HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: \
+        "{method} {route} HTTP/1.1\r\nHost: {addr}\r\n{}: {token}\r\nContent-Type: \
         application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
         gitterrace_web::ADD_TOKEN_HEADER,
         body.len()

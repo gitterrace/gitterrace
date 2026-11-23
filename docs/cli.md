@@ -103,6 +103,22 @@ git terrace open [OPTIONS] <LINK> [PATHS]...
   `http(s)://.../go/...` URL or a bare `/go/...` path.
 - `--print`: Print the URL instead of opening a browser.
 
+## `git terrace launch`
+
+Open the running server in the browser as its owner, so actions and settings can
+write.
+
+Pages are readable by any user of this machine over loopback, so writes need
+proof only you hold: this reads the secret in your 0600 state file and opens a
+one-time link that sets a session cookie. `--print` prints the link instead (it
+works once, for a minute).
+
+```sh
+git terrace launch [OPTIONS] [PATHS]...
+```
+
+- `--print`: Print the link instead of opening a browser.
+
 ## `git terrace remove`
 
 Take a repository off the running server. Its pages then answer 404.

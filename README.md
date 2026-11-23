@@ -103,6 +103,7 @@ git terrace config            Print the effective configuration and where each v
 git terrace mcp               Run a read-only MCP server over stdio for agents [--served]
 git terrace insights [name]   Print one insight of the first repository as JSON, or list them: the numbers of the web pages, `/api/v1/insights/{name}` and the MCP `insight` tool, byte for byte. Reads the repository of the current folder, offline [--rev --period --q --label --metric --limit --json]
 git terrace open <link>       Open a `gitterrace://` or `/go` permalink in the browser, starting a server if needed [--print]
+git terrace launch            Open the running server in the browser as its owner, so actions and settings can write [--print]
 git terrace remove [target]   Take a repository off the running server. Its pages then answer 404
 git terrace install-handler   Register (or with `--uninstall` remove) this program as the `gitterrace://` link handler [--uninstall]
 git terrace service <action>  Run the server at login: print, install or uninstall a systemd user unit or launchd agent [--now]

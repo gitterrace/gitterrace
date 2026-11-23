@@ -98,6 +98,10 @@ async fn main() -> anyhow::Result<()> {
                 return Err(e);
             }
         }
+        Command::Launch { print } => {
+            let addr = server_addr(&loaded.config)?;
+            tokio::task::block_in_place(|| open::launch_cmd(addr, print))?;
+        }
         Command::Remove { target } => {
             let addr = server_addr(&loaded.config)?;
             tokio::task::block_in_place(|| open::remove_cmd(addr, target.as_deref()))?;

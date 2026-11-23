@@ -97,7 +97,7 @@
     "scripts/release/site/site-check.py": 2,
     "scripts/release/site/site-render.mjs": 8,
     "scripts/release/site/site-shots-run.mjs": 5,
-    "scripts/verify/smoke-check.sh": 11,
+    "scripts/verify/smoke-check.sh": 10,
     "scripts/lint/text-check.py": 1,
     "scripts/lint/stubs-check.py": 1,
     "scripts/lint/tests-check.py": 1

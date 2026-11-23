@@ -108,6 +108,16 @@ pub(crate) enum Command {
         #[arg(long)]
         print: bool,
     },
+    /// Open the running server in the browser as its owner, so actions and settings can write.
+    ///
+    /// Pages are readable by any user of this machine over loopback, so writes need proof only
+    /// you hold: this reads the secret in your 0600 state file and opens a one-time link that
+    /// sets a session cookie. `--print` prints the link instead (it works once, for a minute).
+    Launch {
+        /// Print the link instead of opening a browser.
+        #[arg(long)]
+        print: bool,
+    },
     /// Take a repository off the running server. Its pages then answer 404.
     ///
     /// The opposite of serving a repository while a server already runs: the server on
