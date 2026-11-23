@@ -17,19 +17,16 @@ fail() {
 parse_args() {
   local name=$1
   shift
-  if [ "$#" -gt 1 ]; then
-    echo "usage: scripts/dev/$name.sh [--full | --self-test]" >&2
-    return 2
+  if [ "$#" -le 1 ]; then
+    case "${1:-}" in
+    "") echo smoke && return ;;
+    --full) echo full && return ;;
+    --self-test) echo self-test && return ;;
+    *) ;;
+    esac
   fi
-  case "${1:-}" in
-  "") echo smoke ;;
-  --full) echo full ;;
-  --self-test) echo self-test ;;
-  *)
-    echo "usage: scripts/dev/$name.sh [--full | --self-test]" >&2
-    return 2
-    ;;
-  esac
+  echo "usage: scripts/dev/$name.sh [--full | --self-test]" >&2
+  return 2
 }
 
 # parse_args_self_test NAME: the argument rules every run script keeps.
