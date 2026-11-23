@@ -469,8 +469,9 @@
   var armed = false, armTimer = null;
   function disarm() { armed = false; clearTimeout(armTimer); }
   document.addEventListener("keydown", function (e) {
+    var shortcutsOff = window.gtKeysOff && window.gtKeysOff();
+    if (shortcutsOff) return;
     if (e.metaKey || e.ctrlKey || e.altKey || ov.name) return;
-    if (window.gtKeysOff && window.gtKeysOff()) return;
     var t = e.target;
     if (window.gtTyping(t)) return;
     if (armed) {

@@ -298,6 +298,8 @@
   var pickers = false;
   function withPickers(done) { pickers = true; window.gtLazy("pickers", done); }
   document.addEventListener("keydown", function (e) {
+    var shortcutsOff = window.gtKeysOff && window.gtKeysOff();
+    if (shortcutsOff) return;
     // nav.js handles "b" once the pickers are here.
     if (pickers || e.key !== "b" || !free(e)) return;
     e.preventDefault();
@@ -343,6 +345,8 @@
   // ".": keys typed while loading (". s") are held, then replayed in order.
   var held = null;
   document.addEventListener("keydown", function (e) {
+    var shortcutsOff = window.gtKeysOff && window.gtKeysOff();
+    if (shortcutsOff) return;
     if (held) { e.preventDefault(); e.stopImmediatePropagation(); held.push(e.key); return; }
     if (actions || e.key !== "." || !free(e)) return;
     e.preventDefault();
