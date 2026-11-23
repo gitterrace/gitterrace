@@ -215,9 +215,10 @@ coverage-check:
 	python3 scripts/verify/coverage-check.py target/coverage/before target/coverage/after
 
 ## browser-deps: Install the pinned browser check deps and their Playwright browsers
+browser-deps: PWCLI = node_modules/playwright-core/cli.js
 browser-deps:
 	npm ci --no-audit --no-fund
-	PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install chromium webkit
+	PLAYWRIGHT_SKIP_BROWSER_GC=1 node $(PWCLI) install chromium webkit firefox
 
 ## browser-check: Real-browser checks of the served pages (BIN=path to git-terrace)
 browser-check: browser-reap browser-disk

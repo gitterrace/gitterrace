@@ -62,3 +62,7 @@ main.wrap>.ph+h2{margin-top:0}
 .filter-pop dd{color:var(--muted)}
 .filter-pop a{display:inline-block;margin-top:var(--space-2);padding:2px 0;
   font-weight:var(--weight-semibold)}
+/* The chip is as tall as the 24px trigger beside it. Left to the mono line box it is 24px in
+   Chromium and WebKit and 25px in Firefox. */
+.meta a.sha{display:inline-flex;align-items:center;box-sizing:border-box;height:24px;
+padding-block:0;vertical-align:baseline}

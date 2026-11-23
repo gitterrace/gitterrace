@@ -146,11 +146,15 @@ export function checks(env) {
             document.querySelectorAll('.src .ch').length > 0);
           await scrollSettled(p);
           const seen = { landed: await lit(p) };
-          await p.mouse.wheel(0, -2400);
+          await p.evaluate(() => scrollBy({ top: -2400, behavior: 'instant' }));
           await scrollSettled(p);
           seen.up = await lit(p);
           seen.upLine = await p.evaluate(() => {
-            const line = (innerHeight) * 0.55;
+            // The reading line outline.js uses for code: 10% down the window below a pinned head.
+            const pin = document.querySelector('main>.ph.pin');
+            const stuck = pin && getComputedStyle(pin).position === 'sticky';
+            const top = stuck ? pin.getBoundingClientRect().height : 0;
+            const line = top + (innerHeight - top) * 0.1;
             const ids = [...document.querySelectorAll('.outline.rail a')]
               .filter((a) => a instanceof HTMLAnchorElement)
               .map((a) => a.hash.slice(1));
@@ -160,7 +164,7 @@ export function checks(env) {
             }
             return '#' + id;
           });
-          await p.mouse.wheel(0, 4800);
+          await p.evaluate(() => scrollBy({ top: 4800, behavior: 'instant' }));
           await scrollSettled(p);
           seen.down = await lit(p);
           const want = holding(n);

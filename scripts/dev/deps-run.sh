@@ -140,8 +140,9 @@ machete_ok || {
   npm ci --no-audit --no-fund
 }
 if [ "$browsers" = 1 ]; then
-  note "Playwright browsers (chromium, webkit)"
-  PLAYWRIGHT_SKIP_BROWSER_GC=1 node node_modules/playwright-core/cli.js install chromium webkit
+  note "Playwright browsers (chromium, webkit, firefox)"
+  pwcli=node_modules/playwright-core/cli.js
+  PLAYWRIGHT_SKIP_BROWSER_GC=1 node "$pwcli" install chromium webkit firefox
 fi
 
 missing=()

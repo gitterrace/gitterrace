@@ -95,11 +95,20 @@ export function checks(env) {
       }
     });
     const seen = new Set();
+    let prev = null;
     for (let i = 0; i < 400; i++) {
       await p.keyboard.press('Tab');
       const m = await p.evaluate(ringProbe);
       if (!m) break;
       if (seen.has(m.id) && m.id !== '') { if (m.id === [...seen][0]) break; }
+      // Firefox does not hand focus to browser chrome past the last stop: Tab leaves it where
+      // it is. That ends the walk only on the page's last tabbable element, else it is a trap.
+      if (m.id === prev) {
+        if (await p.evaluate(isLastTabbable)) break;
+        found.push(`${m.what}: Tab does not move on`);
+        break;
+      }
+      prev = m.id;
       seen.add(m.id);
       if (m.problem) found.push(`${m.what}: ${m.problem}`);
       if (i === 399) found.push('Tab never leaves the page: a trap or too many stops');
@@ -264,6 +273,14 @@ export function checks(env) {
 }
 
 // Runs in the page after each Tab. Describes the focused element and what is wrong with its ring.
+/** Whether the focused element is the last one Tab can reach in document order. */
+function isLastTabbable() {
+  const sel = 'a[href], button, input, select, textarea, summary, [tabindex]';
+  const all = /** @type {HTMLInputElement[]} */ ([...document.querySelectorAll(sel)])
+    .filter((e) => e.tabIndex >= 0 && !e.disabled && e.getClientRects().length);
+  return all[all.length - 1] === document.activeElement;
+}
+
 function ringProbe() {
   const e = /** @type {HTMLElement} */ (document.activeElement);
   if (!e || e === document.body || e === document.documentElement) return null;

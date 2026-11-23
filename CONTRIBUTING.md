@@ -12,7 +12,9 @@ A pull request is offered under the MIT license ([LICENSE](LICENSE)).
 You need git. `make deps` installs the rest at the versions CI uses: the Rust
 toolchain `rust-toolchain.toml` pins, Python 3.11 or newer, node and the
 linters `make check` runs. On macOS it uses Homebrew, so install that first.
-`make deps BROWSERS=1` also fetches the browsers the browser checks drive.
+`make deps BROWSERS=1` also fetches the browsers the browser checks drive:
+Chromium, WebKit and Firefox, all three run by default. A `make lint` step fails
+if the harness can launch one that the install lines skip.
 
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace

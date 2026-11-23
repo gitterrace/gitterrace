@@ -15,6 +15,9 @@
 .graphed .crow{padding-left:calc(var(--space-3) * 2 + var(--gw))!important}
 .graph{position:relative;flex:none;align-self:stretch;display:flex;align-items:center;
 max-width:96px;margin:calc(-1 * var(--space-2)) 0;overflow:hidden}
+/* A row after the first has a 1px rule above it. The cell reaches over the rule, so lines
+   run on from the row above without a break (Firefox lays the rule outside the margin). */
+.crow+.crow .graph{margin-top:calc(-1 * var(--space-2) - 1px)}
 .graph .gl{position:absolute;inset:0 auto 0 0;height:100%;fill:none;stroke:var(--line-strong);
 stroke-width:1.5px}
 .graph .gl path{vector-effect:non-scaling-stroke}.graph .gl .main{stroke:var(--accent);

@@ -47,7 +47,7 @@ export async function loadPlaywright(need = ['chromium']) {
   const p = process.env.PLAYWRIGHT_CORE || join(root, 'node_modules/playwright-core/index.mjs');
   if (!existsSync(p)) die(`playwright-core not found at ${p}`);
   const pw = await import(pathToFileURL(p).href);
-  if (!pw.chromium?.launch || !pw.webkit?.launch) die(`${p} has no chromium or webkit launcher`);
+  for (const n of LAUNCHERS) if (!pw[n]?.launch) die(`${p} has no ${n} launcher`);
   try {
     createRequire(join(root, 'package.json')).resolve('axe-core');
   } catch {
@@ -76,8 +76,13 @@ function chromiumPath() {
   return undefined;
 }
 
+/** Every browser `launch` can start, and so every one CI installs (browsers-check.mjs). */
+export const LAUNCHERS = ['chromium', 'webkit', 'firefox'];
+
 export async function launch(pw, name) {
-  return name === 'webkit' ? pw.webkit.launch() : pw.chromium.launch({ executablePath: chromiumPath() });
+  if (name === 'chromium') return pw.chromium.launch({ executablePath: chromiumPath() });
+  if (!LAUNCHERS.includes(name)) die(`unknown browser ${name}; known: ${LAUNCHERS.join(', ')}`);
+  return pw[name].launch();
 }
 
 /**
