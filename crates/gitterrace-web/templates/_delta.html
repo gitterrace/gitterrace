@@ -1,5 +1,9 @@
 {#- Lines added and removed, `+a -d` in their colours. The one place a template writes them;
-    `delta.rs` writes the same markup for pages built in Rust. -#}
+    Diff headers build `file_counts` in Rust (`fmt::file_counts`). -#}
 {% macro delta(add, del) -%}
 <b class="add">+{{ add }}</b> <b class="del">-{{ del }}</b>
+{%- endmacro %}
+{#- A file's own `+a -d`, one element fewer: `fmt::file_counts` is its Rust twin. -#}
+{% macro file_counts(add, del) -%}
+<span class="counts add">+{{ add }} <b class="del">-{{ del }}</b></span>
 {%- endmacro %}

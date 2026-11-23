@@ -230,11 +230,7 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
             out.push_str(&crate::media::diff_counts(*old, *new));
             out.push_str("</header>");
         } else {
-            let _ = write!(
-                out,
-                "<span class=\"counts\">{}</span></header>",
-                crate::fmt::line_delta(f.additions, f.deletions)
-            );
+            let _ = write!(out, "{}</header>", crate::fmt::file_counts(f.additions, f.deletions));
         }
         out.push_str(&file_body(r, src, i, f, &mut used));
         out.push_str("</section>");

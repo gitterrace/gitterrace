@@ -41,7 +41,7 @@ function makeHugeRepo() {
 
 /** The id of the last file with added lines, or null. Runs in the page. */
 function lastEditId() {
-  const s = [...document.querySelectorAll('section.file')].reverse().find((x) => x.querySelector('.counts .add')?.textContent !== '+0');
+  const s = [...document.querySelectorAll('section.file')].reverse().find((x) => !x.querySelector('.counts.add')?.textContent.startsWith('+0 '));
   return s ? s.id : null;
 }
 
@@ -92,7 +92,7 @@ export function checks(env) {
     // The last file's fragment loads after the scroll ends, and how long that takes depends on
     // the machine, so wait for the condition (keeping the end in view) instead of a fixed time.
     const tailOpen = await p.waitForFunction(() => {
-      const s = [...document.querySelectorAll('section.file')].reverse().find((x) => x.querySelector('.counts .add')?.textContent !== '+0');
+      const s = [...document.querySelectorAll('section.file')].reverse().find((x) => !x.querySelector('.counts.add')?.textContent.startsWith('+0 '));
       if (s && s.querySelector('.diff .add')) return true;
       // Bring the file in view; every other poll step away first, because a fragment that
       // failed to load is watched again only once it leaves the viewport and comes back.

@@ -166,3 +166,26 @@ fn generated_files_are_counted_above_the_diff_with_a_way_to_expand_them() {
     let html = diff_html_with(&crate::views::Render::fold(400), src(&empty), &files);
     assert!(!html.contains("folded"), "{html}");
 }
+
+/// Opening tags in `html`.
+fn elements(html: &str) -> usize {
+    html.matches('<').count() - html.matches("</").count() - html.matches("<!").count()
+}
+
+/// The page-wide element cap of the huge-diff browser check is spent mostly on rows, so a row
+/// may cost its block and the hidden sign for screen readers and nothing more.
+#[test]
+fn a_changed_line_costs_two_elements() {
+    let render = crate::views::Render::fold(10_000);
+    // Both sizes fit one chunk, so only rows differ.
+    let at = |n: usize| elements(&diff_html(&render, "abc", None, &[file("a.txt", n)]));
+    assert_eq!(at(60) - at(10), 50 * 2);
+}
+
+/// A pure rename costs section, header, badge, link, counts (two), note and path.
+#[test]
+fn a_renamed_file_costs_at_most_eight_elements() {
+    let render = crate::views::Render::fold(400);
+    let html = diff_html(&render, "abc", None, &[moved("old/a.rs", "new/a.rs")]);
+    assert!(elements(&html) <= 8, "{html}");
+}

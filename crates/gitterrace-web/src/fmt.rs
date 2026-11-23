@@ -338,9 +338,15 @@ pub(crate) fn file_link(path: &str) -> String {
     }
 }
 
-/// The `+a -d` markup of lines added and removed, as `_delta.html` writes it.
-pub(crate) fn line_delta(add: impl std::fmt::Display, del: impl std::fmt::Display) -> String {
-    format!("<b class=\"add\">+{}</b> <b class=\"del\">-{}</b>", thousands(add), thousands(del))
+/// The per-file `+a -d` of a diff header or a file list row: one element fewer than
+/// `_delta.html` writes (the added count is the wrapper's own text), which a 2,000-file page pays
+/// four thousand times. The stylesheet gives the wrapper the weight `<b>` gave the count.
+pub(crate) fn file_counts(add: impl std::fmt::Display, del: impl std::fmt::Display) -> String {
+    format!(
+        "<span class=\"counts add\">+{} <b class=\"del\">-{}</b></span>",
+        thousands(add),
+        thousands(del)
+    )
 }
 
 #[cfg(test)]
@@ -438,10 +444,10 @@ mod tests {
     }
 
     #[test]
-    fn writes_both_counts_grouped() {
+    fn a_file_row_writes_both_counts_in_two_elements() {
         assert_eq!(
-            super::line_delta(1200, 3),
-            "<b class=\"add\">+1,200</b> <b class=\"del\">-3</b>"
+            super::file_counts(1200, 3),
+            "<span class=\"counts add\">+1,200 <b class=\"del\">-3</b></span>"
         );
     }
 }

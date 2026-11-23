@@ -86,7 +86,7 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color
 .pager{display:flex;justify-content:space-between;margin-top:var(--space-6)}
 .add{color:var(--add)}.del{color:var(--del)}
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
-/* The counts sit in muted text of nearly their color: the underline tells the link apart. */
+.counts.add{font-weight:900}
 .crow>.cnums a{text-decoration:underline;text-underline-offset:2px}
 .badge{font:var(--weight-semibold) var(--text-xs)/1 var(--sans);padding:3px 8px;border-radius:var(--radius);border:var(--border);color:var(--muted)}
 .badge.added{color:var(--add);border-color:var(--add-hl);background:var(--add-bg)}.badge.deleted{color:var(--del);border-color:var(--del-hl);background:var(--del-bg)}
