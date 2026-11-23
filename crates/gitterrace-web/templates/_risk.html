@@ -1,0 +1,38 @@
+{#- The knowledge risk section, shared by the Ownership page and a person's page. `risk` is a
+    `RiskView`. -#}
+{%- import "_path.html" as paths -%}
+{%- import "_table.html" as t -%}
+<div class="chart-head" id="risk"><div><h2>Knowledge risk{% if let Some(o) = risk.of %} of
+{{ o }}{% endif %}</h2><p class="hint">{{ risk.summary }} By lines changed, as above. A directory is
+at risk when one person holds half of it and has not committed in the 12 months before the newest
+commit. Click a directory to see what is in it.</p></div></div>
+<div class="risk-bar"><span class="hint" data-risk-here>Showing {{ risk.here }}.</span>
+{%- if let Some(u) = risk.up %} <a href="{{ u }}" data-risk-up>Up one level</a>{% endif %}</div>
+{% if let Some(e) = risk.none %}{{ e }}{% else %}<div class="card" tabindex="0" role="region"
+aria-label="Knowledge risk by directory"><table class="entries own risk">
+{%- call t::caption("Knowledge risk by directory") %}{% endcall %}
+<tr class="th"><th scope="col">Directory</th><th scope="col">Top owner</th><th scope="col"
+class="r bus">Bus factor</th><th scope="col" class="r n">Lines</th><th scope="col"
+class="r n">Files</th><th scope="col" class="r">Owner last active</th><th scope="col">Risk</th>
+</tr>
+{% for r in risk.dirs %}<tr data-risk-row><th scope="row">{% if r.drill.is_empty() %}
+{%- call paths::path(&r.label) %}{% endcall %}{% else %}<a href="{{ r.drill }}" data-drill>
+{%- call paths::path(&r.label) %}{% endcall %}</a>{% endif %}</th><td><a href="{{ r.owner_href }}"
+data-person>{{ r.owner }}</a> <span class="muted">{{ r.share }}</span></td><td
+class="r bus">{% if r.bus == 1 %}<b class="warn">1</b>{% else %}{{ r.bus }}{% endif %}</td><td
+class="r n">{{ r.lines }}</td><td class="r n">{{ r.files }}</td><td
+class="r muted">{{ r.last }}</td><td>{% if r.at_risk %}<b class="warn">At risk</b>
+{%- else if r.active %}<span class="muted">Active</span>{% else %}<span
+class="muted">Idle</span>{% endif %}</td></tr>
+{% endfor %}
+</table></div>{% endif %}
+{% if !risk.orphans.is_empty() %}<div class="chart-head" id="orphans"><div><h2>Files without an
+active author</h2><p class="hint">{{ risk.orphan_note }} Every person with a tenth of a file's
+changes, and its top owner, has been quiet for a year. The largest are listed.</p></div></div>
+<div class="card" tabindex="0" role="region" aria-label="Files without an active author"><table
+class="entries">{% call t::caption("Files without an active author") %}{% endcall %}
+<tr class="th"><th scope="col">File</th><th scope="col" class="r n">Lines</th><th scope="col"
+class="r">Last changed</th></tr>
+{% for o in risk.orphans %}<tr><th scope="row"><a href="{{ o.href }}">{% call paths::path(&o.path)
+%}{% endcall %}</a></th><td class="r n">{{ o.lines }}</td><td class="r muted">{{ o.last }}</td></tr>
+{% endfor %}</table></div>{% endif %}

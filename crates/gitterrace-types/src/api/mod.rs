@@ -31,9 +31,10 @@ pub use file_insight::{
 pub use insights::{
     InsightContributor, InsightContributors, InsightCoupling, InsightCouplingPair, InsightData,
     InsightDirChurn, InsightDirOwnership, InsightDirPair, InsightFileChurn, InsightFrequency,
-    InsightHotspot, InsightHotspots, InsightLabelBucket, InsightLabelCount, InsightLanguage,
-    InsightLanguages, InsightOwner, InsightOwnership, InsightPeriod, InsightPeriodStats,
-    InsightPeriodSummary, InsightResponse, InsightRhythm, InsightSeriesPoint, InsightUnit,
+    InsightHotspot, InsightHotspots, InsightKnowledgeRisk, InsightLabelBucket, InsightLabelCount,
+    InsightLanguage, InsightLanguages, InsightOrphan, InsightOwner, InsightOwnership,
+    InsightPeriod, InsightPeriodStats, InsightPeriodSummary, InsightPersonFile, InsightResponse,
+    InsightRhythm, InsightRiskDir, InsightRiskPerson, InsightSeriesPoint, InsightUnit,
 };
 pub use review::{
     CheckpointItem, CheckpointsResponse, Finding, FindingAnchor, FindingLines, FindingsResponse,

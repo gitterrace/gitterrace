@@ -521,3 +521,5 @@ mod insights;
 mod public;
 #[path = "memory_budget/renames.rs"]
 mod renames;
+#[path = "memory_budget/risk.rs"]
+mod risk;

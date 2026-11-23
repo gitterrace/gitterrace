@@ -1,5 +1,6 @@
 mod partners;
 mod path;
+mod people;
 mod reports;
 mod scan;
 
@@ -7,6 +8,9 @@ pub use partners::{CouplingPair, CouplingQuery, CouplingReport, DirPair};
 pub use path::{
     CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, FileFacts, PARTNER_MIN_TOGETHER, Partner, PathCard,
     PathChild, PathKind, RECENT_DAYS,
+};
+pub use people::{
+    KnowledgeRisk, Orphan, PersonFile, RISK_LIMIT, RISK_MAX_LIMIT, RiskDir, RiskPerson, RiskQuery,
 };
 
 use rustc_hash::FxHashMap as FastMap;

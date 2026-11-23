@@ -460,8 +460,8 @@ pub(super) fn under_path(files: &[HeadFile], c: &Counted<'_>) -> Vec<HeadFile> {
 }
 
 #[derive(Default)]
-struct Acc {
-    lines: u64,
-    files: usize,
-    w: BTreeMap<usize, f64>,
+pub(super) struct Acc {
+    pub(super) lines: u64,
+    pub(super) files: usize,
+    pub(super) w: BTreeMap<usize, f64>,
 }

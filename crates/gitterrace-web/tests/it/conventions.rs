@@ -294,6 +294,7 @@ const PAGE_ROUTES: &[(&str, &str)] = &[
     ("/stats/hotspots", "'/stats/hotspots'"),
     ("/stats/languages", "'/stats/languages'"),
     ("/stats/ownership", "'/stats/ownership'"),
+    ("/stats/ownership/{author}", "'/stats/ownership/t'"),
     ("/_settings", "'/_settings'"),
 ];
 

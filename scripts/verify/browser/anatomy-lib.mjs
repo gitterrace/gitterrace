@@ -30,6 +30,7 @@ export const PAGES = [
   ['hotspots', '/stats/hotspots', false, true],
   ['languages', '/stats/languages', false, true],
   ['ownership', '/stats/ownership', false, true],
+  ['ownership person', '/stats/ownership/t', false, true],
   ['search', '/search?q=one'],
   ['worktree', '/worktree'],
   ['not found', '/blob/HEAD/no-such-file'],

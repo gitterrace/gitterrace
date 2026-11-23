@@ -16,8 +16,8 @@ pub(crate) const CHROME_IDS: &str = "\
     actsel basket-note basketbtn branches code-age commits coupled coupled-dirs files-size \
     formoff frequency gt-main \
     gt-repolist gt-tip headstate hotspot-files hotspot-map keys-off livenote loc loc-data logq \
-    logq-error logq-help logq-list patterns q range refbtn remotes releases repobtn \
-    repocount repolink repoq reposwitch searchbtn send-ctx send-head send-title seterrs \
+    logq-error logq-help logq-list orphans owned patterns q range refbtn remotes releases repobtn \
+    repocount repolink repoq reposwitch risk searchbtn send-ctx send-head send-title seterrs \
     seterrsum setform setgut setnote setplain setsave settext sizes stashes tags theme types \
     worktrees wtchip";
 

@@ -63,6 +63,7 @@ mod registry;
 mod related;
 mod reload;
 mod review_panel;
+mod risk;
 mod routes;
 mod search;
 #[cfg(test)]

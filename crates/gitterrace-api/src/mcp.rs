@@ -291,7 +291,9 @@ args! {
         /// Most rows, for the insights that list rows.
         limit: Option<usize>,
         /// For `coupling`: the focus file, shared commits a pair needs, `1` for cross pairs.
+        /// For `knowledge_risk`: the directory to drill, and `author` the person to report.
         path: Option<String>,
+        author: Option<String>,
         min_support: Option<usize>,
         cross_dir: Option<String>,
     }
@@ -576,16 +578,16 @@ impl McpServer {
     }
 
     /// One statistic of the history or head tree, the numbers of the web insights pages:
-    /// activity, contributors, hotspots, coupling, languages, ownership, churn and commit
-    /// types. `name` picks it, `period` and `query` select the commits. Use for "how active",
-    /// "how big", "who owns" and "where is the risk" questions.
+    /// activity, contributors, hotspots, coupling, languages, ownership, knowledge risk, churn
+    /// and commit types. `name` picks it, `period` and `query` select the commits. Use for
+    /// "how active", "how big", "who owns" and "where is the risk" questions.
     #[tool(name = "insight", annotations(read_only_hint = true))]
     async fn insight(
         &self,
         Parameters(a): Parameters<InsightArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         let p = Params::new(a.period, a.query, a.label, a.metric, a.limit);
-        let p = p.coupling(a.path, a.min_support, a.cross_dir);
+        let p = p.coupling(a.path, a.min_support, a.cross_dir).author(a.author);
         self.run("insight", a.repo.clone(), move |s| s.insight(&a.name, a.rev.as_deref(), &p)).await
     }
 }

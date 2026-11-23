@@ -74,7 +74,7 @@ pub const PAGES: &[Page] = &[
         concat!(
             "Insights on the shared filter and period: activity (with commit types and code ",
             "frequency), contributors, hotspots (with patterns and coupling), languages, ",
-            "ownership. ",
+            "ownership (with knowledge risk, and one page per person). ",
             "`?rev=` follows any ref",
         ),
         &[
@@ -82,6 +82,7 @@ pub const PAGES: &[Page] = &[
             "/stats/languages",
             "/stats/hotspots",
             "/stats/ownership",
+            "/stats/ownership/{author}",
             "/stats/contributors",
         ],
     ),

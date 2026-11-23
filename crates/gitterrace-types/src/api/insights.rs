@@ -246,6 +246,72 @@ pub struct InsightOwnership {
     pub untracked_lines: u64,
 }
 
+/// One directory of `knowledge_risk`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightRiskDir {
+    /// People who together hold at least half of the knowledge.
+    pub bus_factor: usize,
+    pub files: usize,
+    /// Author time of the top owner's newest commit, unix seconds.
+    pub last_active: i64,
+    pub lines: u64,
+    /// The top owner committed within the 12 months before the newest commit.
+    pub owner_active: bool,
+    pub path: String,
+    /// One person holds half of it and is not active: `bus_factor` 1 and `owner_active` false.
+    pub at_risk: bool,
+    pub top_owner: String,
+    /// The top owner's share of the directory, 0 to 1.
+    pub top_share: f64,
+}
+
+/// A file of `knowledge_risk` whose main authors are all idle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightOrphan {
+    /// Author time of the newest counted change, unix seconds.
+    pub last_change: i64,
+    pub lines: u64,
+    pub path: String,
+}
+
+/// A file one person owns, `knowledge_risk`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightPersonFile {
+    pub lines: u64,
+    pub path: String,
+    /// The person's share of the changes to the file, 0 to 1.
+    pub share: f64,
+}
+
+/// What one person holds, `knowledge_risk` with `author`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightRiskPerson {
+    /// Files where this person is the top owner.
+    pub files: usize,
+    /// Author time of the person's newest commit, unix seconds.
+    pub last_active: i64,
+    pub lines: u64,
+    pub name: String,
+    /// `lines` over the lines of every tracked file, 0 to 1.
+    pub share_of_repo: f64,
+    pub top_files: Vec<InsightPersonFile>,
+}
+
+/// `knowledge_risk`: who holds each directory, and the files nobody active holds.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct InsightKnowledgeRisk {
+    pub at_risk_dirs: usize,
+    pub at_risk_lines: u64,
+    /// The children of `path` one level down, largest first.
+    pub dirs: Vec<InsightRiskDir>,
+    /// Orphans under the path, all of them, not only those listed.
+    pub orphan_files: usize,
+    pub orphan_lines: u64,
+    pub orphans: Vec<InsightOrphan>,
+    /// Set when `author` is.
+    pub person: Option<InsightRiskPerson>,
+}
+
 /// One language of `languages`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 pub struct InsightLanguage {
@@ -279,6 +345,7 @@ pub enum InsightData {
     Hotspots(InsightHotspots),
     Coupling(InsightCoupling),
     Ownership(InsightOwnership),
+    KnowledgeRisk(InsightKnowledgeRisk),
     Languages(InsightLanguages),
 }
 

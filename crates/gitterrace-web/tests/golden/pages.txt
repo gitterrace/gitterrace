@@ -42,6 +42,8 @@ b47033957fbf48703c47dd8101140eb4 b47033957fbf48703c47dd8101140eb4 [browse] /sear
 f8261e770725d2b32f17990020165576 f8261e770725d2b32f17990020165576 [browse] /search?q=fn.%2A&regex=1
 aeb74702099057fb84b16cdc40ac1787 aeb74702099057fb84b16cdc40ac1787 [browse] /search?q=nothing-matches-this
 b3d230f3fa4c7fe2ee263a6af7f5b2b0 3d8063d763148f70df6f7606d756ed1a [browse] /stashes
+286e2e84ecca5208fb04c30ebfccc432 286e2e84ecca5208fb04c30ebfccc432 [browse] /stats/ownership/Bob
+580997cd2b6b6924c4174b3cbc731111 cd851110245cceee3ca13db1e2d66329 [browse] /stats/ownership/nobody
 5ed69510ce2b8d02691c164fd0f6bcd4 7bcc55c6a1e1d7c0c2fea83e814258cc [browse] /tag/nope
 e99d98cdf14bc86001387d74f10f1c38 e00bed882256bed76bee6d1f09d0b528 [browse] /tag/v1
 aab8f2cbd111dcd67fea9e301151cb8a aab8f2cbd111dcd67fea9e301151cb8a [browse] /tree/HEAD

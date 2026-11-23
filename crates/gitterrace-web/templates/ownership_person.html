@@ -1,0 +1,25 @@
+{% extends "_base.html" %}
+{%- import "_kpis.html" as kp -%}
+{%- import "_path.html" as paths -%}
+{%- import "_table.html" as t -%}
+{% block title %}{{ name }} · Ownership · {{ c.name }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="{{ crate::asset_url("insights.css") }}">{% endblock %}
+{% block content %}
+{{ head }}
+{% include "_chips.html" %}
+{% call kp::kpis(kpis) %}{% endcall %}
+<p class="hint"><a href="{{ back }}" data-back>All owners</a></p>
+<div class="chart-head" id="owned"><div><h2>Largest files owned</h2><p class="hint">Files where
+{{ name }} made the most changes, largest first. Share is their part of the changes to the
+file.</p></div></div>
+{% if let Some(e) = none %}{{ e }}{% else %}<div class="card" tabindex="0" role="region"
+aria-label="Largest files owned"><table class="entries">
+{%- call t::caption("Largest files owned") %}{% endcall %}
+<tr class="th"><th scope="col">File</th><th scope="col" class="r n">Lines</th><th scope="col"
+class="r">Share</th></tr>
+{% for f in files %}<tr><th scope="row"><a href="{{ f.href }}">{% call paths::path(&f.path)
+%}{% endcall %}</a></th><td class="r n">{{ f.lines }}</td><td class="r">{{ f.share }}</td></tr>
+{% endfor %}</table></div>{% endif %}
+{% include "_risk.html" %}
+{% endblock %}

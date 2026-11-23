@@ -15,4 +15,5 @@
 <tr class="th"><th scope="col">Directory</th>{% if solo.is_none() %}<th scope="col" class="r bus">Bus factor</th>{% endif %}<th scope="col" class="r n">Lines</th><th scope="col" class="r n">Files</th>{% if solo.is_none() %}<th scope="col">Owners</th>{% endif %}</tr>
 {% for r in rows %}<tr><th scope="row"><a href="{{ r.href }}">{% call paths::path(&r.path) %}{% endcall %}</a></th>{% if solo.is_none() %}<td class="r bus">{% if r.bus == 1 %}<b class="warn" data-tip="One person holds half of this directory">1</b>{% else %}{{ r.bus }}{% endif %}</td>{% endif %}<td class="r n">{{ r.lines }}</td><td class="r n">{{ r.files }}</td>{% if solo.is_none() %}<td>{% for o in r.owners %}{% if !loop.first %} · {% endif %}{{ o.0 }} <span class="muted">{{ o.1 }}</span>{% endfor %}</td>{% endif %}</tr>{% endfor %}
 </table></div>
+{% include "_risk.html" %}
 {% endblock %}

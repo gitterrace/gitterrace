@@ -34,6 +34,7 @@ struct OwnershipPage {
     fb: FilterBar,
     kpis: Vec<Kpi>,
     rows: Vec<DirRow>,
+    risk: crate::risk::RiskView,
     /// The one person who owns every directory, when that is so: the table then leaves out the
     /// Owners and Bus factor columns, which would repeat that name and a 1 on every row.
     solo: Option<String>,
@@ -60,6 +61,7 @@ pub(crate) async fn page(
     State(app): Shared,
     RawQuery(raw): RawQuery,
     Query(q): Query<InsightsQuery>,
+    Query(drill): Query<crate::risk::Drill>,
 ) -> Result<Html<String>> {
     cached(&app, "ow", raw, move |a, r, c| {
         let f = &q.filter;
@@ -86,6 +88,7 @@ pub(crate) async fn page(
         let mut rows = vec![row(&rep.overall, "(whole repository)".to_owned())];
         rows.extend(rep.dirs.iter().take(TOP_DIRS).map(|d| row(d, dir_label(&d.path))));
         let solo = sole_owner(&rows);
+        let risk = crate::risk::section(&ins, &counted(&ins, &scope, r), &files, &q, &d, &drill);
         let fb = f.bar("/stats/ownership", &**r, period);
         OwnershipPage {
             solo,
@@ -109,6 +112,7 @@ pub(crate) async fn page(
                 Kpi("Directories at one", fmt::thousands(rep.dirs_with_bus_factor_one)),
             ],
             rows,
+            risk,
         }
     })
     .await

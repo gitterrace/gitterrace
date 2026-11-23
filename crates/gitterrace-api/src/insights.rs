@@ -29,8 +29,10 @@ pub struct Params {
     pub metric: Option<String>,
     #[serde(default, deserialize_with = "number")]
     pub limit: Option<usize>,
-    /// `coupling` only: the focus file.
+    /// `coupling` and `knowledge_risk` only: the focus file, or the directory to drill.
     pub path: Option<String>,
+    /// `knowledge_risk` only: the person to report, as `ownership` names them.
+    pub author: Option<String>,
     /// `coupling` only: shared commits a pair needs, default 3.
     #[serde(default, deserialize_with = "number")]
     pub min_support: Option<usize>,
@@ -68,6 +70,15 @@ impl Params {
         cross_dir: Option<String>,
     ) -> Self {
         (self.path, self.min_support, self.cross_dir) = (path, min_support, cross_dir);
+        self
+    }
+}
+
+impl Params {
+    /// These parameters with the one only `knowledge_risk` reads set.
+    #[must_use]
+    pub fn author(mut self, author: Option<String>) -> Self {
+        self.author = author;
         self
     }
 }
@@ -181,6 +192,24 @@ pub const INSIGHTS: &[Insight] = &[
         compute: |c, _, head| val(&c.insights().ownership_in(&head(), c, OWNERSHIP_DEPTH)),
         typed: |v| Ok(InsightData::Ownership(read(v)?)),
     },
+    Insight {
+        name: "knowledge_risk",
+        summary: "Who holds each directory and whether they are still active, and the files no \
+            active person holds. Takes `path` to drill one level, `author` for one person and \
+            `limit`.",
+        compute: |c, q, head| {
+            let query = gitterrace_index::RiskQuery {
+                path: q.path.as_deref().map(|p| p.trim_matches('/')).filter(|p| !p.is_empty()),
+                author: q.author.as_deref().filter(|a| !a.is_empty()),
+                limit: q.limit.unwrap_or(gitterrace_index::RISK_LIMIT),
+            };
+            c.insights().knowledge_risk_in(&head(), c, &query).map_or_else(
+                || Err(ApiError::BadRequest("unknown author: no person has that name".to_owned())),
+                |r| val(&r),
+            )
+        },
+        typed: |v| Ok(InsightData::KnowledgeRisk(read(v)?)),
+    },
 ];
 
 /// Shared commits a coupled pair needs when the request names none.
@@ -196,18 +225,23 @@ const COUPLING_MAX_LIMIT: usize = 500;
 /// Refuses the parameters only `coupling` reads on any other insight: an unread key would
 /// answer unfiltered numbers to a caller who thinks they are filtered.
 pub(crate) fn check_params(name: &str, p: &Params) -> Result<(), ApiError> {
-    if name == "coupling" {
-        return Ok(());
-    }
+    let own_path = matches!(name, "coupling" | "knowledge_risk");
     let named = [
-        ("path", p.path.is_some()),
-        ("min_support", p.min_support.is_some()),
-        ("cross_dir", p.cross_dir.is_some()),
+        ("author", p.author.is_some() && name != "knowledge_risk"),
+        ("path", p.path.is_some() && !own_path),
+        ("min_support", p.min_support.is_some() && name != "coupling"),
+        ("cross_dir", p.cross_dir.is_some() && name != "coupling"),
     ];
     match named.iter().find(|(_, set)| *set) {
         Some((k, _)) => Err(ApiError::BadRequest(format!(
-            "unknown parameter `{k}` for insight {name}: only coupling reads it. Select \
-             commits with `q`"
+            "unknown parameter `{k}` for insight {name}: {}. Select commits with `q`",
+            if *k == "author" {
+                "only knowledge_risk reads it"
+            } else if *k == "path" {
+                "only coupling and knowledge_risk read it"
+            } else {
+                "only coupling reads it"
+            }
         ))),
         None => Ok(()),
     }

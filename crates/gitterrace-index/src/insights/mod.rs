@@ -49,8 +49,9 @@ pub use figure::{EveryTotals, Figure, Population};
 pub use files::{
     AgeBucket, AgeReport, CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, Coupling, CouplingPair,
     CouplingQuery, CouplingReport, DirOwnership, DirPair, FileFacts, Hotspot, HotspotReport,
-    LanguageLines, LanguageReport, Owner, OwnershipReport, PARTNER_MIN_TOGETHER, Partner, PathCard,
-    PathChild, PathKind, RECENT_DAYS, Touch,
+    KnowledgeRisk, LanguageLines, LanguageReport, Orphan, Owner, OwnershipReport,
+    PARTNER_MIN_TOGETHER, Partner, PathCard, PathChild, PathKind, PersonFile, RECENT_DAYS,
+    RISK_LIMIT, RISK_MAX_LIMIT, RiskDir, RiskPerson, RiskQuery, Touch,
 };
 pub use filter::{PathFilter, is_generated};
 pub use fold::ActivityFold;

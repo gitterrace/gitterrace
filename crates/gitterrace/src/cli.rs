@@ -195,7 +195,7 @@ pub(crate) enum Command {
     },
 }
 
-/// The options only the `coupling` insight reads.
+/// The options only the `coupling` and `knowledge_risk` insights read.
 #[derive(clap::Args, Debug, Clone, Default)]
 pub struct CouplingArgs {
     /// Focus file, for `coupling`.
@@ -207,12 +207,15 @@ pub struct CouplingArgs {
     /// `1` lists pairs across directories too, for `coupling`.
     #[arg(long)]
     pub cross_dir: Option<String>,
+    /// The person to report, for `knowledge_risk`. `--path` drills a directory.
+    #[arg(long)]
+    pub author: Option<String>,
 }
 
 impl CouplingArgs {
     /// `params` with these options set.
     pub fn apply(self, params: gitterrace_api::Params) -> gitterrace_api::Params {
-        params.coupling(self.path, self.min_support, self.cross_dir)
+        params.coupling(self.path, self.min_support, self.cross_dir).author(self.author)
     }
 }
 

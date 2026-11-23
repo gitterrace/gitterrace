@@ -90,6 +90,7 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/stats/languages", get(crate::languages::page))
         .route("/stats/hotspots", get(crate::hotspots::page))
         .route("/stats/ownership", get(crate::ownership::page))
+        .route("/stats/ownership/{author}", get(crate::risk::person))
         .route("/compare", get(crate::compare::page))
         .route("/history/{*path}", get(crate::history::page))
         .route("/stats/contributors", get(crate::insights::contributors))

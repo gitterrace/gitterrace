@@ -25,6 +25,10 @@ const COLD_OK: &[(&str, &str)] = &[
         "a client names its own changes and filter, and the plan reads the page's tables",
     ),
     (
+        "/stats/ownership/{author}",
+        "one page per person, named by the visitor, so no warm-up can guess it",
+    ),
+    (
         "/api/insight/{rev}",
         "a fragment for one path, empty before the index is built and remembered per path",
     ),

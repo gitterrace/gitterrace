@@ -223,6 +223,23 @@ Files in the top tenth of the hotspots carry a Hot badge, also on the rows of
 a folder. The badge and the card link to the hotspots page for that path.
 While the index is still being built, or without insights, no card shows.
 
+## Find knowledge that is at risk
+
+The Ownership page ends with **Knowledge risk**. It lists the folders one level
+down with their top owner, bus factor and when that owner last committed. A
+folder is **At risk** when one person holds half of it and has not committed in
+the 12 months before the newest commit. Click a folder to list what is in it,
+and **Up one level** to go back. **Files without an active author** lists the
+largest files whose top owner, and everyone with a tenth of its changes, has
+been quiet for a year.
+
+Click an owner to open their page, `/stats/ownership/{author}`: the files they
+own most, how much of the code that is, when they last committed, and the
+folders where they are the top owner. Ownership is by lines changed, as on the
+Ownership table, not by who wrote the lines that are left. An unknown name is a
+404. `GET /api/v1/insights/knowledge_risk` and the `insight` tool answer the
+same, with `path` to drill, `author` for one person and `limit`.
+
 ## Change a setting
 
 1. Press `.`, then `,` to open Settings on a local server.

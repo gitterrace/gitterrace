@@ -78,6 +78,36 @@ async fn the_period_and_q_give_equal_insights() {
     assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
 }
 
+/// `knowledge_risk` answers its documented shape, takes `path` and `author`, and refuses
+/// both on any other insight and an unknown person.
+#[tokio::test]
+async fn knowledge_risk_takes_path_and_author() {
+    let (_d, s) = fixture();
+    let (st, v) = get(&s, "/insights/knowledge_risk").await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    let d = &v["data"];
+    for k in ["dirs", "orphans", "orphan_files", "orphan_lines", "person", "at_risk_lines"] {
+        assert!(d.get(k).is_some(), "{k} missing: {d}");
+    }
+    assert!(d["person"].is_null());
+    let first = &d["dirs"][0];
+    for k in ["path", "lines", "files", "bus_factor", "top_owner", "top_share", "owner_active"] {
+        assert!(first.get(k).is_some(), "{k} missing: {first}");
+    }
+    let (st, v) = get(&s, "/insights/knowledge_risk?path=src").await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    let who = first["top_owner"].as_str().expect("owner").to_owned();
+    let (st, v) =
+        get(&s, &format!("/insights/knowledge_risk?author={}", who.replace(' ', "%20"))).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(v["data"]["person"]["name"], who.as_str());
+    let (st, v) = get(&s, "/insights/knowledge_risk?author=Nobody").await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
+    let (st, v) = get(&s, "/insights/hotspots?author=x").await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "{v}");
+    assert!(v.to_string().contains("only knowledge_risk"), "{v}");
+}
+
 /// The one-key forms are no parameters: a request that names one is a 400 naming it, never
 /// unfiltered numbers. Red while they were read as terms of `q`.
 #[tokio::test]

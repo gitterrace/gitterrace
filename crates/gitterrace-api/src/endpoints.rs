@@ -326,7 +326,17 @@ pub const ENDPOINTS: &[Endpoint] = &[
                 order and the per-bucket series.",
             ),
             p("limit", "integer", "Most rows."),
-            p("path", "string", "`coupling` only: the focus file, else the whole tree."),
+            p(
+                "path",
+                "string",
+                "`coupling`: the focus file, else the whole tree. `knowledge_risk`: the directory \
+                to drill, else the root.",
+            ),
+            p(
+                "author",
+                "string",
+                "`knowledge_risk` only: the person to report, as `ownership` names them.",
+            ),
             p("min_support", "integer", "`coupling` only: shared commits a pair needs, default 3."),
             p("cross_dir", "string", "`coupling` only: `1` lists pairs across directories too."),
             BOTS,

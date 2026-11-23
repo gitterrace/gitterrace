@@ -54,7 +54,7 @@ each cap.
 | `GET /file_insight` | `rev`, `q`, `period`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | age, authors_90d, bus_factor, churn, hot, kind, link, owners, partners, path, paths, permalink, rev |
 | `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, files, head, since, skipped, source, total_files, truncated |
 | `GET /insights` |  | insights |
-| `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `path`, `min_support`, `cross_dir`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
+| `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `path`, `author`, `min_support`, `cross_dir`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 
 ### Parameters
 
@@ -156,7 +156,10 @@ and its named terms.
 - `metric` (string): `contributors` only: `commits` (default), `added`,
   `deleted` or `net`. Sets the order and the per-bucket series.
 - `limit` (integer): Most rows.
-- `path` (string): `coupling` only: the focus file, else the whole tree.
+- `path` (string): `coupling`: the focus file, else the whole tree.
+  `knowledge_risk`: the directory to drill, else the root.
+- `author` (string): `knowledge_risk` only: the person to report, as `ownership`
+  names them.
 - `min_support` (integer): `coupling` only: shared commits a pair needs, default
   3.
 - `cross_dir` (string): `coupling` only: `1` lists pairs across directories too.
@@ -211,6 +214,7 @@ summary names any other it takes.
 | `coupling` | Files that change in the same commits, for one file or the whole tree. Takes `path`, `min_support`, `cross_dir` and `limit`. |
 | `languages` | Lines and files per language in the head tree, and their total: the project's size, as the web Languages page counts it. |
 | `ownership` | Knowledge share and bus factor per directory two levels deep, weighted by size now. |
+| `knowledge_risk` | Who holds each directory and whether they are still active, and the files no active person holds. Takes `path` to drill one level, `author` for one person and `limit`. |
 
 ## MCP (stdio)
 
@@ -247,12 +251,12 @@ so to the model.
   (string).
 - `insight`: One statistic of the history or head tree, the numbers of the web
   insights pages: activity, contributors, hotspots, coupling, languages,
-  ownership, churn and commit types. `name` picks it, `period` and `query`
-  select the commits. Use for "how active", "how big", "who owns" and "where is
-  the risk" questions. Parameters: `cross_dir?` (string), `label?` (string),
-  `limit?` (integer), `metric?` (string), `min_support?` (integer), `name`
-  (string), `path?` (string), `period?` (string), `query` (string), `repo?`
-  (string), `rev?` (string).
+  ownership, knowledge risk, churn and commit types. `name` picks it, `period`
+  and `query` select the commits. Use for "how active", "how big", "who owns"
+  and "where is the risk" questions. Parameters: `author?` (string),
+  `cross_dir?` (string), `label?` (string), `limit?` (integer), `metric?`
+  (string), `min_support?` (integer), `name` (string), `path?` (string),
+  `period?` (string), `query` (string), `repo?` (string), `rev?` (string).
 - `list_checkpoints`: Checkpoints of the uncommitted work, newest first: id,
   time, file count and the bytes of copies held. Pass an id as `since` to
   `worktree_diff` to see only what changed after it. Taking one is a button on

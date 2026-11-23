@@ -90,6 +90,8 @@ git terrace insights [OPTIONS] [NAME] [PATHS]...
   Default 3.
 - `--cross-dir <CROSS_DIR>`: `1` lists pairs across directories too, for
   `coupling`.
+- `--author <AUTHOR>`: The person to report, for `knowledge_risk`. `--path`
+  drills a directory.
 - `--json`: List as JSON too. An insight is always printed as JSON.
 
 ## `git terrace open`

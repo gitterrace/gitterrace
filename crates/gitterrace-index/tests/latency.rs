@@ -16,7 +16,8 @@ use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
 use gitterrace_index::{
-    CouplingQuery, Index, Insights, LineCache, Options, Period, Scope, ScopeParams, head_files,
+    CouplingQuery, Index, Insights, LineCache, Options, Period, RiskQuery, Scope, ScopeParams,
+    head_files,
 };
 use gitterrace_testkit::synthetic::{self, Shape};
 
@@ -183,6 +184,53 @@ fn coupling_stays_under_its_ceilings_at_100k_commits() {
         all <= CEIL_COUPLING_ALL && one <= CEIL_COUPLING_FILE,
         "coupling {all} ms (ceiling {CEIL_COUPLING_ALL}), one file {one} ms (ceiling \
          {CEIL_COUPLING_FILE}) over {} head files",
+        files.len()
+    );
+}
+
+/// Ceilings, in ms, for the knowledge risk of the whole tree and of one person over the whole
+/// history: measured on an M1 Max at load 6 (124 and 125), with room for load. Work that grows
+/// with the files held per request, or a rescan per person, would put either far above them.
+const CEIL_RISK_ALL: u64 = 250;
+const CEIL_RISK_PERSON: u64 = 250;
+
+#[test]
+fn knowledge_risk_stays_under_its_ceilings_at_100k_commits() {
+    let _one = ONE_AT_A_TIME.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path().join("r");
+    synthetic::build(&path, Shape::sized(100_000));
+    let repo = Repo::discover(&path).expect("repo");
+    let index = Index::open_dir(dir.path().join("cache")).expect("index");
+    index.update(&repo, "HEAD", &|_| {}).expect("update");
+    let tip = repo.resolve("HEAD").expect("tip");
+    let mut lines = LineCache::load(index.dir());
+    let files = head_files(&repo, &tip, &mut lines).expect("head files");
+    let scope = Scope::from_params(&ScopeParams::default(), Options::default(), Period::All)
+        .expect("scope");
+    let run = |author: Option<&str>| {
+        best_of_three(&index, &repo, &tip, |ins| {
+            let c = ins.counted(&scope, ins.context());
+            let q = RiskQuery { path: None, author, limit: 50 };
+            let r = ins.knowledge_risk_in(&files, &c, &q).expect("known author");
+            assert!(r.orphans.len() <= 50);
+        })
+        .expect("the built tip opens")
+    };
+    let who = {
+        let set = index.disk_source(&repo, &tip).expect("open").expect("set");
+        let src = set.unchecked();
+        let ins = Insights::from_source(&*src, Options::default(), None);
+        let c = ins.counted(&scope, ins.context());
+        let top = c.contributors(gitterrace_index::Metric::Commits).contributors;
+        top.first().map(|p| p.name.clone()).expect("a contributor")
+    };
+    let (all, one) = (run(None), run(Some(&who)));
+    writeln!(std::io::stderr(), "knowledge risk all {all} ms, person {one} ms").expect("stderr");
+    assert!(
+        all <= CEIL_RISK_ALL && one <= CEIL_RISK_PERSON,
+        "knowledge risk {all} ms (ceiling {CEIL_RISK_ALL}), one person {one} ms (ceiling \
+         {CEIL_RISK_PERSON}) over {} head files",
         files.len()
     );
 }
