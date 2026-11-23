@@ -305,6 +305,7 @@
     var shortcutsOff = window.gtKeysOff && window.gtKeysOff();
     if (shortcutsOff) return;
     // nav.js handles "b" once the pickers are here.
+    if (window.gtKeysOff && window.gtKeysOff()) return;
     if (pickers || e.key !== "b" || !free(e)) return;
     e.preventDefault();
     withPickers(function () { window.gtPickers.openRefs(); });
@@ -352,6 +353,7 @@
     var shortcutsOff = window.gtKeysOff && window.gtKeysOff();
     if (shortcutsOff) return;
     if (held) { e.preventDefault(); e.stopImmediatePropagation(); held.push(e.key); return; }
+    if (window.gtKeysOff && window.gtKeysOff()) return;
     if (actions || e.key !== "." || !free(e)) return;
     e.preventDefault();
     e.stopImmediatePropagation();

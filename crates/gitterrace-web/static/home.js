@@ -70,6 +70,7 @@
   });
   document.addEventListener("keydown", function (e) {
     var t = e.target, tag = t && t.tagName;
+    if (window.gtKeysOff && window.gtKeysOff()) return;
     if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
     // Single-key shortcuts can be switched off (WCAG 2.1.4). nav.js stores the choice, and this
     // page does not load it, so the same key is read here.

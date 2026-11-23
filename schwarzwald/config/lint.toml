@@ -20,6 +20,7 @@ allow_prefix = "GITTERRACE_"
 [a11y]
 docs = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**.md"]
 known = []
+shortcut_switch = "gtKeysOff"
 
 [css]
 globs = ["crates/gitterrace-web/static/*.css"]
