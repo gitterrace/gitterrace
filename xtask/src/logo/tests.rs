@@ -76,3 +76,21 @@ fn a_word_wider_than_the_line_is_cut_before_a_command_and_short_words_are_kept()
     assert_eq!(split_long("abc", 6), vec!["abc"]);
     assert_eq!(split_long("m1.5-2l3q-1-1", 6).concat(), "m1.5-2l3q-1-1");
 }
+
+/// The class this guards: a wrap that cuts a token or lets whitespace be trimmed away.
+#[test]
+fn trim_comment_wrap_renders_to_the_input_within_the_width() {
+    let one = "<svg class=\"logo\" viewBox=\"2 2 28 28\"><path class=\"w-git\" \
+        d=\"M1 1 L2  2 L3 3 L4 4 L5 5 L6 6 L7 7 L8 8\"/> </svg>";
+    let svg = one.repeat(9);
+    let out = trim_wrap(&svg, 100, 58, 10);
+    assert_eq!(out.replace("{#-\n-#}", ""), svg);
+    for (i, line) in out.lines().enumerate() {
+        let extra = if i == 0 { 58 } else { 0 } + if line.ends_with("</svg>") { 10 } else { 0 };
+        assert!(line.chars().count() + extra <= 100, "{line}");
+    }
+    assert!(out.contains("{#-\n-#}"));
+    for whole in ["class=\"w-git\"", "<svg ", "viewBox=", "class=\"logo\""] {
+        assert_eq!(out.matches(whole).count(), 9, "{whole} is never split");
+    }
+}

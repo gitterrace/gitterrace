@@ -71,6 +71,9 @@
   document.addEventListener("keydown", function (e) {
     var t = e.target, tag = t && t.tagName;
     if (e.key !== "/" || e.ctrlKey || e.metaKey || e.altKey || e.defaultPrevented) return;
+    // Single-key shortcuts can be switched off (WCAG 2.1.4). nav.js stores the choice, and this
+    // page does not load it, so the same key is read here.
+    try { if (localStorage.getItem("gitterrace-keys") === "off") return; } catch (x) {}
     if (/^(INPUT|TEXTAREA|SELECT)$/.test(tag) || (t && t.isContentEditable)) return;
     e.preventDefault();
     q.focus();

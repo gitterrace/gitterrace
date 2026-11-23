@@ -105,7 +105,7 @@ export function checks(env) {
         else r.fail(`${where}: refs tab accessible name lost '& Tags' (${named} matches)`);
         await p.goto(srv.base + '/', { waitUntil: 'load' });
         const text = await p.evaluate(() => document.body.innerText);
-        const inHead = await p.$('aside h3 a.more');
+        const inHead = await p.$('aside h2 a.more');
         if (/View insights/.test(text)) r.fail(`${where}: a lone 'View insights' link remains`);
         else if (!inHead) r.fail(`${where}: no insights link in the Languages heading`);
         else r.ok(`${where}: insights link sits in the Languages heading`);

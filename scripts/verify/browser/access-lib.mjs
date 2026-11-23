@@ -3,7 +3,13 @@
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
-import { root, sh, sweep, reloadUntil, synced } from '../../lib/browser-lib.mjs';
+import { spawn } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  root, sh, sweep, reloadUntil, synced, freePort, makeRepo,
+} from '../../lib/browser-lib.mjs';
 
 const SCHEMES = ['light', 'dark'];
 const WIDTHS = [1400, 900];
@@ -13,6 +19,8 @@ const WIDTHS = [1400, 900];
 // remove it then. A new page or rule that fails is never added here, it is fixed.
 const KNOWN_VIOLATIONS = new Set([]);
 const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
+// Best-practice rules that hold on every page too: a heading never skips a level.
+const AXE_RULES = ['heading-order'];
 const AXE_WIDTHS = [360, 1440];
 
 /** The page kinds the golden set renders, as paths in the test repository. */
@@ -32,7 +40,8 @@ async function golden(p, base) {
   return out;
 }
 
-export function checks({ dir, srv, r, browsers, context }) {
+export function checks(env) {
+  const { dir, srv, r, browsers, context } = env;
   /** Runs `fn(page)`, which returns its failures, on `path` in every browser, scheme, width. */
   async function each(label, path, fn) {
     const sw = { browsers, context, widths: WIDTHS, height: 800 };
@@ -161,7 +170,7 @@ export function checks({ dir, srv, r, browsers, context }) {
     await each('side-order', '/', async (p) => {
       await until(p, '.side .sidelist');
       return p.evaluate(() => {
-        const hs = [...document.querySelectorAll('aside .side h3')]
+        const hs = [...document.querySelectorAll('aside .side h2')]
           .map((h) => h.firstChild.textContent.trim());
         const at = (t) => hs.indexOf(t);
         if (at('Loose ends') < 0) return [`no Loose ends in ${hs.join(', ')}`];
@@ -207,10 +216,11 @@ export function checks({ dir, srv, r, browsers, context }) {
           /** @type {Array<[string, number, string]>} */
           const found = await p.evaluate(async (tags) => {
             // @ts-ignore injected by addScriptTag
-            const res = await axe.run(document, { runOnly: tags });
-            return res.violations.map((v) => [v.id, v.nodes.length,
+            const res = await axe.run(document, { runOnly: tags.tags });
+            const more = await axe.run(document, { runOnly: { type: 'rule', values: tags.rules } });
+            return [...res.violations, ...more.violations].map((v) => [v.id, v.nodes.length,
               v.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' | ')]);
-          }, AXE_TAGS);
+          }, { tags: AXE_TAGS, rules: AXE_RULES });
           const where = `axe-all ${name} ${scheme} ${width} ${key}`;
           const bad = found.filter(([id]) => {
             seen.add(`${key} ${id}`);
@@ -324,5 +334,63 @@ export function checks({ dir, srv, r, browsers, context }) {
     });
   }
 
-  return { markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion };
+  /**
+   * The repository list at `/` exists only with two repositories served, so the single-repository
+   * harness never sees it. Serves two, walks it with axe (WCAG tags and heading order), and with
+   * the single-key shortcuts off checks that `/` does not take focus into the filter.
+   */
+  async function reposPage() {
+    const b2 = makeRepo();
+    const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
+    const port = await freePort();
+    const child = spawn(env.bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir, b2], { stdio: 'ignore' });
+    const origin = `http://127.0.0.1:${port}`;
+    try {
+      for (let i = 0; i < 100; i++) {
+        try { if ((await fetch(origin + '/')).ok) break; } catch {}
+        await new Promise((ok) => setTimeout(ok, 100));
+      }
+      const axePath = createRequire(`${root}/package.json`).resolve('axe-core');
+      for (const name of browsers) {
+        const { b, ctx } = await context(name, { bypassCSP: true });
+        for (const scheme of SCHEMES) for (const width of AXE_WIDTHS) {
+          const p = await ctx.newPage();
+          await p.emulateMedia({ colorScheme: scheme });
+          await p.setViewportSize({ width, height: 900 });
+          await p.goto(origin + '/', { waitUntil: 'load' });
+          const where = `repos-page ${name} ${scheme} ${width}`;
+          if (!(await p.$('.repolist'))) { r.fail(`${where}: not the repository list`); await p.close(); continue; }
+          await p.addScriptTag({ path: axePath });
+          const found = await p.evaluate(async (t) => {
+            // @ts-ignore injected by addScriptTag
+            const a = await axe.run(document, { runOnly: t.tags });
+            // @ts-ignore
+            const h = await axe.run(document, { runOnly: { type: 'rule', values: t.rules } });
+            return [...a.violations, ...h.violations].map((v) => `${v.id} (${v.nodes.length})`);
+          }, { tags: AXE_TAGS, rules: AXE_RULES });
+          r.verdict(where, found);
+          await p.close();
+        }
+        // Shortcuts off: the slash key types into nothing and moves no focus.
+        const p = await ctx.newPage();
+        await p.addInitScript(() => localStorage.setItem('gitterrace-keys', 'off'));
+        await p.goto(origin + '/', { waitUntil: 'load' });
+        await p.keyboard.press('/');
+        const into = await p.evaluate(() => document.activeElement && document.activeElement.id);
+        r.verdict(`repos-page ${name} slash with shortcuts off`, into === 'repoq' ? ['the slash key focused the filter'] : []);
+        const q = await ctx.newPage();
+        await q.goto(origin + '/', { waitUntil: 'load' });
+        await q.evaluate(() => localStorage.removeItem('gitterrace-keys'));
+        await q.reload({ waitUntil: 'load' });
+        await q.keyboard.press('/');
+        const on = await q.evaluate(() => document.activeElement && document.activeElement.id);
+        r.verdict(`repos-page ${name} slash with shortcuts on`, on === 'repoq' ? [] : ['the slash key did not focus the filter']);
+        await b.close();
+      }
+    } finally {
+      child.kill();
+    }
+  }
+
+  return { markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion, reposPage };
 }

@@ -27,7 +27,7 @@ header.top{background:var(--header);border-bottom:var(--border)}
 .brand:hover{text-decoration:none}
 .logo{width:24px;height:24px;display:block}
 .logo .i{fill:var(--fg)}.logo .a{fill:var(--accent-ink)}
-.reponame{font:var(--weight-semibold) 20px/1.3 var(--serif);letter-spacing:-.01em;color:var(--fg);min-width:0;overflow-wrap:break-word}
+.reponame{font:var(--weight-semibold) var(--text-lg)/1.3 var(--serif);letter-spacing:-.01em;color:var(--fg);min-width:0;overflow-wrap:break-word}
 .reponame:hover{text-decoration:none;color:var(--accent-fg)}
 /* The branch is context, not an action: a quiet label at rest, a surface only on hover or focus. */
 .branch{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--mono);color:var(--muted);padding:5px 6px;white-space:nowrap}
@@ -66,11 +66,6 @@ header.top>.wrap{container:topbar/inline-size}
 
 /* primitives */
 .muted{color:var(--muted)}.r{text-align:right}.pad{padding:var(--space-4)}
-.head{display:flex;justify-content:space-between;align-items:center;gap:var(--space-4);margin-bottom:0;padding-block:var(--space-3);flex-wrap:wrap;min-height:calc(35px + 2 * var(--space-3))}
-.head>h1{min-height:35px}.head>.muted{line-height:35px}
-/* The switch is 38 px with its frame: let it overhang so the title row keeps its height. */
-.head>.segctl{margin-block:-2px}
-.head h1 .muted{font-weight:var(--weight-regular);font-size:var(--text-md);font-family:var(--mono)}
 .card{border:var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;background:var(--bg)}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
@@ -94,7 +89,7 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color
 .sha:hover{text-decoration:none;color:var(--accent-fg);border-color:var(--line-strong)}
 
 /* breadcrumbs */
-.crumbs{font-family:var(--serif);font-size:22px;font-weight:var(--weight-semibold);letter-spacing:-.015em;display:block;min-width:0}
+.crumbs{font-family:var(--serif);font-size:var(--text-xl);font-weight:var(--weight-semibold);letter-spacing:-.015em;display:block;min-width:0}
 .crumbs a{color:var(--accent-fg)}.crumbs a:last-child{color:var(--fg)}
 .crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);margin:0 3px}
 
@@ -137,10 +132,10 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .doc-tools{display:flex;align-items:center;gap:var(--space-3);margin-left:auto;flex:none;font-size:var(--text-sm)}
 .dochead .outline.menu{display:block;margin-left:0}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b,.progress b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
-.side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side>:last-child{margin-bottom:0}.side h3{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h3 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
+.side{margin:0 0 var(--space-5);font-size:var(--text-sm)}.side>:last-child{margin-bottom:0}.side h2{margin:0 0 var(--space-2);font-size:var(--text-xs);text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:var(--weight-semibold)}.side h2 a{color:inherit}.side p{margin:0 0 var(--space-2)}p.facts{line-height:1.6;display:flex;flex-wrap:wrap;gap:0 var(--space-3)}
 .side b{font-variant-numeric:tabular-nums}.sparkwrap{display:block;margin:0 0 var(--space-2)}.sparkwrap svg.spark{width:100%;height:24px;overflow:visible}.sparkwrap .base{stroke:var(--line);stroke-width:1}.sparkwrap .dot{stroke-width:5;stroke-linecap:round}
 .sidelist{list-style:none;margin:0;padding:0}.sidelist li{display:flex;justify-content:space-between;gap:var(--space-3);padding:2px 0}.sidelist a{min-width:0;overflow-wrap:anywhere;font-family:var(--mono)}.sidelist .muted{flex:none;text-align:right;font-variant-numeric:tabular-nums}
-.side h3.split{display:flex;justify-content:space-between;align-items:baseline}.side h3 .more{text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
+.side h2.split{display:flex;justify-content:space-between;align-items:baseline}.side h2 .more{text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
 @media (min-width:601px){.entries tr.up{display:none}}
 @media (max-width:400px){.tabnav .more{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
 .langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%;width:var(--w)}
@@ -180,7 +175,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 @media (max-width:600px){.list:not(.graphed)>.crow{flex-wrap:wrap}.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap;flex:1 1 9rem;min-width:min(9rem,100%)}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;overflow-wrap:anywhere}}
 
 /* commit page and diff */
-.meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.head+.meta{margin-top:calc(-1 * var(--space-2));margin-bottom:var(--space-4)}.meta b{color:var(--fg)}
+.meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}
 .body{font:inherit;white-space:pre-wrap;margin:var(--space-3) 0;color:var(--muted);max-width:80ch}
 .files summary{display:flex;justify-content:space-between;gap:var(--space-4);padding:var(--space-3) var(--space-4);cursor:pointer;font-weight:var(--weight-semibold);background:var(--soft)}
 .files ul{list-style:none;margin:0;padding:0}
@@ -356,7 +351,7 @@ mark{/* one quiet background, no ring or padding: letters keep their places */ba
 .searchbar input[type=radio],.searchbar input[type=checkbox]{min-width:0;width:auto;height:auto;flex:none;margin:0}
 
 /* ---- voice: serif display, grotesk body, mono metadata, hairlines ---- */
-h2:not(.markdown-body *),.doc-title,.files summary{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
+h2:not(.markdown-body *),.doc-title,.files summary{font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);text-transform:uppercase;letter-spacing:var(--tracking-label,.12em);color:var(--muted)}
 main h2:not(.markdown-body *){display:flex;align-items:center;gap:var(--space-3)}
 main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .entries td.r,.facts b,.meta,.latest .muted,.cmain .muted,td.ago{font-family:var(--mono);font-size:var(--text-sm)}
@@ -368,8 +363,7 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .sep{color:var(--faint)}
 .wordmark{height:15px;width:auto;flex:none;overflow:visible}
 .wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
-@media (max-width:600px){.tabnav a,.tabs>a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
-.head h1:not(.crumbs){font-size:28px}
+@media (max-width:600px){.tabnav a,.tabs>a{letter-spacing:0;padding-left:var(--space-2);padding-right:var(--space-2)}}
 
 /* languages: chart, brush, range card */
 .filters{display:flex;flex-wrap:wrap;gap:var(--space-3) var(--space-6);margin:var(--space-4) 0}
@@ -617,3 +611,15 @@ svg.chart a:focus-visible .bar{fill:Highlight}}
   .crow:not(:has(>.ref))>.sha{grid-column:3;grid-row:2;align-self:center}
   .crow:not(:has(>.ref))>.cnums{grid-column:2/4;grid-row:3}
 }
+
+/* ---- page head density and section labels ---- */
+/* A section label is the page's second level: readable size and the text colour. The sidebar
+   keeps its quiet muted labels (they are h2 too, for the heading order). */
+main h2:not(.markdown-body *){font-size:var(--text-xs);color:var(--fg)}
+main .side h2:not(.markdown-body *){display:block;color:var(--muted);letter-spacing:.04em}
+main .side h2:not(.markdown-body *)::after,main h2.day:not(.markdown-body *)::after{content:none}
+main .side h2.split:not(.markdown-body *){display:flex}
+main h2.day:not(.markdown-body *){color:var(--muted)}
+main.wrap{padding-top:var(--space-4)}
+.ph{margin-bottom:var(--space-3)}
+.ph-sep{margin-top:var(--space-3)}

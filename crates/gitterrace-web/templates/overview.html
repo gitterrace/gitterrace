@@ -14,7 +14,7 @@
 </article>
 {% if let Some(t) = totals %}{% if !no_side %}<aside>
 {{ side|safe }}
-<section class="side"><h3>All time</h3>
+<section class="side"><h2>All time</h2>
 <p class="facts"><span data-population="{{ t.every }}"><b>{{ t.commits }}</b> {{ t.commits_noun }}</span>{% if !t.merges.is_empty() %} <span class="muted" data-population="{{ t.every }}" data-tip="All commits, merges and bots included. Insights and the rest of this line count only the counted ones: no merges, since a merge repeats its branch, and bots as the options say.">{{ t.merges }}</span>{% endif %} <span data-population="{{ t.counted }}"><b>{{ t.authors }}</b> {{ t.authors_noun }}</span> <span data-population="{{ t.counted }}"><b>{{ t.files }}</b> {{ t.files_noun }}</span> <span data-population="{{ t.counted }}">{% call deltas::delta(t.additions, t.deletions) %}{% endcall %} {{ t.lines_noun }}</span></p></section>
 </aside>{% endif %}{% endif %}
 </div>

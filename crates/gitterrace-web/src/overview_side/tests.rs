@@ -83,10 +83,10 @@ fn sidebar_is_built_once_per_tip_and_dirty_flag() {
 
 /// Each sidebar heading's first text, whatever tags wrap it.
 fn headings(html: &str) -> Vec<&str> {
-    html.split("<h3")
+    html.split("<h2")
         .skip(1)
         .map(|h| {
-            let h = h.split("</h3>").next().unwrap_or("");
+            let h = h.split("</h2>").next().unwrap_or("");
             h.split('>')
                 .skip(1)
                 .map(|t| t.split('<').next().unwrap_or("").trim())

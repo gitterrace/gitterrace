@@ -9,7 +9,7 @@
 {% if !graph.is_empty() %}<ul class="list log graphed lw{{ gutter }}">
 {% for r in graph %}{{ r }}{% endfor %}
 </ul>
-{% endif %}{% for d in days %}<h3 class="day">{{ d.label }}</h3>
+{% endif %}{% for d in days %}<h2 class="day">{{ d.label }}</h2>
 <ul class="list log">
 {% for r in d.rows %}{{ r }}{% endfor %}
 </ul>

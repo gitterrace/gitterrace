@@ -393,6 +393,67 @@ fn wrap(svg: &str, width: usize) -> String {
     lines.join("\n")
 }
 
+/// `svg` cut into lines at most `width` wide for an app template, each cut written as askama
+/// trim comments (`{#-` ends a line, `-#}` starts the next) so the rendered bytes equal `svg`.
+/// `col` is the column the first line starts at and `tail` the text that follows the last one.
+/// A cut sits only inside a quoted value with a digit and never next to whitespace, which the
+/// comments would trim away, so no tag, attribute name or class is split (a source scan and a
+/// spell check still read them whole).
+fn trim_wrap(svg: &str, width: usize, col: usize, tail: usize) -> String {
+    const OPEN: &str = "{#-";
+    const SHUT: &str = "-#}";
+    let chars: Vec<char> = svg.chars().collect();
+    // A position is cuttable only inside a quoted value that holds a digit (a path's data, a
+    // view box), so no tag, attribute name, class or word-like value (`true`) is split.
+    let mut data = vec![false; chars.len()];
+    let mut i = 0;
+    while i < chars.len() {
+        if chars[i] == '"' {
+            let end =
+                chars[i + 1..].iter().position(|&c| c == '"').map_or(chars.len(), |e| i + 1 + e);
+            if chars[i + 1..end].iter().any(char::is_ascii_digit) {
+                data[i + 1..end].fill(true);
+            }
+            i = end;
+        }
+        i += 1;
+    }
+    let mut out = String::new();
+    let (mut at, mut start) = (0, col);
+    while at < chars.len() {
+        let head = if at == 0 { 0 } else { SHUT.len() };
+        let room = |more: usize| width.saturating_sub(start + head + more);
+        let rest = chars.len() - at;
+        let take = if rest <= room(tail) {
+            rest
+        } else {
+            // Never take it all here: the tail would not fit beside it.
+            let mut n = room(OPEN.len()).min(rest - 1);
+            let ok = |k: usize| {
+                data[at + k - 1]
+                    && data[at + k]
+                    && !chars[at + k - 1].is_whitespace()
+                    && !chars[at + k].is_whitespace()
+            };
+            while n > 1 && !ok(n) {
+                n -= 1;
+            }
+            n.max(1)
+        };
+        if at > 0 {
+            out.push_str(SHUT);
+        }
+        out.extend(&chars[at..at + take]);
+        at += take;
+        if at < chars.len() {
+            out.push_str(OPEN);
+            out.push('\n');
+        }
+        start = 0;
+    }
+    out
+}
+
 /// The plain logo and the square mark, from a header already in `theme`'s colors.
 fn build(re: &Re, header: &str) -> Result<(String, String)> {
     let mark = re.mark_group.find(header).map(|m| m.as_str());
@@ -487,12 +548,25 @@ pub fn outs(root: &Path) -> Result<Vec<Out>> {
                 .push(format!("{page}: has a <head> without {{% include \"_favicon.html\" %}}"));
         }
         if has {
-            let fit = |s: String| {
-                if page.starts_with(SITE_TEMPLATES) { wrap(&s, 100) } else { s }
+            let site = page.starts_with(SITE_TEMPLATES);
+            let fit = |text: &str, c: &Captures, s: String| {
+                if site {
+                    return wrap(&s, 100);
+                }
+                let m = c.get(0).map_or(0, |m| m.start());
+                let col = text[..m].rsplit('\n').next().map_or(0, |l| l.chars().count());
+                let end = c.get(0).map_or(0, |m| m.end());
+                let tail = text[end..].split('\n').next().map_or(0, |l| l.chars().count());
+                trim_wrap(&s, 100, col, tail)
             };
-            let text = re.app_logo.replace_all(&text, |_: &Captures| fit(app_logo())).into_owned();
-            let text =
-                re.wordmark.replace_all(&text, |_: &Captures| fit(word.clone())).into_owned();
+            let text = re
+                .app_logo
+                .replace_all(&text, |c: &Captures| fit(&text, c, app_logo()))
+                .into_owned();
+            let text = re
+                .wordmark
+                .replace_all(&text, |c: &Captures| fit(&text, c, word.clone()))
+                .into_owned();
             outs.push(Out::file(page, text));
         }
     }
