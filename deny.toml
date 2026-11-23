@@ -1,4 +1,7 @@
 [advisories]
+# Unmaintained crates anywhere in the graph, not only direct dependencies: cargo-deny 0.22
+# narrowed the default to the workspace, which would hide every transitive one below.
+unmaintained = "all"
 # A crate yanked after we locked it was withdrawn or compromised.
 yanked = "deny"
 # An ignore whose advisory no longer matches is dead weight and fails.
