@@ -21,6 +21,11 @@ allow_prefix = "GITTERRACE_"
 docs = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "docs/**.md"]
 known = []
 
+[css]
+globs = ["crates/gitterrace-web/static/*.css"]
+exempt = ["crates/gitterrace-web/static/tokens.css", "crates/gitterrace-web/static/diffview.css"]
+min_files = 5
+
 [own_shas]
 # The one place a tracked file may name a commit of this repository: the build commit a bench
 # run recorded in its results JSON, in those results and in the generated results block of

@@ -463,6 +463,35 @@ _lw "git commit -F -" ALLOW "role: absent from the file means coordinator" GUARD
 _lw "git log -5" ALLOW "role: reads stay open for a resolved lane" GUARD_SESSION_ID=session_selftest_lane GUARD_LANE_ROLES="$_roles"
 rm -f "$_roles"
 
+# Feature lane: no full gate, no writes to the main checkout. An unset role changes nothing. The
+# cases name their own gate pattern: a product's guards.env may not set GUARD_FULL_GATE_CMDS yet (the
+# rule is opt-in) or may name another command, and the shared cases must judge the rule either way.
+_fg() { t "$2" feature_lane_full_gate "$REPO" bash '{"command":"'"$1"'"}' "$3" GUARD_FULL_GATE_CMDS='make[[:space:]]+gate' "${@:4}"; }
+_fg "make gate" BLOCK "feature lane: the full gate" GUARD_LANE=feature
+_fg "cd /tmp && make gate" BLOCK "feature lane: the full gate after a cd" GUARD_LANE=feature
+_fg "GATE_OK=1 make gate" ALLOW "feature lane: GATE_OK=1 forces the gate" GUARD_LANE=feature
+_fg "make test-one" ALLOW "feature lane: targeted tests stay open" GUARD_LANE=feature
+_fg "make gate" ALLOW "no role: the full gate is open" GUARD_LANE=
+_fg "make gate" ALLOW "ro lane: not a feature lane" GUARD_LANE=ro
+# A product whose lane variable has its own name: GUARD_LANE_ENV names it, and the engine reads it.
+_fg "make gate" BLOCK "feature lane via the product's lane variable" GUARD_LANE= GUARD_LANE_ENV=SELFTEST_LANE SELFTEST_LANE=feature
+_mc() { t "$2" feature_lane_main_checkout "$4" "$5" "$1" "$3" GUARD_LANE=feature GUARD_MAIN_CHECKOUT="$REPO" "${@:6}"; }
+mkdir -p "$REPO/.wt/lane1" "$ORG/elsewhere"
+ln -s "$REPO" "$ORG/elsewhere/tomain"
+_mc '{"file_path":"'"$REPO"'/README.md","content":"x"}' BLOCK "feature lane: write in the main checkout" "$REPO" write
+_mc '{"file_path":"'"$REPO"'/.wt/lane1/README.md","content":"x"}' ALLOW "feature lane: write in its lane clone" "$REPO" write
+_mc '{"file_path":"'"$ORG"'/elsewhere/tomain/README.md","content":"x"}' BLOCK "feature lane: write through a symlink into main" "$REPO/.wt/lane1" write
+_mc '{"file_path":"'"$ORG"'/sibling/f.txt","content":"x"}' ALLOW "feature lane: write outside main" "$REPO" write
+_mc '{"command":"git commit -m x"}' BLOCK "feature lane: git commit with cwd main" "$REPO" bash
+_mc '{"command":"git commit -m x"}' ALLOW "feature lane: git commit with cwd in its clone" "$REPO/.wt/lane1" bash
+_mc '{"command":"git -C '"$REPO"' add x"}' BLOCK "feature lane: git -C main add" "$REPO/.wt/lane1" bash
+_mc '{"command":"git -C '"$ORG"'/elsewhere/tomain add x"}' BLOCK "feature lane: git -C a symlink to main" "$REPO/.wt/lane1" bash
+_mc '{"command":"git -C '"$REPO"'/.wt/lane1 add x"}' ALLOW "feature lane: git -C its clone" "$REPO" bash
+_mc '{"command":"git log -3"}' ALLOW "feature lane: reads in main stay open" "$REPO" bash
+_mc '{"file_path":"'"$REPO"'/README.md","content":"x"}' ALLOW "no role: the coordinator writes main" "$REPO" write GUARD_LANE=
+rm -rf "$REPO/.wt" "$ORG/elsewhere"
+COVERED="$COVERED feature_lane_full_gate feature_lane_main_checkout "
+
 echo
 echo "stream edits and protected files"
 t BLOCK destructive_class "$REPO" bash '{"command":"sed -i '"''"' s/a/b/ f"}' "sed -i"
@@ -530,6 +559,9 @@ t ALLOW clone_location "$REPO" bash '{"command":"git clone --depth 1 https://exa
 t ALLOW clone_location "$REPO" bash '{"command":"git clone -q \"$clone\" \"$tmp/w\""}' "a script's temporary clone at a variable path"
 t ALLOW clone_location "$REPO" bash '{"command":"git clone -q '"$ORG"'/../elsewhere /tmp/e"}' "a source outside the org"
 t ALLOW clone_location "$REPO" bash '{"command":"git clone . y/x"}' "an install's own clone dir" GUARD_WORKTREE_DIR=y
+t ALLOW clone_location "$REPO" bash '{"command":"git clone --no-local . '"$REPO"'/.wt/x"}' "a relative source, an absolute .wt destination"
+t BLOCK clone_location "$ORG/sibling" bash '{"command":"git clone --no-local ../product '"$ORG"'/sibling/.wt/x"}' "a relative source from outside, into another repo's .wt"
+t ALLOW clone_location "$ORG" bash '{"command":"cd product && git clone --no-local . '"$REPO"'/.wt/x"}' "a relative source after a cd"
 
 # hookless_commit reads the checkout's hooks dir: one repo whose hooks are wired, one fresh
 # clone with none, and one with no scripts/hooks at all (a repo that keeps no hooks).
@@ -764,3 +796,78 @@ git -C "$REPO" worktree remove --force "$_scr/wt" 2>/dev/null
 git -C "$REPO" worktree remove --force "$_scr/att" 2>/dev/null
 git -C "$REPO" branch -qD scr-attached 2>/dev/null
 rm -rf "$_sb" "$_scr"
+
+echo
+echo "every refusal names a remedy"
+# read from the tree under test, so a red probe on remedy.sh in a copy is felt
+. "$GUARDS_SRC/tests/remedy.sh"
+_off=$(remedy_offenders "$GUARDS_SRC")
+if [ -z "$_off" ]; then
+    echo "  ok   [REMEDY] every guard_block and fallback refusal carries a remedy line"
+else
+    echo "  FAIL refusal without a remedy line:"
+    echo "$_off"
+    FAILED=1
+fi
+CASES=$((CASES + 1))
+# Green and red on a fixture: one remedy passes, a lone message is named.
+_rt=$(mktemp -d "$_SCRATCH_PREFIX.remedy.XXXXXX")
+mkdir -p "$_rt/rules/fallback" "$_rt/adapters"
+printf 'guard_block "a" \\\n    "b"\n' >"$_rt/rules/ok.sh"
+: >"$_rt/engine.sh"; : >"$_rt/rules/fallback/fail-closed.sh"; : >"$_rt/adapters/jcode-pre.sh"
+if [ -z "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] fixture with a remedy passes"; else echo "  FAIL fixture with a remedy was flagged"; FAILED=1; fi
+printf 'guard_block "only a message"\n' >"$_rt/rules/bad.sh"
+if [ -n "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] fixture with a lone message is flagged"; else echo "  FAIL a block with no remedy went unseen"; FAILED=1; fi
+rm -f "$_rt/rules/bad.sh"
+printf 'guard_block "a" \\\n    "bash vendor/schwarzwald/kit/tools/clone.sh x"\n' >"$_rt/rules/lit.sh"
+if [ -n "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] a literal kit path in a remedy is flagged"; else echo "  FAIL a literal kit path in a remedy went unseen"; FAILED=1; fi
+rm -f "$_rt/rules/lit.sh"
+printf 'guard_block "a" \\\n    "bash ${GUARD_KIT_DIR:-schwarzwald/kit}/tools/clone.sh x"\n' >"$_rt/rules/dflt.sh"
+if [ -n "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] a hardcoded default kit path is flagged"; else echo "  FAIL a default kit path went unseen"; FAILED=1; fi
+rm -f "$_rt/rules/dflt.sh"
+printf 'guard_block "a" \\\n    "bash ${GUARD_KIT_DIR}/tools/clone.sh x"\n' >"$_rt/rules/good.sh"
+if [ -z "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] a GUARD_KIT_DIR remedy passes"; else echo "  FAIL a GUARD_KIT_DIR remedy was flagged"; FAILED=1; fi
+printf 'guard_block "only a message"\n' >"$_rt/rules/fallback/bad.sh"
+if [ -n "$(remedy_offenders "$_rt")" ]; then echo "  ok   [REMEDY] the scan covers rules/fallback/"; else echo "  FAIL a fallback block with no remedy went unseen"; FAILED=1; fi
+rm -rf "$_rt"
+CASES=$((CASES + 6))
+
+echo
+echo "witness log records rule, verdict and session"
+_wl=$(mktemp "$_SCRATCH_PREFIX.witness.XXXXXX")
+_run_engine '{"event":"pre_tool","tool":"bash","cwd":"'"$REPO"'","session_id":"sess-from-input","status":"ok","input":{"command":"git stash"}}' "$REPO" GUARD_WITNESS="$_wl"
+if grep -q 'sess-from-input bash .* pre_tool block git_stash' "$_wl"; then
+    echo "  ok   [WITNESS] a block logs its rule, the verdict and the session from the hook input"
+else
+    echo "  FAIL witness line lacks rule, verdict or session: $(tail -2 "$_wl")"
+    FAILED=1
+fi
+: >"$_wl"
+_run_engine '{"event":"pre_tool","tool":"bash","cwd":"'"$REPO"'","session_id":"sess-two","status":"ok","input":{"command":"git status"}}' "$REPO" GUARD_WITNESS="$_wl"
+if grep -q 'sess-two bash' "$_wl" && ! grep -q ' block ' "$_wl"; then
+    echo "  ok   [WITNESS] an allowed call logs the session and no block"
+else
+    echo "  FAIL an allowed call was logged as a block or lost its session"
+    FAILED=1
+fi
+rm -f "$_wl"
+CASES=$((CASES + 2))
+
+echo
+echo "refusals do not advise the git show route"
+_gs=$(grep -n 'git show HEAD:<path>' "$GUARDS_SRC"/engine.sh "$GUARDS_SRC"/rules/*.sh "$GUARDS_SRC"/rules/fallback/*.sh 2>/dev/null)
+if [ -z "$_gs" ]; then
+    echo "  ok   [HINT] no refusal advises git show ref:path, which rtk refuses"
+else
+    echo "  FAIL a refusal advises git show ref:path; name baseline.sh save|restore: $_gs"
+    FAILED=1
+fi
+_run_engine '{"event":"pre_tool","tool":"bash","cwd":"'"$REPO"'","status":"ok","input":{"command":"git stash"}}' "$REPO"
+# Only the git_stash rule's own lines count: the destructive class also blocks a stash with the same hint.
+if awk '/^guard-block: /{on=($2=="git_stash")} on' <<<"$_RUN_ERR" | grep -q 'baseline.sh save <path>'; then
+    echo "  ok   [HINT] the stash refusal names baseline.sh"
+else
+    echo "  FAIL the stash refusal does not name baseline.sh"
+    FAILED=1
+fi
+CASES=$((CASES + 2))

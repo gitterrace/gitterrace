@@ -109,7 +109,7 @@ guard_rule_git_stash() {
     guard_cmd_has 'git( -C [^ ]+)? stash (list|show)' && return 0
     guard_block \
         "git stash in a shared checkout sweeps up OTHER sessions' uncommitted work -- it is not scoped to your files." \
-        "To baseline ONE file: git show HEAD:<path> > /tmp/<session>-baseline, measure, copy back."
+        "To baseline ONE file: bash ${GUARD_KIT_DIR}/tools/baseline.sh save <path>, measure, then baseline.sh restore <path>."
     return 0
 }
 

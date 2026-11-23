@@ -7,6 +7,8 @@
 #   - HEAD added it and the index lacks it: a drop of a file added since.
 #   - HEAD changed it and the staged blob lacks that change (merging base -> HEAD onto the
 #     staged blob changes it or conflicts): a revert of lines changed since.
+#   - The staged blob equals an older blob of that same path from the last STALE_DEPTH commits
+#     while HEAD has a different one: a single-path revert no base explains (the history sweep).
 # The kit's commit-msg runs it with the message file as $1, so a `restore:` line in the message
 # restores deliberately. Without an argument (a product's own pre-commit) only
 # <prefix>ALLOW_RESTORE=1 does. <prefix>STALE_DEPTH sets how

@@ -64,6 +64,7 @@ guard_fallback_arm() {
     if guard_fallback_too_big "${GUARD_CMD:-}"; then
         GUARD_FALLBACK_SETTLED=1
         printf 'Blocked: %s\n' "$GUARD_FALLBACK_REASON" >&2
+        echo "         Split it into smaller commands, or write it to a file and run that." >&2
         exit "$GUARD_FALLBACK_BLOCK_RC"
     fi
 }
@@ -91,6 +92,7 @@ guard_fallback_degraded() {
     printf 'Blocked: %s\n' "$GUARD_FALLBACK_REASON" >&2
     echo "         The guards are DEGRADED, so this is the fail-closed fallback, not the engine." >&2
     echo "         Retry once they recover; read-only commands still pass." >&2
+    echo "         To baseline ONE file meanwhile: bash ${GUARD_KIT_DIR:-<kit>}/tools/baseline.sh save <path>, measure, then baseline.sh restore <path>." >&2
     exit "$GUARD_FALLBACK_BLOCK_RC"
 }
 
@@ -1025,9 +1027,9 @@ _gf_rm() {
         if [ -z "$ends" ]; then
             case "$w" in
                 --) ends=1 && continue ;;
-                --recursive) _gf_refuse "rm -r deletes a tree that may hold another session's work." || return 1 ;;
+                --recursive) _gf_refuse "rm -r deletes a tree that may hold another session's work. Remove only your own named files, or work under your scratch dir." || return 1 ;;
                 --*) continue ;;
-                -*r* | -*R*) _gf_refuse "rm -r deletes a tree that may hold another session's work." || return 1 ;;
+                -*r* | -*R*) _gf_refuse "rm -r deletes a tree that may hold another session's work. Remove only your own named files, or work under your scratch dir." || return 1 ;;
                 -*) continue ;;
             esac
         fi
@@ -1059,7 +1061,7 @@ _gf_find() {
     # No root names the cwd.
     [ -n "$seen" ] || _gf_scratch . "$2" || safe=0
     if [ -n "$del" ] && [ "$safe" = 0 ]; then
-        _gf_refuse "find -delete removes every match, including another session's files."
+        _gf_refuse "find -delete removes every match, including another session's files. Name the files, or run it under your scratch dir."
         return 1
     fi
     return 0

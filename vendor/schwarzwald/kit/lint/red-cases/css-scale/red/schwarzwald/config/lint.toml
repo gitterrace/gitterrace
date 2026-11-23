@@ -1,0 +1,3 @@
+[css]
+globs = ["static/*.css"]
+exempt = ["static/tokens.css"]

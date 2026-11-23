@@ -65,11 +65,13 @@ belong.
 
 ## Parallel work
 
+- Run benches, timing tests and full gates through `tools/quiet.sh`, so one runs at
+  a time and only on a quiet machine.
 - Feature work builds and runs short checks only: a compile check, its own
   targeted tests, the lint for the files it touched, at most one browser or UI
   case. Never the full test suite, the landing gate, the full browser run or
-  repeat loops. It ends by handing over the clone path, the tip and one line on
-  what it checked.
+  repeat loops. It ends by handing over the clone path, the tip sha, the files
+  it read and one line on what it checked. A report without them is not done.
 - One runner takes the full gates and the merges, one at a time: it rebases each
   stack onto main, gates it and lands what is green. It may gate small
   file-disjoint stacks together, and it decides whether a red is the stack, a

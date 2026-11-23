@@ -3,6 +3,15 @@
   "font": {
     "title": {
       "web": "Fraunces",
+      "metrics": {
+        "local": [
+          "Georgia"
+        ],
+        "sizeAdjust": 119.23,
+        "ascent": 82.02,
+        "descent": 21.39,
+        "lineGap": 0
+      },
       "weight": 600,
       "fallback": [
         "Georgia",
@@ -12,6 +21,16 @@
     },
     "body": {
       "web": "Bricolage Grotesque",
+      "metrics": {
+        "local": [
+          "Arial",
+          "Helvetica"
+        ],
+        "sizeAdjust": 117.21,
+        "ascent": 79.35,
+        "descent": 23.04,
+        "lineGap": 0
+      },
       "weights": [
         400,
         600
@@ -24,6 +43,15 @@
     },
     "mono": {
       "web": "JetBrains Mono",
+      "metrics": {
+        "local": [
+          "Menlo"
+        ],
+        "sizeAdjust": 99.66,
+        "ascent": 102.35,
+        "descent": 30.1,
+        "lineGap": 0
+      },
       "weight": 400,
       "fallback": [
         "ui-monospace",
@@ -51,7 +79,9 @@
     "weights": [
       400,
       600
-    ]
+    ],
+    "trackingLabel": ".12em",
+    "measure": "72ch"
   },
   "space": {
     "gridPx": 4,
@@ -72,14 +102,20 @@
       56,
       60,
       64
-    ]
+    ],
+    "subGridPx": {
+      "hairline": 1,
+      "nudge": 2,
+      "meter": 6
+    }
   },
   "radius": {
     "webPx": 3,
     "nativePx": [
       6,
       12
-    ]
+    ],
+    "round": "50%"
   },
   "motion": {
     "durationMs": {
@@ -88,5 +124,12 @@
       "progress": 400
     },
     "easing": "cubic-bezier(0.2, 0.7, 0.2, 1)"
+  },
+  "size": {
+    "rowPx": 40,
+    "controlPx": 32,
+    "controlSmPx": 28,
+    "barPx": 6,
+    "barSmPx": 4
   }
 }

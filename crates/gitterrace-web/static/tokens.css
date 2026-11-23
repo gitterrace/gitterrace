@@ -19,7 +19,7 @@
 --n-0:light-dark(#f7f8fa,#1e2023); --n-1:light-dark(#f7f8fa,#1e2023); --n-2:light-dark(#f0f1f3,#27292c); --n-3:light-dark(#eaebee,#2d2f33); --n-4:light-dark(#d3d5d9,#34363a); --n-5:light-dark(#7c8188,#7a8086);
 --n-6:light-dark(#636a73,#a1aab3); --n-7:light-dark(#4a5159,#bbc4cd); --n-9:light-dark(#21272e,#e3ecf6); --header:light-dark(#ebeef2,#171a1c); --raised:light-dark(#f7f8fa,#25272a); --scrim:#0000004d;
 --accent:light-dark(#5b5e8d,#9ca1d4); --accent-fg:light-dark(#5b5e8d,#9ca1d4); --accent-soft:light-dark(#e4e6ed,#2d2f38); --ring:light-dark(#5b5e8d66,#9ca1d480); --on-accent:light-dark(#ffffff,#1e2023); --add:light-dark(#236958,#78c9b7);
---add-bg:light-dark(#e2eaea,#2b3838); --add-hl:light-dark(#cadbd8,#374f4c); --del:light-dark(#af383d,#ff7778); --del-bg:light-dark(#f0e5e7,#3e2c2f); --del-hl:light-dark(#efdcde,#4a3033); --warn:light-dark(#875900,#e1a447);
+--add-bg:light-dark(#e2eaea,#2b3838); --add-hl:light-dark(#eff3f3,#253030); --del:light-dark(#af383d,#ff7778); --del-bg:light-dark(#f0e5e7,#3e2c2f); --del-hl:light-dark(#f7f0f2,#4a3033); --warn:light-dark(#875900,#e1a447);
 --warn-bg:light-dark(#ece8e1,#393228); --info:light-dark(#4a5159,#bbc4cd); --done:light-dark(#236958,#78c9b7); --seq-0:light-dark(#eaebee,#2d2f33); --seq-1:light-dark(#c4c6d6,#474958); --seq-2:light-dark(#9fa2bd,#62657f);
 --seq-3:light-dark(#7c80a5,#7e82a8); --seq-4:light-dark(#5b5e8d,#9ca1d4); --cat-1:light-dark(#306693,#66a6dd); --cat-2:light-dark(#8c5528,#cf945f); --cat-3:light-dark(#127050,#50b291); --cat-4:light-dark(#6e3a52,#d28caf);
 --cat-5:light-dark(#1f6a72,#4caeb8); --cat-6:light-dark(#994b4c,#de898e); --cat-7:light-dark(#706226,#aea25c); --cat-8:light-dark(#c8cacd,#45494d); --syn-comment:light-dark(#5f676f,#a1aab3); --syn-keyword:light-dark(#513761,#b992d2);

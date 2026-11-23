@@ -91,3 +91,10 @@ script_content_patch	engine.sh	[ -z "${GUARD_PATCH:-}" ] || guard_patch_script_l
 script_content_class	rules/82-script-content.sh	if [ "$GUARD_VERDICT" != block ] &&{NL}        !	writing a .zsh that runs git reset --hard	if false &&{NL}        !	cases-rules
 containment_per_segment	rules/05-containment.sh	_contain_segment "$cmd" "$org" "$seg" || return 1	a Trash move does not cover an rm in the Trash	_contain_segment "$cmd" "$org" "$seg"; return $?	cases-rules
 script_join_quadratic	engine.sh	kept[${#kept[@]}]="$line"	size cap|timing baseline	kept[${#kept[@]}]="$line"; _q="$_q$line"$'\n'; _q="$_q$line"; _q="$_q$line"	cases-rules
+feature_lane_full_gate	rules/15-lane-checkouts.sh	guard_cmd_is "$GUARD_FULL_GATE_CMDS" || return 0	feature lane: the full gate	return 0	cases-rules
+feature_lane_main_checkout	rules/15-lane-checkouts.sh	_role_in_main "$target" || return 0	feature lane: write in the main checkout	return 0	cases-rules
+feature_lane_symlink	rules/15-lane-checkouts.sh	real=$(_role_real "$1")	write through a symlink into main	real="$1"	cases-rules
+remedy_scan	tests/remedy.sh	if (s !~	a block with no remedy went unseen	if (1 || s !~	cases-rules
+witness_block_rule	engine.sh	guard_witness block "${GUARD_ACTIVE_RULE:-engine}"	witness line lacks rule	:	cases-rules
+witness_input_session	engine.sh	[ -n "${GUARD_SESSION_ID:-}" ] || GUARD_SESSION_ID="$GUARD_INPUT_SESSION"	witness line lacks rule	:	cases-rules
+baseline_hint	rules/10-shared-checkout.sh	baseline.sh save <path>	the stash refusal does not name baseline.sh	restore <path>	cases-rules

@@ -166,6 +166,31 @@ gate_env() {
   env "${drop[@]}" -u GIT_AUTHOR_NAME -u GIT_AUTHOR_EMAIL -u GIT_AUTHOR_DATE \
     -u GIT_COMMITTER_NAME -u GIT_COMMITTER_EMAIL -u GIT_COMMITTER_DATE -u LAND_TOOL "$@"
 }
+# make_retired <make args...>: main's `make` gate command without the targets the result's
+# Makefile no longer has, so a gate change can retire a target. Flags, their values and VAR=value
+# words stay, and each target is probed with them. Only make's own "No rule to make target" drops
+# a target: a Makefile that fails to parse keeps every target, so its gate still runs and fails.
+# Prints the command and a note per dropped target, and fails when no target is left.
+make_retired() {
+  local a err flags=() targets=() kept=() takes=""
+  for a in "$@"; do
+    if [ -n "$takes" ]; then flags+=("$a"); takes=""; continue; fi
+    case $a in
+      -C | -f | -I | -o | -W | --directory | --file | --include-dir) flags+=("$a"); takes=1 ;;
+      -* | *=* | [0-9]*) flags+=("$a") ;;
+      *) targets+=("$a") ;;
+    esac
+  done
+  for a in "${targets[@]+"${targets[@]}"}"; do
+    err=$(make "${flags[@]+"${flags[@]}"}" -n -q "$a" 2>&1 >/dev/null) || true
+    case $err in
+      *"No rule to make target"*) echo "gate change: main's make target $a is skipped, the result's Makefile has no rule for it" >&2 ;;
+      *) kept+=("$a") ;;
+    esac
+  done
+  [ "${#kept[@]}" -gt 0 ] || return 1
+  echo "make ${flags[*]+${flags[*]} }${kept[*]}"
+}
 
 # run_gate <base>: the product's gate, in the current directory (a temporary clone holding the
 # result exactly as main would get it). Exits refusing on a red gate, or on no gate without
@@ -221,6 +246,9 @@ run_gate() {
       w=""
       for x in "${ws[@]}"; do case $x in */*) [ -e "$x" ] || { w=$x; break; } ;; esac; done
       if [ -n "$w" ]; then echo "gate change: main's '$mitem' is skipped, $w is not in the result" >&2; continue; fi
+      if [ "${ws[0]:-}" = make ]; then
+        mitem=$(make_retired "${ws[@]:1}") || { echo "gate change: main's '$mitem' is skipped, the result's Makefile has none of its targets" >&2; continue; }
+      fi
       gates+=("$mitem")
     done < <(landing_cfg "$gd/land.toml")
   fi

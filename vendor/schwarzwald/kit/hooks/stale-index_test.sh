@@ -75,6 +75,19 @@ for p in a land.sh added added2; do git update-index --add --cacheinfo "100644,$
 git rm -q --cached b
 printf 'y\n' >u && git add u
 expect "passes an old index whose only change from HEAD is an unrelated path" 0
+# The second defect it catches: one path alone put back to a blob a recent commit replaced, on an
+# index that is otherwise fresh. No base explains it, so only the history of that path shows it.
+git read-tree HEAD && git update-index --cacheinfo "100644,$(git rev-parse "${stale}:land.sh"),land.sh"
+expect "refuses one path staged back to a blob a recent commit replaced" 1
+DEMO_ALLOW_RESTORE=1 expect "passes that revert with the restore override" 0
+# A path whose older blob equals HEAD's is not a revert, and neither is a new edit beside it.
+printf 'v1\n' >r && git add r && git commit -qm r1
+printf 'v2\n' >r && git commit -qam r2
+printf 'v1\n' >r && git commit -qam r3
+git read-tree HEAD && printf 'v3\n' >r && printf 'four\n' >a && git add r a
+expect "passes a genuine new edit on paths with older blobs" 0
+git read-tree HEAD && printf 'four\n' >a && git add a
+expect "passes a path whose old blob equals HEAD's, left as it is" 0
 git read-tree HEAD && printf 'three\n' >a && git add a
 expect "passes an ordinary change on a fresh index" 0
 git read-tree HEAD && git rm -q --cached a

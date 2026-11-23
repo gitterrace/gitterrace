@@ -65,6 +65,7 @@ guard_attribute() {
 guard_block() {
     GUARD_VERDICT=block
     guard_attribute guard-block
+    guard_witness block "${GUARD_ACTIVE_RULE:-engine}"
     printf 'Blocked: %s\n' "$1" >&2
     shift
     local line
@@ -161,6 +162,7 @@ guard_parse() {
              GUARD_FILE=\(.input.file_path // "")
              GUARD_ACTION=\(.input.action // "")
              GUARD_READ_BOUND=\(if (.input | type) == "object" and (.input | has("offset") or has("limit") or has("start_line")) then "1" else "" end)
+             GUARD_INPUT_SESSION=\(.session_id // "")
              GUARD_MODEL=\(.input.model // "")
              GUARD_PROMPT=\(.input.prompt // .input.initial_message // "")
              GUARD_BACKGROUND=\(.input.run_in_background // false | tostring)
@@ -169,6 +171,10 @@ guard_parse() {
     ' 2>/dev/null) || return 1
     [ -n "$assigns" ] || return 1
     eval "$assigns" || return 1
+    # The session from the hook input, when the adapter gave none.
+    # It names a spool file, so only a plain token is taken.
+    [[ ${GUARD_INPUT_SESSION:-} =~ ^[A-Za-z0-9_.-]+$ ]] || GUARD_INPUT_SESSION=""
+    [ -n "${GUARD_SESSION_ID:-}" ] || GUARD_SESSION_ID="$GUARD_INPUT_SESSION"
     [ -z "${GUARD_PATCH:-}" ] || guard_patch_script_lines
     return 0
 }
@@ -551,7 +557,8 @@ guard_main() {
     if [ "${GUARD_TOOL:-}" = bash ] && [ "${GUARD_EVENT:-pre_tool}" = pre_tool ] &&
         guard_fallback_too_big "${GUARD_CMD:-}"; then
         GUARD_ACTIVE_RULE=destructive_class
-        guard_block "$GUARD_FALLBACK_REASON"
+        guard_block "$GUARD_FALLBACK_REASON" \
+            "Split it into smaller commands, or write it to a script file and run that."
         GUARD_ACTIVE_RULE=""
         printf 'verdict: %s\n' "$GUARD_VERDICT"
         return 0
@@ -687,6 +694,8 @@ guard_cwd_repo() {
         git -C "$GUARD_CWD" rev-parse --show-toplevel 2>/dev/null || :
 }
 
+# One line per call: `time session tool entry event`. A block adds `block <rule>`, so friction
+# (which rule refuses how often, in which session) can be counted from the log.
 guard_witness() {
     if [ -z "${GUARD_WITNESS:-}" ]; then
         # A per-user 0700 dir, never a fixed name in shared temp: another user could pre-create the
@@ -701,7 +710,7 @@ guard_witness() {
     fi
     printf '%s %s %s %s %s\n' "$(date +%H:%M:%S)" \
         "${GUARD_SESSION_ID:-synthetic}" "${GUARD_TOOL:-?}" \
-        "${GUARD_ENTRYPOINT:-direct}" "${GUARD_EVENT:-pre_tool}" \
+        "${GUARD_ENTRYPOINT:-direct}" "${GUARD_EVENT:-pre_tool}${1:+ $1 ${2:-engine}}" \
         >>"$GUARD_WITNESS" 2>/dev/null
 
     if [ -f "$GUARD_WITNESS" ]; then

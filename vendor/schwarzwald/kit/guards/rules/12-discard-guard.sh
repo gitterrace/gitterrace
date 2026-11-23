@@ -36,7 +36,7 @@ guard_rule_git_checkout_discards() {
     [ "$_guard_discard_is_path" = 1 ] || return 0
     guard_block \
         "git checkout/restore of a PATH discards uncommitted work there, and this checkout is SHARED -- the work may not be yours." \
-        "To baseline ONE file: git show HEAD:<path> > /tmp/<session>-baseline, measure, copy back." \
+        "To baseline ONE file: bash ${GUARD_KIT_DIR}/tools/baseline.sh save <path>, measure, then baseline.sh restore <path>." \
         "Branch work (checkout <branch>, -b, --track) and 'restore --staged' are unaffected."
     return 0
 }

@@ -20,6 +20,6 @@ guard_rule_destructive_class() {
     guard_block \
         "$reason" \
         "This is the destructive class in a SHARED checkout: scripts/guards/rules/fallback/fail-closed.sh is its single definition." \
-        "To baseline ONE file: git show HEAD:<path> > /tmp/<session>-baseline, measure, copy back."
+        "To baseline ONE file: bash ${GUARD_KIT_DIR}/tools/baseline.sh save <path>, measure, then baseline.sh restore <path>."
     return 0
 }

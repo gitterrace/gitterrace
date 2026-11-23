@@ -5,20 +5,93 @@
 # .git/config, so a clone never inherits it, and it names the path, so a linked worktree sharing
 # that .git/config is not matched either. Only the marked checkout refuses a commit without the
 # land tool's stamp LAND_TOOL=1. A lane, a full clone or a linked worktree, is never refused.
+#
+# Then, for every checkout: a warning when a staged path also has unstaged edits (never a block),
+# the staged markdown through the pinned markdownlint-cli2, and the product's own checks. All three
+# read schwarzwald/config/lint.toml: [run] markdownlint (the pin, "" skips), [hooks] markdown_exclude
+# (globs, `*` crosses folders) and [hooks] pre_commit_checks (commands run through bash from the
+# repo root, the first failure fails the hook). The checks are trusted product code, as [run] steps.
 set -euo pipefail
 top=$(git rev-parse --show-toplevel)
-target=$(git config --local landing.target 2>/dev/null || true)
-[[ -n $target && $(cd "$target" 2>/dev/null && pwd -P) == "$(cd "$top" && pwd -P)" ]] || exit 0
-env_file="$top/schwarzwald/config/guards.env"
-[[ -f $env_file ]] || exit 0
-# Read through the guards' own loader, so every spelling the config shape allows counts.
-# shellcheck source=/dev/null
-. "$(dirname "${BASH_SOURCE[0]}")/../guards/config.sh" || {
-  echo "pre-commit: cannot load guards/config.sh beside it" >&2
-  exit 1
+
+landing_check() {
+  target=$(git config --local landing.target 2>/dev/null || true)
+  [[ -n $target && $(cd "$target" 2>/dev/null && pwd -P) == "$(cd "$top" && pwd -P)" ]] || return 0
+  env_file="$top/schwarzwald/config/guards.env"
+  [[ -f $env_file ]] || return 0
+  # Read through the guards' own loader, so every spelling the config shape allows counts.
+  # shellcheck source=/dev/null
+  . "$(dirname "${BASH_SOURCE[0]}")/../guards/config.sh" || {
+    echo "pre-commit: cannot load guards/config.sh beside it" >&2
+    return 1
+  }
+  guard_config_value "$env_file" MAIN_CHECKOUT_LANDS_ONLY
+  [[ $GUARD_CONFIG_VALUE == 1 ]] || return 0
+  [[ ${LAND_TOOL:-} == 1 ]] && return 0
+  echo "pre-commit: refused. This checkout takes landings only (MAIN_CHECKOUT_LANDS_ONLY=1, landing.target set): commit in a lane and land it with land.sh." >&2
+  return 1
 }
-guard_config_value "$env_file" MAIN_CHECKOUT_LANDS_ONLY
-[[ $GUARD_CONFIG_VALUE == 1 ]] || exit 0
-[[ ${LAND_TOOL:-} == 1 ]] && exit 0
-echo "pre-commit: refused. This checkout takes landings only (MAIN_CHECKOUT_LANDS_ONLY=1, landing.target set): commit in a lane and land it with land.sh." >&2
-exit 1
+
+# A path staged with unstaged edits: `git add` later takes the whole working copy, and a commit
+# of just the staged part leaves the rest behind, so the author may not mean what is committed.
+warn_partial_stage() {
+  local dirty='' p
+  while IFS= read -r p; do
+    [[ -n ${p} ]] || continue
+    git diff --quiet -- "${p}" 2>/dev/null || dirty="${dirty}  ${p}
+"
+  done < <(git diff --cached --name-only --diff-filter=ACMR)
+  [[ -n ${dirty} ]] || return 0
+  printf 'pre-commit: warning: staged paths also have unstaged edits, only the staged part is committed:\n%s' "${dirty}" >&2
+}
+
+# hook_config <lines>: the lint.toml values this hook reads, as `pin=..`, `exclude=..`, `check=..` lines.
+hook_config() {
+  [[ -f ${top}/schwarzwald/config/lint.toml ]] || return 0
+  local here py lib
+  here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  lib="${here}/../lint/lib/pick-python.sh"
+  [[ -f ${lib} ]] || return 0
+  # shellcheck source=../lint/lib/pick-python.sh
+  . "${lib}"
+  pick_py || { echo "pre-commit: needs python 3.11 or newer for lint.toml" >&2; return 1; }
+  py=${PY}
+  "${py}" -c '
+import sys, tomllib
+d = tomllib.load(open(sys.argv[1], "rb"))
+print("pin=" + str(d.get("run", {}).get("markdownlint", "")))
+for e in d.get("hooks", {}).get("markdown_exclude", []): print("exclude=" + e)
+for c in d.get("hooks", {}).get("pre_commit_checks", []): print("check=" + c.replace("\n", " "))
+' "${top}/schwarzwald/config/lint.toml"
+}
+
+markdown_staged() {
+  local pin=$1 ex=$2 f g skip md=()
+  while IFS= read -r f; do
+    [[ -f ${f} ]] || continue
+    skip=0
+    while IFS= read -r g; do
+      # shellcheck disable=SC2254
+      [[ -n ${g} ]] && case ${f} in ${g}) skip=1 ;; esac
+    done <<<"${ex}"
+    [[ ${skip} == 1 ]] || md+=("${f}")
+  done < <(git diff --cached --name-only --diff-filter=ACMR -- '*.md')
+  [[ ${#md[@]} -gt 0 ]] || return 0
+  if [[ -z ${pin} ]]; then echo "pre-commit: markdown lint skipped, [run] markdownlint pins no version" >&2; return 0; fi
+  if ! command -v npx >/dev/null 2>&1; then echo "pre-commit: markdown lint skipped, npx (markdownlint-cli2) is not installed" >&2; return 0; fi
+  local out
+  out=$(npx --yes "markdownlint-cli2@${pin}" "${md[@]}" 2>&1) && return 0
+  printf '%s\n' "${out}" | grep -E '^[^ ]+\.md:[0-9]+' | head -20 >&2
+  echo "pre-commit: refused. Staged markdown fails markdownlint-cli2@${pin}. Fix it and stage again." >&2
+  return 1
+}
+
+landing_check || exit 1
+warn_partial_stage
+cfg=$(hook_config) || exit 1
+markdown_staged "$(sed -n 's/^pin=//p' <<<"${cfg}")" "$(sed -n 's/^exclude=//p' <<<"${cfg}")" || exit 1
+while IFS= read -r c; do
+  [[ -n ${c} ]] || continue
+  (cd "${top}" && bash -c "${c}") || { echo "pre-commit: refused. Product check failed: ${c}" >&2; exit 1; }
+done < <(sed -n 's/^check=//p' <<<"${cfg}")
+exit 0

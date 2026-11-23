@@ -1,0 +1,3 @@
+[a11y]
+scripts = ["*.js"]
+shortcut_switch = "shortcutsOff"

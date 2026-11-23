@@ -1,0 +1,2 @@
+/* a 3px note and #888 in a comment are prose */
+.x{--hue:hsl(var(--h) var(--s) var(--l));width:35px;top:var(--pin,150px)}
