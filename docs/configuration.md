@@ -261,6 +261,14 @@ Exceptions, each on purpose:
 - `findings_entries` (integer, default `500`): Most entries the review basket
   keeps. The oldest go first. The basket lives in `.git/gitterrace/` and holds
   the notes you wrote.
+- `plan_files` (integer, default `200`): Most files `review_plan` lists. The
+  rest count in `total_files`.
+- `test_siblings` (list of strings, default
+  `["{dir}/{stem}_test.{ext}", "{dir}/{stem}.test.{ext}", "{dir}/{stem}.spec.{ext}", "{dir}/test_{stem}.{ext}", "{dir}/{stem}_spec.{ext}", "{dir}/{stem}_tests.{ext}", "{dir}/tests.{ext}", "{dir}/{stem}/tests.{ext}", "{dir}/__tests__/{stem}.*", "{dir}/tests/{stem}.*", "tests/**/{stem}.*", "tests/{stem}_*.*"]`):
+  Patterns that say a file has a test next to it. `{dir}`, `{stem}` and `{ext}`
+  stand for the changed file's folder, name and extension. A file that matches
+  one, or sits under a `test`, `tests`, `__tests__` or `spec` folder, is a test
+  itself.
 
 ## `[multi]`
 

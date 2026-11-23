@@ -15,6 +15,7 @@ mod commit;
 mod file_insight;
 mod insights;
 mod review;
+mod review_plan;
 
 #[cfg(test)]
 mod tests;
@@ -37,6 +38,10 @@ pub use insights::{
 pub use review::{
     CheckpointItem, CheckpointsResponse, Finding, FindingAnchor, FindingLines, FindingsResponse,
     NewFinding, ViewedItem, ViewedResponse,
+};
+
+pub use review_plan::{
+    PlanFile, PlanHotspot, PlanOwner, PlanSkipped, PlanSource, PlanTerms, ReviewPlan, SkipReason,
 };
 
 /// Who did something and when.

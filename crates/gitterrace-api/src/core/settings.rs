@@ -8,7 +8,7 @@ use gitterrace_types::LinkStyle;
 
 use crate::core::{ApiState, options_from};
 
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub(super) struct Settings {
     /// Form of the `link` field; `permalink` is always `/go`.
     pub(super) style: LinkStyle,
@@ -21,6 +21,24 @@ pub(super) struct Settings {
     pub(super) caps: gitterrace_config::Api,
     /// Checkpoint caps from `[review]`.
     pub(super) review: gitterrace_config::Review,
+    /// `limits.diff_fold_lines`: where the size term of a review plan saturates.
+    pub(super) fold_lines: usize,
+    /// `worktree_enabled` for this repository: the working-tree source of a review plan.
+    pub(super) worktree_on: bool,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        let cfg = gitterrace_config::Config::default();
+        Self {
+            style: LinkStyle::default(),
+            defaults: Options::default(),
+            caps: cfg.api,
+            review: cfg.review,
+            fold_lines: cfg.limits.diff_fold_lines,
+            worktree_on: true,
+        }
+    }
 }
 
 impl ApiState {
@@ -56,12 +74,15 @@ impl ApiState {
     pub fn reconfigure(&self, cfg: &gitterrace_config::Config) {
         self.index.set_block_cache(cfg.cache_bytes(gitterrace_config::Cache::Blocks));
         self.index.set_message_index(cfg.index.has_messages);
-        let defaults = options_from(cfg, &self.repo.name());
+        let name = self.repo.name();
+        let defaults = options_from(cfg, &name);
         let mut s = self.write_settings();
         s.style = cfg.links.style;
         s.defaults = defaults;
         s.caps = cfg.api.clone();
         s.review = cfg.review.clone();
+        s.fold_lines = cfg.limits.diff_fold_lines;
+        s.worktree_on = cfg.feature_on(gitterrace_config::Feature::Worktree, Some(&name));
     }
 
     pub(super) fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {

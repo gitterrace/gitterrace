@@ -385,6 +385,7 @@ const TOOL_ROUTES: &[(&str, &str)] = &[
     ("blame", "/api/v1/blame"),
     ("contributors", "/api/v1/contributors"),
     ("file_insight", "/api/v1/file_insight"),
+    ("review_plan", "/api/v1/review_plan"),
     ("insight", "/api/v1/insights/{name}"),
     ("list_insights", "/api/v1/insights"),
 ];

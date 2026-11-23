@@ -7,7 +7,7 @@ use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
     ContributorsResponse, EndpointDoc, FileInsight, FindingsResponse, IndexResponse, InsightList,
-    InsightResponse, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
+    InsightResponse, LogResponse, ParamDoc, RefsResponse, RepoResponse, ReviewPlan, TreeResponse,
     ViewedResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
@@ -90,7 +90,10 @@ async fn etag(
 ) -> Response {
     // The working tree, checkpoints and marks change with no ref moving: a tag would answer 304
     // to a stale copy.
-    if matches!(req.uri().path(), "/worktree" | "/checkpoints" | "/viewed" | "/findings") {
+    if matches!(
+        req.uri().path(),
+        "/worktree" | "/checkpoints" | "/viewed" | "/findings" | "/review_plan"
+    ) {
         return next.run(req).await;
     }
     let slot = state.job_slot().await;
@@ -298,6 +301,36 @@ pub(crate) async fn file_insight(
     let path =
         q.path.ok_or_else(|| ApiError::BadRequest("missing query parameter: path".into()))?;
     blocking(&s, move |s| s.file_insight(q.rev.as_deref(), &path, &q.params)).await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct PlanQuery {
+    source: Option<String>,
+    base: Option<String>,
+    head: Option<String>,
+    three_dot: Option<bool>,
+    scope: Option<String>,
+    since: Option<String>,
+    #[serde(flatten)]
+    params: insights::Params,
+}
+
+pub(crate) async fn review_plan(
+    State(s): State<ApiState>,
+    Query(q): Query<PlanQuery>,
+) -> Reply<ReviewPlan> {
+    blocking(&s, move |s| {
+        let req = crate::PlanRequest {
+            source: q.source.as_deref(),
+            base: q.base.as_deref(),
+            head: q.head.as_deref(),
+            three_dot: q.three_dot,
+            scope: q.scope.as_deref(),
+            since: q.since.as_deref(),
+        };
+        s.review_plan(&req, &q.params)
+    })
+    .await
 }
 
 pub(crate) async fn insight_list() -> Json<InsightList> {

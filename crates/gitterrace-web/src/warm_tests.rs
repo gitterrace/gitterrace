@@ -20,6 +20,10 @@ const COLD_OK: &[(&str, &str)] = &[
         "/api/v1/file_insight",
         "a client asks for one path with its own filter, read from the path's postings",
     ),
+    (
+        "/api/v1/review_plan",
+        "a client names its own changes and filter, and the plan reads the page's tables",
+    ),
     ("/api/v1/insights", "an index of names, no history read"),
     (
         "/api/v1/insights/{name}",

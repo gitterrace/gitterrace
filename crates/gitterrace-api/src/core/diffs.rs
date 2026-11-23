@@ -8,6 +8,9 @@ use crate::core::{ApiState, under};
 use crate::error::ApiError;
 use crate::wire;
 
+/// A checkpoint id and what differs from it.
+pub(super) type SinceRead = (String, gitterrace_git::SinceDiff);
+
 /// Added and removed lines over a file list.
 fn totals(list: &[FileDiff]) -> (u64, u64) {
     list.iter().fold((0, 0), |(a, d), f| (a + u64::from(f.additions), d + u64::from(f.deletions)))
@@ -76,6 +79,32 @@ impl ApiState {
         max_lines: Option<usize>,
         since: Option<&str>,
     ) -> Result<WorktreeResponse, ApiError> {
+        let (list, since_part) = self.worktree_list(scope, since)?;
+        let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
+        let (additions, deletions) = totals(&list);
+        let (since, unchanged_files, content_gone) = since_part
+            .map_or((None, None, Vec::new()), |(id, d)| {
+                (Some(id), Some(d.unchanged as u64), d.gone)
+            });
+        Ok(WorktreeResponse {
+            additions,
+            content_gone,
+            deletions,
+            files,
+            scope: scope.unwrap_or("all").to_owned(),
+            since,
+            truncated,
+            unchanged_files,
+        })
+    }
+
+    /// The changed files of the working tree in `scope`, or the ones that differ from checkpoint
+    /// `since`. Refused on a committed-only (public) handle.
+    pub(super) fn worktree_list(
+        &self,
+        scope: Option<&str>,
+        since: Option<&str>,
+    ) -> Result<(Vec<FileDiff>, Option<SinceRead>), ApiError> {
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden("the working tree"));
         }
@@ -105,21 +134,6 @@ impl ApiState {
                 (d.files.clone(), Some((id.to_owned(), d)))
             }
         };
-        let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
-        let (additions, deletions) = totals(&list);
-        let (since, unchanged_files, content_gone) = since_part
-            .map_or((None, None, Vec::new()), |(id, d)| {
-                (Some(id), Some(d.unchanged as u64), d.gone)
-            });
-        Ok(WorktreeResponse {
-            additions,
-            content_gone,
-            deletions,
-            files,
-            scope: scope.unwrap_or("all").to_owned(),
-            since,
-            truncated,
-            unchanged_files,
-        })
+        Ok((list, since_part))
     }
 }

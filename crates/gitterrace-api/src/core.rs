@@ -7,9 +7,11 @@ mod file_insight;
 mod findings;
 mod page_tables;
 mod rebuild;
+mod review_plan;
 mod settings;
 
 pub use page_tables::Pages;
+pub use review_plan::PlanRequest;
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};

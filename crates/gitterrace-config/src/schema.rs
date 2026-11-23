@@ -231,6 +231,7 @@ pub const BOUNDS: &[(&str, u64, u64)] = &[
     ("limits.export_pages", 1, 10_000_000),
     ("review.checkpoint_file_kb", 1, 4096),
     ("review.findings_entries", 1, 5000),
+    ("review.plan_files", 1, 5000),
     ("api.log_page_commits", 1, 100_000),
     ("api.log_skip_commits", 1, 100_000_000),
     ("api.blob_lines", 1, 10_000_000),
@@ -457,6 +458,17 @@ settings! {
         /// Most entries the review basket keeps. The oldest go first. The basket lives in
         /// `.git/gitterrace/` and holds the notes you wrote.
         findings_entries: usize = 500 => Live,
+        /// Most files `review_plan` lists. The rest count in `total_files`.
+        plan_files: usize = 200 => Live,
+        /// Patterns that say a file has a test next to it. `{dir}`, `{stem}` and `{ext}` stand
+        /// for the changed file's folder, name and extension. A file that matches one, or sits
+        /// under a `test`, `tests`, `__tests__` or `spec` folder, is a test itself.
+        test_siblings: Vec<String> = [
+            "{dir}/{stem}_test.{ext}", "{dir}/{stem}.test.{ext}", "{dir}/{stem}.spec.{ext}",
+            "{dir}/test_{stem}.{ext}", "{dir}/{stem}_spec.{ext}", "{dir}/{stem}_tests.{ext}",
+            "{dir}/tests.{ext}", "{dir}/{stem}/tests.{ext}", "{dir}/__tests__/{stem}.*",
+            "{dir}/tests/{stem}.*", "tests/**/{stem}.*", "tests/{stem}_*.*",
+        ].map(str::to_owned).to_vec() => Live,
     }
     multi: Multi {
         /// Folder levels searched for repositories below a folder given on the command line.

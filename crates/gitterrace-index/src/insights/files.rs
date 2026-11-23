@@ -3,8 +3,8 @@ mod reports;
 mod scan;
 
 pub use path::{
-    CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, PARTNER_MIN_TOGETHER, Partner, PathCard, PathChild,
-    PathKind, RECENT_DAYS,
+    CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, FileFacts, PARTNER_MIN_TOGETHER, Partner, PathCard,
+    PathChild, PathKind, RECENT_DAYS,
 };
 
 use rustc_hash::FxHashMap as FastMap;

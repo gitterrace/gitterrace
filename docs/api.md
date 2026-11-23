@@ -52,6 +52,7 @@ each cap.
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
 | `GET /contributors` | `rev`, `q`, `period`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /file_insight` | `rev`, `q`, `period`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | age, authors_90d, bus_factor, churn, hot, kind, link, owners, partners, path, paths, permalink, rev |
+| `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, files, head, since, skipped, source, total_files, truncated |
 | `GET /insights` |  | insights |
 | `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 
@@ -123,6 +124,25 @@ owners, partners, age.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
 - `path` (string, required): File or directory, relative to the repository root.
+- The counting parameters below.
+
+`/review_plan`: The changed files in the order to review them, each with a risk
+and its named terms.
+
+- `source` (string): `worktree` (default, refused on a public server) or
+  `compare`.
+- `base` (string): `compare`: revision to compare from. Required there.
+- `head` (string): `compare`: revision to compare to, default `HEAD`.
+- `three_dot` (boolean): `compare`: `true` compares from the merge base, like
+  `/compare`.
+- `scope` (string): `worktree`: `all` (default), `staged` or `unstaged`.
+- `since` (string): `worktree`: a checkpoint id from `/checkpoints`, only what
+  changed since it. Needs scope `all`.
+- `q` (string): The commit filter, the web filter field's text, see Filter. The
+  one way to select commits.
+- `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
+  ending at the newest commit. Sets the bucket unit.
+- `limit` (integer): Most files listed, default and at most `review.plan_files`.
 - The counting parameters below.
 
 `/insights/{name}`: One insight.
@@ -267,6 +287,16 @@ so to the model.
   totals (commits, authors, files touched, lines added and removed, first and
   last commit time). Call this first, before drilling into history. Use `log`
   for the commits themselves. Parameters: `repo?` (string).
+- `review_plan`: The changed files of a branch (`source` `compare`, with `base`)
+  or of the uncommitted work (`worktree`, refused on a public server) in the
+  order to review them. Each file has a `risk` from 0 to 100 and its `terms`
+  (churn, size, ownership, untested) that sum to it, with the evidence: hotspot
+  rank, top owners, whether a test sits next to it. Lockfiles, generated and
+  binary files are listed in `skipped`, unscored. Call this first when asked to
+  review a change, then `show_commit`, `compare` or `read_file` on the top
+  files. Parameters: `base?` (string), `head?` (string), `limit?` (integer),
+  `period?` (string), `query` (string), `repo?` (string), `scope?` (string),
+  `since?` (string), `source?` (string), `three_dot?` (boolean).
 - `show_commit`: One commit: full message, changed files with additions and
   deletions and, by default, the diff hunks (capped by `max_lines`, `truncated`
   says when cut). Use after `log` or `blame` to learn what a change did.
@@ -284,6 +314,6 @@ Prompts are ready-made instructions an agent can load. They read nothing
 themselves and tell the agent which tools to call.
 
 - `review_change`: Review a change: the steps to order its files by risk with
-  `compare` or `worktree_diff`, the `hotspots` and ownership insights, `blame`
-  and `read_file`. Arguments: `base?`, `findings?`, `head?`, `repo?`,
+  `review_plan`, then read the top ones with `compare` or `worktree_diff`,
+  `blame` and `read_file`. Arguments: `base?`, `findings?`, `head?`, `repo?`,
   `worktree?`.

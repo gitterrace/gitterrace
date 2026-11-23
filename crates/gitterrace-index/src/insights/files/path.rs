@@ -13,7 +13,7 @@ use std::collections::{BTreeMap, HashSet};
 use rustc_hash::FxHashMap as FastMap;
 
 use crate::feed::local_day_of;
-use crate::insights::files::Owner;
+use crate::insights::files::{Owner, SOLO_SHARE};
 use crate::insights::{Counted, DAY, HeadFile, Insights};
 
 /// Owners a card lists.
@@ -59,6 +59,20 @@ pub struct PathChild {
     pub changes: usize,
     /// 1-based by hotspot score, 0 when no file under it has a counted change.
     pub rank: usize,
+}
+
+/// What a review of one file needs: its hotspot row and its owners, read from the reports the
+/// pages read, narrowed to the file.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct FileFacts {
+    /// `(rank, ranked files, score)`, `None` without a counted change or outside the head tree.
+    pub hotspot: Option<(usize, usize, f64)>,
+    /// Top [`CARD_OWNERS`] by share.
+    pub owners: Vec<Owner>,
+    /// One person alone holds half the knowledge.
+    pub bus_factor_one: bool,
+    /// The top owner holds at least `SOLO_SHARE` of the lines.
+    pub sole_owner: bool,
 }
 
 /// The card of one path, see the module docs.
@@ -196,6 +210,71 @@ impl Insights<'_> {
                 .map(|(path, (changes, rank))| PathChild { path, hot: hot(rank), changes, rank })
                 .collect(),
         }
+    }
+
+    /// The hotspot row and owners of each of `paths` (head files) over the commits `c` counts,
+    /// in the order of `paths`. A path the head tree lacks, or the reports leave out, has no
+    /// hotspot and no owners. One hotspot report and one owner pass serve every path.
+    pub fn file_facts(
+        &self,
+        files: &[HeadFile],
+        c: &Counted<'_>,
+        paths: &[&str],
+    ) -> Vec<FileFacts> {
+        let report = self.hotspots_in(files, c);
+        let at: FastMap<&str, usize> =
+            report.files.iter().enumerate().map(|(i, h)| (&*h.path, i)).collect();
+        let matcher = c.scope().matcher();
+        let wanted: HashSet<&str> = paths.iter().copied().collect();
+        let counted: Vec<&HeadFile> = files
+            .iter()
+            .filter(|f| {
+                wanted.contains(&*f.path)
+                    && f.lines != 0
+                    && matcher.row(&f.path)
+                    && !self.skips_head(&f.path)
+            })
+            .collect();
+        let s = c.scope();
+        let whole = s.period() == crate::insights::Period::All
+            && s.range().is_none()
+            && s.matcher().is_empty();
+        let per_file = self.owner_lines(&counted, c, whole);
+        let mut owned: FastMap<&str, (Vec<Owner>, bool, bool)> = FastMap::default();
+        for (f, who) in counted.iter().zip(per_file) {
+            let changed: u64 = who.values().sum();
+            if changed == 0 {
+                continue;
+            }
+            let mut rows: Vec<(usize, f64)> =
+                who.into_iter().map(|(p, n)| (p, n as f64 / changed as f64)).collect();
+            rows.sort_by(|a, b| b.1.total_cmp(&a.1).then_with(|| self.person_order(a.0, b.0)));
+            let bus = crate::insights::bus_factor(rows.iter().map(|r| r.1));
+            let sole = rows.first().is_some_and(|r| r.1 >= SOLO_SHARE);
+            let owners = rows
+                .into_iter()
+                .take(CARD_OWNERS)
+                .map(|(p, share)| Owner {
+                    name: self.person_at(p).map(|x| x.name.clone()).unwrap_or_default(),
+                    share,
+                })
+                .collect();
+            owned.insert(&f.path, (owners, bus == 1, sole));
+        }
+        paths
+            .iter()
+            .map(|path| {
+                let (owners, bus_factor_one, sole_owner) = owned.remove(path).unwrap_or_default();
+                FileFacts {
+                    hotspot: at
+                        .get(path)
+                        .map(|&i| (i + 1, report.files.len(), report.files[i].score)),
+                    owners,
+                    bus_factor_one,
+                    sole_owner,
+                }
+            })
+            .collect()
     }
 
     /// The pairs of the full coupling report that name `path`, strongest first.

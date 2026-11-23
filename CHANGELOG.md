@@ -29,6 +29,7 @@ All notable changes are listed here. The format follows
 - review: a review basket of findings, listed with where their code is now
 - web: add a diff toolbar with find, viewed progress and hide viewed
 - api: serve the card of one file or directory
+- api: rank the changed files of a review by risk
 
 ### Changed
 

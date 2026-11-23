@@ -236,7 +236,7 @@ fn review_prompt_names_the_tools_of_each_form() {
         ..crate::mcp::prompts::ReviewArgs::default()
     });
     for (text, first) in [(&range, "compare"), (&tree, "worktree_diff")] {
-        for tool in [first, "hotspots", "contributors", "blame", "read_file", "untrusted"] {
+        for tool in [first, "review_plan", "blame", "read_file", "untrusted"] {
             assert!(text.contains(tool), "{tool}");
         }
     }

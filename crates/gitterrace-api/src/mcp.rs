@@ -2,24 +2,24 @@ mod bounded;
 mod docs;
 mod prompts;
 mod repos;
+mod serve;
 
-use std::path::Path;
 use std::sync::Arc;
 
 use gitterrace_config::{Config, Feature};
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{CallToolResult, ContentBlock};
-use rmcp::{ErrorData, ServerHandler, ServiceExt, prompt_handler, tool, tool_handler, tool_router};
+use rmcp::{ErrorData, ServerHandler, prompt_handler, tool, tool_handler, tool_router};
 use schemars::JsonSchema;
 use serde::Deserialize;
 
 use crate::core::ApiState;
 use crate::error::{ApiError, SERVER_ERROR_MESSAGE};
 use crate::insights::{INSIGHTS, Params};
-use crate::mcp::bounded::{LineBound, MAX_LINE_BYTES};
 pub use crate::mcp::docs::ToolDoc;
 pub use crate::mcp::repos::McpRepo;
 use crate::mcp::repos::Repos;
+pub use crate::mcp::serve::{serve_mcp, serve_mcp_repos};
 
 /// The gitterrace MCP server. Every tool is read-only.
 #[derive(Clone)]
@@ -48,6 +48,7 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("blame", &[Feature::Blame], None),
     ("contributors", &[Feature::Insights], Some("contributors")),
     ("file_insight", &[Feature::Insights], None),
+    ("review_plan", &[Feature::Insights], None),
     ("insight", &[Feature::Insights], None),
     ("list_insights", &[Feature::Insights], None),
 ];
@@ -248,6 +249,27 @@ args! {
         /// Repository-relative file or directory path, empty for the repository root.
         path: String,
         /// `1w`, `1m`, `3m`, `1y` or `all` (default).
+        period: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
+    }
+    ReviewPlanArgs {
+        /// `worktree` (default) reviews the uncommitted files, `compare` two revisions.
+        source: Option<String>,
+        /// `compare`: revision to compare from. Required there.
+        base: Option<String>,
+        /// `compare`: revision to compare to. Defaults to HEAD.
+        head: Option<String>,
+        /// `compare`: true compares from the merge base of base and head.
+        three_dot: Option<bool>,
+        /// `worktree`: `all` (default), `staged` or `unstaged`.
+        scope: Option<String>,
+        /// `worktree`: a checkpoint id from `list_checkpoints`, only what changed since it.
+        since: Option<String>,
+        /// Most files listed. Defaults to and is at most `review.plan_files` (200).
+        limit: Option<usize>,
+        /// `1w`, `1m`, `3m`, `1y` or `all` (default): the window the hotspot and owner numbers
+        /// count.
         period: Option<String>,
         #[schemars(schema_with = "query_schema")]
         query: Option<String>,
@@ -510,6 +532,34 @@ impl McpServer {
         .await
     }
 
+    /// The changed files of a branch (`source` `compare`, with `base`) or of the uncommitted work
+    /// (`worktree`, refused on a public server) in the order to review them. Each file has a
+    /// `risk` from 0 to 100 and its `terms` (churn, size, ownership, untested) that sum to it,
+    /// with the evidence: hotspot rank, top owners, whether a test sits next to it. Lockfiles,
+    /// generated and binary files are listed in `skipped`, unscored. Call this first when asked
+    /// to review a change, then `show_commit`, `compare` or `read_file` on the top files.
+    #[tool(name = "review_plan", annotations(read_only_hint = true))]
+    async fn review_plan(
+        &self,
+        Parameters(a): Parameters<ReviewPlanArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let p = Params::new(a.period, a.query, None, None, a.limit);
+        self.run("review_plan", a.repo.clone(), move |s| {
+            s.review_plan(
+                &crate::PlanRequest {
+                    source: a.source.as_deref(),
+                    base: a.base.as_deref(),
+                    head: a.head.as_deref(),
+                    three_dot: a.three_dot,
+                    scope: a.scope.as_deref(),
+                    since: a.since.as_deref(),
+                },
+                &p,
+            )
+        })
+        .await
+    }
+
     /// The insights this server computes, each with a summary. Every one is a value of `name`
     /// for `insight`.
     #[tool(name = "list_insights", annotations(read_only_hint = true))]
@@ -534,60 +584,6 @@ impl McpServer {
         let p = Params::new(a.period, a.query, a.label, a.metric, a.limit);
         self.run("insight", a.repo.clone(), move |s| s.insight(&a.name, a.rev.as_deref(), &p)).await
     }
-}
-
-/// Stdin and stdout, with a line limit on what is read.
-fn stdio() -> (LineBound<tokio::io::Stdin>, tokio::io::Stdout) {
-    (LineBound::new(tokio::io::stdin(), MAX_LINE_BYTES), tokio::io::stdout())
-}
-
-/// Serves MCP on stdin/stdout for the repository containing `repo_path` until the client leaves.
-///
-/// The insights cache is brought up to date first; when that fails the server still answers
-/// with whatever the cache holds, since browsing reads never need it. `cfg` sets the `link`
-/// form and the counting defaults, the same way it does for the web's `/api/v1`.
-#[expect(
-    clippy::print_stderr,
-    reason = "a stdio MCP server owns stdout for the protocol, so its startup warning goes to \
-        stderr"
-)]
-pub async fn serve_mcp(repo_path: &Path, cfg: &gitterrace_config::Config) -> Result<(), ApiError> {
-    let path = repo_path.to_owned();
-    let owned = cfg.clone();
-    let state = tokio::task::spawn_blocking(move || {
-        let state = ApiState::open(&path)?.configured(&owned);
-        if let Err(e) = state.refresh_index() {
-            eprintln!("gitterrace: insights index incomplete, serving anyway: {e}");
-        }
-        Ok::<_, ApiError>(state)
-    })
-    .await
-    .map_err(|e| ApiError::Task(e.to_string()))??;
-    let running = McpServer::new(state)
-        .with_config(cfg)
-        .serve(stdio())
-        .await
-        .map_err(|e| ApiError::Task(e.to_string()))?;
-    running.waiting().await.map_err(|e| ApiError::Task(e.to_string()))?;
-    Ok(())
-}
-
-/// Serves MCP on stdin/stdout over every repository in `list` until the client leaves.
-///
-/// Nothing is opened up front: each repository opens (and its insights cache catches up) on
-/// the first tool that names it, so a long list starts at once and a broken entry fails alone.
-pub async fn serve_mcp_repos(
-    scope: &str,
-    list: Vec<McpRepo>,
-    cfg: &gitterrace_config::Config,
-) -> Result<(), ApiError> {
-    let running = McpServer::over(scope, list)
-        .with_config(cfg)
-        .serve(stdio())
-        .await
-        .map_err(|e| ApiError::Task(e.to_string()))?;
-    running.waiting().await.map_err(|e| ApiError::Task(e.to_string()))?;
-    Ok(())
 }
 
 #[cfg(test)]

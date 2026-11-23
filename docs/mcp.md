@@ -21,19 +21,22 @@ history and find risky code. It needs the
 
 ## Review a change
 
-1. List the change.
-   - A branch: `compare` with `base`, `head` and `three_dot` true. It shows
-     only what `head` did since the branches split, like a pull request.
-   - Uncommitted work: `worktree_diff` with `scope` `all`. It is refused on a
-     public server.
-2. If `truncated` is true, narrow with `path` or read the file with
-   `read_file`.
-3. Call `hotspots` and `contributors`. Files that change often, are large or
-   have one owner are riskier.
-4. For the files with the most changed lines, call `blame` on the touched
-   lines and `read_file` for the code around them.
-5. Order the files, riskiest first. Give the evidence from the tools for each
-   risk, and note a change with no test file beside it.
+1. Call `review_plan`. For a branch pass `source` `compare` with `base`,
+   `head` and `three_dot` true, which shows only what `head` did since the
+   branches split, like a pull request. For uncommitted work leave `source`
+   at `worktree`, which a public server refuses.
+2. Read the order. The files come riskiest first. `risk` runs from 0 to 100
+   and is the sum of `terms`: `churn` (up to 30, the hotspot rank), `size`
+   (up to 25, changed lines against `limits.diff_fold_lines`), `ownership`
+   (25 for a sole owner, 12 for a bus factor of one) and `untested` (20 for a
+   source file with no test beside it). Lockfiles, generated and binary files
+   sit in `skipped`, unscored. If `truncated` is true, narrow with `limit` or
+   `query`. `review.plan_files` caps the list and `review.test_siblings`
+   says what a test beside a file looks like.
+3. For the top files call `compare` or `worktree_diff` and `read_file` to
+   read the change, and `blame` on the touched lines to see who holds them.
+4. Report each risk with the evidence from the tools: hotspot rank, owners
+   and a missing test.
 
 The server also offers the `review_change` prompt (`base`, `head`, `repo`,
 `worktree`, `findings`), which holds the same steps. With `findings` it also lists

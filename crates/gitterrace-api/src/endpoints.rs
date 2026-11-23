@@ -7,8 +7,8 @@ use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
     ContributorsResponse, FileInsight, FindingsResponse, IndexResponse, InsightList,
-    InsightResponse, LogResponse, ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse,
-    ViewedResponse, WorktreeResponse,
+    InsightResponse, LogResponse, ParamDoc as Param, RefsResponse, RepoResponse, ReviewPlan,
+    TreeResponse, ViewedResponse, WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
@@ -270,6 +270,39 @@ pub const ENDPOINTS: &[Endpoint] = &[
         ],
         schema: of::<FileInsight>,
         route: || get(http::file_insight),
+    },
+    Endpoint {
+        path: "/review_plan",
+        summary: "The changed files in the order to review them, each with a risk and its \
+            named terms.",
+        params: &[
+            p("source", "string", "`worktree` (default, refused on a public server) or `compare`."),
+            p("base", "string", "`compare`: revision to compare from. Required there."),
+            p("head", "string", "`compare`: revision to compare to, default `HEAD`."),
+            p(
+                "three_dot",
+                "boolean",
+                "`compare`: `true` compares from the merge base, like `/compare`.",
+            ),
+            p("scope", "string", "`worktree`: `all` (default), `staged` or `unstaged`."),
+            p(
+                "since",
+                "string",
+                "`worktree`: a checkpoint id from `/checkpoints`, only what changed since it. \
+                Needs scope `all`.",
+            ),
+            Q,
+            PERIOD,
+            p("limit", "integer", "Most files listed, default and at most `review.plan_files`."),
+            BOTS,
+            MERGES,
+            GENERATED,
+            IGNORE,
+            WS,
+            EXCLUDE,
+        ],
+        schema: of::<ReviewPlan>,
+        route: || get(http::review_plan),
     },
     Endpoint {
         path: "/insights",

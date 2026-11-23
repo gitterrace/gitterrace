@@ -443,7 +443,11 @@ impl Insights<'_> {
 
     /// Ties in a ranked list of people: display name, then the first e-mail. Never the person
     /// index, which follows commit counts of whatever history the tables were built over.
-    fn person_order(&self, a: usize, b: usize) -> std::cmp::Ordering {
+    pub(in crate::insights::files) fn person_order(
+        &self,
+        a: usize,
+        b: usize,
+    ) -> std::cmp::Ordering {
         let key = |i| self.person_at(i).map(|x| (&x.name, &x.emails));
         key(a).cmp(&key(b))
     }
