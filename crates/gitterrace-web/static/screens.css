@@ -36,7 +36,6 @@ main .side h2.split:not(.markdown-body *){display:flex}
 main h2.day:not(.markdown-body *){color:var(--muted)}
 main.wrap{padding-top:var(--space-4)}
 .ph{margin-bottom:var(--space-3)}
-.ph-sep{margin-top:var(--space-3)}
 
 /* ---- states: the not-found card, a failed repository, a zero tab, a bar with no value yet ---- */
 .lost{padding:var(--space-6) var(--space-4);text-align:left}
