@@ -194,7 +194,7 @@ fn palette(light: Colours, dark: Colours) -> String {
             },
         )
         .collect();
-    let rows: Vec<String> = items.chunks(6).map(|c| c.join(" ")).collect();
+    let rows: Vec<String> = items.chunks(7).map(|c| c.join(" ")).collect();
     format!(":root{{\n{}\n}}", rows.join("\n"))
 }
 

@@ -82,3 +82,9 @@ html:has(.difftools){--dt-h:49px}
   section.file>header{flex-wrap:wrap}
   section.file>header>a{overflow-wrap:anywhere;min-width:0}
   .difftools{position:static}.dt-find{flex-basis:100%;order:2}.dt-hide{order:3;margin-left:0}}
+/* A changed line is marked by shape as well as colour: a solid edge for added, a double edge for
+   removed, so a tint a step off the row never carries it alone.
+   Context lines keep an empty edge, so the numbers line up. */
+div.diff :is(.add,.del,.ctx,.hh){border-left:var(--space-1) solid transparent}
+div.diff .add{border-left-color:var(--add)}
+div.diff .del{border-left-style:double;border-left-color:var(--del)}

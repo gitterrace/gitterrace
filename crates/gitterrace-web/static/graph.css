@@ -33,11 +33,13 @@ stroke-width:1.5px}
 background:var(--bg);padding-left:2px}.gfold.w{display:block}
 .crow:hover .gfold{background:var(--soft)}
 .graph .xw,.graph .on{display:none}
-.gedge{display:none;position:absolute;right:0;width:6px;height:6px;border-radius:var(--radius-round);
+.gedge{display:none;position:absolute;right:0;width:6px;height:6px;
+  border-radius:var(--radius-round);
   background:var(--muted)}.gedge.w{display:block}
 .grefs{display:inline-flex;align-self:center;align-items:center;gap:var(--space-1);flex:none;
 font:var(--text-2xs)/1 var(--mono)}
-.gref{padding:2px var(--space-1);border:var(--border);border-radius:var(--radius);color:var(--muted)}
+.gref{padding:2px var(--space-1);border:var(--border);border-radius:var(--radius);
+  color:var(--muted)}
 .gref.cur{color:var(--accent-ink);border-color:var(--accent);background:var(--accent-soft)}
 .graph .k0{color:var(--accent)}.graph .k1,.glabels.k1{color:var(--add)}
 .graph .k2,.glabels.k2{color:var(--warn)}.graph .k3,.glabels.k3{color:var(--del)}

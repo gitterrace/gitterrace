@@ -40,7 +40,8 @@ select.sm{padding-right:calc(var(--space-3)*2 + var(--space-2))}
 /* A copy button says it worked in the accent for a moment (app.js flashes .copied). */
 .copied{color:var(--accent-ink);border-color:var(--accent-ink)}
 /* The segmented control: ghost choices in one frame, the chosen one held in the accent. */
-.segs a,.segs button,.segs label{display:inline-flex;align-items:center;height:auto;min-height:var(--control-h);
+.segs a,.segs button,.segs label{display:inline-flex;align-items:center;height:auto;
+  min-height:var(--control-h);
   box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid transparent;
   border-radius:var(--radius);color:var(--muted);background:none;font:inherit;line-height:1;
   cursor:pointer}
@@ -57,10 +58,22 @@ select.sm{padding-right:calc(var(--space-3)*2 + var(--space-2))}
    the theme and the mode recolour it, and no literal colour sits in a data URI. A component may
    size a picker and set its background-color, never the background shorthand, which would drop
    the arrow. */
-select{appearance:none;-webkit-appearance:none;padding-right:calc(var(--space-3)*2 + var(--space-2));
+select{appearance:none;-webkit-appearance:none;
+  padding-right:calc(var(--space-3)*2 + var(--space-2));
   background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),
     linear-gradient(135deg,var(--faint) 50%,transparent 50%);background-repeat:no-repeat;
   background-position:calc(100% - var(--space-3) - var(--space-2)) 50%,
     calc(100% - var(--space-3) - var(--space-1)) 50%;
   background-size:var(--space-1) var(--space-1)}
+/* Touch: every small target is 44px tall (the segmented switch above, the rest here). */
+@media (pointer:coarse){
+  .tabnav a,.tabs>a,.chip a,.viewed-mark,.actbtn{min-height:44px;min-width:44px}
+  .chip a{display:inline-grid}
+}
+/* A scroller clips an outside ring: inside the scrollers' edge the ring is drawn within the box. */
+:is(.tabnav,.tabs,.doctabs,.segs) :is(a,button,label):focus-visible,
+.segs label:has(:focus-visible){outline-offset:-2px}
+/* The repository name is the switcher's button. */
+button.reponame{gap:2px;padding:2px var(--space-1);margin:calc(-1 * var(--space-1));
+  min-height:var(--control-h);cursor:pointer}
 /* ---- end of buttons ---- */

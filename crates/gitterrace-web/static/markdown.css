@@ -1,6 +1,7 @@
 /* Rendered markdown. Everything is scoped to .markdown-body and themed
    through the app variables. Syntax classes carry the s- prefix. */
-.markdown-body{color:var(--fg);font-size:var(--text-md);line-height:var(--leading);max-width:var(--measure);overflow-wrap:break-word}
+.markdown-body{color:var(--fg);font-size:var(--text-md);line-height:var(--leading);
+  max-width:var(--measure);overflow-wrap:break-word}
 .markdown-body>:first-child{margin-top:0!important}
 .markdown-body>:last-child{margin-bottom:0!important}
 .markdown-body a{color:var(--accent-fg);text-decoration:underline;text-underline-offset:3px}
@@ -10,8 +11,10 @@
    author wrote, which markdown/levels.rs leaves as .markdown-hN. */
 /* The contract's rendered prose: h1 and h2 in the serif, the deeper levels in the grotesk at the
    reading size, h5 and h6 shrink to the label sizes of the scale. */
-.markdown-body .markdown-h1{font-family:var(--serif);font-size:var(--text-xl);margin:var(--space-8) 0 var(--space-4)}
-.markdown-body .markdown-h2{font-family:var(--serif);font-size:var(--text-lg);margin:var(--space-8) 0 var(--space-3);padding-bottom:var(--space-2);border-bottom:var(--border)}
+.markdown-body .markdown-h1{font-family:var(--serif);font-size:var(--text-xl);
+  margin:var(--space-8) 0 var(--space-4)}
+.markdown-body .markdown-h2{font-family:var(--serif);font-size:var(--text-lg);
+  margin:var(--space-8) 0 var(--space-3);padding-bottom:var(--space-2);border-bottom:var(--border)}
 .markdown-body .markdown-h5{font-size:var(--text-sm)}
 .markdown-body .markdown-h6{font-size:var(--text-sm);color:var(--muted)}
 .markdown-body .anchor{position:absolute;left:-28px;top:0;bottom:0;width:24px;display:flex;align-items:center;justify-content:center;opacity:0;color:var(--muted)}
@@ -24,34 +27,47 @@
 .markdown-body ul ul,.markdown-body ol ol,.markdown-body ul ol,.markdown-body ol ul{margin:0}
 .markdown-body li:has(>input[type=checkbox]){list-style:none;margin-left:calc(-1 * var(--space-5))}
 .markdown-body li>input[type=checkbox]{margin:0 var(--space-2) 0 0}
-.markdown-body hr{height:0;padding:0;margin:var(--space-6) 0;background:none;border:0;border-top:var(--border)}
-.markdown-body blockquote{padding:0 0 0 var(--space-4);color:var(--muted);border-left:2px solid var(--line-strong)}
+.markdown-body hr{height:0;padding:0;margin:var(--space-6) 0;background:none;border:0;
+  border-top:var(--border)}
+.markdown-body blockquote{padding:0 0 0 var(--space-4);color:var(--muted);
+  border-left:2px solid var(--line-strong)}
 .markdown-body blockquote>:last-child{margin-bottom:0}
 .markdown-body img{max-width:100%;height:auto;box-sizing:content-box}
 .markdown-body table{display:block;width:max-content;max-width:100%;overflow:auto;border-spacing:0;border-collapse:collapse}
 .markdown-body table{font-size:var(--text-sm)}
-.markdown-body th,.markdown-body td{padding:var(--space-2) var(--space-3);border:0;border-top:var(--border)}
+.markdown-body th,.markdown-body td{padding:var(--space-2) var(--space-3);border:0;
+  border-top:var(--border)}
 .markdown-body th{font-weight:var(--weight-semibold);background:var(--soft)}
 .markdown-body tr:first-child>:is(th,td){border-top:0}
-.markdown-body code,.markdown-body kbd,.markdown-body samp{font-family:var(--mono);font-size:var(--text-sm)}
-.markdown-body :not(pre)>code{padding:0 var(--space-1);background:var(--soft);border-radius:var(--radius)}
-.markdown-body kbd{display:inline-block;padding:var(--space-1);line-height:var(--space-3);color:var(--fg);vertical-align:middle;background:var(--soft);border:1px solid var(--line);border-bottom-color:var(--line);border-radius:var(--radius);box-shadow:inset 0 -1px 0 var(--line)}
-.markdown-body pre{padding:var(--space-4);overflow:auto;font-size:var(--text-sm);line-height:var(--leading-code);background:var(--soft);border-radius:var(--radius)}
-.markdown-body pre code{padding:0;background:transparent;font-size:inherit;white-space:pre;word-break:normal}
+.markdown-body code,.markdown-body kbd,.markdown-body samp{font-family:var(--mono);
+  font-size:var(--text-sm)}
+.markdown-body :not(pre)>code{padding:0 var(--space-1);background:var(--soft);
+  border-radius:var(--radius)}
+.markdown-body kbd{display:inline-block;padding:var(--space-1);line-height:var(--space-3);
+  color:var(--fg);vertical-align:middle;background:var(--soft);border:1px solid var(--line);
+  border-bottom-color:var(--line);border-radius:var(--radius);box-shadow:inset 0 -1px 0 var(--line)}
+.markdown-body pre{padding:var(--space-4);overflow:auto;font-size:var(--text-sm);
+  line-height:var(--leading-code);background:var(--soft);border-radius:var(--radius)}
+.markdown-body pre code{padding:0;background:transparent;font-size:inherit;white-space:pre;
+  word-break:normal}
 .markdown-body pre.mermaid{display:flex;justify-content:center;background:transparent;border:1px solid var(--line);white-space:pre}
 .markdown-body pre.mermaid[data-processed]{white-space:normal}
 .markdown-body details>summary{cursor:pointer;font-weight:var(--weight-semibold)}
 .markdown-body details[open]>summary{margin-bottom:var(--space-4)}
 .markdown-body del{color:var(--muted)}
 .markdown-body sup,.markdown-body sub{font-size:var(--text-2xs)}
-.markdown-body .footnote-definition{font-size:var(--text-sm);color:var(--muted);margin:0 0 var(--space-2)}
+.markdown-body .footnote-definition{font-size:var(--text-sm);color:var(--muted);
+  margin:0 0 var(--space-2)}
 .markdown-body .footnote-definition p{display:inline}
 .markdown-body .footnote-definition-label{margin-right:var(--space-2)}
 .markdown-body .footnote-reference{font-size:var(--text-2xs);vertical-align:super}
 /* alerts */
-.markdown-body .markdown-alert{padding:0 0 0 var(--space-4);margin:0 0 var(--space-4);border-left:2px solid var(--md-c,var(--line));color:var(--fg)}
+.markdown-body .markdown-alert{padding:0 0 0 var(--space-4);margin:0 0 var(--space-4);
+  border-left:2px solid var(--md-c,var(--line));color:var(--fg)}
 .markdown-body .markdown-alert>:last-child{margin-bottom:0}
-.markdown-body .markdown-alert-title{display:flex;align-items:center;gap:var(--space-2);margin:var(--space-3) 0 var(--space-2);font-weight:var(--weight-semibold);line-height:1;color:var(--md-c)}
+.markdown-body .markdown-alert-title{display:flex;align-items:center;gap:var(--space-2);
+  margin:var(--space-3) 0 var(--space-2);font-weight:var(--weight-semibold);line-height:1;
+  color:var(--md-c)}
 .markdown-body .markdown-alert-title::before{content:"";width:16px;height:16px;background:currentColor;-webkit-mask:var(--md-i) center/contain no-repeat;mask:var(--md-i) center/contain no-repeat}
 .markdown-body .markdown-alert-note{--md-c:var(--md-note);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0 8a8 8 0 1 1 16 0A8 8 0 0 1 0 8Zm8-6.5a6.5 6.5 0 1 0 0 13 6.5 6.5 0 0 0 0-13ZM6.5 7.75A.75.75 0 0 1 7.25 7h1a.75.75 0 0 1 .75.75v2.75h.25a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5h.25v-2h-.25a.75.75 0 0 1-.75-.75ZM8 6a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E")}
 .markdown-body .markdown-alert-tip{--md-c:var(--md-tip);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M8 1.5c-2.363 0-4 1.69-4 3.75 0 .984.424 1.625.984 2.304l.214.253c.223.264.47.556.673.848.284.411.537.896.621 1.49a.75.75 0 0 1-1.484.211c-.04-.282-.163-.547-.37-.847a8.456 8.456 0 0 0-.542-.68c-.084-.1-.173-.205-.268-.32C3.201 7.75 2.5 6.766 2.5 5.25 2.5 2.31 4.863 0 8 0s5.5 2.31 5.5 5.25c0 1.516-.701 2.5-1.328 3.259-.095.115-.184.22-.268.319-.207.245-.383.453-.541.681-.208.3-.33.565-.37.847a.751.751 0 0 1-1.485-.212c.084-.593.337-1.078.621-1.489.203-.292.45-.584.673-.848.075-.088.147-.173.213-.253.561-.679.985-1.32.985-2.304 0-2.06-1.637-3.75-4-3.75ZM5.75 12h4.5a.75.75 0 0 1 0 1.5h-4.5a.75.75 0 0 1 0-1.5ZM6 15.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5a.75.75 0 0 1-.75-.75Z'/%3E%3C/svg%3E")}
@@ -59,8 +75,10 @@
 .markdown-body .markdown-alert-warning{--md-c:var(--md-warning);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M6.457 1.047c.659-1.234 2.427-1.234 3.086 0l6.082 11.378A1.75 1.75 0 0 1 14.082 15H1.918a1.75 1.75 0 0 1-1.543-2.575Zm1.763.707a.25.25 0 0 0-.44 0L1.698 13.132a.25.25 0 0 0 .22.368h12.164a.25.25 0 0 0 .22-.368Zm.53 3.996v2.5a.75.75 0 0 1-1.5 0v-2.5a.75.75 0 0 1 1.5 0ZM9 11a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z'/%3E%3C/svg%3E")}
 .markdown-body .markdown-alert-caution{--md-c:var(--md-caution);--md-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.47.22A.749.749 0 0 1 5 0h6c.199 0 .389.079.53.22l4.25 4.25c.141.14.22.331.22.53v6a.749.749 0 0 1-.22.53l-4.25 4.25A.749.749 0 0 1 11 16H5a.749.749 0 0 1-.53-.22L.22 11.53A.749.749 0 0 1 0 11V5c0-.199.079-.389.22-.53Zm.84 1.28L1.5 5.31v5.38l3.81 3.81h5.38l3.81-3.81V5.31L10.69 1.5ZM8 4a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5A.75.75 0 0 1 8 4Zm0 8a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z'/%3E%3C/svg%3E")}
 .markdown-body table.fm{display:table;width:auto;margin:0 0 var(--space-4);font-size:var(--text-sm)}
-.markdown-body table.fm th,.markdown-body table.fm td{padding:2px var(--space-3) 2px 0;border:0;background:none;vertical-align:top}
-.markdown-body table.fm th{color:var(--muted);font-weight:var(--weight-regular);text-align:left;white-space:nowrap}
+.markdown-body table.fm th,.markdown-body table.fm td{padding:2px var(--space-3) 2px 0;border:0;
+  background:none;vertical-align:top}
+.markdown-body table.fm th{color:var(--muted);font-weight:var(--weight-regular);text-align:left;
+  white-space:nowrap}
 .markdown-body table.fm tr{background:none}
 /* Jupyter notebooks: cells stacked, outputs under their input. */
 .markdown-body .nb-cell{margin:0 0 var(--space-4)}

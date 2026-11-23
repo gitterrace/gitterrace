@@ -157,8 +157,9 @@ def check_templates() -> list[str]:
 
 def script_files() -> list[Path]:
     """Every script under scripts/, its group dirs too. Hooks, guard adapters, ast-grep rules
-    and the screenshot config are data or entry points other tools name, not scripts."""
-    data = ("guards", "hooks", "ast-grep", "site-shots")
+    the screenshot config and the red cases of a lint are data or entry points other tools
+    name, not scripts."""
+    data = ("guards", "hooks", "ast-grep", "site-shots", "red-cases")
     return sorted(
         f
         for f in (ROOT / "scripts").rglob("*")

@@ -10,7 +10,8 @@
 .matrix td a:hover{text-decoration:none;outline:2px solid var(--fg);outline-offset:-2px}
 .matrix .m1{background:var(--seq-1)}.matrix .m2{background:var(--seq-2)}.matrix .m3{background:var(--seq-3)}.matrix .m4{background:var(--seq-4)}
 /* Text on a step is its own ink: the first of primary ink, the page and black to reach 4.5:1. */
-.matrix .m1 a{color:var(--ink-on-heat-1)}.matrix .m2 a{color:var(--ink-on-heat-2)}.matrix .m3 a{color:var(--ink-on-heat-3)}.matrix .m4 a{color:var(--ink-on-heat-4)}
+.matrix .m1 a{color:var(--ink-on-heat-1)}.matrix .m2 a{color:var(--ink-on-heat-2)}
+  .matrix .m3 a{color:var(--ink-on-heat-3)}.matrix .m4 a{color:var(--ink-on-heat-4)}
 /* contributors: two-sided bar, deleted to the left and added to the right on one scale */
 .tsb{display:flex;width:160px;height:8px;gap:1px}.tsb i{display:flex;flex:1;background:var(--soft)}.tsb i.l{justify-content:flex-end;border-radius:var(--radius) 0 0 var(--radius)}.tsb i.r{border-radius:0 var(--radius) var(--radius) 0}.tsb b{display:block;height:100%;width:var(--w)}.tsb i.l b{background:var(--del)}.tsb i.r b{background:var(--add)}
 /* ownership: a bus factor of 1 is a risk, in the table and its figure. Narrow, the bus factor
@@ -21,4 +22,7 @@ table.own :is(td,th){white-space:nowrap}table.own :is(td,th):first-child{width:3
 .matrix-chart td a:focus-visible{outline:2px solid var(--fg);outline-offset:-2px}
 .coupling-bar{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3);
 margin:0 0 var(--space-3)}
-.matrix-chart .m1 a:focus-visible{outline-color:var(--ink-on-heat-1)}.matrix-chart .m2 a:focus-visible{outline-color:var(--ink-on-heat-2)}.matrix-chart .m3 a:focus-visible{outline-color:var(--ink-on-heat-3)}.matrix-chart .m4 a:focus-visible{outline-color:var(--ink-on-heat-4)}
+.matrix-chart .m1 a:focus-visible{outline-color:var(--ink-on-heat-1)}
+  .matrix-chart .m2 a:focus-visible{outline-color:var(--ink-on-heat-2)}
+  .matrix-chart .m3 a:focus-visible{outline-color:var(--ink-on-heat-3)}
+  .matrix-chart .m4 a:focus-visible{outline-color:var(--ink-on-heat-4)}

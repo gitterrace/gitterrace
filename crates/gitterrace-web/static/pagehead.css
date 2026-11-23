@@ -6,7 +6,8 @@
 .ph{margin:0 0 var(--space-4);min-width:0}
 .ph-eyebrow{
   font:var(--weight-regular) var(--text-2xs)/1.4 var(--mono);
-  text-transform:uppercase;letter-spacing:var(--tracking-label);color:var(--muted);margin:0 0 var(--space-1)}
+  text-transform:uppercase;letter-spacing:var(--tracking-label);color:var(--muted);
+  margin:0 0 var(--space-1)}
 .ph-row{display:flex;align-items:center;gap:var(--space-3);min-height:36px;min-width:0}
 .ph h1{
   font:var(--weight-semibold) var(--text-xl)/var(--leading-tight) var(--serif);

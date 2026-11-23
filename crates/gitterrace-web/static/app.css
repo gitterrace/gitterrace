@@ -91,7 +91,8 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-col
 /* breadcrumbs */
 .crumbs{font-family:var(--serif);font-size:var(--text-xl);font-weight:var(--weight-semibold);letter-spacing:-.015em;display:block;min-width:0}
 .crumbs a{color:var(--accent-fg)}.crumbs a:last-child{color:var(--fg)}
-.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);margin:0 var(--space-1)}
+.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);
+  margin:0 var(--space-1)}
 
 /* file table and other row tables */
 /* Text for screen readers only: table captions, header cells of a table with no header row,
@@ -372,10 +373,6 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .segsel{font:inherit;min-height:44px;padding-left:var(--space-3);border:var(--border);border-radius:var(--radius);background-color:var(--surface);color:var(--fg)}
 .dochead .segctl{font-size:var(--text-xs)}
 @media (pointer:coarse){.segs a,.segs button,.segs label{min-height:44px}}
-/* Touch: every small target is 44px tall (the segmented switch above, the rest here). */
-@media (pointer:coarse){.tabnav a,.tabs>a,.chip a,.viewed-mark,.actbtn{min-height:44px;min-width:44px}.chip a{display:inline-grid}}
-/* A scroller clips an outside ring: inside the scrollers' edge the ring is drawn within the box. */
-:is(.tabnav,.tabs,.doctabs,.segs) :is(a,button,label):focus-visible,.segs label:has(:focus-visible){outline-offset:-2px}
 /* A paned switch: radios, the ring on the label, the checked one's pane shown. */
 .segs label input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
 .segs label:has(:focus-visible){outline:2px solid var(--focus);outline-offset:-2px}
@@ -423,7 +420,6 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .sharebar{display:flex;height:var(--bar-h);border-radius:var(--radius);overflow:hidden;margin:var(--space-2) 0 var(--space-4);background:var(--soft)}
 .sharebar b{display:block;height:100%}.sharebar b+b{border-left:1px solid var(--surface)}
 .dcol{width:30%;min-width:100px}
-.dbar{display:block;height:var(--bar-h);background:var(--soft);border-radius:var(--radius);overflow:hidden}
 .dbar b{display:block;height:100%}.dbar b.up{background:var(--add)}.dbar b.dn{background:var(--del)}
 /* Tables in a card keep their outer cell padding: the header band and the row hover reach the
    card's inner edge, and text flush against them reads as cut off. */
@@ -486,12 +482,6 @@ div.diff .add,div.diff .del,div.diff .ctx,div.diff .hh{white-space:pre;min-heigh
 div.diff .add::before,div.diff .del::before,div.diff .ctx::before{content:attr(data-o);position:absolute;left:0;width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none}
 div.diff .add::after,div.diff .del::after,div.diff .ctx::after{content:attr(data-n);position:absolute;left:calc(6ch + var(--space-3));width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none}
 div.diff .add{background:var(--add-bg)}div.diff .del{background:var(--del-bg)}
-/* A changed line is marked by shape as well as colour: a solid edge for added, a double edge for
-   removed (scripts/lint/diff-cue-check.py), so a tint a step off the row never carries it alone.
-   Context lines keep an empty edge, so the numbers line up. */
-div.diff :is(.add,.del,.ctx,.hh){border-left:var(--space-1) solid transparent}
-div.diff .add{border-left-color:var(--add)}
-div.diff .del{border-left-style:double;border-left-color:var(--del)}
 div.diff .add::before,div.diff .add::after{background:var(--add-hl);color:var(--add)}
 div.diff .del::before,div.diff .del::after{background:var(--del-hl);color:var(--del)}
 div.diff .hh{background:var(--soft);color:var(--muted)}
@@ -549,7 +539,6 @@ td:has(>.actbtn.float){position:relative}
 /* Repository switcher: the name itself is the button. One repository: a link. */
 .reposwitch{display:inline-flex}
 .reposwitch:not([hidden])+#repolink{display:none}
-button.reponame{gap:2px;padding:2px var(--space-1);margin:calc(-1 * var(--space-1));min-height:var(--control-h);cursor:pointer}
 button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .ov-title{display:flex;align-items:center;justify-content:space-between;padding:var(--space-1) var(--space-1) var(--space-1) var(--space-4);border-bottom:var(--border)}
 .ov-title h2{margin:0}
