@@ -104,6 +104,26 @@ export function checks({ srv, r, browsers, context }) {
       if (document.querySelector('p.meta button.copy')) bad.push('a Copy button is still on the meta line');
       const sum = document.querySelector('details.files > summary');
       if (!sum || !sum.querySelector('.counts .add') || !sum.querySelector('.counts .del')) bad.push('no totals in the changed-files header');
+      // Identity above, ids below: the sha, each parent and Browse files wrap as units with no
+      // dot separators, and the actions button is a labelled control at the row's end.
+      const ids = document.querySelector('.meta.ids');
+      if (!ids) bad.push('no ids row');
+      else {
+        if (/\u00b7/.test(ids.textContent)) bad.push('dot separators in the ids row');
+        const b = ids.querySelector('#actcommit');
+        const q = b?.getBoundingClientRect();
+        if (!b || !b.getAttribute('aria-label')) bad.push('the actions button has no label');
+        else if (Math.abs(q.right - ids.getBoundingClientRect().right) > 2) bad.push('the actions button is not at the row end');
+      }
+      const c = sum?.querySelector('.counts');
+      if (c && getComputedStyle(c).textTransform !== 'none') bad.push('the counts are uppercase');
+      if (c && getComputedStyle(c).letterSpacing !== 'normal' && parseFloat(getComputedStyle(c).letterSpacing) !== 0) bad.push('the counts are tracked');
+      if (sum && getComputedStyle(sum, '::before').content === 'none') bad.push('no caret on the files summary');
+      const body = document.querySelector('pre.body');
+      if (body) {
+        if (/\n\n\n/.test(body.textContent)) bad.push('three newlines in the message body');
+        if (!/mono|Mono/.test(getComputedStyle(body).fontFamily)) bad.push('the body is not set in mono');
+      }
       return bad;
     }));
   }

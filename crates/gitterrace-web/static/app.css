@@ -518,7 +518,6 @@ svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);strok
 td:has(>.actbtn.float){position:relative}
 :hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
 .actbtn.mark{position:fixed;z-index:20;box-shadow:var(--shadow-2)}
-.meta .actbtn{margin-left:var(--space-1)}
 .ov.actmenu{width:min(300px,92vw)}
 .actmenu .ov-list li{justify-content:space-between;align-items:center}
 .actmenu .ov-list li kbd{margin-left:auto}
@@ -634,3 +633,17 @@ progress:not([value])::-webkit-progress-bar{background:linear-gradient(90deg,var
 progress:not([value])::-moz-progress-bar{background:var(--accent-soft)}
 progress:not([value]){background:linear-gradient(90deg,var(--soft),var(--accent-soft),var(--soft)) 0 0/200% 100%;animation:indeterminate 1.6s linear infinite}
 @keyframes indeterminate{to{background-position:-200% 0}}
+
+/* ---- commit page: identity row, ids row, message body, summary ---- */
+.meta{margin:var(--space-2) 0 0}
+.meta.ids{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4);margin:var(--space-2) 0 var(--space-4)}
+.meta.ids .idset{display:inline-flex;align-items:center;gap:var(--space-2)}
+.meta.ids .actbtn{margin-left:auto}
+.body{font:var(--text-sm)/1.6 var(--mono);color:var(--fg);margin:var(--space-3) 0 var(--space-4)}
+.files summary{list-style:none;align-items:center}
+.files summary::-webkit-details-marker{display:none}
+.files summary::before{content:"";flex:none;width:var(--space-2);height:var(--space-2);margin-right:var(--space-2);border:solid currentColor;border-width:0 1px 1px 0;transform:rotate(-45deg);transition:transform var(--dur-fast)}
+.files[open] summary::before{transform:rotate(45deg);margin-top:calc(-1 * var(--space-1))}
+.files summary{justify-content:flex-start}
+.files summary .counts{margin-left:auto}
+.files summary .counts{text-transform:none;letter-spacing:0;color:var(--fg);font-size:var(--text-xs)}

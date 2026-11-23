@@ -389,6 +389,25 @@ fn graph_rows(
         .collect())
 }
 
+/// A message body with runs of blank lines cut to one, so a source with several empty lines
+/// between paragraphs does not open a hole in the page.
+fn squeeze_blank_lines(body: &str) -> String {
+    let mut out = String::with_capacity(body.len());
+    let mut blank = 0;
+    for line in body.lines() {
+        if line.trim().is_empty() {
+            blank += 1;
+        } else {
+            blank = 0;
+        }
+        if blank <= 1 {
+            out.push_str(if blank == 0 { line } else { "" });
+            out.push('\n');
+        }
+    }
+    out.trim_end().to_owned()
+}
+
 #[derive(Template)]
 #[template(path = "commit.html")]
 struct CommitPage {
@@ -442,7 +461,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
                 )),
             ),
             sha: fmt::sha_link(&id),
-            body: d.body.trim().to_owned(),
+            body: squeeze_blank_lines(d.body.trim()),
             author: d.summary.author.name.clone(),
             author_href: views::author_href(&d.summary.author.email),
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
@@ -516,7 +535,14 @@ fn media_facts(
 mod tests {
     use askama::Template;
 
-    use super::{FILTER_DOCS, LogFilter, filter_help};
+    use super::{FILTER_DOCS, LogFilter, filter_help, squeeze_blank_lines};
+
+    #[test]
+    fn runs_of_blank_lines_in_a_message_body_become_one() {
+        assert_eq!(squeeze_blank_lines("a\n\n\n\n\nb\n\nc"), "a\n\nb\n\nc");
+        assert_eq!(squeeze_blank_lines("a\n   \n\t\nb"), "a\n\nb");
+        assert_eq!(squeeze_blank_lines("one\ntwo"), "one\ntwo");
+    }
 
     fn escaped(s: &str) -> String {
         s.replace('&', "&#38;").replace('<', "&#60;").replace('>', "&#62;").replace('"', "&#34;")
