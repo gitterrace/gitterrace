@@ -293,7 +293,11 @@ process.on('unhandledRejection', (e) => { stopAll(); console.error(e); process.e
  */
 export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'))) {
   const port = await freePort();
-  const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir], { stdio: 'ignore' });
+  // Its own state folder: the owner secret the launch link needs is written there.
+  const state = mkdtempSync(join(tmpdir(), 'gt-state-'));
+  const env = { ...process.env, XDG_STATE_HOME: state };
+  const args = ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir];
+  const child = spawn(bin, args, { stdio: 'ignore', env });
   servers.add(child);
   child.on('exit', () => servers.delete(child));
   const origin = `http://127.0.0.1:${port}`;
@@ -304,7 +308,25 @@ export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'
   }
   if (!up) { child.kill(); throw new Error(`${bin} did not answer on ${origin}`); }
   const m = /href="(\/r\/[^"\/]+)\/?"/.exec(await (await fetch(origin + '/')).text());
-  return { origin, base: m ? origin + m[1] : origin, stop: () => child.kill() };
+  const secret = join(state, 'gitterrace', `add-token-${port}`);
+  const owner = () => ownerCookie(origin, secret);
+  return { origin, base: m ? origin + m[1] : origin, stop: () => child.kill(), owner };
+}
+
+/**
+ * The owner cookie a browser gets from the launch link, as `git terrace open` hands it: the
+ * secret from the 0600 file buys a one-time ticket, the ticket sets the HttpOnly cookie. Pass it
+ * to `ctx.addCookies` so a page can run an action or save a setting.
+ */
+export async function ownerCookie(origin, secretFile) {
+  const secret = readFileSync(secretFile, 'utf8').trim();
+  const headers = { 'x-gitterrace-add-token': secret };
+  const t = await (await fetch(`${origin}/_launch`, { method: 'POST', headers })).json();
+  const res = await fetch(`${origin}/_launch?t=${t.ticket}&to=/`, { redirect: 'manual' });
+  const [pair] = res.headers.get('set-cookie').split(';');
+  const i = pair.indexOf('=');
+  const [name, value] = [pair.slice(0, i), pair.slice(i + 1)];
+  return { name, value, url: origin, httpOnly: true, sameSite: 'Strict' };
 }
 
 /** Opens `url` at one width and colour scheme. */

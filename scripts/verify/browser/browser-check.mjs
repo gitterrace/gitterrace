@@ -62,6 +62,7 @@ console.log('serving', srv.base, 'with', bin);
 async function context(name, opts = {}) {
   const b = await launch(pw, name);
   const ctx = await b.newContext(opts);
+  await ctx.addCookies([await srv.owner()]);
   // Every script and stylesheet in the folder, read at run time, so a new or forgotten file is
   // never served stale from the binary while the check claims to test the working tree.
   if (fromDisk) await routeFromDisk(ctx);

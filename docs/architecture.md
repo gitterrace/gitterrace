@@ -193,7 +193,8 @@ the prefix.
 | `/r/{name}/...`, `/api/repos` | The prefix of every per-repository row above, also when one is served; and the server-wide list the switcher reads |
 | `/_dirty` | The repositories with uncommitted work, as JSON the home page fetches to fill its chips after the rows render |
 | `POST /_repos`, `DELETE /_repos`, `GET /_repos?nonce=N` | Adds a repository to the running server for `git terrace open`, or takes one off for `git terrace remove`: loopback, no browser, secret from a 0600 file. The GET proves the secret by hashing it with the nonce |
-| `/_settings`, `/_settings/file`, `POST /_settings/check` | The settings page: a form and a plain editor for `config.toml` and `actions.toml`, read, checked and saved on local servers only, same-origin with the page token, never a path from the request |
+| `/_launch` | Owner launch: `POST` hands the holder of the 0600 secret a one-time ticket, `GET ?t=` spends it and sets the HttpOnly owner cookie every write needs |
+| `/_settings`, `/_settings/file`, `POST /_settings/check` | The settings page: a form and a plain editor for `config.toml` and `actions.toml`, read, checked and saved on local servers only, same-origin with the owner cookie, never a path from the request |
 
 <!-- END GENERATED: routes -->
 

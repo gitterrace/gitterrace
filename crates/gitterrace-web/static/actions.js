@@ -18,7 +18,6 @@
   var offMeta = meta("gt-off");
   var OFF = offMeta ? offMeta.content.split(" ") : [];
   var act = meta("gitterrace-actions");
-  var token = act ? act.content : "";
   var mine = [];
   try { mine = act ? JSON.parse(act.dataset.menu || "[]") : []; } catch (e) { mine = []; }
   var rev = body.dataset.rev || "HEAD";
@@ -258,7 +257,7 @@
     fetch("/_actions/run", {
       method: "POST",
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "X-Gitterrace-Token": token },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ action: a.id, kind: t.kind, locator: loc })
     }).then(function (r) { return r.json().catch(function () { return { ok: false, first_line: "HTTP " + r.status }; }); })
       .then(function (res) {
@@ -485,7 +484,7 @@
     }
     // nav.js's "g" chord takes the next key, whatever it is, and nav.js arms it on "g".
     if (ov.chord || e.key === "g") return;
-    if (e.key === "a" && token && mine.some(function (a) { return a.key; })) {
+    if (e.key === "a" && act && mine.some(function (a) { return a.key; })) {
       armed = true;
       armTimer = setTimeout(disarm, 1200);
       toast("a, then " + mine.filter(function (a) { return a.key; }).map(function (a) { return a.key + " " + a.label; }).join(", "));

@@ -127,10 +127,16 @@ pub const PAGES: &[Page] = &[
         &["/_repos"],
     ),
     page(
+        "`/_launch`",
+        "Owner launch: `POST` hands the holder of the 0600 secret a one-time ticket, `GET ?t=` \
+        spends it and sets the HttpOnly owner cookie every write needs",
+        &["/_launch"],
+    ),
+    page(
         "`/_settings`, `/_settings/file`, `POST /_settings/check`",
         concat!(
             "The settings page: a form and a plain editor for `config.toml` and `actions.toml`, ",
-            "read, checked and saved on local servers only, same-origin with the page token, ",
+            "read, checked and saved on local servers only, same-origin with the owner cookie, ",
             "never a path from the request"
         ),
         &["/_settings", "/_settings/file", "/_settings/check"],

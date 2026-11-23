@@ -46,6 +46,7 @@ mod multi;
 #[cfg(test)]
 mod multi_tests;
 mod overview_side;
+mod owner;
 mod ownership;
 mod pagehead;
 mod patterns;
@@ -282,7 +283,17 @@ fn build_server(
     // Behind a proxy a public server sits on loopback and every request is remote.
     let local = extra.is_none() && !env.public();
     let output_kb = env.cfg().limits.action_output_kb;
-    let (live, status) = actions::start(actions_file, &roots, local, output_kb);
+    // One secret for the add route and the owner proof. Without the 0600 file nobody can be
+    // handed proof, so writes stay refused: a secret held only in memory is never reachable.
+    let published = add.is_some();
+    let secret = Arc::new(match add {
+        Some(t) => t,
+        None => gitterrace_actions::Token::generate().map_err(io::Error::other)?,
+    });
+    let owner = Arc::new(owner::Owner::new(Arc::clone(&secret)));
+    #[cfg(test)]
+    owner.remember_for_tests();
+    let (live, status) = actions::start(actions_file, &roots, local, output_kb, &owner);
     env.set_actions_status(&status);
     table.live.clone_from(&live);
     let sends = actions::sends(live.as_ref(), actions_file, &roots);
@@ -302,11 +313,14 @@ fn build_server(
     let mut router = router.merge(actions::router(Arc::clone(&site)));
     // A non-loopback bind or a public server never takes additions: the token is the only
     // gate a remote client would face.
-    if let Some(token) = add.filter(|_| local) {
+    if local && !env.public() {
+        router = router.merge(owner::router(Arc::clone(&owner)));
+    }
+    if published && local {
         router = router.merge(add::router(Arc::new(add::Adder {
             table,
             site,
-            token,
+            token: secret,
             actions_file: actions_file.map(Path::to_path_buf),
             state,
         })));
@@ -314,19 +328,14 @@ fn build_server(
     if settings::mountable(env.public(), local, env.settings_dir.is_some())
         && let Some(dir) = env.settings_dir.clone()
     {
-        match gitterrace_actions::Token::generate() {
-            Ok(token) => {
-                env.set_settings_on();
-                router = router.merge(settings::router(Arc::new(settings::Settings {
-                    dir,
-                    actions: actions_file.map(Path::to_path_buf),
-                    actions_on: live.is_some(),
-                    token,
-                    env: env.clone(),
-                })));
-            }
-            Err(e) => tracing::warn!("settings page off: no randomness for the token: {e}"),
-        }
+        env.set_settings_on();
+        router = router.merge(settings::router(Arc::new(settings::Settings {
+            dir,
+            actions: actions_file.map(Path::to_path_buf),
+            actions_on: live.is_some(),
+            owner: Arc::clone(&owner),
+            env: env.clone(),
+        })));
     }
     let router = router
         .route_layer(axum::middleware::from_fn_with_state(env.clone(), features::server_gate));
@@ -450,6 +459,11 @@ pub async fn serve_on(
         );
     }
     tracing::info!("serving {name} on http://{addr}");
+    if published {
+        tracing::info!(
+            "to run actions or save settings, open the server with `git terrace launch`"
+        );
+    }
     let stop = listen::stop_signal()?;
     let stop = async move {
         stop.await;

@@ -75,7 +75,7 @@ async fn every_page_kind_renders_the_shared_header() {
         html.contains("<a href=\"/_settings\" class=\"on\" aria-current=\"page\">Settings</a>"),
         "Settings is the current tab"
     );
-    assert!(html.contains("name=\"gitterrace-settings\""), "token meta stays");
+    assert!(html.contains("name=\"gitterrace-settings\""), "settings meta stays");
     assert!(html.contains("/static/settings.css"), "settings.css stays");
 }
 

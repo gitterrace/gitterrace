@@ -51,10 +51,10 @@ async fn page(r: &axum::Router, uri: &str) -> (u16, String) {
     gitterrace_testkit::get_as(r, &uri, &gitterrace_testkit::on_port("localhost")).await
 }
 
+/// The owner cookie the last server built on this thread accepts.
 fn token(html: &str) -> String {
-    let i = html.find("name=\"gitterrace-actions\" content=\"").expect("token meta");
-    let rest = &html[i + 35..];
-    rest[..rest.find('"').expect("end")].to_owned()
+    assert!(!html.contains("x-gitterrace-token"), "no page names a token header");
+    crate::owner::test_cookie()
 }
 
 struct Req<'a> {
@@ -82,7 +82,7 @@ impl<'a> Req<'a> {
 async fn send(r: &axum::Router, q: Req<'_>) -> (u16, serde_json::Value) {
     let mut b = Request::post(RUN_PATH).header("host", q.host).header("content-type", q.ctype);
     if let Some(t) = q.token {
-        b = b.header("x-gitterrace-token", t);
+        b = b.header("cookie", t);
     }
     if let Some(s) = q.site {
         b = b.header("sec-fetch-site", s);
@@ -132,10 +132,10 @@ async fn run_route_security_table() {
     let on = router(&repo, Some(cfg.path()), None);
     let (_, html) = page(&on, "/").await;
     let tok = token(&html);
-    assert_eq!(tok.len(), 43);
     let wrong = {
         let mut b = tok.clone().into_bytes();
-        b[5] = if b[5] == b'A' { b'B' } else { b'A' };
+        let last = b.len() - 1;
+        b[last] = if b[last] == b'A' { b'B' } else { b'A' };
         String::from_utf8(b).expect("ascii")
     };
     let ok = || Req::ok(&tok, body("echo", "page", ""));

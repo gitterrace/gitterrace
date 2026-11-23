@@ -3,7 +3,7 @@
 //! They exist only on a local server: a loopback bind, not public, with a config folder, never
 //! in an export. Elsewhere the routes are not mounted, and `public.rs` lists them as local so a
 //! public server answers 404 even if one were. Every request passes the same gate as the run
-//! route (same-origin fetch metadata, matching `Origin`, the per-process token), reads included.
+//! route (same-origin fetch metadata, matching `Origin`, the owner cookie), reads included.
 //! A request names a file from a closed set, never a path. A save carries the stamp of the text
 //! it started from, so a tab never overwrites an edit made in an editor meanwhile.
 
@@ -17,29 +17,25 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
-use gitterrace_actions::Token;
 use gitterrace_config::{Change, Located, MAX_FILE_BYTES, SaveError, Stamp};
 use gitterrace_types::SettingsFile;
 
 use crate::app::Env;
+use crate::owner::Owner;
 
-/// What the routes need: where the two files are and the token pages echo back.
+/// What the routes need: where the two files are and the owner proof a write must carry.
 pub(crate) struct Settings {
     pub(crate) dir: PathBuf,
     /// The `actions.toml` the server was started with, `None` with actions off.
     pub(crate) actions: Option<PathBuf>,
     /// Whether the run route is mounted. Without it a first action needs a restart: the route
-    /// and its token are decided once at startup, see `actions::start`.
+    /// and its owner proof are decided once at startup, see `actions::start`.
     pub(crate) actions_on: bool,
-    pub(crate) token: Token,
+    pub(crate) owner: Arc<Owner>,
     pub(crate) env: Env,
 }
 
 impl Settings {
-    pub(crate) fn token(&self) -> &str {
-        self.token.as_str()
-    }
-
     /// Where file `f` lives; `None` for actions.toml with actions off.
     pub(crate) fn path(&self, f: SettingsFile) -> Option<PathBuf> {
         match f {
@@ -61,17 +57,8 @@ impl Settings {
     }
 }
 
-#[cfg(test)]
-thread_local! {
-    /// The token of the last router built on this thread, for the tests to echo.
-    static LAST_TOKEN: std::cell::RefCell<String> =
-        const { std::cell::RefCell::new(String::new()) };
-}
-
 /// Mounted only on a local server; see the module comment.
 pub(crate) fn router(s: Arc<Settings>) -> Router {
-    #[cfg(test)]
-    LAST_TOKEN.with(|t| *t.borrow_mut() = s.token().to_owned());
     Router::new()
         .route("/_settings", get(crate::settings_page::page))
         .route("/_settings/file", get(read).put(write))
@@ -177,7 +164,7 @@ fn plain(status: StatusCode, why: &'static str) -> Response {
 }
 
 fn gate(h: &HeaderMap, s: &Settings) -> Option<Response> {
-    crate::guard::same_origin_write(h, &s.token).map(|why| plain(StatusCode::FORBIDDEN, why))
+    crate::guard::same_origin_write(h, &s.owner).map(|why| plain(StatusCode::FORBIDDEN, why))
 }
 
 /// `GET /_settings/file?f=config|actions`: the text and its stamp.

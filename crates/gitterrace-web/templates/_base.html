@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="gt-base" content="{{ c.base }}">
 <meta name="gt-repo" content="{{ c.repo_key }}" data-id="{{ c.repo_id }}" data-link="{{ c.link_style }}">
-{% if !c.off.is_empty() %}<meta name="gt-off" content="{{ c.off }}">{% endif %}{% if let Some((token, menu)) = c.actions %}<meta name="gitterrace-actions" content="{{ token }}" data-menu="{{ menu }}">{% endif %}<meta name="gt-release" content="{{ c.release }}">{% if c.settings %}<meta name="gt-settings" content="/_settings">{% endif %}
+{% if !c.off.is_empty() %}<meta name="gt-off" content="{{ c.off }}">{% endif %}{% if let Some(menu) = c.actions %}<meta name="gitterrace-actions" content="" data-menu="{{ menu }}">{% endif %}<meta name="gt-release" content="{{ c.release }}">{% if c.settings %}<meta name="gt-settings" content="/_settings">{% endif %}
 <title>{% block title %}{{ c.name }}{% endblock %} · gitterrace</title>
 <script>(function(){try{var q=/[?&]theme=(light|dark)/.exec(location.search),t=q?q[1]:localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
 {% include "_favicon.html" %}

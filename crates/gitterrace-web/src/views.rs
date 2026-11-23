@@ -119,9 +119,9 @@ pub(crate) struct Chrome {
     pub(crate) live_on: &'static str,
     /// Fingerprint the page was rendered at, so a reconnect can tell it missed a change.
     pub(crate) version: String,
-    /// Per-process action token and the menu as JSON; `None` when actions are off, so pages
-    /// carry neither.
-    pub(crate) actions: Option<(String, String)>,
+    /// The action menu as JSON; `None` when actions are off. No secret: a write proves itself
+    /// with the owner cookie, which no page can read.
+    pub(crate) actions: Option<String>,
     /// Which of the top bar's switchable tools the page shows.
     pub(crate) tools: Tools,
     /// The running release, shown small at the foot of the menu.
@@ -263,7 +263,7 @@ pub(crate) fn chrome_at(app: &crate::app::App, active: &str, rev: &str) -> Chrom
             .actions
             .as_ref()
             .filter(|_| crate::features::on(Feature::Actions))
-            .map(|l| (l.token().to_owned(), l.menu_json())),
+            .map(|l| l.menu_json()),
         tools: Tools {
             search: crate::features::on(Feature::Search),
             picker: crate::features::on(Feature::Picker),

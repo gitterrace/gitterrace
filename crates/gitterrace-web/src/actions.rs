@@ -21,13 +21,13 @@ use axum::{
 };
 use gitterrace_actions::{
     Action, Config, Limits, Output, Payload, PayloadError, Reloader, RunError, RunRequest, Runner,
-    Token,
 };
 use gitterrace_git::Repo;
 
 use crate::{
     fmt::enc_path,
     guard::{self, json_body, no_store},
+    owner::Owner,
     reload::poll_every,
 };
 
@@ -54,16 +54,12 @@ impl AsRef<Repo> for Target {
 }
 
 pub(crate) struct Live {
-    token: Token,
+    owner: Arc<Owner>,
     config: Arc<RwLock<Arc<Config>>>,
     runner: Runner,
 }
 
 impl Live {
-    pub(crate) fn token(&self) -> &str {
-        self.token.as_str()
-    }
-
     fn config(&self) -> Arc<Config> {
         self.config.read().map_or_else(|_| Arc::default(), |c| Arc::clone(&c))
     }
@@ -200,9 +196,10 @@ pub(crate) fn start(
     roots: &[PathBuf],
     loopback: bool,
     output_kb: usize,
+    owner: &Arc<Owner>,
 ) -> (Option<Arc<Live>>, Arc<Status>) {
     let status = Arc::new(Status::default());
-    (start_live(file, roots, loopback, output_kb, &status), status)
+    (start_live(file, roots, loopback, output_kb, owner, &status), status)
 }
 
 /// Where `GET /_send/targets` reads from. Sending opens a URL in the browser and starts
@@ -227,6 +224,7 @@ fn start_live(
     roots: &[PathBuf],
     loopback: bool,
     output_kb: usize,
+    owner: &Arc<Owner>,
     status: &Arc<Status>,
 ) -> Option<Arc<Live>> {
     let file = file?;
@@ -249,17 +247,10 @@ fn start_live(
     if config.actions.is_empty() {
         return None;
     }
-    let token = match Token::generate() {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::warn!("actions disabled: no randomness for the token: {e}");
-            return None;
-        }
-    };
     tracing::info!("actions: {} loaded from {}", config.actions.len(), file.display());
     let reloader = Reloader::new(file.to_path_buf(), roots.to_vec(), config);
     let live = Arc::new(Live {
-        token,
+        owner: Arc::clone(owner),
         config: reloader.handle(),
         runner: Runner::new(Limits {
             output_bytes: output_kb.saturating_mul(1024),
@@ -378,7 +369,7 @@ async fn run(State(site): State<Arc<Site>>, req: Request) -> Response {
     let Some(live) = site.live.clone() else {
         return StatusCode::NOT_FOUND.into_response();
     };
-    if let Some(why) = crate::guard::same_origin_write(req.headers(), &live.token) {
+    if let Some(why) = crate::guard::same_origin_write(req.headers(), &live.owner) {
         return (StatusCode::FORBIDDEN, why).into_response();
     }
     if !guard::is_json(req.headers()) {

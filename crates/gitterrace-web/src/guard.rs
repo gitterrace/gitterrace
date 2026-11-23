@@ -133,11 +133,12 @@ fn refusal(
 
 /// Why a state-changing request from a page is refused before its body is read, shared by every
 /// route that writes so they cannot drift apart. Fetch metadata must say same-origin (absent and
-/// `none` are refused, unlike GETs), `Origin` must be this host, and the per-process token must
-/// match: only a page served here can read it.
+/// `none` are refused, unlike GETs), `Origin` must be this host, and the request must carry the
+/// owner cookie. The first two stop other sites. They are headers, so another user of the machine
+/// sets them freely: the cookie is the proof, and no page ever holds what makes it.
 pub(crate) fn same_origin_write(
     h: &HeaderMap,
-    token: &gitterrace_actions::Token,
+    owner: &crate::owner::Owner,
 ) -> Option<&'static str> {
     let get = |n: &str| h.get(n).and_then(|v| v.to_str().ok());
     if !get("sec-fetch-site").is_some_and(|v| v.eq_ignore_ascii_case("same-origin")) {
@@ -151,8 +152,8 @@ pub(crate) fn same_origin_write(
     if !origin_ok {
         return Some("forbidden: foreign origin\n");
     }
-    if !get("x-gitterrace-token").is_some_and(|t| token.verify(t)) {
-        return Some("forbidden: bad token\n");
+    if !owner.proven(h) {
+        return Some("forbidden: not the owner of this server, open it with `git terrace open`\n");
     }
     None
 }

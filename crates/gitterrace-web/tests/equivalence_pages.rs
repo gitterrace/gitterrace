@@ -260,7 +260,7 @@ const BROWSE: [&str; 59] = [
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
-const EXEMPT: [(&str, &str); 16] = [
+const EXEMPT: [(&str, &str); 17] = [
     ("/api/last/{rev}", "a fragment the tree page fetches, filled by the file walk"),
     ("/api/last/{rev}/{*path}", "same fragment, below the root"),
     ("/api/progress", "indexing state, changes with timing"),
@@ -274,6 +274,7 @@ const EXEMPT: [(&str, &str); 16] = [
     ("/api/repos", "the repository list, holds a temp path"),
     ("/_dirty", "live working tree state, tested in multi::tests"),
     ("/_repos", "adds and removes repositories, secret and loopback only"),
+    ("/_launch", "hands the owner a one-time ticket and cookie, no page"),
     ("/_settings", "reads the user's config file"),
     ("/_settings/file", "reads and writes the user's config file"),
     ("/_settings/check", "checks a posted config file, never a page"),

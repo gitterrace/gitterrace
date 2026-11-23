@@ -46,7 +46,6 @@ pub(crate) struct Section {
 #[template(path = "settings.html")]
 struct Page {
     c: crate::views::Chrome,
-    token: String,
     file: &'static str,
     head: crate::pagehead::PageHead,
     text: String,
@@ -194,7 +193,6 @@ pub(crate) async fn page(
         return crate::error::not_found("Actions are off on this server.");
     };
     let actions_on = settings.path(SettingsFile::Actions).is_some();
-    let token = settings.token().to_owned();
     let env = settings.env.clone();
     let r = tokio::task::spawn_blocking(move || {
         let stamp = gitterrace_config::Stamp::of(&path).ok().flatten();
@@ -226,7 +224,6 @@ pub(crate) async fn page(
         let form_off = first_error(&check);
         Page {
             c: chrome_bare(&env, "Settings", "/_settings"),
-            token,
             file: f.as_str(),
             head: settings_head(files, form_off.is_none(), &path, stamp.is_some()),
             missing: stamp

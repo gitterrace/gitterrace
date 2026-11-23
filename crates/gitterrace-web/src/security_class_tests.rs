@@ -166,12 +166,13 @@ struct Reply {
     body: String,
 }
 
-/// A page served here: same-origin fetch metadata, this origin, and `token` when given.
-fn page(token: Option<&str>) -> Vec<(&'static str, String)> {
+/// What a page served here sends, or what any program can forge: same-origin fetch metadata and
+/// this origin, plus the `cookie` pair when given.
+fn page(cookie: Option<&str>) -> Vec<(&'static str, String)> {
     let host = gitterrace_testkit::on_port("localhost");
     let mut h =
         vec![("sec-fetch-site", "same-origin".to_owned()), ("origin", format!("http://{host}"))];
-    h.extend(token.map(|t| ("x-gitterrace-token", t.to_owned())));
+    h.extend(cookie.map(|t| ("cookie", t.to_owned())));
     h
 }
 
@@ -196,11 +197,16 @@ async fn send(r: &Router, method: &str, uri: &str, headers: &[(&str, String)]) -
     Reply { status, headers, body }
 }
 
-/// The `content` of `<meta name="{name}">` in a page.
-fn meta(html: &str, name: &str) -> String {
-    let key = format!("name=\"{name}\" content=\"");
-    let rest = &html[html.find(&key).unwrap_or_else(|| panic!("{name} meta")) + key.len()..];
-    rest[..rest.find('"').expect("end")].to_owned()
+/// Every `content` of the `<meta>` tags that once carried a write token, plus the long
+/// base64url words in any `content` or `value`: what a page could hand a forging client.
+fn token_like(html: &str) -> Vec<String> {
+    let re =
+        regex::Regex::new(r#"(?:content|value|data-[a-z-]+)="([A-Za-z0-9_-]{32,})""#).expect("re");
+    // A commit or repository id is hex and public: a token is base64url and has other letters.
+    re.captures_iter(html)
+        .map(|c| c[1].to_owned())
+        .filter(|w| !w.bytes().all(|b| b.is_ascii_hexdigit()))
+        .collect()
 }
 
 /// Class: every route of the built routers is either public (`public_route`) or listed in
@@ -268,12 +274,9 @@ async fn every_local_route_is_dark_on_a_public_server() {
 async fn every_response_sends_nosniff_and_html_sends_the_csp() {
     let tmp = tempfile::tempdir().expect("tmp");
     let b = server(tmp.path(), false);
-    let actions = meta(&send(&b.router, "GET", "/r/r/", &[]).await.body, "gitterrace-actions");
-    let settings =
-        meta(&send(&b.router, "GET", "/_settings", &[]).await.body, "gitterrace-settings");
     let callers = [
-        page(Some(&actions)),
-        page(Some(&settings)),
+        page(Some(&crate::owner::test_cookie())),
+        page(None),
         vec![(crate::add::TOKEN_HEADER, b.add_token.clone())],
     ];
     let mut accepted = 0;
@@ -368,32 +371,107 @@ async fn no_path_route_reads_outside_the_tree() {
 
 /// The routes that take a write, as (pattern, method): a write is an owner decision recorded
 /// here, never an accident. Each is mounted only when its feature is configured.
-const WRITES: [(&str, &str); 5] = [
+const WRITES: [(&str, &str); 6] = [
     (crate::actions::RUN_PATH, "POST"),
+    ("/_launch", "POST"),
     ("/_repos", "POST"),
     ("/_repos", "DELETE"),
     ("/_settings/file", "PUT"),
     ("/_settings/check", "POST"),
 ];
 
-/// Class: no route changes state for a same-origin request without its token. Every method
-/// but GET and HEAD answers 405 on every route, and 403 on the listed write routes.
+/// Class: a plain client on a shared loopback, with every header a non-browser can forge and no
+/// owner proof, changes nothing anywhere. The write routes are found from the routers: any
+/// route that does not answer 405 to a non-GET method is one, so a new write route is driven
+/// without a new test, and must be listed in `WRITES` (an owner decision). Every other
+/// method answers 405 on every route. The forger also reads every page first and replays
+/// whatever token-looking value it finds, since that is the attack: it must not help.
 #[tokio::test(flavor = "multi_thread")]
-async fn no_write_succeeds_without_the_token() {
+async fn a_forging_loopback_client_without_owner_proof_writes_nothing() {
     let tmp = tempfile::tempdir().expect("tmp");
     let b = server(tmp.path(), false);
+    let mut loot = BTreeSet::new();
+    for u in ["/", "/r/r/", "/r/r/log/HEAD", "/_settings", "/_settings?f=actions"] {
+        loot.extend(token_like(&send(&b.router, "GET", u, &[]).await.body));
+    }
+    let mut forged: Vec<Vec<(&str, String)>> = vec![page(None)];
+    for t in &loot {
+        forged.push(page(Some(t)));
+        forged.push(page(Some(&format!("gt-owner-x={t}"))));
+        let mut h = page(None);
+        h.push(("x-gitterrace-token", t.clone()));
+        h.push((crate::add::TOKEN_HEADER, t.clone()));
+        forged.push(h);
+    }
+    let mut found = BTreeSet::new();
     for (scope, route) in every_route(&b) {
         let u = uri(scope, &route, "a.txt");
+        let missing = send(&b.router, "GET", &u, &page(None)).await.status == 404;
         for m in ["POST", "PUT", "DELETE", "PATCH"] {
-            let got = send(&b.router, m, &u, &page(None)).await.status;
-            let writes = WRITES.contains(&(route.as_str(), m));
-            // 405 is a route that exists for GET only. A URL GET cannot find either may answer
-            // 404. Any other status means a handler took the write.
-            let missing = send(&b.router, "GET", &u, &page(None)).await.status == 404;
-            let want = if writes { 403 } else { 405 };
-            assert!(got == want || (missing && got == 404), "{m} {u} answered {got}, not {want}");
+            for h in &forged {
+                let got = send(&b.router, m, &u, h).await.status;
+                if got == 403 {
+                    found.insert((route.clone(), m));
+                }
+                // 405 is a route that exists for GET only. A URL GET cannot find either may
+                // answer 404. Any other status means a handler took the write.
+                assert!(
+                    got == 403 || got == 405 || (missing && got == 404),
+                    "{m} {u} answered {got} to a forged client"
+                );
+            }
         }
     }
+    let want: BTreeSet<_> = WRITES.iter().map(|(r, m)| ((*r).to_owned(), *m)).collect();
+    assert_eq!(found, want, "the write routes the routers hold differ from WRITES");
+    for h in &forged {
+        let spent = send(&b.router, "GET", "/_launch?t=guess&to=/", h).await;
+        assert_eq!(spent.status, 403, "a guessed ticket");
+        assert!(!spent.headers.contains_key("set-cookie"), "a cookie for a guess");
+    }
     let after = std::fs::read_to_string(b.dirs.1.path().join("config.toml")).expect("r");
-    assert_eq!(after, "", "a tokenless request wrote the config");
+    assert_eq!(after, "", "a forged request wrote the config");
+}
+
+/// Class: the owner cookie opens every write route past the guard. Without this the test above
+/// would pass on routes that refuse everyone.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_owner_cookie_reaches_every_write_route() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let b = server(tmp.path(), false);
+    let who = page(Some(&crate::owner::test_cookie()));
+    for (route, m) in WRITES {
+        if route == "/_launch" || route == "/_repos" {
+            continue;
+        }
+        let got = send(&b.router, m, route, &who).await.status;
+        assert!(got != 403 && got != 405 && got != 404, "{m} {route} answered {got} to the owner");
+    }
+}
+
+/// Class: no served page holds a write token or any secret. Another user of the machine reads
+/// every page over loopback, so a page that embeds one is an oracle for it. Every page of the
+/// built routers is read, with and without the owner cookie, and the owner proof, the add
+/// secret and a ticket must appear in none of them, nor in a header.
+#[tokio::test(flavor = "multi_thread")]
+async fn no_served_page_contains_a_write_token() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let b = server(tmp.path(), false);
+    let cookie = crate::owner::test_cookie();
+    let proof = cookie.split_once('=').expect("pair").1.to_owned();
+    let mut seen = 0;
+    for (scope, route) in every_route(&b) {
+        let u = uri(scope, &route, "a.txt");
+        for who in [page(None), page(Some(&cookie))] {
+            let res = send(&b.router, "GET", &u, &who).await;
+            let all = format!("{:?}{}", res.headers, res.body);
+            for secret in [&proof, &b.add_token] {
+                assert!(!all.contains(secret.as_str()), "{u} holds a secret");
+            }
+            assert!(token_like(&res.body).is_empty(), "{u} holds a token-like value");
+            assert!(!res.body.to_lowercase().contains("x-gitterrace-token"), "{u}");
+            seen += 1;
+        }
+    }
+    assert!(seen > 100, "only {seen} pages read");
 }

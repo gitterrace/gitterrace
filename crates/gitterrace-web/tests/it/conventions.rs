@@ -332,6 +332,7 @@ const NOT_PAGES: &[&str] = &[
     "/api/repos",
     "/_dirty",
     "/_repos",
+    "/_launch",
     "/_settings/file",
     "/_settings/check",
 ];

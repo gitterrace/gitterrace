@@ -6,7 +6,6 @@
   var meta = document.querySelector('meta[name="gitterrace-settings"]');
   if (!meta) return;
   var mk = window.gtNav.el;
-  var token = meta.content;
   var file = meta.dataset.file;
   var stamp = meta.dataset.stamp;
   var form = document.getElementById("setform");
@@ -26,7 +25,7 @@
     return fetch(url, {
       method: method,
       credentials: "same-origin",
-      headers: { "content-type": "application/json", "x-gitterrace-token": token },
+      headers: { "content-type": "application/json" },
       body: body ? JSON.stringify(body) : undefined
     }).then(function (r) {
       return r.text().then(function (t) {

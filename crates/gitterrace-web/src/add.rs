@@ -80,7 +80,7 @@ const BODY_LIMIT: usize = 8 * 1024;
 pub(crate) struct Adder {
     pub(crate) table: Arc<Table>,
     pub(crate) site: Arc<crate::actions::Site>,
-    pub(crate) token: Token,
+    pub(crate) token: Arc<Token>,
     pub(crate) actions_file: Option<PathBuf>,
     pub(crate) state: Option<PathBuf>,
 }
@@ -125,7 +125,7 @@ fn browser(h: &HeaderMap) -> Option<&'static str> {
 }
 
 /// Why a request is refused before its body is read.
-fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
+pub(crate) fn refusal(h: &HeaderMap, token: &Token) -> Option<&'static str> {
     if let Some(why) = browser(h) {
         return Some(why);
     }

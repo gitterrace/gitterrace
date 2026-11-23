@@ -58,14 +58,14 @@ async fn send(r: &axum::Router, q: Req<'_>) -> (u16, String) {
         b = b.header("origin", o);
     }
     if let Some(t) = q.token {
-        b = b.header("x-gitterrace-token", t);
+        b = b.header("cookie", t);
     }
     gitterrace_testkit::send(r, b.body(Body::from(q.body)).expect("req")).await
 }
 
-/// The token the last server built on this thread hands its pages.
+/// The owner cookie the last server built on this thread accepts.
 fn token_of(_built: &axum::Router) -> String {
-    super::LAST_TOKEN.with(|t| t.borrow().clone())
+    crate::owner::test_cookie()
 }
 
 #[tokio::test]
@@ -273,14 +273,16 @@ async fn check_reply_names_the_line() {
 }
 
 #[tokio::test]
-async fn the_page_renders_the_schema_and_carries_its_token() {
+async fn the_page_renders_the_schema_and_holds_no_secret() {
     let (root, dir) = (tempfile::tempdir().expect("t"), tempfile::tempdir().expect("t"));
     std::fs::write(dir.path().join("config.toml"), "[watch]\nrescan_secs = 50\n").expect("w");
     let app = server(root.path(), dir.path(), false);
     let (s, html) = page(&app, "/_settings").await;
     assert_eq!(s, 200, "{html}");
     let token = token_of(&app);
-    assert!(html.contains(&format!("name=\"gitterrace-settings\" content=\"{token}\"")));
+    let secret = token.split_once('=').expect("pair").1;
+    assert!(html.contains("name=\"gitterrace-settings\" content=\"\""));
+    assert!(!html.contains(secret), "the settings page is no oracle for the owner proof");
     for k in gitterrace_config::keys() {
         assert!(html.contains(&format!("data-id=\"{}\"", k.id)), "{} has no row", k.id);
     }
@@ -299,7 +301,7 @@ async fn the_page_renders_the_schema_and_carries_its_token() {
             "{uri}: a header destination appears twice with settings on"
         );
     }
-    assert!(!overview.contains(&token), "only the settings page carries its token");
+    assert!(!overview.contains(secret), "no page carries the owner proof");
 }
 
 #[tokio::test]
