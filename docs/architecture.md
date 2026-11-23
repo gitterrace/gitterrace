@@ -197,13 +197,13 @@ Each door in [security](security.md) and what holds it in the code:
 | Local routes (`LOCAL`)     | `only_public` 404s anything not in `PUBLIC`                      | `every_local_route_is_dark_on_a_public_server`         |
 | Path tails                 | Tree lookup, the worktree reader canonicalizes the parent        | `no_path_route_reads_outside_the_tree`                 |
 | `/raw`                     | `sandbox` CSP for SVG and text, PDF attachment, size cap         | `wiring_tests`, `security_class_tests`                 |
-| `POST /_actions/run`       | `same_origin_write`, JSON only, `config/trust.rs`                | `run_route_security_table`                             |
+| `POST /_actions/run`       | `same_origin_write`, JSON only, `actions/src/config/trust.rs`    | `run_route_security_table`                             |
 | `/_settings/*`             | `same_origin_write`, enum file choice, stamp                     | `settings/tests.rs`                                    |
 | `/_repos`                  | Add token from a 0600 file, browser headers refused              | `add/tests.rs`                                         |
 | Every non-GET method       | Tokenless writes never succeed                                   | `no_write_succeeds_without_the_token`                  |
 | MCP server                 | Read-only tools, the switches of `/api/v1`                       | `mcp_tools_follow_the_switches_of_the_web_api`         |
 | `open` and `gitterrace://` | Strict link parse, known clones only                             | `open` tests                                           |
-| Static export              | `_headers` carries the CSP, no local routes crawled              | `export/tests.rs`                                      |
+| Static export              | `_headers` carries the CSP, no local routes crawled              | `export/headers_tests.rs`                              |
 | Hostile content            | Askama escaping, CSP, actions never from the repository          | `hostile_repo_content_is_escaped_where_the_menu_lives` |
 
 `security_class_tests.rs` reads every route from the built routers, so a route
