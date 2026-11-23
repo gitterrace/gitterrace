@@ -70,8 +70,9 @@ async function markSeam() {
   });
 }
 
-// The overview's About box: one place per layout, never moving between nearby widths. With two
-// columns it is beside the files, with one it is above them, never below.
+// The overview's sidebar: one place per layout, never moving between nearby widths. With two
+// columns it is beside the files, with one it is below them, so the file list is the first
+// thing on a phone.
 async function aboutPlace() {
   await eachBrowser(browsers, context, async (ctx, name) => {
     const p = await ctx.newPage();
@@ -82,12 +83,12 @@ async function aboutPlace() {
         const a = document.querySelector('.cols>aside'), f = document.querySelector('.cols>article');
         if (!a || !f) return null;
         const ar = a.getBoundingClientRect(), fr = f.getBoundingClientRect();
-        return { beside: ar.left >= fr.right - 1, above: ar.bottom <= fr.top + 1 };
+        return { beside: ar.left >= fr.right - 1, below: ar.top >= fr.bottom - 1 };
       });
       const where = `${name} ${width}`;
       if (!m) r.fail(`about-place ${where}: no overview columns`);
-      else if (m.beside || m.above) r.ok(`about-place ${where}: ${m.beside ? 'beside' : 'above'} the files`);
-      else r.fail(`about-place ${where}: About is below the files`);
+      else if (m.beside || m.below) r.ok(`about-place ${where}: ${m.beside ? 'beside' : 'below'} the files`);
+      else r.fail(`about-place ${where}: the sidebar is above the files`);
     }
   });
 }

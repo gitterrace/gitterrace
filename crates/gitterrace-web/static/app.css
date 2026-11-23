@@ -22,7 +22,7 @@ header.top{background:var(--header);border-bottom:var(--border)}
 .topbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-2) var(--space-3);min-height:var(--header-h);padding-block:var(--space-2)}
 /* A bare bar (settings) has no branch switcher, but keeps the two rows the narrow bar of the
    other pages has, so the nav and the content do not move. */
-@media (max-width:600px){.topbar.bare{min-height:calc(var(--header-h) + 26px)}}
+@media (max-width:600px){.topbar.bare{min-height:calc(var(--header-h) + 56px)}}
 .brand{display:flex;align-items:center;color:var(--fg)}
 .brand:hover{text-decoration:none}
 .logo{width:24px;height:24px;display:block}
@@ -48,7 +48,6 @@ header.top>.wrap{container:topbar/inline-size}
    ref name (the button keeps its icon and opens the same menu). Names are never cut. */
 @container topbar (max-width:700px){.wordmark,.sep{display:none}}
 @container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 4px}}
-@container topbar (max-width:460px){#refbtn .name{display:none}}
 .theme svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme .fill{fill:currentColor;stroke:none}
 .theme .i-auto{display:block}
@@ -76,7 +75,7 @@ header.top>.wrap{container:topbar/inline-size}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
 .cols.wide{grid-template-columns:minmax(0,1fr)}
-@media (max-width:999px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}aside{order:-1}}
+@media (max-width:999px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}}
 aside h2{margin-top:0}
 input:not([type=checkbox],[type=radio]){font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
 input[type=checkbox],input[type=radio]{width:16px;height:16px;margin:0;flex:none;accent-color:var(--accent);vertical-align:-3px}
@@ -370,7 +369,6 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .wordmark{height:15px;width:auto;flex:none;overflow:visible}
 .wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
 @media (max-width:600px){.tabnav a,.tabs>a{letter-spacing:.04em;padding-left:var(--space-2);padding-right:var(--space-2)}}
-@media (max-width:400px){.tabnav{gap:0}.tabnav a{letter-spacing:0;padding-left:4px;padding-right:4px}}
 .head h1:not(.crumbs){font-size:28px}
 
 /* languages: chart, brush, range card */
@@ -396,7 +394,7 @@ main:has(>.ph input[value=source]:checked) [data-md-view] [data-pane=rendered]{d
 [data-seg-select] .segsel,[data-seg-select].narrow .segs{display:none}
 [data-seg-select].narrow .segsel{display:inline-block}
 .md-pane[hidden]{display:none}
-.md-pane[data-pane=rendered],.readme .markdown-body,.readme .doc-plain{padding:24px 32px}
+.md-pane[data-pane=rendered],.readme .markdown-body,.readme .doc-plain{padding:var(--space-6) var(--space-8)}
 /* A document shown as its text (a LICENSE, or any README with the preview off). */
 .doc-plain pre{margin:0;padding:16px;overflow:auto;font:85%/1.45 var(--mono);background:var(--soft);border-radius:var(--radius)}
 .chart-head{display:flex;justify-content:space-between;align-items:flex-start;gap:var(--space-4);flex-wrap:wrap;margin-bottom:var(--space-3)}
@@ -594,3 +592,28 @@ svg.chart a:focus-visible .bar{fill:Highlight}}
 /* A CSV or TSV blob as a table, and an archive's entries (filetype/). */
 .data-table{border-collapse:collapse;font:85%/1.45 var(--mono);margin:16px}
 .data-table :is(th,td){border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top;white-space:pre-wrap}
+
+/* ---- phone layout (390px): the list comes first, targets are 44px, README text has room ---- */
+#refbtn .name{min-width:0;overflow-wrap:anywhere;white-space:normal;text-align:left}
+@media (max-width:600px){
+  .md-pane[data-pane=rendered],.readme .markdown-body,.readme .doc-plain{padding:var(--space-4)}
+  .tabnav a,.tabs>a{display:inline-flex;align-items:center;min-height:44px;padding-block:0}
+  .tabnav a.on{padding-bottom:0}
+  .tools .icon,.branch,.wtchip{min-height:44px}
+  .tools .icon{min-width:44px}
+  .branch{height:44px}
+  /* The sha is a 44px target without growing the row: its hit area reaches past its box. */
+  .crow .sha{position:relative}
+  .crow .sha::after{content:"";position:absolute;inset:calc(-1 * var(--space-3)) calc(-1 * var(--space-1))}
+  /* One commit row on a phone: the subject takes the full width on one line (it ends in an ellipsis), then author and
+     time with the commit id at the row's end. The grid places the pieces. */
+  .list:not(.graphed)>.crow:not(:has(>.ref)){display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+    align-items:start;column-gap:var(--space-3)!important;row-gap:var(--space-1)}
+  .list:not(.graphed)>.crow:not(:has(>.ref)) .cmain{display:contents}
+  .crow:not(:has(>.ref)) .av{grid-row:1/span 2;grid-column:1;margin-top:var(--space-1)}
+  .crow:not(:has(>.ref)) .cmain>.subj{grid-column:2/4;grid-row:1;white-space:nowrap}
+  .crow:not(:has(>.ref)) .cmain>.muted{grid-column:2;grid-row:2;align-self:center}
+  .crow:not(:has(>.ref)) .cmain>.grefs{grid-column:2/4;grid-row:3}
+  .crow:not(:has(>.ref))>.sha{grid-column:3;grid-row:2;align-self:center}
+  .crow:not(:has(>.ref))>.cnums{grid-column:2/4;grid-row:3}
+}
