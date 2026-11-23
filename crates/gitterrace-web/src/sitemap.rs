@@ -85,12 +85,14 @@ pub const PAGES: &[Page] = &[
         ],
     ),
     page(
-        "`/events`, `/api/{files,refs,last,progress}`",
-        "Live updates and the fragments pages fetch",
+        "`/events`, `/api/{files,refs,last,insight,progress}`",
+        "Live updates and the fragments pages fetch, such as a file's card",
         &[
             "/events",
             "/api/files/{rev}",
             "/api/refs",
+            "/api/insight/{rev}",
+            "/api/insight/{rev}/{*path}",
             "/api/last/{rev}",
             "/api/last/{rev}/{*path}",
             "/api/progress",

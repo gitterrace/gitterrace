@@ -174,6 +174,15 @@ languages page, drag across the chart to select a stretch of commits: the page
 reloads with the chart drawn on just that stretch. The date axis starts at the
 first selected commit and ends at the last.
 
+## See a file's history at a glance
+
+A file's page, its history page and every folder listing fetch a small card
+from the insights. The card for a file shows how often it changed and its
+rank, who owns it, which files change with it and how old its lines are.
+Files in the top tenth of the hotspots carry a Hot badge, also on the rows of
+a folder. The badge and the card link to the hotspots page for that path.
+While the index is still being built, or without insights, no card shows.
+
 ## Change a setting
 
 1. Press `.`, then `,` to open Settings on a local server.

@@ -236,7 +236,7 @@
   var V = new URL(HERE).search;
   var body = document.body;
   var STATIC = body.dataset.static !== undefined;
-  var CSS = { send: "send.css" };
+  var CSS = { send: "send.css", card: "card.css" };
   var state = {};
   window.gtLazy = function (name, done) {
     var s = state[name];
@@ -283,6 +283,9 @@
 
   // Outline and filter help: only where the page has one.
   if (document.querySelector("[data-outline], [data-filter-help]")) window.gtLazy("outline");
+
+  // The file card and the hot badges: only where the page names a fragment.
+  if (document.querySelector("[data-card]")) window.gtLazy("card");
 
   // Folded diff files: only where the page has one, or once a live refresh brings one.
   function withDiffs() {

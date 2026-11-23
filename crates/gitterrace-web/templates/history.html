@@ -7,4 +7,7 @@
 {% if let Some(e) = empty %}{{ e }}{% else %}
 <ul class="list log">{% for r in rows %}{{ r }}{% endfor %}</ul>
 {% endif %}
+{% if !card_href.is_empty() %}<div class="card fcard" hidden
+ data-card="{{ card_href }}"></div>{% endif %}
 {% endblock %}
+

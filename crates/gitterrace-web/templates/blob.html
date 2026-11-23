@@ -20,6 +20,8 @@
 <p class="muted pad">{{ format }} · {{ size }}{% if !raw_href.is_empty() %} · {# -#}
 <a href="{{ raw_href }}" download>Download</a>{% endif %}</p>{% endif %}
 </div>{% if !outline_rail.is_empty() %}{{ outline_rail|safe }}</div>{% endif %}{% endif %}
+{% if !card_href.is_empty() %}<div class="card fcard" hidden
+ data-card="{{ card_href }}"></div>{% endif %}
 {% endblock %}
 {% block scripts %}{% if font.is_some() %}
 <script src="{{ crate::asset_url("font.js") }}" defer></script>

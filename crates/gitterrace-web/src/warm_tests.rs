@@ -24,6 +24,14 @@ const COLD_OK: &[(&str, &str)] = &[
         "/api/v1/review_plan",
         "a client names its own changes and filter, and the plan reads the page's tables",
     ),
+    (
+        "/api/insight/{rev}",
+        "a fragment for one path, empty before the index is built and remembered per path",
+    ),
+    (
+        "/api/insight/{rev}/{*path}",
+        "same fragment below the root, per path, so no warm-up can guess it",
+    ),
     ("/api/v1/insights", "an index of names, no history read"),
     (
         "/api/v1/insights/{name}",

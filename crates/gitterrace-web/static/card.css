@@ -1,0 +1,9 @@
+/* The file card under a blob or history page, and the hot badge on a tree row. */
+.fcard{margin-top:var(--space-4);padding:var(--space-3) var(--space-4);font-size:var(--text-sm)}
+.fcard-body>div+div{margin-top:var(--space-2)}
+.fcard svg.spark{vertical-align:middle;margin-left:var(--space-2)}
+.hot{font:var(--weight-semibold) var(--text-2xs)/1 var(--sans);padding:2px var(--space-2);
+  border-radius:var(--radius);border:1px solid var(--warn);color:var(--warn)}
+a.hot{margin-left:var(--space-2);vertical-align:middle}
+a.hot:hover{text-decoration:none;background:var(--soft)}
+.fcard[hidden]{display:none}

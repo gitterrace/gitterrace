@@ -506,6 +506,11 @@ impl App {
         self.api.set(api).ok();
     }
 
+    /// This repository's `/api/v1` state, once linked.
+    pub(crate) fn api(&self) -> Option<&gitterrace_api::ApiState> {
+        self.api.get()
+    }
+
     fn reconfigure(&self, cfg: &Config) {
         if let Some(api) = self.api.get() {
             api.reconfigure(cfg);

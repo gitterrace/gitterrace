@@ -1,0 +1,22 @@
+<div class="fcard-body">
+<div class="fcard-main"><b>{% if hot %}<span class="hot">Hot</span> {% endif %}
+{{- changes }}</b>
+{%- if !rank.is_empty() %} <span class="muted">· rank {{ rank }}</span>{% endif %}
+ <span class="muted">· {{ lines }} changed</span>
+{%- if let Some(s) = spark %} {{ s }}{% endif %}</div>
+{% if !owners.is_empty() %}<div>Owners:
+{%- for o in owners %}{% if !loop.first %} ·{% endif %} {{ o.0 }}
+ <span class="muted">{{ o.1 }}</span>{% endfor %}
+{%- if !bus.is_empty() %} <span class="muted">· bus factor {{ bus }}</span>{% endif %}</div>
+{% endif %}
+{% if !partners.is_empty() %}<div>Changes with:
+{%- for p in partners %}{% if !loop.first %} ·{% endif %}
+ <a href="{{ p.href }}" data-tip="{{ p.degree }}">{{ p.path }}</a>{% endfor %}</div>
+{% endif %}
+<div class="muted">
+{%- if !last.is_empty() %}Last changed {{ last }}{% endif %}
+{%- if !age.is_empty() %}{% if !last.is_empty() %} · {% endif %}
+half the lines are older than {{ age }}{% endif %}
+{%- if !last.is_empty() || !age.is_empty() %} · {% endif %}
+<a href="{{ link }}">Stats for this path</a></div>
+</div>

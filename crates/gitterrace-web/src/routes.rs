@@ -73,6 +73,8 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/worktree/blob/{*path}", get(files::worktree_blob))
         .route("/api/files/{rev}", get(api::files))
         .route("/api/refs", get(api::refs))
+        .route("/api/insight/{rev}", get(crate::card::root))
+        .route("/api/insight/{rev}/{*path}", get(crate::card::fragment))
         .route("/api/last/{rev}", get(api::last_root))
         .route("/api/last/{rev}/{*path}", get(api::last))
         .route("/stats", get(crate::activity::page))

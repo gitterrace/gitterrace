@@ -30,6 +30,7 @@ All notable changes are listed here. The format follows
 - web: add a diff toolbar with find, viewed progress and hide viewed
 - api: serve the card of one file or directory
 - api: rank the changed files of a review by risk
+- web: show a card for a file or folder on the blob, tree and history pages
 
 ### Changed
 

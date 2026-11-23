@@ -7,6 +7,7 @@ mod add;
 mod app;
 mod bounded;
 mod caches;
+mod card;
 mod charts;
 mod charttip;
 mod commit_line;

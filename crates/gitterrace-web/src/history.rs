@@ -24,6 +24,7 @@ struct HistoryPage {
     head: crate::pagehead::PageHead,
     rows: Vec<views::CommitRow>,
     empty: Option<crate::empty::Empty>,
+    card_href: String,
 }
 
 pub(crate) async fn page(
@@ -93,6 +94,7 @@ pub(crate) async fn page(
                 crate::empty::Empty::new("No history found for this path.")
                     .step("Browse the files", href(&format!("/tree/{}", fmt::selected_seg())))
             }),
+            card_href: crate::card::href(&fmt::selected(), &path),
             path,
             rows,
         }

@@ -260,7 +260,9 @@ const BROWSE: [&str; 59] = [
 
 /// Routes with no golden cell, each with the reason. A route listed here that does not exist
 /// fails, so the list can only follow the router.
-const EXEMPT: [(&str, &str); 17] = [
+const EXEMPT: [(&str, &str); 19] = [
+    ("/api/insight/{rev}", "the file card fragment, empty until the index is built"),
+    ("/api/insight/{rev}/{*path}", "same fragment, for one path"),
     ("/api/last/{rev}", "a fragment the tree page fetches, filled by the file walk"),
     ("/api/last/{rev}/{*path}", "same fragment, below the root"),
     ("/api/progress", "indexing state, changes with timing"),

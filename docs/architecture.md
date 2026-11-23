@@ -186,7 +186,7 @@ the prefix.
 | `/refs`, `/tag/{name}`, `/worktrees`, `/stashes`, `/worktree`, `/worktree/diff/{path}`, `/worktree/find`, `/worktree/raw/{path}`, `/worktree/blob/{path}` | Git state: branches, tags, worktrees, stashes and uncommitted changes, each file as diff, bytes or page |
 | `/search` | Code and commit search |
 | `/stats`, `/stats/{page}` | Insights on the shared filter and period: activity (with commit types and code frequency), contributors, hotspots (with patterns), languages, ownership. `?rev=` follows any ref |
-| `/events`, `/api/{files,refs,last,progress}` | Live updates and the fragments pages fetch |
+| `/events`, `/api/{files,refs,last,insight,progress}` | Live updates and the fragments pages fetch, such as a file's card |
 | `/api/v1/...` | JSON API, see [api.md](api.md) |
 | `/go/{repo-id}/{sha}/{path}` | Permalink: finds the served repository by id |
 | `/_send/targets` | Send to targets as JSON template parts, filled in by the page |

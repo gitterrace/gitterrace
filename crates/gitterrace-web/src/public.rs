@@ -35,6 +35,8 @@ pub(crate) const PUBLIC: &[&str] = &[
     "/stats/contributors",
     "/api/files/{rev}",
     "/api/refs",
+    "/api/insight/{rev}",
+    "/api/insight/{rev}/{*path}",
     "/api/last/{rev}",
     "/api/last/{rev}/{*path}",
     "/api/progress",

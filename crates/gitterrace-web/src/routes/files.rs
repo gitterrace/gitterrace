@@ -30,6 +30,8 @@ struct TreePage {
     up: Option<String>,
     entries: Vec<Entry>,
     about: Option<crate::about::About>,
+    /// The badge fragment of this folder, empty when insights are off.
+    card_href: String,
 }
 
 pub(super) async fn tree_root(
@@ -89,6 +91,7 @@ pub(super) async fn tree(
                 md: about.as_ref().is_some_and(|d| d.markdown),
                 ..views::chrome_at(a, "files", &rev)
             },
+            card_href: crate::card::href(&rev, &path),
             about,
             title: if path.is_empty() { rev.clone() } else { path.clone() },
             head: tree_head(&rev, &path, &list),
@@ -164,6 +167,8 @@ struct BlobPage {
     rendered: Option<String>,
     /// "On this page" as the rail: the document's headings, or a source file's symbols.
     outline_rail: String,
+    /// The card fragment of this file, empty for the working tree or without insights.
+    card_href: String,
 }
 
 fn is_markdown(path: &str) -> bool {
@@ -332,6 +337,10 @@ fn blob_page(
     BlobPage {
         c: Chrome { md: rendered.is_some(), ..chrome },
         rendered,
+        card_href: match at {
+            BlobAt::Rev(r) => crate::card::href(r, &path),
+            BlobAt::Worktree => String::new(),
+        },
         outline_rail,
         page_head,
         size: fmt::size(b.size),
