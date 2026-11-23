@@ -163,6 +163,7 @@ docs-check:
 	python3 scripts/bench/bench-report.py --check
 	bash scripts/land-check.sh --self-test
 	python3 scripts/release/site/site-check.py --self-test
+	node scripts/release/site/site-render.mjs --self-test
 	python3 scripts/lint/commits-check.py --self-test
 	python3 scripts/lint/tracked-check.py --self-test
 	bash scripts/lib/python-run.sh vendor/schwarzwald/kit/tools/golden.py --self-test

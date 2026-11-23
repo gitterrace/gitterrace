@@ -8,11 +8,45 @@
 //   target/site/assets/og.png         1200x630, the light README header (link previews)
 // Chromium draws the SVGs, the same renderer as the app icon.
 //
-//   node scripts/release/site/site-render.mjs
+//   node scripts/release/site/site-render.mjs [--self-test]
 import { existsSync, readFileSync, mkdirSync, readdirSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 import { root, loadPlaywright, launch } from '../../lib/browser-lib.mjs';
+
+/**
+ * The committed shots a raw set lacks. A stale or partial target/site-shots would otherwise
+ * replace docs/screenshots with fewer files, so the render refuses before deleting anything.
+ * The committed folder is the reference: `cargo xtask check` holds it to the site's SHOTS.
+ * @param {string[]} raw PNG names in target/site-shots
+ * @param {string[]} committed file names in docs/screenshots
+ */
+export function missingShots(raw, committed) {
+  const have = new Set(raw.map((f) => f.replace(/\.png$/, '')));
+  const want = new Set(committed.filter((f) => f.endsWith('.webp'))
+    .map((f) => f.replace(/(\.thumb)?\.webp$/, '')));
+  return [...want].filter((s) => !have.has(s)).sort();
+}
+
+if (process.argv.includes('--self-test')) {
+  const committed =
+    ['a-light.webp', 'a-light.thumb.webp', 'b-dark.webp', 'b-dark.thumb.webp', 'README.md'];
+  const cases = [
+    ['a full set passes', ['a-light.png', 'b-dark.png'], []],
+    ['a new shot beyond the committed set passes',
+      ['a-light.png', 'b-dark.png', 'c-light.png'], []],
+    ['a partial set names the missing shot', ['a-light.png'], ['b-dark']],
+    ['an unrelated set names every shot', ['z-light.png'], ['a-light', 'b-dark']],
+  ];
+  let bad = 0;
+  for (const [name, raw, want] of cases) {
+    const got = missingShots(/** @type {string[]} */ (raw), committed);
+    const ok = JSON.stringify(got) === JSON.stringify(want);
+    if (!ok) bad++;
+    console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}: ${JSON.stringify(got)}`);
+  }
+  process.exit(bad ? 1 : 0);
+}
 
 const brand = (f) => 'data:image/svg+xml,' + encodeURIComponent(readFileSync(join(root, 'docs/brand', f), 'utf8'));
 // The light page background, from the shared tokens, so the PNG files match the site.
@@ -54,6 +88,12 @@ if (!raw.length) {
     process.exit(1);
   }
   mkdirSync(siteShots, { recursive: true });
+  const lack = missingShots(raw, readdirSync(siteShots));
+  if (lack.length) {
+    console.error(`site-render: target/site-shots lacks ${lack.join(', ')}; `
+      + 'docs/screenshots left as it is (make site-shots)');
+    process.exit(1);
+  }
   for (const f of readdirSync(siteShots)) if (f.endsWith('.webp')) rmSync(join(siteShots, f));
   for (const f of raw) {
     const src = join(rawDir, f);
