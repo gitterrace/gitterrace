@@ -2,5 +2,6 @@
 {% block title %}Not found · {{ c.name }}{% endblock %}
 {% block content %}
 {{ head }}
-<div class="card empty lost"><ul class="steps">{% for s in steps %}<li><a href="{{ s.href }}">{{ s.label }}</a></li>{% endfor %}</ul></div>
+<div class="card lost"><p class="lost-path">Requested <code>{{ path }}</code></p>
+<ul class="steps">{% for s in steps %}<li><a class="btn{% if loop.first %} primary{% endif %}" href="{{ s.href }}">{{ s.label }}</a></li>{% endfor %}</ul></div>
 {% endblock %}

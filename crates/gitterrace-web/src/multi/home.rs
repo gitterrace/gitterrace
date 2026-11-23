@@ -62,6 +62,9 @@ struct IndexRow {
     dirty: Option<bool>,
     /// The insights state while it is not ready (queued, indexing, warming, failed).
     state: Option<&'static str>,
+    /// What a failed index build said, in place of the day's news. Empty on a public server:
+    /// the reason names host paths.
+    failure: String,
 }
 
 /// Bucket counts as a polyline across a 90x20 box, scaled to `max`.
@@ -138,12 +141,12 @@ pub(super) async fn index(
         let live = follows_list(&table).then(|| table.env.home_version());
         let served = table.snapshot();
         let reads = in_order(&served, |s| {
-            (s.recent(now), show_tree.then(|| s.dirty.get()), s.insights_state())
+            (s.recent(now), show_tree.then(|| s.dirty.get()), s.insights_state(), s.failure())
         });
         let rows: Vec<IndexRow> = served
             .iter()
             .zip(reads)
-            .map(|(s, (r, dirty, state))| {
+            .map(|(s, (r, dirty, state, failure))| {
                 let href = s.href();
                 let c = r.last.as_ref();
                 let counts = &r.series.counts;
@@ -159,6 +162,16 @@ pub(super) async fn index(
                     total,
                     today: today_line(r.today, c, now),
                     commits_today: r.today,
+                    failure: if state == Some(crate::app::RepoState::Failed) && !table.env.public()
+                    {
+                        if failure.is_empty() {
+                            "The index build failed.".to_owned()
+                        } else {
+                            format!("The index build failed: {failure}")
+                        }
+                    } else {
+                        String::new()
+                    },
                     dirty: dirty.map(|d| d.unwrap_or(false)),
                     state: state
                         .filter(|s| *s != crate::app::RepoState::Ready)

@@ -50,6 +50,8 @@ impl RepoState {
 #[derive(Debug, Default)]
 pub(crate) struct StateCell {
     now: AtomicU8,
+    /// Why the last build failed, for the repository list. Empty until one failed.
+    why: std::sync::Mutex<String>,
 }
 
 impl StateCell {
@@ -65,6 +67,18 @@ impl StateCell {
                 (c != RepoState::Ready.code()).then_some(to.code())
             })
             .is_ok()
+    }
+
+    /// Records why the build failed, then moves to failed like [`StateCell::advance`].
+    pub(crate) fn fail(&self, why: &str) -> bool {
+        if let Ok(mut g) = self.why.lock() {
+            why.clone_into(&mut g);
+        }
+        self.advance(RepoState::Failed)
+    }
+
+    pub(crate) fn why(&self) -> String {
+        self.why.lock().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// Warming to ready, and nothing else. Returns whether it moved.
@@ -95,6 +109,16 @@ impl App {
 
     pub(crate) fn state(&self) -> RepoState {
         self.state.get()
+    }
+
+    /// Marks the build failed and keeps `why` for the repository list, see [`StateCell::fail`].
+    pub(crate) fn fail(&self, why: &str) -> bool {
+        self.state.fail(why)
+    }
+
+    /// Why the last build failed, empty when none did.
+    pub(crate) fn failure(&self) -> String {
+        self.state.why()
     }
 
     /// Moves a repository not yet ready on to `to`, see [`StateCell::advance`].

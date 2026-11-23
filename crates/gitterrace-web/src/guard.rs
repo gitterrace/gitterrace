@@ -22,7 +22,7 @@ use axum::{
 pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; \
     style-src 'self' 'unsafe-inline'; \
     script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
-    'sha256-Rbk1A+FIExFQ+koGhLey9hvtVuj90foK6DS83At6mms='; object-src 'none'; \
+    'sha256-sTYFCmpcG70tpbnxf2wd5UdeZwg8HujkRWb3okhcpTY='; object-src 'none'; \
     frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
 
 /// Whether the request declares a JSON body.

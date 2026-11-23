@@ -101,9 +101,10 @@
       var pct = p.total ? Math.floor((p.done / p.total) * 100) : p.ready ? 100 : 0;
       boxes.forEach(function (b) {
         var bar = b.querySelector("progress");
-        if (bar) bar.value = pct;
+        // No value until the build reports a total: the bar keeps its indeterminate motion.
+        if (bar && p.total) bar.value = pct;
         var t = b.querySelector(".pct");
-        if (t) t.textContent = pct + "%";
+        if (t && p.total) t.textContent = pct + "%";
         var s = b.querySelector(".badge.state");
         if (s && p.state) s.textContent = p.state;
       });

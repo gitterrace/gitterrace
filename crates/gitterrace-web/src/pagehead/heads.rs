@@ -20,7 +20,7 @@ pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> 
     PageHead {
         tabs: crate::views::stats_tabs(active)
             .into_iter()
-            .map(|n| Tab { label: n.label.to_owned(), href: n.href, on: n.on })
+            .map(|n| Tab { label: n.label.to_owned(), href: n.href, on: n.on, zero: false })
             .collect(),
         toolbar,
         ..PageHead::new("Insights", tagline)
@@ -30,12 +30,21 @@ pub(crate) fn insights_head(active: &str, tagline: Tagline, toolbar: String) -> 
 /// The branches and tags page's head: how many of each kind of ref there are, from `total`,
 /// and Compare from the newest tag (`compare`, `""` when the page is off).
 pub(crate) fn refs_head(total: impl Fn(RefKind) -> usize, compare: String) -> PageHead {
-    let said = format!(
-        "{} \u{b7} {} \u{b7} {}",
-        fmt::count(total(RefKind::Branch), "branch", "branches"),
-        fmt::count(total(RefKind::Tag), "tag", "tags"),
-        fmt::count(total(RefKind::Remote), "remote branch", "remote branches")
-    );
+    // A kind with none is left out: the page shows no group for it either.
+    let kinds = [
+        (RefKind::Branch, "branch", "branches"),
+        (RefKind::Tag, "tag", "tags"),
+        (RefKind::Remote, "remote branch", "remote branches"),
+    ];
+    let mut parts: Vec<String> = kinds
+        .iter()
+        .filter(|(k, ..)| total(*k) > 0)
+        .map(|(k, one, many)| fmt::count(total(*k), one, many))
+        .collect();
+    if parts.is_empty() {
+        parts.push("No branches or tags".to_owned());
+    }
+    let said = parts.join(" \u{b7} ");
     PageHead {
         actions: if compare.is_empty() {
             Vec::new()
@@ -66,12 +75,14 @@ pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -
         label: "File".to_owned(),
         href: fmt::href(&format!("/blob/{r}/{p}")),
         on: on == FileView::File,
+        zero: false,
     }];
     if crate::features::on(Feature::Blame) {
         tabs.push(Tab {
             label: "Blame".to_owned(),
             href: fmt::href(&format!("/blame/{r}/{p}")),
             on: on == FileView::Blame,
+            zero: false,
         });
     }
     if crate::features::on(Feature::History) {
@@ -79,6 +90,7 @@ pub(crate) fn file_head(rev: &str, path: &str, on: FileView, tagline: Tagline) -
             label: "History".to_owned(),
             href: fmt::href(&format!("/history/{p}")),
             on: on == FileView::History,
+            zero: false,
         });
     }
     PageHead { crumbs: crate::views::crumbs(rev, path, true), tabs, ..PageHead::new(path, tagline) }

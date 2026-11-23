@@ -49,23 +49,23 @@ impl IntoResponse for Error {
     }
 }
 
-/// The page every error answers with: the app's favicon and styles, the status, one line of
-/// detail and a way back. One shell, so no error page ships without the icon.
+#[derive(askama::Template)]
+#[template(path = "error_page.html")]
+struct ErrorPage {
+    status: u16,
+    head: crate::pagehead::PageHead,
+}
+
+/// The page every error answers with: the app's header, favicon and styles, the status, one
+/// line of detail and a way back. One shell, so no error page ships bare.
 pub(crate) fn page(status: StatusCode, detail: &str) -> Html<String> {
-    Html(format!(
-        "<!doctype html><meta charset=utf-8><meta name=viewport content=\"width=device-width\">{}\
-         <link rel=stylesheet href={}><link rel=stylesheet href={}>\
-         <link rel=stylesheet href={}>\
-         <main class=wrap>{}<p><a href=/>Back to overview</a></p></main>",
-        crate::fmt::FAVICON,
-        crate::asset_url("tokens.css"),
-        crate::asset_url("app.css"),
-        crate::asset_url("pagehead.css"),
-        crate::pagehead::PageHead::new(
-            status.as_u16().to_string(),
-            crate::pagehead::Tagline::of(detail)
-        )
-    ))
+    use askama::Template;
+    let head = crate::pagehead::PageHead::new(
+        status.as_u16().to_string(),
+        crate::pagehead::Tagline::of(detail),
+    );
+    let shown = ErrorPage { status: status.as_u16(), head }.render();
+    Html(shown.unwrap_or_else(|_| format!("{} {detail}", status.as_u16())))
 }
 
 /// A 404 with [`page`], for a path or repository nothing serves. It carries its detail, so a

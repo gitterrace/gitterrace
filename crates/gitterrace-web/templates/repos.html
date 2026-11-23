@@ -7,7 +7,7 @@
 <meta name="color-scheme" content="light dark">
 <meta name="gt-base" content="">
 <title>Repositories · gitterrace</title>
-<script>(function(){try{var t=localStorage.getItem("gitterrace-theme");if(t==="light"||t==="dark")document.documentElement.dataset.theme=t}catch(e){}})()</script>
+{% include "_theme.html" %}
 {% include "_favicon.html" %}
 <link rel="stylesheet" href="{{ crate::asset_url("tokens.css") }}">
 <link rel="stylesheet" href="{{ crate::asset_url("app.css") }}">
@@ -36,7 +36,7 @@
 <ul class="repos">
 {% for r in rows %}<li class="reporow" data-name="{{ r.name }}"
 {%- if r.hidden %} hidden{% endif %}><div class="rtop"><a class="rname" href="{{ r.href }}">{{ r.name }}</a>{% if let Some(d) = r.dirty %}<a class="wtchip" href="{{ r.href }}worktree" data-repo="{{ r.name }}" data-tip="Uncommitted changes in the working tree"{% if !d %} hidden{% endif %}><span class="dot"></span><span class="label">Uncommitted</span></a>{% endif %}{% if let Some(s) = r.state %}{% call bd::badge("state", s) %}{% endcall %}{% endif %}<span class="rmeta"><span class="muted">{{ r.when }}</span><span class="sparkcell" data-tip="{{ r.tip }}"><svg class="spark s1" viewBox="0 0 90 20" width="90" height="20" aria-hidden="true"><polyline points="{{ r.spark }}"/></svg><span class="muted">{{ r.total }}</span></span></span></div>
-<a class="today" href="{{ r.commit_href }}" data-tip="{{ r.today }}">{{ r.today }}</a></li>
+{% if r.failure.is_empty() %}<a class="today" href="{{ r.commit_href }}" data-tip="{{ r.today }}">{{ r.today }}</a>{% else %}<p class="today why" role="status">{{ r.failure }}</p>{% endif %}</li>
 {% endfor %}</ul>
 <p class="muted repos-none"{% if !none %} hidden{% endif %}>No repository matches</p></div>
 </main>

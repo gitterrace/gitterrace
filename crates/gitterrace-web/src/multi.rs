@@ -401,6 +401,11 @@ impl Served {
         v
     }
 
+    /// Why its last index build failed, empty when none did or its app is not built.
+    fn failure(&self) -> String {
+        self.app.lock().ok().and_then(|g| g.upgrade()).map(|a| a.failure()).unwrap_or_default()
+    }
+
     /// The insights state of its app, `None` until its router is built: a repository is
     /// served at once, its app only on first use or an addition.
     fn insights_state(&self) -> Option<crate::app::RepoState> {

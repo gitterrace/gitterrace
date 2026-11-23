@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta name="gt-base" content="">
+<title>{{ status }} · gitterrace</title>
+{% include "_theme.html" %}
+{% include "_favicon.html" %}
+<link rel="stylesheet" href="{{ crate::asset_url("base.css") }}">
+</head>
+<body>
+<a class="skip" href="#gt-main">Skip to content</a>
+<header class="top"><div class="wrap"><div class="topbar">
+{% include "_brand.html" %}
+</div></div></header>
+<main class="wrap" id="gt-main" tabindex="-1">
+{{ head }}
+<div class="card lost"><ul class="steps"><li><a class="btn primary" href="/">Back to overview</a></li></ul></div>
+</main>
+</body>
+</html>

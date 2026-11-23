@@ -299,6 +299,7 @@ fn log_head(
         label: label.to_owned(),
         href: fmt::href(&href),
         on,
+        zero: false,
     };
     PageHead {
         qualifier: rev.to_owned(),

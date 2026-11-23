@@ -19,7 +19,8 @@ pub(crate) fn has_ext(path: &str, exts: &[&str]) -> bool {
     ext(path).is_some_and(|e| exts.contains(&e.as_str()))
 }
 
-/// The favicon `<link>`, the same file the page templates include, for pages built as strings.
+/// The favicon `<link>`, the same file the page templates include, for tests that look for it.
+#[cfg(test)]
 pub(crate) const FAVICON: &str = include_str!("../templates/_favicon.html");
 
 /// How a commit time renders when it is outside years 1 to 9999 (a corrupt or hostile

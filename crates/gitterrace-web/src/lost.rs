@@ -33,6 +33,8 @@ pub(crate) struct Missing(pub(crate) String);
 struct LostPage {
     c: Chrome,
     head: crate::pagehead::PageHead,
+    /// The address that was asked for, shown as it came.
+    path: String,
     steps: Vec<Step>,
 }
 
@@ -58,11 +60,18 @@ pub(crate) async fn in_shell(State(app): State<Arc<App>>, req: Request, next: Ne
     };
     let shown = blocking(&app, move |a| {
         let (title, steps) = explain(&path, &rev);
+        // The generic detail repeats the title's claim, so it says what to do instead.
+        let said = if detail == "Nothing here." {
+            "Check the address, or start from one of these."
+        } else {
+            detail.as_str()
+        };
         Ok(LostPage {
+            path: path.clone(),
             c: views::chrome(a, ""),
             head: crate::pagehead::PageHead {
                 qualifier: "404".to_owned(),
-                ..crate::pagehead::PageHead::new(title, crate::pagehead::Tagline::of(&detail))
+                ..crate::pagehead::PageHead::new(title, crate::pagehead::Tagline::of(said))
             },
             steps,
         }
@@ -107,15 +116,27 @@ fn explain(path: &str, rev: &str) -> (String, Vec<Step>) {
             });
         }
     }
-    let known = !title.starts_with("No revision");
-    steps.push(if known && rev != "HEAD" {
-        Step {
-            label: format!("Back to the tree of {rev}"),
-            href: href(&format!("/tree/{}", enc_seg(&rev))),
+    let generic = file.is_none() && title == "Nothing at this address";
+    if generic {
+        // No path to search for: the three places the app starts from.
+        steps.push(Step { label: "Code".to_owned(), href: href("/") });
+        if crate::features::on(Feature::History) {
+            steps.push(Step { label: "Commits".to_owned(), href: href("/log/HEAD") });
+        }
+        if crate::features::on(Feature::Search) {
+            steps.push(Step { label: "Search".to_owned(), href: href("/search") });
         }
     } else {
-        Step { label: "Back to the overview".to_owned(), href: href("/") }
-    });
+        let known = !title.starts_with("No revision");
+        steps.push(if known && rev != "HEAD" {
+            Step {
+                label: format!("Back to the tree of {rev}"),
+                href: href(&format!("/tree/{}", enc_seg(&rev))),
+            }
+        } else {
+            Step { label: "Back to the overview".to_owned(), href: href("/") }
+        });
+    }
     (title, steps)
 }
 
@@ -133,6 +154,14 @@ mod tests {
             ["Search for nope.c", "Open the history of this path", "Back to the tree of v1"]
         );
         assert!(steps[1].href.ends_with("/history/src/nope.c"));
+    }
+
+    #[test]
+    fn an_unknown_address_offers_code_commits_and_search() {
+        let (title, steps) = explain("/nothing-here", "HEAD");
+        assert_eq!(title, "Nothing at this address");
+        let labels: Vec<_> = steps.iter().map(|s| s.label.as_str()).collect();
+        assert_eq!(labels, ["Code", "Commits", "Search"]);
     }
 
     #[test]

@@ -150,7 +150,7 @@ fn settings_head(
         own: true,
         tabs: files
             .into_iter()
-            .map(|c| crate::pagehead::Tab { label: c.label, href: c.target, on: c.on })
+            .map(|c| crate::pagehead::Tab { label: c.label, href: c.target, on: c.on, zero: false })
             .collect(),
         toolbar: format!(
             "{}{}",

@@ -80,8 +80,8 @@ async fn remove_is_gated_and_takes_the_repository_off() {
     let (s, js) = send(&r, req("DELETE", tok), by_path).await;
     assert_eq!((s, js.contains("\"b\"")), (200, true), "{js}");
     let (s, page) = get(&r, "/r/b/").await;
-    assert_eq!(s, 404, "a removed repository is a plain 404");
-    assert!(page.contains("href=/"), "links to the overview: {page}");
+    assert_eq!(s, 404, "a removed repository is a 404 in the app shell");
+    assert!(page.contains("href=\"/\""), "links to the overview: {page}");
     assert_eq!(get(&r, "/r/b/stats").await.0, 404);
     let (_, list) = get(&r, "/api/repos").await;
     assert!(!list.contains("/r/b/") && list.contains("/r/a/"), "{list}");

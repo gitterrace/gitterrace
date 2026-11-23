@@ -29,6 +29,8 @@ pub(crate) struct Tab {
     pub(crate) label: String,
     pub(crate) href: String,
     pub(crate) on: bool,
+    /// The tab holds nothing: drawn quiet, still a link.
+    pub(crate) zero: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -188,7 +190,12 @@ mod tests {
 
     #[test]
     fn one_tab_is_no_tab_row_and_two_are() {
-        let tab = |label: &str, on| Tab { label: label.into(), href: format!("/{label}"), on };
+        let tab = |label: &str, on| Tab {
+            label: label.into(),
+            href: format!("/{label}"),
+            on,
+            zero: false,
+        };
         let one = PageHead { tabs: vec![tab("A", true)], ..PageHead::new("T", Tagline::of("x")) }
             .to_string();
         assert!(!one.contains("class=\"tabs\"") && one.contains("ph-sep"));

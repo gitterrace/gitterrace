@@ -46,6 +46,7 @@ pub(crate) fn tabs(current: Scope, counts: ScopeCounts) -> Vec<Tab> {
         label: format!("{label} ({})", fmt::thousands(n)),
         href: fmt::href(&format!("/worktree{}", query(scope))),
         on: scope == current,
+        zero: n == 0,
     })
     .collect()
 }

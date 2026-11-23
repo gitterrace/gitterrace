@@ -256,7 +256,13 @@ async fn export_writes_every_prewarmed_page() {
     // A static host answers a missing file with `404.html`: the app's not-found page, whose
     // stylesheets and way back resolve from the root it sits in.
     let lost = std::fs::read_to_string(out.join("404.html")).expect("404.html is written");
-    assert!(lost.contains("404") && lost.contains("static/app.css"), "{lost}");
+    assert!(lost.contains("404") && lost.contains("rel=\"stylesheet\" href=\""), "{lost}");
+    // Every stylesheet it links is a file of the copy: a link to a sheet export never wrote
+    // would be stripped, or would 404 on the host.
+    for href in lost.split("rel=\"stylesheet\" href=\"").skip(1) {
+        let href = href.split(['"', '?']).next().unwrap_or_default();
+        assert!(out.join(href).is_file(), "404.html links {href}, which was not exported");
+    }
     assert!(!lost.contains("type=\"font/woff2\""), "{lost}");
     // The credit is a footer of its own, not a second snapshot banner.
     let page = std::fs::read_to_string(target(&out, "/r/r/", "text/html").expect("home"))

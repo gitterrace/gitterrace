@@ -249,8 +249,7 @@ progress::-moz-progress-bar{background:var(--accent);border-radius:var(--radius)
 .progress .bar{display:flex;align-items:center;gap:var(--space-3)}.progress .bar progress{flex:1;min-width:0}.progress .bar .pct{min-width:4ch;text-align:right}
 .indexing .dochead{position:static}.indexing .progress{max-width:none;padding:var(--space-5) var(--space-4)}.indexing .next{display:flex;gap:var(--space-5)}
 .empty{padding:var(--space-8) var(--space-4);text-align:center;color:var(--muted)}.empty p{margin:0}.empty .next{margin-top:var(--space-2)}
-.lost h1{color:var(--fg);font-size:var(--text-md);margin:0 0 var(--space-2);overflow-wrap:anywhere}
-.lost .steps{list-style:none;margin:var(--space-4) 0 0;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:var(--space-2) var(--space-5)}
+.lost .steps{list-style:none;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-2) var(--space-3)}
 
 @media (max-width:600px){
 :root{--page-pad:var(--space-4)}
@@ -623,3 +622,15 @@ main h2.day:not(.markdown-body *){color:var(--muted)}
 main.wrap{padding-top:var(--space-4)}
 .ph{margin-bottom:var(--space-3)}
 .ph-sep{margin-top:var(--space-3)}
+
+/* ---- states: the not-found card, a failed repository, a zero tab, a bar with no value yet ---- */
+.lost{padding:var(--space-6) var(--space-4);text-align:left}
+.lost-path{margin:0 0 var(--space-4);color:var(--muted);overflow-wrap:anywhere}
+.lost .steps{justify-content:flex-start;margin:0}
+.reporow .today.why{color:var(--del);white-space:normal;margin-bottom:0}
+.tabs>a.zero{color:var(--faint)}
+/* A bar with no value moves, so a slow first build does not read as stalled. */
+progress:not([value])::-webkit-progress-bar{background:linear-gradient(90deg,var(--soft),var(--accent-soft),var(--soft)) 0 0/200% 100%;animation:indeterminate 1.6s linear infinite}
+progress:not([value])::-moz-progress-bar{background:var(--accent-soft)}
+progress:not([value]){background:linear-gradient(90deg,var(--soft),var(--accent-soft),var(--soft)) 0 0/200% 100%;animation:indeterminate 1.6s linear infinite}
+@keyframes indeterminate{to{background-position:-200% 0}}

@@ -161,7 +161,7 @@ const RULES: &[Rule] = &[
         name: "top bar and full page, _base.html",
         dirs: &["templates"],
         exts: &["html"],
-        owners: &["_base.html", "repos.html"],
+        owners: &["_base.html", "repos.html", "error_page.html"],
         find: top_bars,
         red: &["<header class=\"top\">", "<div class=\"topbar\">", "<!doctype html><html></html>"],
         green: &["{% extends \"_base.html\" %}<!doctype html>"],

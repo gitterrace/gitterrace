@@ -273,17 +273,17 @@ async fn refresh(app: &Arc<App>, rev: &str, warm: Option<&str>) {
         Ok(Err(e)) if gitterrace_index::feed::SourceError::of(&e).is_some() => {
             tracing::warn!("cache unreadable while updating {rev}, rebuilding: {e}");
             if let Err(e) = app.unreadable_now() {
-                app.advance(RepoState::Failed);
+                app.fail(&e.to_string());
                 tracing::warn!("rebuilding the unreadable cache failed: {e}");
             }
             return;
         }
         Ok(Err(e)) => {
-            app.advance(RepoState::Failed);
+            app.fail(&e.to_string());
             return tracing::warn!("index update for {rev} failed: {e}");
         }
         Err(e) => {
-            app.advance(RepoState::Failed);
+            app.fail(&e.to_string());
             return tracing::warn!("index task failed: {e}");
         }
     }
