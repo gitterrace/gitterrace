@@ -51,6 +51,7 @@ each cap.
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
 | `GET /contributors` | `rev`, `q`, `period`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
+| `GET /file_insight` | `rev`, `q`, `period`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | age, authors_90d, bus_factor, churn, hot, kind, link, owners, partners, path, paths, permalink, rev |
 | `GET /insights` |  | insights |
 | `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 
@@ -111,6 +112,17 @@ counts them.
   one way to select commits.
 - `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
   ending at the newest commit. Sets the bucket unit.
+- The counting parameters below.
+
+`/file_insight`: The card of one file or directory: churn rank and sparkline,
+owners, partners, age.
+
+- `rev` (string): Revision to read, default `HEAD`.
+- `q` (string): The commit filter, the web filter field's text, see Filter. The
+  one way to select commits.
+- `period` (string): `1w`, `1m`, `3m`, `1y` or `all` (default): the window,
+  ending at the newest commit. Sets the bucket unit.
+- `path` (string, required): File or directory, relative to the repository root.
 - The counting parameters below.
 
 `/insights/{name}`: One insight.
@@ -201,6 +213,13 @@ so to the model.
   `bus_factor` (the fewest people who made half of all commits). Use for
   ownership and knowledge-concentration questions. Parameters: `repo?` (string),
   `rev?` (string).
+- `file_insight`: The card of one file or directory: how hot it is (churn rank
+  among the files, a 12-bucket sparkline), who owns it (top 3 with share, bus
+  factor), the files that change with it, and its age. A directory lists each
+  direct child's rank. Use to judge a file before editing or reviewing it.
+  `query` and `period` select the commits as for `insight`. Parameters: `path`
+  (string), `period?` (string), `query` (string), `repo?` (string), `rev?`
+  (string).
 - `insight`: One statistic of the repository's history or head tree, the numbers
   of the web insights pages: activity per period, contributors, hotspots,
   languages (lines per language and the project's size), ownership, churn per

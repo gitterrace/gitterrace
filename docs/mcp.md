@@ -58,10 +58,16 @@ Answer with commit ids and dates so the user can check them.
    `limit`. The score is changes times the square root of lines.
 2. Call `contributors` for ownership and `bus_factor`, the fewest people who
    made half of all commits.
-3. For the top files, call `log` with `path` to see why they change, and
+3. For one file or directory, call `file_insight` with `path`. It answers
+   the card: churn rank among the files with a 12 bucket sparkline, the top
+   three owners and the bus factor, the files that change with it and its
+   age. A directory also ranks each direct child. A path the tree lacks
+   answers an empty `missing` card. It counts as `hotspots` and `ownership`
+   do, so the same `query` and `period` give the same rank.
+4. For the top files, call `log` with `path` to see why they change, and
    `blame` to see who holds the lines now.
-4. Call `activity` to see whether the project is speeding up or slowing down.
-5. Report a ranked list. Each entry holds the file, its score, its owners and
+5. Call `activity` to see whether the project is speeding up or slowing down.
+6. Report a ranked list. Each entry holds the file, its score, its owners and
    one reason it changes.
 
 A high score is a question and not a verdict: a changelog or a lockfile

@@ -47,6 +47,7 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("list_tree", &[], None),
     ("blame", &[Feature::Blame], None),
     ("contributors", &[Feature::Insights], Some("contributors")),
+    ("file_insight", &[Feature::Insights], None),
     ("insight", &[Feature::Insights], None),
     ("list_insights", &[Feature::Insights], None),
 ];
@@ -241,6 +242,15 @@ args! {
         rev: Option<String>,
         /// Repository-relative file path.
         path: String,
+    }
+    FileInsightArgs {
+        rev: Option<String>,
+        /// Repository-relative file or directory path, empty for the repository root.
+        path: String,
+        /// `1w`, `1m`, `3m`, `1y` or `all` (default).
+        period: Option<String>,
+        #[schemars(schema_with = "query_schema")]
+        query: Option<String>,
     }
     InsightArgs {
         /// Which insight: one of the names `list_insights` gives.
@@ -480,6 +490,22 @@ impl McpServer {
     ) -> Result<CallToolResult, ErrorData> {
         self.run("contributors", a.repo.clone(), move |s| {
             s.contributors(a.rev.as_deref(), &crate::insights::Params::default())
+        })
+        .await
+    }
+
+    /// The card of one file or directory: how hot it is (churn rank among the files, a 12-bucket
+    /// sparkline), who owns it (top 3 with share, bus factor), the files that change with it,
+    /// and its age. A directory lists each direct child's rank. Use to judge a file before
+    /// editing or reviewing it. `query` and `period` select the commits as for `insight`.
+    #[tool(name = "file_insight", annotations(read_only_hint = true))]
+    async fn file_insight(
+        &self,
+        Parameters(a): Parameters<FileInsightArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        let p = Params::new(a.period, a.query, None, None, None);
+        self.run("file_insight", a.repo.clone(), move |s| {
+            s.file_insight(a.rev.as_deref(), &a.path, &p)
         })
         .await
     }

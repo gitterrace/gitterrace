@@ -24,7 +24,11 @@ All notable changes are listed here. The format follows
 - site: lead the landing page with install, trust and the hand-off
 - harness: run the browser checks in Firefox
 - review: checkpoints of uncommitted work and viewed marks
+- actions: derive an owner session value and cookie name from the secret
+- cli: open the browser through a one-time launch link
 - review: a review basket of findings, listed with where their code is now
+- web: add a diff toolbar with find, viewed progress and hide viewed
+- api: serve the card of one file or directory
 
 ### Changed
 
@@ -135,6 +139,8 @@ All notable changes are listed here. The format follows
 - index: bound every stored count by the bytes left before sizing a buffer
 - sweep: trash landed clones and keep any younger than 30 minutes
 - web: honour the shortcut switch in every printable-key handler
+- web: require an owner cookie for writes and serve no token in pages
+- git: count every worktree tab from the rows its table lists
 
 ### Performance
 

@@ -440,3 +440,130 @@ fn file_history_counts_bots_by_the_option() {
         assert_eq!(changes, want, "bots {bots}");
     }
 }
+
+/// 150 files in three directories over 90 commits by four people, one file renamed: wide
+/// enough that a directory card reads more than one chunk of touches.
+fn wide_history() -> (Vec<crate::CommitRecord>, Vec<HeadFile>) {
+    let who = ["Ann", "Bob", "Cy", "Di"];
+    let name = |n: usize| format!("{}/f{n}.rs", ["a", "b", "c"][n % 3]);
+    let mut recs = Vec::new();
+    for i in 0..90usize {
+        let mut touched: Vec<_> = (0..4).map(|k| (i * 7 + k * 13) % 150).collect();
+        touched.dedup();
+        let files = touched.iter().map(|&n| file(&name(n), 3, 1, 10 + n as u32)).collect();
+        recs.push(rec(&format!("c{i}"), who[i % 4], i as i64 * 6, files));
+    }
+    recs.push(rec("mv", "Ann", 600, vec![renamed("a/f0.rs", "a/moved.rs")]));
+    let mut head: Vec<HeadFile> =
+        (0..150).map(|n| HeadFile { path: name(n), lines: 10 + n as u32 }).collect();
+    head[0].path = "a/moved.rs".into();
+    (recs, head)
+}
+
+/// Counts the card of every path through `ins` over `c`, against the full reports narrowed to
+/// the path: hotspots for churn and rank, coupling for partners, the top-level directory rows
+/// of ownership for owners.
+fn assert_cards_equal_reports(
+    ins: &Insights<'_>,
+    c: &crate::Counted<'_>,
+    head: &[HeadFile],
+    case: &str,
+) {
+    let hot = ins.hotspots_in(head, c);
+    let pairs = ins.coupling_in(head, c, super::PARTNER_MIN_TOGETHER, usize::MAX);
+    let own = ins.ownership_in(head, c, 1);
+    for h in head {
+        let card = ins.path_card(head, c, &h.path);
+        let at = hot.files.iter().position(|f| f.path == h.path);
+        let row = at.map(|i| &hot.files[i]);
+        let tag = format!("{case}: {}", h.path);
+        assert_eq!(card.kind, super::PathKind::File, "{tag}");
+        assert_eq!(card.changes, row.map_or(0, |r| r.changes), "{tag}: changes");
+        assert_eq!(card.lines_changed, row.map_or(0, |r| r.lines_changed), "{tag}: lines");
+        assert_eq!(card.rank, at.map_or(0, |i| i + 1), "{tag}: rank");
+        assert_eq!(card.of, if at.is_some() { hot.files.len() } else { 0 }, "{tag}: of");
+        assert_eq!(card.hot, at.is_some_and(|i| i < hot.top_tenth), "{tag}: hot");
+        assert_eq!(card.last_change, row.map(|r| r.last_change), "{tag}: last change");
+        assert!(card.authors_90d <= row.map_or(0, |r| r.authors), "{tag}: authors");
+        let want: Vec<(String, usize)> = pairs
+            .iter()
+            .filter(|p| p.a == h.path || p.b == h.path)
+            .take(super::CARD_PARTNERS)
+            .map(|p| (if p.a == h.path { p.b.clone() } else { p.a.clone() }, p.together))
+            .collect();
+        let got: Vec<(String, usize)> =
+            card.partners.iter().map(|p| (p.path.clone(), p.together)).collect();
+        assert_eq!(got, want, "{tag}: partners");
+        let in_window: u32 = card.series.iter().sum();
+        assert!(in_window as usize <= card.changes, "{tag}: sparkline");
+    }
+    for d in ["a", "b", "c"] {
+        let card = ins.path_card(head, c, d);
+        let under: Vec<&crate::Hotspot> =
+            hot.files.iter().filter(|f| f.path.starts_with(&format!("{d}/"))).collect();
+        let tag = format!("{case}: dir {d}");
+        assert_eq!(card.kind, super::PathKind::Dir, "{tag}");
+        assert_eq!(card.changes, under.iter().map(|f| f.changes).sum::<usize>(), "{tag}");
+        let best = hot.files.iter().position(|f| f.path.starts_with(&format!("{d}/")));
+        assert_eq!(card.rank, best.map_or(0, |i| i + 1), "{tag}: rank");
+        let row = own.dirs.iter().find(|r| r.path == d);
+        let owners: Vec<_> = card.owners.iter().map(|o| (&o.name, o.share.to_bits())).collect();
+        let want: Vec<_> = row
+            .map(|r| r.owners.iter().take(3).map(|o| (&o.name, o.share.to_bits())).collect())
+            .unwrap_or_default();
+        assert_eq!(owners, want, "{tag}: owners");
+        assert_eq!(card.bus_factor, row.map_or(0, |r| r.bus_factor), "{tag}: bus factor");
+        assert!(!card.children.is_empty(), "{tag}: children");
+    }
+}
+
+/// Oracle: the card for path P is the full report filtered to P, for every file and top-level
+/// directory, over the whole history, a year and under a selection.
+#[test]
+fn the_card_of_a_path_equals_the_full_report_filtered_to_it() {
+    use crate::feed::{FixedClock, MemorySource};
+    use crate::{CountContext, Scope, ScopeParams};
+    let (recs, head) = wide_history();
+    let ins = Insights::new(&recs, Options::default(), None);
+    let cx = CountContext::new(&MemorySource::new(&recs), &FixedClock(i64::MAX));
+    for (case, q, period) in [
+        ("all", None, Period::All),
+        ("year", None, Period::Year),
+        ("author", Some("author:ann@x.io"), Period::All),
+        ("path", Some("path:a"), Period::All),
+    ] {
+        let mut p = ScopeParams::default();
+        p.select.q = q.map(str::to_owned);
+        let s = Scope::from_params(&p, Options::default(), period).expect("scope");
+        assert_cards_equal_reports(&ins, &ins.counted(&s, cx), &head, case);
+    }
+}
+
+/// The plan that reads a directory's touches is not the answer: any chunk size, and one visit
+/// that builds the tip index, give the same card.
+#[test]
+fn a_directory_card_does_not_depend_on_the_touch_chunk() {
+    let (recs, head) = wide_history();
+    let ins = Insights::new(&recs, Options::default(), None);
+    ins.in_period(Period::All, |c| {
+        let want = ins.path_card_chunked(&head, c, "", 0);
+        for chunk in [1, 7, 64, 1000] {
+            assert_eq!(ins.path_card_chunked(&head, c, "", chunk), want, "chunk {chunk}");
+        }
+        assert!(want.series.iter().sum::<u32>() > 0);
+    });
+}
+
+#[test]
+fn a_path_outside_the_tree_has_an_empty_card() {
+    let (recs, head) = wide_history();
+    let ins = Insights::new(&recs, Options::default(), None);
+    ins.in_period(Period::All, |c| {
+        let card = ins.path_card(&head, c, "a/f0.rs");
+        assert_eq!(card.kind, super::PathKind::Missing, "the old name of a renamed file");
+        assert_eq!((card.changes, card.rank, card.owners.len()), (0, 0, 0));
+        assert_eq!(card.series.len(), super::CARD_BUCKETS);
+        let none = ins.path_card(&head, c, "nope/");
+        assert_eq!(none.kind, super::PathKind::Missing);
+    });
+}

@@ -512,3 +512,33 @@ async fn api_reads_wait_for_a_shared_job_slot() {
     assert_eq!(status, StatusCode::OK);
     assert_eq!(jobs.available_permits(), 1, "the slot comes back");
 }
+
+/// The card of a path is the full reports narrowed to it, over HTTP: the same rank as the
+/// hotspots row, and a path the tree lacks is an empty card, not an error.
+#[tokio::test]
+async fn file_insight_matches_the_hotspots_row() {
+    let (_d, s) = fixture();
+    let (_, hot) = get(&s, "/insights/hotspots").await;
+    let rows = hot["data"]["files"].as_array().expect("rows");
+    for (i, row) in rows.iter().enumerate() {
+        let path = row["path"].as_str().expect("path");
+        let (st, card) = get(&s, &format!("/file_insight?path={path}")).await;
+        assert_eq!(st, StatusCode::OK, "{card}");
+        assert_eq!(card["kind"], "file");
+        assert_eq!(card["churn"]["changes"], row["changes"], "{path}");
+        assert_eq!(card["churn"]["rank"], i + 1, "{path}");
+        assert_eq!(card["churn"]["of"], rows.len(), "{path}");
+        assert_eq!(card["churn"]["series"].as_array().map(Vec::len), Some(12));
+    }
+    let (_, dir) = get(&s, "/file_insight?path=src").await;
+    assert_eq!(dir["kind"], "dir");
+    assert_eq!(dir["paths"][0]["path"], "src/b.rs");
+    let (st, gone) = get(&s, "/file_insight?path=gone.rs").await;
+    assert_eq!(st, StatusCode::OK, "{gone}");
+    assert_eq!(gone["kind"], "missing");
+    assert_eq!(gone["hot"], false);
+    let (st, _) = get(&s, "/file_insight").await;
+    assert_eq!(st, StatusCode::BAD_REQUEST, "path is required");
+    let (st, _) = get(&s, "/file_insight?path=a.txt&rev=nope").await;
+    assert_eq!(st, StatusCode::NOT_FOUND, "an unknown rev is 404");
+}

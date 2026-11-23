@@ -14,7 +14,9 @@ use std::io::Write as _;
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
-use gitterrace_index::{Index, Insights, LineCache, Options, Period, head_files};
+use gitterrace_index::{
+    Index, Insights, LineCache, Options, Period, Scope, ScopeParams, head_files,
+};
 use gitterrace_testkit::synthetic::{self, Shape};
 
 /// Ceilings, in ms, for (hotspots, ownership): measured on an M1 Max (all: 224 and 156, one
@@ -77,4 +79,86 @@ fn file_pages_stay_under_their_ceilings_at_100k_commits() {
     }
     // The report is the point of a passing run: the times against their ceilings.
     writeln!(std::io::stderr(), "{}", report.join("\n")).expect("stderr");
+}
+
+/// Ceilings, in ms, for one file card and one directory card: a card reads the whole hotspots,
+/// ownership and coupling reports to rank its path, plus the touches of its own files.
+/// Measured on an M1 Max at load 9 to 12, times 1.5: file 220, directory of 1.1k files at the
+/// card's chunk of 256 paths 262 (chunk 64: 2543, one visit: 129). A file card reads the whole
+/// hotspots report, so its ceiling matches `CEIL_HOT_ALL`.
+const CEIL_FILE_CARD: u64 = 340;
+const CEIL_DIR_CARD: u64 = 400;
+/// Chunk sizes the report compares: 64 (the postings bound), 256 (the card's) and one visit.
+const CHUNKS: [usize; 3] = [64, 256, 0];
+
+#[test]
+fn path_cards_stay_under_their_ceilings_at_100k_commits() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let path = dir.path().join("r");
+    synthetic::build(&path, Shape::sized(100_000));
+    let repo = Repo::discover(&path).expect("repo");
+    let index = Index::open_dir(dir.path().join("cache")).expect("index");
+    index.update(&repo, "HEAD", &|_| {}).expect("update");
+    let tip = repo.resolve("HEAD").expect("tip");
+    let mut lines = LineCache::load(index.dir());
+    let files = head_files(&repo, &tip, &mut lines).expect("head files");
+    let scope = Scope::from_params(&ScopeParams::default(), Options::default(), Period::All)
+        .expect("scope");
+    // One file, and the widest top-level directory of the synthetic tree (about a 37th of it).
+    let cases: [(&str, &str, usize); 3] =
+        [("file", "d0/d0/f0.rs", 64), ("dir", "d0", 256), ("root", "", 64)];
+    let mut report = Vec::new();
+    let mut ceilings = (0, 0);
+    for (what, at, chunk) in cases.into_iter().take(2) {
+        let best = best_of_three(&index, &repo, &tip, |ins| {
+            let c = ins.counted(&scope, ins.context());
+            let card = ins.path_card_chunked(&files, &c, at, chunk);
+            assert!(card.changes > 0, "{at} has changes");
+        })
+        .expect("the built tip opens");
+        match what {
+            "file" => ceilings.0 = best,
+            _ => ceilings.1 = best,
+        }
+        report.push(format!("{what} card {at}: {best} ms (chunk {chunk})"));
+    }
+    for chunk in CHUNKS {
+        let best = best_of_three(&index, &repo, &tip, |ins| {
+            let c = ins.counted(&scope, ins.context());
+            ins.path_card_chunked(&files, &c, "d0", chunk);
+        })
+        .expect("the built tip opens");
+        report.push(format!("dir card d0 at chunk {chunk}: {best} ms"));
+    }
+    writeln!(std::io::stderr(), "{}", report.join("\n")).expect("stderr");
+    assert!(
+        ceilings.0 <= CEIL_FILE_CARD && ceilings.1 <= CEIL_DIR_CARD,
+        "file card {} ms (ceiling {CEIL_FILE_CARD}), directory card {} ms (ceiling \
+         {CEIL_DIR_CARD}) over {} head files",
+        ceilings.0,
+        ceilings.1,
+        files.len()
+    );
+}
+
+/// The best of three runs of `f` over a fresh source and fresh tables each: what the first
+/// request after a build pays. A loaded machine slows a run, it never speeds one up.
+fn best_of_three(
+    index: &Index,
+    repo: &Repo,
+    tip: &str,
+    f: impl Fn(&Insights<'_>),
+) -> std::io::Result<u64> {
+    let mut best = u64::MAX;
+    for _ in 0..3 {
+        let Some(set) = index.disk_source(repo, tip)? else {
+            return Err(std::io::Error::other("the built tip reads no segment set"));
+        };
+        let src = set.unchecked();
+        let t = Instant::now();
+        let ins = Insights::from_source(&*src, Options::default(), None);
+        f(&ins);
+        best = best.min(ms(t.elapsed()));
+    }
+    Ok(best)
 }

@@ -3,6 +3,7 @@
 
 mod checkpoints;
 mod diffs;
+mod file_insight;
 mod findings;
 mod page_tables;
 mod rebuild;

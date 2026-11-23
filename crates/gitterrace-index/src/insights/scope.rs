@@ -303,6 +303,16 @@ impl CountContext {
         self.anchor_day
     }
 
+    /// Local day of the oldest commit; after [`CountContext::last_day`] for an empty history.
+    pub const fn first_day(&self) -> i64 {
+        self.first_day
+    }
+
+    /// Newest local day of the history, see the field.
+    pub const fn last_day(&self) -> i64 {
+        self.last_day
+    }
+
     /// Hour 0..24 in the commit's own offset.
     pub fn local_hour(&self, time: i64, offset: i32) -> usize {
         usize::try_from(feed::local_time_of(time, offset).rem_euclid(DAY) / 3600).unwrap_or(0)

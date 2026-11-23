@@ -12,6 +12,7 @@ use serde::Serialize;
 use crate::git::{RefKind, TreeEntryKind};
 
 mod commit;
+mod file_insight;
 mod insights;
 mod review;
 
@@ -21,6 +22,10 @@ mod tests;
 pub use commit::{
     CommitResponse, CompareResponse, DiffHunk, DiffLine, FileItem, LogCommit, LogResponse,
     WorktreeResponse,
+};
+pub use file_insight::{
+    FileInsight, FileInsightAge, FileInsightChild, FileInsightChurn, FileInsightKind,
+    FileInsightOwner, FileInsightPartner,
 };
 pub use insights::{
     InsightContributor, InsightContributors, InsightData, InsightDirChurn, InsightDirOwnership,

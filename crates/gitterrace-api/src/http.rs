@@ -6,7 +6,7 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
-    ContributorsResponse, EndpointDoc, FindingsResponse, IndexResponse, InsightList,
+    ContributorsResponse, EndpointDoc, FileInsight, FindingsResponse, IndexResponse, InsightList,
     InsightResponse, LogResponse, ParamDoc, RefsResponse, RepoResponse, TreeResponse,
     ViewedResponse, WorktreeResponse,
 };
@@ -281,6 +281,23 @@ pub(crate) async fn contributors(
 ) -> Reply<ContributorsResponse> {
     let InsightQuery { rev, params } = q;
     blocking(&s, move |s| s.contributors(rev.as_deref(), &params)).await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct CardQuery {
+    rev: Option<String>,
+    path: Option<String>,
+    #[serde(flatten)]
+    params: insights::Params,
+}
+
+pub(crate) async fn file_insight(
+    State(s): State<ApiState>,
+    Query(q): Query<CardQuery>,
+) -> Reply<FileInsight> {
+    let path =
+        q.path.ok_or_else(|| ApiError::BadRequest("missing query parameter: path".into()))?;
+    blocking(&s, move |s| s.file_insight(q.rev.as_deref(), &path, &q.params)).await
 }
 
 pub(crate) async fn insight_list() -> Json<InsightList> {

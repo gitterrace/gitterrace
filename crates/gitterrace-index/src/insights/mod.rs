@@ -47,8 +47,9 @@ pub use counted::{
 };
 pub use figure::{EveryTotals, Figure, Population};
 pub use files::{
-    AgeBucket, AgeReport, Coupling, DirOwnership, Hotspot, HotspotReport, LanguageLines,
-    LanguageReport, Owner, OwnershipReport, Touch,
+    AgeBucket, AgeReport, CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, Coupling, DirOwnership,
+    Hotspot, HotspotReport, LanguageLines, LanguageReport, Owner, OwnershipReport,
+    PARTNER_MIN_TOGETHER, Partner, PathCard, PathChild, PathKind, RECENT_DAYS, Touch,
 };
 pub use filter::{PathFilter, is_generated};
 pub use fold::ActivityFold;

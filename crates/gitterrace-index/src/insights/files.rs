@@ -1,5 +1,11 @@
+mod path;
 mod reports;
 mod scan;
+
+pub use path::{
+    CARD_BUCKETS, CARD_OWNERS, CARD_PARTNERS, PARTNER_MIN_TOGETHER, Partner, PathCard, PathChild,
+    PathKind, RECENT_DAYS,
+};
 
 use rustc_hash::FxHashMap as FastMap;
 use std::collections::HashSet;
@@ -14,7 +20,7 @@ pub(super) const COUPLING_MAX_FILES: usize = 30;
 /// Above this many paths a request scans the file rows once instead of looking each path up
 /// in the postings: a lookup reads its blocks, a scan reads every row once.
 /// Not configurable: a query plan threshold, the answer is the same either way.
-const PER_PATH_MAX: usize = 64;
+pub(super) const PER_PATH_MAX: usize = 64;
 pub(super) const SOLO_SHARE: f64 = 0.8;
 pub(super) const STALE_SECS: i64 = 365 * crate::insights::DAY;
 

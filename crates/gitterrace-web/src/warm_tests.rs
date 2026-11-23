@@ -16,6 +16,10 @@ const COLD_OK: &[(&str, &str)] = &[
         "/api/v1/contributors",
         "the API reads the page's shared tables and builds nothing of its own",
     ),
+    (
+        "/api/v1/file_insight",
+        "a client asks for one path with its own filter, read from the path's postings",
+    ),
     ("/api/v1/insights", "an index of names, no history read"),
     (
         "/api/v1/insights/{name}",

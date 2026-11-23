@@ -6,9 +6,9 @@ use std::borrow::Cow;
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
-    ContributorsResponse, FindingsResponse, IndexResponse, InsightList, InsightResponse,
-    LogResponse, ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse, ViewedResponse,
-    WorktreeResponse,
+    ContributorsResponse, FileInsight, FindingsResponse, IndexResponse, InsightList,
+    InsightResponse, LogResponse, ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse,
+    ViewedResponse, WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
@@ -251,6 +251,25 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[REV, Q, PERIOD, BOTS, MERGES, GENERATED, IGNORE, WS, EXCLUDE],
         schema: of::<ContributorsResponse>,
         route: || get(http::contributors),
+    },
+    Endpoint {
+        path: "/file_insight",
+        summary: "The card of one file or directory: churn rank and sparkline, owners, partners, \
+            age.",
+        params: &[
+            REV,
+            Q,
+            PERIOD,
+            req("path", "string", "File or directory, relative to the repository root."),
+            BOTS,
+            MERGES,
+            GENERATED,
+            IGNORE,
+            WS,
+            EXCLUDE,
+        ],
+        schema: of::<FileInsight>,
+        route: || get(http::file_insight),
     },
     Endpoint {
         path: "/insights",
