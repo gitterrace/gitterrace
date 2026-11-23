@@ -30,7 +30,7 @@ header.top{background:var(--header);border-bottom:var(--border)}
 .reponame{font:var(--weight-semibold) var(--text-lg)/1.3 var(--serif);letter-spacing:-.01em;color:var(--fg);min-width:0;overflow-wrap:break-word}
 .reponame:hover{text-decoration:none;color:var(--accent-fg)}
 /* The branch is context, not an action: a quiet label at rest, a surface only on hover or focus. */
-.branch{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--mono);color:var(--muted);padding:5px 6px;white-space:nowrap}
+.branch{display:inline-flex;align-items:center;gap:var(--space-1);font:var(--weight-regular) var(--text-xs)/1 var(--mono);color:var(--muted);padding:var(--space-1) 6px;white-space:nowrap}
 .branch svg{width:12px;height:12px;fill:currentColor;opacity:.8}
 /* The bar is two units: where you are (brand, repository, switchers, chip) and the tools.
    Each wraps as a whole, never one control at a time. */
@@ -40,14 +40,14 @@ header.top{background:var(--header);border-bottom:var(--border)}
 .tools{display:flex;align-items:center;gap:var(--space-1);flex:0 1 auto;min-width:0;margin-left:auto}
 button.icon:not(.theme)>svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round}
 .topsearch{display:none;align-items:center}
-.topsearch input[type=search]{min-width:0;width:100%;height:30px}
+.topsearch input[type=search]{min-width:0;width:100%;height:var(--control-h)}
 .topbar.searching>:not(.tools),.topbar.searching .searchbtn{display:none}
 .topbar.searching .tools,.topbar.searching .topsearch{display:flex;flex:1}
 header.top>.wrap{container:topbar/inline-size}
 /* Then the bar sheds words, never controls: the wordmark, then the chip's label, then the
    ref name (the button keeps its icon and opens the same menu). Names are never cut. */
 @container topbar (max-width:700px){.wordmark,.sep{display:none}}
-@container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:5px 4px}}
+@container topbar (max-width:560px){.wtchip .label{display:none}.wtchip{padding:var(--space-1)}}
 .theme svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round;display:none}
 .theme .fill{fill:currentColor;stroke:none}
 .theme .i-auto{display:block}
@@ -59,10 +59,10 @@ header.top>.wrap{container:topbar/inline-size}
   overflow-x:auto;scrollbar-width:none}
 .tabnav::-webkit-scrollbar,.tabs::-webkit-scrollbar{display:none}.tabnav{margin-bottom:-1px}
 .tabs{border-bottom:var(--border);margin-bottom:var(--space-2)}.tabs::after{content:"";flex:0 0 var(--space-1)}.tabs.over-r{--fr:transparent}.tabs.over-l{--fl:transparent}.tabs.over-l,.tabs.over-r{-webkit-mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black));mask-image:linear-gradient(90deg,var(--fl,black),black 32px,black calc(100% - 32px),var(--fr,black))}
-.tabnav a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) 10px;font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
+.tabnav a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3) var(--space-3);font:var(--weight-regular) 12px/1.4 var(--mono);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap;border-bottom:2px solid transparent;transition:color var(--dur-fast)}
 .tabs>a{position:relative;color:var(--muted);padding:var(--space-2) var(--space-3);font:var(--weight-regular) var(--text-sm)/1.4 var(--sans);white-space:nowrap;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color var(--dur-fast)}
 .tabnav a:hover,.tabs>a:hover{color:var(--fg);text-decoration:none}
-.tabnav a.on{color:var(--fg);font-weight:600;border-bottom:1px solid var(--fg);padding-bottom:11px}.tabs>a.on{color:var(--fg);font-weight:var(--weight-semibold);border-bottom-color:var(--accent)}
+.tabnav a.on{color:var(--fg);font-weight:600;border-bottom:1px solid var(--fg);padding-bottom:calc(var(--space-3) + 1px)}.tabs>a.on{color:var(--fg);font-weight:var(--weight-semibold);border-bottom-color:var(--accent)}
 
 /* primitives */
 .muted{color:var(--muted)}.r{text-align:right}.pad{padding:var(--space-4)}
@@ -72,20 +72,20 @@ header.top>.wrap{container:topbar/inline-size}
 .cols.wide{grid-template-columns:minmax(0,1fr)}
 @media (max-width:999px){.cols{grid-template-columns:minmax(0,1fr);gap:var(--space-6)}}
 aside h2{margin-top:0}
-input:not([type=checkbox],[type=radio]){font:inherit;padding:5px var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:32px}
+input:not([type=checkbox],[type=radio]){font:inherit;padding:var(--space-1) var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background:var(--surface);color:var(--fg);min-width:240px;height:var(--control-h)}
 input[type=checkbox],input[type=radio]{width:16px;height:16px;margin:0;flex:none;accent-color:var(--accent);vertical-align:-3px}
 input::placeholder{color:var(--faint)}
-input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color:var(--accent)}
+input:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-color:var(--accent)}
 .filter{display:flex;gap:var(--space-2)}
 .pager{display:flex;justify-content:space-between;margin-top:var(--space-6)}
 .add{color:var(--add)}.del{color:var(--del)}
 .counts{font:var(--weight-semibold) var(--text-xs) var(--mono);font-variant-numeric:tabular-nums}
 .counts.add{font-weight:900}
 .crow>.cnums a{text-decoration:underline;text-underline-offset:2px}
-.badge{font:var(--weight-semibold) var(--text-xs)/1 var(--sans);padding:3px 8px;border-radius:var(--radius);border:var(--border);color:var(--muted)}
+.badge{font:var(--weight-semibold) var(--text-xs)/1 var(--sans);padding:var(--space-1) var(--space-2);border-radius:var(--radius);border:var(--border);color:var(--muted)}
 .badge.added{color:var(--add);border-color:var(--add-hl);background:var(--add-bg)}.badge.deleted{color:var(--del);border-color:var(--del-hl);background:var(--del-bg)}
-.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;font:var(--weight-semibold) 9px/1.2 var(--sans);letter-spacing:-.02em;overflow:hidden;color:var(--on-accent);background:light-dark(hsl(var(--hue) 38% var(--av-l-light)),hsl(var(--hue) 38% var(--av-l-dark)));flex:none}
-.sha{font:var(--text-xs) var(--mono);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:3px var(--space-2);background:transparent;white-space:nowrap}
+.av{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:var(--radius-round);font:var(--weight-semibold) var(--text-2xs)/1.2 var(--sans);letter-spacing:-.02em;overflow:hidden;color:var(--on-accent);background:light-dark(hsl(var(--hue) var(--av-s) var(--av-l-light)),hsl(var(--hue) var(--av-s) var(--av-l-dark)));flex:none}
+.sha{font:var(--text-xs) var(--mono);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:calc(var(--space-1) - 1px) var(--space-2);background:transparent;white-space:nowrap}
 .sha:hover{text-decoration:none;color:var(--accent-fg);border-color:var(--line-strong)}
 
 /* breadcrumbs */
@@ -98,14 +98,14 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:0;border-color
    the sign of a diff line and the age of a blame run. */
 .vh{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap;border:0}.vh.sign{user-select:none}
 .entries{width:100%;border-collapse:collapse}
-.entries :is(td,th){padding:6px var(--space-3);border-top:var(--border);position:relative;line-height:24px;text-align:left;font-weight:inherit}
+.entries :is(td,th){height:var(--row-h);padding:0 var(--space-3);border-top:var(--border);position:relative;line-height:var(--space-6);text-align:left;font-weight:inherit}
 .entries tr:first-child :is(td,th){border-top:0}
 thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .entries .th th{color:var(--muted);font-size:var(--text-sm);font-weight:var(--weight-semibold);background:var(--soft)}
 .entries tr:hover :is(td,th){background:var(--soft)}.entries .th:hover th{background:var(--soft)}
 .entries .r{text-align:right}.entries :is(td,th).r{font-variant-numeric:tabular-nums;white-space:nowrap}
-.entries .fill{padding-bottom:14px}
-.entries .bar{position:absolute;left:var(--space-4);right:var(--space-4);bottom:6px;height:3px;border-radius:var(--radius);background:linear-gradient(90deg,var(--accent) var(--w),var(--soft) var(--w));display:block}
+.entries .fill{padding-bottom:var(--space-3)}
+.entries .bar{position:absolute;left:var(--space-4);right:var(--space-4);bottom:6px;height:2px;border-radius:var(--radius);background:linear-gradient(90deg,var(--accent) var(--w),var(--soft) var(--w));display:block}
 .entries :is(td,th):first-child{width:100%}
 .entries :is(td,th):has(>code){white-space:nowrap}.entries td.wrap{white-space:normal;overflow-wrap:anywhere}
 .entries :is(td,th) a{color:var(--fg)}.entries :is(td,th) a:hover{color:var(--accent-fg)}
@@ -122,13 +122,13 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .files-card{margin-bottom:var(--space-6)}
 /* The README below a file list sits apart from it on every page, not only the overview. */
 .card+.card.readme{margin-top:var(--space-6)}.files-card+.card.readme{margin-top:0}
-/* The document card's header (dochead.rs): one 44px row, every part centred in it, so the
+/* The document card's header (dochead.rs): one --row-h row, every part centred in it, so the
    outline button never reaches the bar's bottom edge. The tab row fills the height for its
    underline; the tools sit at the right end. */
-.dochead{display:flex;align-items:center;gap:var(--space-3);height:44px;box-sizing:border-box;padding:0 var(--space-2) 0 var(--space-4);background:var(--soft);border-bottom:var(--border)}
+.dochead{display:flex;align-items:center;gap:var(--space-3);height:var(--row-h);box-sizing:border-box;padding:0 var(--space-2) 0 var(--space-4);background:var(--soft);border-bottom:var(--border)}
 .dochead .doctabs{flex:0 1 auto;min-width:0;align-self:stretch;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;margin:0 0 -1px calc(-1 * var(--space-2));padding:0;border-bottom:0;background:none}.dochead .doctabs a{padding-top:var(--space-3)}
 .dochead .doc-path{font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);letter-spacing:0;min-width:0;flex:0 1 auto;flex-wrap:nowrap;overflow:hidden;white-space:nowrap}
-@media (max-width:600px){.dochead:has(.doc-path){flex-wrap:wrap;height:auto;min-height:44px;padding-top:var(--space-1);padding-bottom:var(--space-1)}.dochead .doc-path{flex:1 1 100%}.dochead .doc-tools{margin-left:auto}}
+@media (max-width:600px){.dochead:has(.doc-path){flex-wrap:wrap;height:auto;min-height:var(--row-h);padding-top:var(--space-1);padding-bottom:var(--space-1)}.dochead .doc-path{flex:1 1 100%}.dochead .doc-tools{margin-left:auto}}
 .doc-tools{display:flex;align-items:center;gap:var(--space-3);margin-left:auto;flex:none;font-size:var(--text-sm)}
 .dochead .outline.menu{display:block;margin-left:0}
 .facts{list-style:none;margin:0 0 var(--space-4);padding:0;color:var(--muted)}.facts li{padding:var(--space-1) 0}.facts b,.progress b{color:var(--fg);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}.facts b.add{color:var(--add)}.facts b.del{color:var(--del)}
@@ -138,8 +138,8 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .side h2.split{display:flex;justify-content:space-between;align-items:baseline}.side h2 .more{text-transform:none;letter-spacing:0;font-weight:var(--weight-regular)}
 @media (min-width:601px){.entries tr.up{display:none}}
 @media (max-width:400px){.tabnav .more{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}}
-.langbar{display:flex;height:6px;border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%;width:var(--w)}
-.langs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3)}.langs i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:var(--space-1)}
+.langbar{display:flex;height:var(--bar-h);border-radius:var(--radius);overflow:hidden;margin:0 0 var(--space-2);background:var(--soft)}.langbar span{display:block;height:100%;width:var(--w)}
+.langs{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-3)}.langs i{display:inline-block;width:8px;height:8px;border-radius:var(--radius-round);margin-right:var(--space-1)}
 
 /* commit list */
 .list{list-style:none;margin:0;padding:0}
@@ -151,7 +151,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .day{font:var(--text-2xs) var(--mono);text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin:var(--space-4) 0 var(--space-2);display:flex;align-items:center;gap:var(--space-2)}
 .day::before{content:"";width:12px;border-top:1px solid var(--line-strong)}
 .crow{flex-direction:row!important;align-items:center;gap:var(--space-3)!important;padding-top:var(--space-2)!important;padding-bottom:var(--space-2)!important}
-.crow .av{width:18px;height:18px;flex:none}
+.crow .av{width:var(--space-5);height:var(--space-5);flex:none}
 /* One line per commit: subject takes the room, author and time sit after it,
    muted, and give way first when the line is short. */
 .cmain{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
@@ -278,14 +278,14 @@ input:not([type=checkbox],[type=radio]){min-width:0;flex:1}.filter{width:100%}
 /* ---- navigation: finder, switcher, search, shortcuts (gitterrace-ux) ---- */
 .refswitch{display:inline-flex}
 button.branch{height:auto}
-.branch .caret{width:0;height:0;border:3px solid transparent;border-top-color:currentColor;margin:3px 0 0 1px;opacity:.7}
+.branch .caret{width:0;height:0;border:3px solid transparent;border-top-color:currentColor;margin:var(--space-1) 0 0 1px;opacity:.7}
 [hidden]{display:none!important}
 /* Joined to the branch as one phrase ("main · Working tree"): information, not a second button. */
-.wtchip{display:inline-flex;align-items:center;gap:5px;font:var(--weight-regular) var(--text-xs)/1 var(--sans);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:5px 6px;margin-left:-4px;white-space:nowrap;transition:color var(--dur-fast)}
+.wtchip{display:inline-flex;align-items:center;gap:var(--space-1);font:var(--weight-regular) var(--text-xs)/1 var(--sans);color:var(--muted);background:transparent;border:1px solid transparent;border-radius:var(--radius);padding:var(--space-1) 6px;margin-left:calc(-1 * var(--space-1));white-space:nowrap;transition:color var(--dur-fast)}
 .wtchip:hover{color:var(--fg);text-decoration:underline;text-underline-offset:3px}
 /* Uncommitted work is a normal state: quiet label, only the dot carries the warn colour. */
-.wtchip .dot{width:6px;height:6px;border-radius:50%;background:var(--warn)}
-kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted);border:var(--border);border-bottom-width:2px;border-radius:var(--radius);padding:2px 5px;background:var(--soft)}
+.wtchip .dot{width:6px;height:6px;border-radius:var(--radius-round);background:var(--warn)}
+kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted);border:var(--border);border-bottom-width:2px;border-radius:var(--radius);padding:2px var(--space-1);background:var(--soft)}
 /* A modal is a <dialog> filling the window, its box centered inside; a menu is the box itself. */
 .ov-back[open]{animation:ov-in var(--dur-fast) var(--ease);position:fixed;inset:0;width:auto;
   height:auto;max-width:none;max-height:none;margin:0;border:0;padding:12vh 0 0;
@@ -317,7 +317,7 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
 /* A key chip is a box, so the row centers both sides on one line instead of matching baselines
    across two text sizes, which left the chips above their description. */
 .keys dt{display:flex;align-items:center;gap:var(--space-1);white-space:nowrap;font-size:var(--text-xs);line-height:1}.keys dd{margin:0;color:var(--muted);line-height:var(--leading-tight)}
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:var(--radius);font-size:var(--text-sm);z-index:60;transition:opacity var(--dur-slow);animation:toast-in var(--dur-fast) ease-out}
+.toast{position:fixed;bottom:var(--space-6);left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:var(--space-2) var(--space-3);border-radius:var(--radius);font-size:var(--text-sm);z-index:60;transition:opacity var(--dur-slow);animation:toast-in var(--dur-fast) ease-out}
 .toast.out{opacity:0}
 @keyframes toast-in{from{opacity:0;transform:translate(-50%,6px)}}
 .copy.float{position:absolute;top:8px;right:8px;opacity:0;transition:opacity var(--dur-fast)}
@@ -360,7 +360,7 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 
 .brand{gap:var(--space-2)}
 .sep{color:var(--faint)}
-.wordmark{height:15px;width:auto;flex:none;overflow:visible}
+.wordmark{height:var(--text-base);width:auto;flex:none;overflow:visible}
 .wordmark .w-git{fill:var(--wm-git)}.wordmark .w-terrace{fill:var(--wm-terrace)}
 @media (max-width:600px){.tabnav a,.tabs>a{letter-spacing:0;padding-left:var(--space-2);padding-right:var(--space-2)}}
 
@@ -372,9 +372,13 @@ main h2:not(.markdown-body *)::after{content:"";flex:1;border-top:var(--border)}
 .segsel{font:inherit;min-height:44px;padding-left:var(--space-3);border:var(--border);border-radius:var(--radius);background-color:var(--surface);color:var(--fg)}
 .dochead .segctl{font-size:var(--text-xs)}
 @media (pointer:coarse){.segs a,.segs button,.segs label{min-height:44px}}
+/* Touch: every small target is 44px tall (the segmented switch above, the rest here). */
+@media (pointer:coarse){.tabnav a,.tabs>a,.chip a,.viewed-mark,.actbtn{min-height:44px;min-width:44px}.chip a{display:inline-grid}}
+/* A scroller clips an outside ring: inside the scrollers' edge the ring is drawn within the box. */
+:is(.tabnav,.tabs,.doctabs,.segs) :is(a,button,label):focus-visible,.segs label:has(:focus-visible){outline-offset:-2px}
 /* A paned switch: radios, the ring on the label, the checked one's pane shown. */
 .segs label input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
-.segs label:has(:focus-visible){outline:2px solid var(--focus);outline-offset:2px}
+.segs label:has(:focus-visible){outline:2px solid var(--focus);outline-offset:-2px}
 .paned:has(input[value=rendered]:checked) [data-pane=source],
 .paned:has(input[value=source]:checked) [data-pane=rendered],
 .paned:has(input[value=sides]:checked) [data-pane=overlay],
@@ -402,7 +406,7 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .loc-tip{position:absolute;top:8px;z-index:3;min-width:200px;max-width:320px;padding:var(--space-3);background:var(--surface);border:var(--border);border-radius:var(--radius);font-size:var(--text-xs);pointer-events:none;box-shadow:var(--shadow-2)}
 .loc-tip p{margin:0 0 2px}.loc-tip .s{font-weight:var(--weight-semibold);overflow-wrap:break-word}
 .loc-tip div{display:flex;align-items:center;gap:6px;padding:1px 0}.loc-tip div span{flex:1}.loc-tip b{font-variant-numeric:tabular-nums;font-weight:var(--weight-regular)}
-.dot{display:inline-block;width:9px;height:9px;border-radius:var(--radius);margin-right:8px;flex:none}
+.dot{display:inline-block;width:var(--space-2);height:var(--space-2);border-radius:var(--radius);margin-right:var(--space-2);flex:none}
 .loc-tip .dot{margin:0}
 .loc-tip .tot{border-top:var(--border);margin-top:var(--space-1);padding-top:var(--space-1)}.loc-tip .tot b{font-weight:var(--weight-semibold)}
 .fold{margin-top:var(--space-16);scroll-margin-top:calc(var(--header-h) + var(--space-4))}
@@ -416,16 +420,16 @@ svg.loc .xh{display:none;stroke:var(--fg);stroke-width:1;stroke-dasharray:3 3;po
 .kpis b{display:block;font:var(--weight-semibold) var(--text-xl)/1.2 var(--mono);font-variant-numeric:tabular-nums;letter-spacing:-.02em;color:var(--fg)}
 .kpis span{color:var(--muted);font-size:var(--text-sm)}
 .card.pad+.card.pad,.filters+.card.pad,.fbar+.card.pad{margin-top:var(--space-4)}
-.sharebar{display:flex;height:12px;border-radius:6px;overflow:hidden;margin:var(--space-2) 0 var(--space-4);background:var(--soft)}
+.sharebar{display:flex;height:var(--bar-h);border-radius:var(--radius);overflow:hidden;margin:var(--space-2) 0 var(--space-4);background:var(--soft)}
 .sharebar b{display:block;height:100%}.sharebar b+b{border-left:1px solid var(--surface)}
 .dcol{width:30%;min-width:100px}
-.dbar{display:block;height:6px;background:var(--soft);border-radius:3px;overflow:hidden}
+.dbar{display:block;height:var(--bar-h);background:var(--soft);border-radius:var(--radius);overflow:hidden}
 .dbar b{display:block;height:100%}.dbar b.up{background:var(--add)}.dbar b.dn{background:var(--del)}
 /* Tables in a card keep their outer cell padding: the header band and the row hover reach the
    card's inner edge, and text flush against them reads as cut off. */
 .rlist{margin-top:var(--space-4)}.rlist summary,.media-src summary{cursor:pointer;color:var(--muted);font-size:var(--text-sm)}
 .rlist ul{list-style:none;margin:var(--space-3) 0 0;padding:0;max-height:360px;overflow:auto}
-.rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:3px 0;border-top:var(--border);min-width:0}
+.rlist li{display:flex;gap:var(--space-3);align-items:baseline;padding:var(--space-1) 0;border-top:var(--border);min-width:0}
 .rlist .subj{flex:1}
 .foot{color:var(--muted);font-size:var(--text-sm);margin:var(--space-2) 0 0}
 svg.spark{display:block;fill:none;stroke-width:1.6;stroke-linejoin:round}svg.spark *{vector-effect:non-scaling-stroke}
@@ -444,10 +448,10 @@ svg.spark.s1{stroke:var(--cat-1)}svg.spark.s2{stroke:var(--cat-2)}svg.spark.s3{s
    as an icon only, a second choice shows as its select and the period takes what is left. */
 @media (max-width:999px){.fbar{flex-wrap:wrap;row-gap:var(--space-2)}.fbar .outline.menu{margin-left:auto}.fbar .optline{order:3;flex-basis:100%;margin:0}}
 @media (max-width:600px){.fbar{column-gap:var(--space-2)}.fbar>.segctl:first-child{flex:1 1 0;min-width:0}.fbar>.segctl+.segctl{flex:none}.fbar>.segctl+.segctl .segs{display:none}.fbar>.segctl+.segctl .segsel{display:inline-block}.fbar .outlinebtn{width:32px;padding:0;justify-content:center;font-size:0;gap:0}}
-.chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:28px}
-.chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius);padding:3px 4px 3px 12px;font-size:var(--text-sm);color:var(--fg)}
+.chips{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);margin:var(--space-2) 0;min-height:var(--control-h-sm)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--accent-soft);border:var(--border);border-radius:var(--radius);padding:var(--space-1) var(--space-1) var(--space-1) var(--space-3);font-size:var(--text-sm);color:var(--fg)}
 .chip i{font-style:normal;color:var(--muted)}
-.chip a{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;color:var(--muted)}
+.chip a{display:inline-grid;place-items:center;width:var(--space-5);height:var(--space-5);border-radius:var(--radius-round);color:var(--muted)}
 .chip a:hover{background:var(--hover);color:var(--fg);text-decoration:none}
 .chips .clear{font-size:var(--text-sm);color:var(--muted)}
 a.who{color:inherit}a.who:hover b{color:var(--accent-fg);text-decoration:underline}
@@ -492,7 +496,7 @@ svg.chart .col:hover .up,svg.chart .col:hover .dn{opacity:.75}
 svg.chart .line{fill:none;stroke:var(--accent);stroke-width:2;stroke-linejoin:round;pointer-events:none}
 svg.chart .dot{fill:var(--accent);stroke:var(--surface);stroke-width:2;opacity:0}
 svg.chart .col:hover .dot{opacity:1}
-.tag{font-size:var(--text-2xs);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:0 5px}
+.tag{font-size:var(--text-2xs);color:var(--muted);border:var(--border);border-radius:var(--radius);padding:0 var(--space-1)}
 
 .ico.img{background:var(--accent);opacity:.75;--i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1.75 2h12.5c.966 0 1.75.784 1.75 1.75v8.5A1.75 1.75 0 0 1 14.25 14H1.75A1.75 1.75 0 0 1 0 12.25v-8.5C0 2.784.784 2 1.75 2zM1.5 12.25c0 .138.112.25.25.25h.04l6.6-6.6a.75.75 0 0 1 1.06 0l3.3 3.3.9-.9a.75.75 0 0 1 1.06 0l.79.79V3.75a.25.25 0 0 0-.25-.25H1.75a.25.25 0 0 0-.25.25zM5 4.5a1.25 1.25 0 1 1 0 2.5 1.25 1.25 0 0 1 0-2.5z'/%3E%3C/svg%3E")}
 .ov-list .ico{flex:none;align-self:center}
@@ -501,7 +505,7 @@ svg.chart .col:hover .dot{opacity:1}
 .delta{font-size:var(--text-sm);color:var(--muted)}.delta.up{color:var(--add)}.delta.dn{color:var(--del)}
 svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);stroke-width:1}svg.chart a:hover .dot-pt{fill-opacity:.95}
 .cmp{display:flex;gap:var(--space-2);align-items:center;flex:0 1 520px;min-width:0;margin:0}.cmp input{flex:1 1 140px;min-width:0;max-width:240px}.cmp i{font-style:normal;color:var(--faint)}
-.livenote{font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:var(--soft);border:var(--border);border-radius:var(--radius);padding:5px 10px;white-space:nowrap;cursor:pointer}
+.livenote{font:var(--weight-semibold) var(--text-xs)/1 var(--mono);color:var(--muted);background:var(--soft);border:var(--border);border-radius:var(--radius);padding:var(--space-1) var(--space-2);white-space:nowrap;cursor:pointer}
 .livenote:hover{border-color:var(--line-strong)}
 .headstate{background:var(--warn-bg);color:var(--warn);border-bottom:var(--border);font:var(--weight-semibold) var(--text-sm)/1.4 var(--mono);padding:var(--space-2) 0}
 .actnote{background:var(--soft);color:var(--muted);border-bottom:var(--border);font:var(--text-xs)/1.5 var(--mono);padding:var(--space-2) 0;overflow-wrap:break-word}
@@ -539,7 +543,7 @@ td:has(>.actbtn.float){position:relative}
 /* Repository switcher: the name itself is the button. One repository: a link. */
 .reposwitch{display:inline-flex}
 .reposwitch:not([hidden])+#repolink{display:none}
-button.reponame{gap:2px;padding:2px 4px;margin:-3px -5px;min-height:32px;cursor:pointer}
+button.reponame{gap:2px;padding:2px var(--space-1);margin:calc(-1 * var(--space-1));min-height:var(--control-h);cursor:pointer}
 button.reponame .tri{width:16px;height:16px;fill:var(--muted)}
 .ov-title{display:flex;align-items:center;justify-content:space-between;padding:var(--space-1) var(--space-1) var(--space-1) var(--space-4);border-bottom:var(--border)}
 .ov-title h2{margin:0}
@@ -582,5 +586,5 @@ svg.chart a:focus-visible .bar{fill:Highlight}}
 
 [data-tip]:focus-visible{outline-color:var(--focus)}
 /* A CSV or TSV blob as a table, and an archive's entries (filetype/). */
-.data-table{border-collapse:collapse;font:85%/1.45 var(--mono);margin:16px}
-.data-table :is(th,td){border:1px solid var(--line);padding:4px 8px;text-align:left;vertical-align:top;white-space:pre-wrap}
+.data-table{border-collapse:collapse;font:var(--text-sm)/1.45 var(--mono);margin:var(--space-4)}
+.data-table :is(th,td){border:1px solid var(--line);padding:var(--space-1) var(--space-2);text-align:left;vertical-align:top;white-space:pre-wrap}

@@ -33,7 +33,7 @@
 --bg:var(--n-1);--surface:var(--n-0);--soft:var(--n-2);--hover:var(--n-3);--line:var(--n-4);--line-strong:var(--n-5);--accent-ink:var(--accent);
 --focus:var(--accent);
 /* Avatar fill lightness per scheme: every hue keeps on-accent initials at 4.5:1 or more. */
---av-l-light:33%;--av-l-dark:66%;
+--av-s:38%;--av-l-light:33%;--av-l-dark:66%;
 /* A pressed or hovered accent fill steps toward the text color: darker in light, lighter in
    dark, so on-accent text gains contrast in both. */
 --accent-hover:color-mix(in oklab,var(--accent),var(--fg) 14%);
