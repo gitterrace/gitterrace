@@ -1,5 +1,4 @@
 /* The note of a checkpoint page and the Checkpoint bar. */
 .cpbar .cpnote{font-size:var(--text-sm)}
-.cpbar .btn{font-weight:var(--weight-regular)}
 .cp-since ul{font-family:var(--mono)}
 .cp-since summary{cursor:pointer}

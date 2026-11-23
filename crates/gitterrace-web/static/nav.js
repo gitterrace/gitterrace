@@ -362,11 +362,28 @@
 
   // "]" and "[" focus the next or previous diff file: after the focused one, else from the top
   // of the window.
-  function jumpFile(d) {
+  // With a review order panel the files come in its order (riskiest first), the files it does
+  // not score after them in page order.
+  function fileHeads() {
     var hs = Array.prototype.slice.call(document.querySelectorAll("section.file > header"));
+    var order = Array.prototype.map.call(document.querySelectorAll("[data-rplan-path]"),
+      function (li) { return li.dataset.rplanPath; });
+    if (!order.length) return hs;
+    function rank(h) {
+      var i = order.indexOf(h.parentNode.dataset.path);
+      return i < 0 ? order.length : i;
+    }
+    return hs.map(function (h, n) { return [rank(h), n, h]; }).sort(function (a, b) {
+      return a[0] - b[0] || a[1] - b[1];
+    }).map(function (x) { return x[2]; });
+  }
+  function jumpFile(d) {
+    var hs = fileHeads(), ordered = hs.length > 1 && document.querySelector("[data-rplan-path]");
     var at = document.activeElement.closest && document.activeElement.closest("section.file");
     var i = at ? hs.indexOf(at.firstElementChild) : -1;
-    if (i < 0) {
+    if (i < 0 && ordered) {
+      i = d > 0 ? -1 : hs.length;
+    } else if (i < 0) {
       i = d > 0 ? hs.length : -1;
       for (var n = 0; n < hs.length; n++) {
         var t = hs[n].getBoundingClientRect().top;

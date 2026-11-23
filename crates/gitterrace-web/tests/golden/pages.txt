@@ -15,7 +15,7 @@ a3a17cfa5b567cc22ccb59a2b5f29322 a5bfd89dd006d922517cd9812464c892 [browse] /comm
 22470b9115211ea531884e8ed4b4288f 12a85600a1a786bfe0e5ec381445e98d [browse] /commit/HEAD~1
 27fced5a9d178b41f6c8af3f6e2ef8c2 27fced5a9d178b41f6c8af3f6e2ef8c2 [browse] /compare
 91abd0322a964d8d03bee622c9d5d596 91abd0322a964d8d03bee622c9d5d596 [browse] /compare?base=HEAD&head=HEAD
-ffe70dccde51b9e4536368fd283a6e85 ee5b2fd4e55cca78fcc6000dd6a38625 [browse] /compare?base=HEAD~3&head=HEAD
+959ed8db49ae9f3371d3275324d922f5 04978477a98a43fa23fbf40f95767d6f [browse] /compare?base=HEAD~3&head=HEAD
 b21a25f65b6f1d9dea00aeb70b1ef58f b21a25f65b6f1d9dea00aeb70b1ef58f [browse] /compare?base=nope&head=HEAD
 0b9ac81109649e9f2f4435f6e10fedc8 0b9ac81109649e9f2f4435f6e10fedc8 [browse] /diff-find/HEAD?q=fn
 4962ef02d642672ff969f5c3da795081 4962ef02d642672ff969f5c3da795081 [browse] /diff/HEAD/0

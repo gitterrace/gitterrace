@@ -50,6 +50,8 @@ struct Result2 {
     commits: Vec<views::CommitRow>,
     more: usize,
     diff_href: String,
+    /// The review order panel of the changed files.
+    plan: String,
     /// The head commit as the shared sha chip.
     head_sha: String,
 }
@@ -290,6 +292,10 @@ fn outcome(
         commits,
         more: cmp.commits.len().saturating_sub(COMPARE_LIST),
         diff_href: href(&format!("/commit/{hi}")),
+        plan: crate::review_panel::render(
+            a,
+            &crate::review_panel::Source::Compare { base: bi, head: hi, three_dot: false },
+        ),
         head_sha: fmt::sha_link(hi),
     })
 }

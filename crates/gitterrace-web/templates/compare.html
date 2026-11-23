@@ -9,6 +9,7 @@
 {% if let Some(r) = result %}
 {% if let Some(e) = r.empty %}{{ e }}{% else %}
 {% call kp::kpis(&r.kpis) %}<div><b>{{ r.head_sha|safe }}</b><span>Head commit</span></div>{% endcall %}
+{{ r.plan|safe }}
 <meta name="gt-open" content="{{ r.diff_href }}" data-label="Open the head commit">
 <div class="chart-head"><div><h2>Languages</h2><p class="hint">Lines added and removed per language between the two revisions, largest net change first.</p></div></div>
 <div class="card"><table class="entries">{% call t::caption("Languages") %}{% endcall %}

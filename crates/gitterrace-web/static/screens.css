@@ -66,3 +66,20 @@ progress:not([value])::-moz-progress-bar{background:var(--accent-soft)}
 .files[open] summary::before{transform:rotate(45deg);margin-top:calc(-1 * var(--space-1))}
 .files summary .counts{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--fg);
   font-size:var(--text-xs)}
+.rplan{margin:var(--space-4) 0}
+.rplan-list{padding:0}
+.rplan-list>li{flex-wrap:wrap;align-items:baseline;justify-content:flex-start;
+  gap:var(--space-1) var(--space-4)}
+.rplan-list>li>a{flex:0 1 auto}
+.rplan .risk{margin-left:auto;order:1;font-size:var(--text-xs);color:var(--warn)}
+.rplan-why{flex:none;margin:0}
+.rplan .rplan-why summary::before,.rplan-skipped summary::before{display:none}
+.rplan .rplan-why summary{display:inline-block;padding:0;background:none;color:var(--muted);
+  font-size:var(--text-xs);text-transform:none;letter-spacing:0}
+.rplan .rplan-why ul{padding:var(--space-1) 0 0 var(--space-4)}
+.rplan .rplan-why li{display:block;border:0;padding:0;font-size:var(--text-xs)}
+.rplan .rplan-why li:hover{background:none}
+.rplan-skipped{padding:var(--space-2) var(--space-4);font-size:var(--text-sm)}
+.rplan-skipped summary{padding:0;background:none;text-transform:none;letter-spacing:0}
+.rplan-skipped li{border:0;padding:0}
+.cpbar .btn{font-weight:var(--weight-regular)}

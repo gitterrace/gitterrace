@@ -449,6 +449,7 @@ struct WorktreePage {
     head: crate::pagehead::PageHead,
     files_summary: String,
     tools: String,
+    plan: String,
     files: Vec<WorktreeFileRow>,
     diff: String,
     clean: bool,
@@ -519,6 +520,10 @@ async fn worktree(
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),
+            plan: crate::review_panel::render(
+                a,
+                &crate::review_panel::Source::Worktree { scope, since: review.since_id() },
+            ),
             tools: review.since_note() + &crate::diff_find::toolbar(stats.len()),
             files: stats,
         })

@@ -128,6 +128,16 @@ files that git does not ignore, and are not rebuildable: deleting the folder
 forgets them. The buttons are on local servers only, a public server leaves
 them out.
 
+## Review order
+
+The Working tree and Compare pages open with a **Review order** panel: the
+changed files, riskiest first. Each row links to its diff and has a **Why**
+list with the four terms of its risk (churn, size, ownership, untested) and the
+plain facts behind them. Lockfiles, generated, binary and oversized files are
+under **Not scored**. Press `]` and `[` to walk the diff files in this order.
+The panel is the same plan that `GET /api/v1/review_plan` and the `review_plan`
+tool answer, and it needs the insights index.
+
 ## Review basket
 
 The basket collects findings: a line, file, commit or hunk you flagged, each

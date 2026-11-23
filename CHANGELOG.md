@@ -36,6 +36,7 @@ All notable changes are listed here. The format follows
 - insights: explore which files change together
 - web: checkpoint button, since tab and server-kept viewed marks
 - web: add findings to the review basket and send them all
+- web: review order panel on the working tree and compare pages
 
 ### Changed
 

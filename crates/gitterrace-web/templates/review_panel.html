@@ -1,0 +1,14 @@
+<details class="card files rplan" data-rplan open><summary>Review order
+<span class="counts">{{ summary }}, riskiest first</span></summary>
+<ol class="rplan-list">
+{%- for f in rows %}
+<li data-rplan-path="{{ f.path }}"><a href="{{ f.href }}">{{ f.path }}</a>
+<b class="risk" title="Risk {{ f.risk }} of 100">{{ f.risk }}</b>
+<details class="rplan-why"><summary>Why</summary><ul>
+{%- for t in f.terms %}<li>{{ t }}</li>{% endfor %}
+{%- for w in f.why %}<li class="muted">{{ w }}</li>{% endfor %}</ul></details></li>
+{%- endfor %}</ol>
+{%- if !skipped.is_empty() %}<details class="rplan-skipped"><summary>Not scored</summary><ul>
+{%- for s in skipped %}<li>{{ s.path }} <span class="muted">{{ s.reason }}</span></li>
+{%- endfor %}</ul></details>{% endif %}
+{%- if !more.is_empty() %}<p class="muted">and {{ more }}.</p>{% endif %}</details>

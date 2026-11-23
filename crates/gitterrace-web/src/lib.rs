@@ -62,6 +62,7 @@ mod public;
 mod registry;
 mod related;
 mod reload;
+mod review_panel;
 mod routes;
 mod search;
 #[cfg(test)]
