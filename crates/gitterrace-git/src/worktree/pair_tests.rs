@@ -169,3 +169,25 @@ fn each_scope_lists_its_files_with_its_own_hunks() {
         crate::worktree_file_diff_scoped(&repo, "u.txt", Scope::Staged).expect("read").is_none()
     );
 }
+
+/// Every tab count is the number of rows its table lists, renames and untracked files
+/// included: a `git mv` is one file, not two paths.
+#[test]
+fn tab_counts_equal_the_rows_of_each_table() {
+    use crate::Scope;
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    init(p, &[("a.txt", "same\n"), ("b.txt", "other\n"), ("m.txt", "m\n"), ("d.txt", "d\n")]);
+    git(p, &["mv", "a.txt", "moved.txt"]);
+    std::fs::rename(p.join("b.txt"), p.join("b2.txt")).expect("mv");
+    std::fs::write(p.join("m.txt"), "m\nmore\n").expect("w");
+    std::fs::remove_file(p.join("d.txt")).expect("rm");
+    std::fs::write(p.join("new.txt"), "n\n").expect("w");
+    let repo = Repo::discover(p).expect("repo");
+    let c = crate::worktree_counts(&repo).expect("counts");
+    let rows = |s| crate::worktree_diff_scoped(&repo, s).expect("diff").len();
+    assert_eq!(
+        (c.staged, c.unstaged, c.all),
+        (rows(Scope::Staged), rows(Scope::Unstaged), rows(Scope::All))
+    );
+}

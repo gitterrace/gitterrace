@@ -100,14 +100,14 @@ fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BT
     Ok(out)
 }
 
-/// The file count of every scope, from the path passes alone (no file is read).
+/// The file count of every scope: the rows its table lists, so a tab never disagrees with the
+/// page under it. One function counts them all, after renames are paired.
 pub fn worktree_counts(repo: &Repo) -> Result<ScopeCounts> {
-    let r = open(repo)?;
-    let limit = repo.worktree_files();
+    let rows = |scope| worktree_diff_scoped(repo, scope).map(|f| f.len());
     Ok(ScopeCounts {
-        all: scoped_paths(&r, Scope::All, limit)?.len(),
-        staged: scoped_paths(&r, Scope::Staged, limit)?.len(),
-        unstaged: scoped_paths(&r, Scope::Unstaged, limit)?.len(),
+        all: rows(Scope::All)?,
+        staged: rows(Scope::Staged)?,
+        unstaged: rows(Scope::Unstaged)?,
     })
 }
 
