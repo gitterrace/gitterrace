@@ -21,15 +21,18 @@ folder like the repository.
 - Git objects and refs, plus `.git/config` with any credentials in remote URLs.
 - `config.toml`, `actions.toml` and the repository registry: editing
   `actions.toml` is code execution by design.
-- Per-process tokens: the actions token, the settings token and the add token in
-  its file.
+- The per-process owner secret, in a 0600 file under the state folder, and the
+  cookie a launched browser derives from it. No page holds either.
 - The user's other repositories and every file outside the served tree.
 
 ## Actors
 
 - A web page in any browser tab on this machine: it can fire requests at
   loopback and try DNS rebinding.
-- Another local process: it already runs as the user and gains nothing.
+- Another local process of the same user: it already runs as the user and gains
+  nothing.
+- Another OS user on the same machine: loopback is shared, so this actor can
+  fetch every page and set any header. See the multi-user section.
 - A peer on the network, when the server binds beyond loopback or runs with
   `--public`.
 - A hostile repository: file names, commit text, markdown, SVG, `.mailmap`, huge
@@ -44,10 +47,11 @@ folder like the repository.
 | Local-only pages | local only | Answered 404 on a public server |
 | File paths in a URL | both | Looked up by name in the tree, the working tree reader never follows a symlink out |
 | `/raw` | both | SVG and text sandboxed, PDF as a download, size cap |
-| Running an action | loopback only | Same-origin token, JSON only, `actions.toml` outside every served repository, and on Unix owned by you and not writable by others |
-| Settings | loopback only, not in an export | Same-origin token, only `config.toml` or `actions.toml`, never a path from the request |
+| Running an action | loopback only | Same-origin, owner cookie, JSON only, `actions.toml` outside every served repository, and on Unix owned by you and not writable by others |
+| Settings | loopback only, not in an export | Same-origin, owner cookie, only `config.toml` or `actions.toml`, never a path from the request |
 | Adding a repository | loopback only | Token from a private file, any browser request refused |
-| Every write | all | Never succeeds without its token |
+| Launching a browser | loopback only | One-time ticket for the holder of the private file, spent once, gone in a minute |
+| Every write | all | Never succeeds without the owner secret or the cookie made from it |
 | MCP server | the process that started it | Read-only tools, the same feature switches as `/api/v1` |
 | `open` and `gitterrace://` | the OS | Strict link parse, only known clones, no network for an unknown id |
 | Static export | wherever it is hosted | No local pages, the content security policy in a `_headers` file the host must apply |
@@ -57,6 +61,34 @@ Tests walk every route of the built server, so a new route is covered without a
 new test. Each must be classified public or local, dark on a public server when
 local, send `nosniff` and the policy, read nothing outside the tree, and refuse
 a write without its token.
+
+## Multi-user host
+
+On a machine shared with other OS users, loopback is not private: any user can
+connect to the port, read every page and send any header. So headers prove
+nothing about who is asking, and a secret in a page is a secret given away.
+
+- Pages carry no token. A page body holds neither the owner secret nor the
+  cookie made from it (`no_served_page_contains_a_write_token`).
+- The owner secret lives in `add-token-PORT` in the state folder, mode 0600 in a
+  0700 folder, read without following a link and refused when another user owns
+  or can read it.
+- `git terrace open` and `git terrace launch` read that file and ask `POST /_launch`
+  for a ticket. A browser opens `/_launch?t=TICKET`, which spends the ticket and
+  sets an HttpOnly, SameSite=Strict cookie holding a hash of the secret. The
+  secret never sits in the browser. `git terrace launch --print` prints the
+  link, which works once, for a minute.
+- Every write, and every read of the settings files, needs that cookie on top of
+  the same-origin checks, which stop other sites but are forgeable by a local
+  client (`a_forging_loopback_client_without_owner_proof_writes_nothing`).
+  Without it, writing is refused: another user can run no action and save no
+  setting.
+- Not covered: reading. Committed history, the working tree pages and the
+  diffs of a served repository are readable by any local user who can reach the
+  port, as on any loopback server. Run it on a machine you do not share, or bind
+  it where the OS limits who connects, when that matters.
+- Without a state folder the server has no secret a person can read, so no
+  browser can be launched and writes stay refused.
 
 ## Accepted risks
 

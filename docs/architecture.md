@@ -212,7 +212,9 @@ Each door in [security](security.md) and what holds it in the code:
 | `POST /_actions/run`       | `same_origin_write`, JSON only, `actions/src/config/trust.rs`    | `run_route_security_table`                             |
 | `/_settings/*`             | `same_origin_write`, enum file choice, stamp                     | `settings/tests.rs`                                    |
 | `/_repos`                  | Add token from a 0600 file, browser headers refused              | `add/tests.rs`                                         |
-| Every non-GET method       | Tokenless writes never succeed                                   | `no_write_succeeds_without_the_token`                  |
+| `/_launch`                 | One-time ticket for the 0600 secret, cookie HttpOnly Strict      | `owner.rs` tests, `launch_*` in `add/tests.rs`         |
+| Every non-GET method       | Forged writes without the owner cookie never succeed             | `a_forging_loopback_client_without_owner_proof_writes_nothing` |
+| Every page                 | Holds no token                                                   | `no_served_page_contains_a_write_token`                 |
 | MCP server                 | Read-only tools, the switches of `/api/v1`                       | `mcp_tools_follow_the_switches_of_the_web_api`         |
 | `open` and `gitterrace://` | Strict link parse, known clones only                             | `open` tests                                           |
 | Static export              | `_headers` carries the CSP, no local routes crawled              | `export/headers_tests.rs`                              |
