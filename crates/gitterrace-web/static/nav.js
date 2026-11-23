@@ -306,7 +306,7 @@
   var SHORTCUTS = [
     ["t", "Go to file"], ["/", "Focus search"], ["y", "Permalink to this commit"],
     ["g c", "Code"], ["g i", "Insights"], ["g b", "Branches and tags"], ["g l", "Commits"], ["g s", "Search"],
-    ["b", "Switch branch or tag"], [".", "Action menu"], ["j / k", "Next / previous commit or result"], ["] / [", "Next / previous changed file"], ["?", "This sheet"], ["Esc", "Close"]
+    ["b", "Switch branch or tag"], [".", "Action menu"], ["j / k", "Next / previous commit or result"], ["] / [", "Next / previous changed file"], ["f", "Find in the diff"], ["n / N", "Next / previous match"], ["?", "This sheet"], ["Esc", "Close"]
   ];
   // Action chords: "a" then the key the user gave an action in actions.toml.
   function actionChords() {

@@ -201,17 +201,13 @@ section.file>header{display:flex;gap:var(--space-3);align-items:center;padding:v
 section.file>header a{color:var(--fg)}
 section.file>header :is(.counts,.media-counts){flex:none;min-width:12ch;text-align:right;
   white-space:nowrap;font-variant-numeric:tabular-nums}
-/* The toggle owns a fixed slot just left of the counts, so it lands at one x in every header. */
-.viewed-mark{margin-left:auto;flex:none;width:9ch;display:inline-flex;align-items:center;
-  justify-content:flex-end;gap:var(--space-1);line-height:1;color:var(--muted);cursor:pointer}
+/* The Viewed toggle sits right after the +/- counts. diffs-viewed.js adds it, so a header
+   reserves its slot until then and the page holds still. */
+section.file>header:not(:has(.viewed-mark))::after{content:"";flex:none;width:9ch}
+section.file>header :is(.counts,.media-counts){margin-left:auto}
+.viewed-mark{flex:none;width:9ch;display:inline-flex;align-items:center;justify-content:flex-end;
+  gap:var(--space-1);line-height:1;color:var(--muted);cursor:pointer}
 .viewed-mark input{margin:0}.viewed-changed{flex:none}
-/* Find sits left and the count right on one row: the form floats, the count fills the rest. */
-.diff-find{float:left;width:calc(100% - 20ch);margin-top:var(--space-3)}
-.diff-find input{width:100%;max-width:32rem}
-.viewed-count{margin:var(--space-3) 0 0;overflow:hidden;text-align:right;line-height:2.25rem}
-section.file{clear:both}
-@media (max-width:600px){section.file>header{flex-wrap:wrap}section.file>header>a{overflow-wrap:anywhere;min-width:0}
-  .diff-find{float:none;width:auto}.viewed-count{text-align:left;line-height:1.5}}
 table.code{border-collapse:collapse;width:100%}
 .diffwrap{overflow-x:auto}
 .code td{padding:0 var(--space-3);line-height:var(--leading-code);white-space:pre;vertical-align:top}

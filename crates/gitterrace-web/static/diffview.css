@@ -43,3 +43,42 @@ body[data-diff-font="32"] div.diff{font-size:32px}
 body[data-diff-wrap] div.diff :is(.add,.del,.ctx,.hh){
   white-space:pre-wrap;overflow-wrap:anywhere;min-width:0}
 body[data-diff-wrap] div.diff .ch{width:auto}
+
+/* The diff toolbar: one bar under the changed-files card, sticky under the top of the window.
+   Viewed progress, find, hide viewed on one baseline. */
+.difftools{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2) var(--space-4);
+  position:sticky;top:0;z-index:4;margin:0 0 var(--space-3);padding:var(--space-2) var(--space-4);
+  background:var(--soft);border:var(--border);border-top:0;
+  border-radius:0 0 var(--radius) var(--radius);font-size:var(--text-sm)}
+.difftools .vh{position:absolute}
+.dt-viewed,.dt-find{display:flex;align-items:center;gap:var(--space-2)}
+.dt-find{flex:1 1 20rem;min-width:0}
+.dt-q{flex:1 1 10rem;min-width:0;max-width:32rem;display:flex}.dt-q input{flex:1}
+.dt-viewed .viewed-count{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.dt-bar{width:6rem;height:4px;appearance:none;border:0;border-radius:var(--radius);
+  background:var(--line);accent-color:var(--accent);overflow:hidden}
+.dt-bar::-webkit-progress-bar{background:var(--line)}
+.dt-bar::-webkit-progress-value{background:var(--accent)}
+.dt-bar::-moz-progress-bar{background:var(--accent)}
+.find-status{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.difftools[data-state=none] .find-status{color:var(--warn)}
+.difftools[data-state=none] input[type=search]{border-color:var(--warn)}
+.difftools[data-state=error] .find-status{color:var(--del)}
+.dt-prev,.dt-next{min-width:32px;padding:0 var(--space-2)}
+.dt-hint{flex:none}
+.dt-hide{display:inline-flex;align-items:center;gap:var(--space-2);margin-left:auto;
+  color:var(--muted);cursor:pointer}
+html:has(.difftools){--dt-h:49px}
+@media (min-width:601px){
+  html:has(.difftools){scroll-padding-top:var(--dt-h)}
+  html:has(.difftools) section.file>header{top:var(--dt-h)}
+}
+.hide-viewed section.file[data-viewed]{display:none}
+::highlight(find){background-color:var(--warn-bg);color:var(--fg)}
+::highlight(find-current){background-color:var(--accent-soft);color:var(--fg);
+  text-decoration:underline}
+.diffwrap:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+@media (max-width:600px){
+  section.file>header{flex-wrap:wrap}
+  section.file>header>a{overflow-wrap:anywhere;min-width:0}
+  .difftools{position:static}.dt-find{flex-basis:100%;order:2}.dt-hide{order:3;margin-left:0}}

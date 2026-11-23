@@ -54,7 +54,12 @@ const SIGN_REMOVED: &str = "<span class=\"vh sign\">Removed, </span>";
 
 /// The hunks of one file as line blocks. Also the body of the fragment a folded file loads.
 fn diff_body_html(r: &Render, f: &FileDiff) -> String {
-    let mut out = String::from("<div class=\"diffwrap\"><div class=\"diff\">");
+    // A scroll box takes focus so the keyboard can scroll it, and names its file.
+    let mut out = format!(
+        "<div class=\"diffwrap\" tabindex=\"0\" role=\"region\" \
+            aria-label=\"Diff of {}\"><div class=\"diff\">",
+        esc(&f.path)
+    );
     let mut chunk = String::new();
     let mut in_chunk = 0usize;
     let total: usize = f.hunks.iter().flat_map(|h| &h.lines).map(|l| l.text.len()).sum();
@@ -197,7 +202,8 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         let _ = write!(
             out,
             "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{gen_attr}>\
-                <header id=\"{a}\" tabindex=\"-1\"><span class=\"badge {k}\">{k}</span> ",
+                <header id=\"{a}\" tabindex=\"-1\" role=\"heading\" \
+                aria-level=\"2\" aria-label=\"{p}\"><span class=\"badge {k}\">{k}</span> ",
             k = f.kind.as_str(),
             p = esc(&f.path),
             a = esc(&crate::fmt::file_anchor(&f.path)),

@@ -1,0 +1,15 @@
+{#- The bar under the changed-files card (diff_find.rs): viewed progress, find, hide viewed. The
+scripts only fill it in, so the page never shifts when they load. -#}
+<form class="difftools" role="search" aria-label="Find in diff" data-difftools
+ data-files="{{ files }}">
+<div class="dt-viewed"><span class="viewed-count" role="status">{{ label }}</span>
+<progress class="dt-bar" max="{{ files }}" value="0" aria-label="Files viewed"></progress></div>
+<div class="dt-find">
+<label class="dt-q"><span class="vh">Find in diff</span>
+<input type="search" placeholder="Find in diff" autocomplete="off"></label>
+<span class="find-status" role="status" aria-live="polite"></span>
+<button type="button" class="dt-prev" aria-label="Previous match" disabled>&uarr;</button>
+<button type="button" class="dt-next" aria-label="Next match" disabled>&darr;</button>
+<kbd class="dt-hint" title="Press f to find, n and N to step">f</kbd></div>
+<label class="dt-hide"><input type="checkbox" class="dt-hide-box"> Hide viewed</label>
+</form>

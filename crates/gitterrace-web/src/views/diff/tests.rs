@@ -82,7 +82,7 @@ fn a_mode_only_change_is_one_line() {
 fn files_past_the_page_budget_fold_lazily_and_link_their_body() {
     let files: Vec<FileDiff> = (0..120).map(|i| file(&format!("f{i}.rs"), 3)).collect();
     let html = diff_html(&crate::views::Render::fold(400), "abc", None, &files);
-    let open = html.matches("<div class=\"diffwrap\">").count();
+    let open = html.matches("<div class=\"diffwrap\" tabindex=\"0\"").count();
     assert_eq!(open, super::TOTAL_DIFF_FILES, "the first files render in full");
     let last = section(&html, 119);
     assert!(

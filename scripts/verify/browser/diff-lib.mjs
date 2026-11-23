@@ -155,14 +155,18 @@ export function checks(env) {
       const at = await g.evaluate((x) => {
         const s = document.getElementById(x);
         const hdr = s.querySelector('header').getBoundingClientRect();
+        // The diff toolbar is sticky above the headers: they pin right under it.
+        const bar = document.querySelector('.difftools');
+        const pin = bar ? Math.round(bar.getBoundingClientRect().height) : 0;
         const under = document.elementFromPoint(innerWidth / 2, hdr.bottom + 20)
           ?.closest('section.file');
         // The file above may not show: a sliver of it reads as being in the wrong file.
         const above = document.elementFromPoint(innerWidth / 2, 4)?.closest('section.file');
-        return { top: Math.round(s.getBoundingClientRect().top), hdr: Math.round(hdr.top),
+        return { pin, top: Math.round(s.getBoundingClientRect().top), hdr: Math.round(hdr.top),
           under: under && under.id, above: above && above.id };
       }, id);
-      at.top === -1 && at.hdr === 0 && at.under === id && (!at.above || at.above === id)
+      at.top === at.pin - 1 && at.hdr === at.pin && at.under === id
+        && (!at.above || at.above === id)
         ? r.ok(`${where}: opening at #${id} pins its header at the top`)
         : r.fail(`${where}: opening at #${id} shows ${at.above} on top, file ${at.top},`
           + ` header ${at.hdr}`);

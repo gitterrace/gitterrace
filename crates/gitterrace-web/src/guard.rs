@@ -217,7 +217,7 @@ mod tests {
             ("_base.html", 1),
             ("blame.html", 1),
             ("blob.html", 8),
-            ("commit.html", 3),
+            ("commit.html", 4),
             ("commit_line.html", 1),
             ("compare.html", 1),
             ("dochead.html", 6),
@@ -232,7 +232,7 @@ mod tests {
             ("stats.html", 2),
             ("toolbar.html", 1),
             ("tree.html", 1),
-            ("worktree.html", 1),
+            ("worktree.html", 2),
         ];
         let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/templates");
         let mut found = Vec::new();

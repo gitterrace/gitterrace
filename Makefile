@@ -43,14 +43,14 @@ preview:
 
 ##@ Check gates
 .PHONY: check check-static check-built fmt clippy clippy-features clippy-cross lint harness-links \
-	test doc theme actions send-vectors diff-order names lines docs-check gc-guard bench-guard deny
+	test doc theme actions send-vectors names lines docs-check gc-guard bench-guard deny
 
 ## check: Every gate, in the order CI runs them
-check: gc-guard theme actions send-vectors diff-order names lines bench-guard docs-check \
+check: gc-guard theme actions send-vectors names lines bench-guard docs-check \
 	fmt clippy clippy-features clippy-cross lint deny test doc
 
 ## check-static: The check steps that build nothing, in the same order, fast and cargo-build free
-check-static: gc-guard actions send-vectors diff-order names lines fmt lint
+check-static: gc-guard actions send-vectors names lines fmt lint
 
 ## check-built: The check steps check-static leaves out, in order, for a runner that skips them
 check-built: theme bench-guard docs-check clippy clippy-features clippy-cross deny test doc
@@ -137,10 +137,6 @@ actions:
 # send-vectors: Check send.js against the shared send vectors
 send-vectors:
 	node scripts/verify/send-vectors-check.mjs
-
-# diff-order: The Find box and Viewed count land in one order, whichever script runs first
-diff-order:
-	node scripts/verify/diff-order-check.mjs
 
 # names: File, env and project names follow the conventions
 names:

@@ -437,6 +437,7 @@ struct WorktreePage {
     c: Chrome,
     head: crate::pagehead::PageHead,
     files_summary: String,
+    tools: String,
     files: Vec<WorktreeFileRow>,
     diff: String,
     clean: bool,
@@ -499,6 +500,7 @@ async fn worktree(
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),
+            tools: crate::diff_find::toolbar(stats.len()),
             files: stats,
         })
     })

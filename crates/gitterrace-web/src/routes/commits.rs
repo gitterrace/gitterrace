@@ -401,6 +401,7 @@ struct CommitPage {
     date: String,
     parents: Vec<String>,
     files_summary: String,
+    tools: String,
     /// Lines added and removed over all files, shown on the right of the summary.
     total_add: String,
     total_del: String,
@@ -446,6 +447,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
             parents: d.summary.parents.iter().map(|p| fmt::sha_link(p)).collect(),
             files_summary: fmt::count(d.files.len(), "changed file", "changed files"),
+            tools: crate::diff_find::toolbar(d.files.len()),
             total_add: fmt::thousands(d.files.iter().map(|f| u64::from(f.additions)).sum::<u64>()),
             total_del: fmt::thousands(d.files.iter().map(|f| u64::from(f.deletions)).sum::<u64>()),
             files: views::file_stats(&d),
