@@ -8,7 +8,7 @@
 .setname{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-2);min-width:0}
 .setname code{overflow-wrap:anywhere}
 .setin input:not([type=checkbox]),.setin select,.setin textarea{width:100%;max-width:420px;min-width:0;box-sizing:border-box}
-.setin select,.setin textarea{font:inherit;padding-top:5px;padding-bottom:5px;padding-left:var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background-color:var(--surface);color:var(--fg)}
+.setin select,.setin textarea{font:inherit;padding-top:var(--space-1);padding-bottom:var(--space-1);padding-left:var(--space-3);border:1px solid var(--line-strong);border-radius:var(--radius);background-color:var(--surface);color:var(--fg)}
 .setin textarea{padding-right:var(--space-3)}
 .setdoc{margin:var(--space-2) 0 0;font-size:var(--text-sm)}
 .seterr{margin:var(--space-2) 0 0;color:var(--del);font-size:var(--text-sm)}

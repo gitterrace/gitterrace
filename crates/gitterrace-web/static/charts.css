@@ -37,7 +37,8 @@ svg.chart .col rect[class^=c],svg.loc path[class^=c]{stroke:CanvasText}}
 svg.heat .h0{fill:var(--seq-0)}svg.heat .h1{fill:var(--seq-1)}svg.heat .h2{fill:var(--seq-2)}
 svg.heat .h3{fill:var(--seq-3)}svg.heat .h4{fill:var(--seq-4)}
 /* One size for every cell, so the markup does not repeat it 168 times (CELL - 4 in charts.rs). */
-svg.heat rect{width:34px;height:34px;rx:4px}
+svg.heat{--cell:34px}
+svg.heat rect{width:var(--cell);height:var(--cell);rx:var(--space-1)}
 svg.heat rect:hover{stroke:var(--fg);stroke-width:1.5}
 .c1{fill:var(--cat-1);background:var(--cat-1)}.c2{fill:var(--cat-2);background:var(--cat-2)}
 .c3{fill:var(--cat-3);background:var(--cat-3)}.c4{fill:var(--cat-4);background:var(--cat-4)}
@@ -46,10 +47,10 @@ svg.heat rect:hover{stroke:var(--fg);stroke-width:1.5}
 .legend{display:flex;flex-wrap:wrap;gap:6px var(--space-4);margin-top:var(--space-3);
   font-size:var(--text-xs);color:var(--muted)}
 .legend span{display:inline-flex;align-items:center;gap:6px}
-.legend i{display:inline-block;width:10px;height:10px;border-radius:var(--radius)}
-.heat-legend{display:flex;justify-content:flex-end;align-items:center;gap:3px;
+.legend i{display:inline-block;width:var(--space-2);height:var(--space-2);border-radius:var(--radius)}
+.heat-legend{display:flex;justify-content:flex-end;align-items:center;gap:2px;
   margin-top:var(--space-2);font-size:var(--text-xs);color:var(--faint)}
-.heat-legend i{width:10px;height:10px;border-radius:var(--radius)}
+.heat-legend i{width:var(--space-2);height:var(--space-2);border-radius:var(--radius)}
 .heat-legend i:nth-of-type(1){background:var(--seq-0)}
 .heat-legend i:nth-of-type(2){background:var(--seq-1)}
 .heat-legend i:nth-of-type(3){background:var(--seq-2)}

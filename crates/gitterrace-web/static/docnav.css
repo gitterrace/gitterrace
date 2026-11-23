@@ -34,7 +34,7 @@ section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 .outline ol{list-style:none;margin:0;padding:0}
 .outline.rail{position:sticky;top:var(--space-4);max-height:calc(100vh - 2 * var(--space-4));overflow:auto;font-size:var(--text-sm)}
 .outline.rail h2{margin:0 0 var(--space-2)}
-.outline.rail a{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding:3px var(--space-3);border-left:2px solid var(--line);color:var(--muted);overflow-wrap:anywhere}
+.outline.rail a{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden;padding:2px var(--space-3);border-left:2px solid var(--line);color:var(--muted);overflow-wrap:anywhere}
 .outline li.d1>a{padding-left:var(--space-6)}
 .outline a:hover{color:var(--fg);text-decoration:none}
 .outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
@@ -42,7 +42,7 @@ section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 .outlinebtn{font-size:var(--text-sm);text-transform:none;letter-spacing:0;list-style:none}
 .outlinebtn::-webkit-details-marker{display:none}
 .outline-pop{position:absolute;right:0;top:calc(100% + var(--space-1));z-index:20;width:min(320px,92vw);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
-.outline-pop a{display:block;padding:5px var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
+.outline-pop a{display:block;padding:var(--space-1) var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
 .outline-pop a:hover,.outline-pop a:focus-visible,.outline-pop a.on{background:var(--hover)}
 /* Two classes, so the global input floor (min-width:240px) cannot widen the 220 px rail. */
 .markdown-body :is(h1,h2,h3,h4,h5,h6,.anchor){scroll-margin-top:var(--space-4)}

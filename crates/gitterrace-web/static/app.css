@@ -91,7 +91,7 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-col
 /* breadcrumbs */
 .crumbs{font-family:var(--serif);font-size:var(--text-xl);font-weight:var(--weight-semibold);letter-spacing:-.015em;display:block;min-width:0}
 .crumbs a{color:var(--accent-fg)}.crumbs a:last-child{color:var(--fg)}
-.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);margin:0 3px}
+.crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);margin:0 var(--space-1)}
 
 /* file table and other row tables */
 /* Text for screen readers only: table captions, header cells of a table with no header row,
@@ -486,6 +486,12 @@ div.diff .add,div.diff .del,div.diff .ctx,div.diff .hh{white-space:pre;min-heigh
 div.diff .add::before,div.diff .del::before,div.diff .ctx::before{content:attr(data-o);position:absolute;left:0;width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none}
 div.diff .add::after,div.diff .del::after,div.diff .ctx::after{content:attr(data-n);position:absolute;left:calc(6ch + var(--space-3));width:calc(6ch + var(--space-3));text-align:right;color:var(--faint);user-select:none}
 div.diff .add{background:var(--add-bg)}div.diff .del{background:var(--del-bg)}
+/* A changed line is marked by shape as well as colour: a solid edge for added, a double edge for
+   removed (scripts/lint/diff-cue-check.py), so a tint a step off the row never carries it alone.
+   Context lines keep an empty edge, so the numbers line up. */
+div.diff :is(.add,.del,.ctx,.hh){border-left:var(--space-1) solid transparent}
+div.diff .add{border-left-color:var(--add)}
+div.diff .del{border-left-style:double;border-left-color:var(--del)}
 div.diff .add::before,div.diff .add::after{background:var(--add-hl);color:var(--add)}
 div.diff .del::before,div.diff .del::after{background:var(--del-hl);color:var(--del)}
 div.diff .hh{background:var(--soft);color:var(--muted)}

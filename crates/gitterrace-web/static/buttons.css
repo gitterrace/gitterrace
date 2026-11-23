@@ -12,7 +12,7 @@
    Every variant gets every state from here: hover, :active (pressed), the shared focus ring
    (app.css), :disabled, and aria-expanded or aria-pressed true, which read as held. */
 button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);
-  box-sizing:border-box;height:32px;padding:.5px var(--space-4) 0;font:inherit;
+  box-sizing:border-box;height:var(--control-h);padding:0 var(--space-4);font:inherit;
   font-weight:var(--weight-semibold);line-height:normal;white-space:nowrap;color:var(--fg);
   background:var(--soft);border:var(--border);border-radius:var(--radius);cursor:pointer;
   text-decoration:none;transition:background var(--dur-fast),border-color var(--dur-fast),
@@ -33,14 +33,14 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:va
 .danger:hover:not(:disabled){color:var(--del);background:var(--del-bg);border-color:var(--del)}
 .danger:active:not(:disabled){color:var(--del);background:var(--del-hl);border-color:var(--del)}
 /* At 13px in a 28px box the browser snaps the line to a whole pixel and the capitals land
-   high; .75px on top centers their measured ink, a picker's (select.sm) included. */
-.sm{height:28px;padding:.25px var(--space-3) 0;font-size:var(--text-sm)}
-select.sm{padding-right:calc(var(--space-3)*2 + 10px)}
-.icon{width:32px;padding:0}.icon.sm{width:28px}
+   high; line-height:normal keeps the ink as centered as the grid allows. */
+.sm{height:var(--control-h-sm);padding:0 var(--space-3);font-size:var(--text-sm)}
+select.sm{padding-right:calc(var(--space-3)*2 + var(--space-2))}
+.icon{width:var(--control-h);padding:0}.icon.sm{width:var(--control-h-sm)}
 /* A copy button says it worked in the accent for a moment (app.js flashes .copied). */
 .copied{color:var(--accent-ink);border-color:var(--accent-ink)}
 /* The segmented control: ghost choices in one frame, the chosen one held in the accent. */
-.segs a,.segs button,.segs label{display:inline-flex;align-items:center;height:auto;min-height:32px;
+.segs a,.segs button,.segs label{display:inline-flex;align-items:center;height:auto;min-height:var(--control-h);
   box-sizing:border-box;padding:var(--space-2) var(--space-3);border:1px solid transparent;
   border-radius:var(--radius);color:var(--muted);background:none;font:inherit;line-height:1;
   cursor:pointer}
@@ -50,15 +50,17 @@ select.sm{padding-right:calc(var(--space-3)*2 + 10px)}
 .segs .on,.segs .on:hover:not(:disabled),.segs label:has(:checked){background:var(--accent-soft);
   color:var(--accent-ink);
   border-color:var(--accent);font-weight:var(--weight-semibold)}
-.dochead .segs a,.dochead .segs button,.dochead .segs label{min-height:28px;
+.dochead .segs a,.dochead .segs button,.dochead .segs label{min-height:var(--control-h-sm);
   padding:var(--space-1) var(--space-3)}
 /* Every picker (<select>) draws one arrow, inset from the right edge like its text from the
-   left, so no arrow sits against the border. A component may size a picker and set its
-   background-color, never the background shorthand, which would drop the arrow. */
-select{appearance:none;-webkit-appearance:none;padding-right:calc(var(--space-3)*2 + 10px);
-  background-image:var(--chev);background-repeat:no-repeat;
-  background-position:right var(--space-3) center;background-size:10px 6px;
-  --chev:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E\
-%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' \
-stroke-linejoin='round'/%3E%3C/svg%3E")}
+   left, so no arrow sits against the border. The arrow is two gradient halves in a text role, so
+   the theme and the mode recolour it, and no literal colour sits in a data URI. A component may
+   size a picker and set its background-color, never the background shorthand, which would drop
+   the arrow. */
+select{appearance:none;-webkit-appearance:none;padding-right:calc(var(--space-3)*2 + var(--space-2));
+  background-image:linear-gradient(45deg,transparent 50%,var(--faint) 50%),
+    linear-gradient(135deg,var(--faint) 50%,transparent 50%);background-repeat:no-repeat;
+  background-position:calc(100% - var(--space-3) - var(--space-2)) 50%,
+    calc(100% - var(--space-3) - var(--space-1)) 50%;
+  background-size:var(--space-1) var(--space-1)}
 /* ---- end of buttons ---- */
