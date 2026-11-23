@@ -40,6 +40,8 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("show_commit", &[], None),
     ("compare", &[Feature::Compare], None),
     ("worktree_diff", &[Feature::Worktree], None),
+    ("list_checkpoints", &[Feature::Worktree], None),
+    ("list_viewed", &[Feature::Worktree], None),
     ("read_file", &[], None),
     ("list_tree", &[], None),
     ("blame", &[Feature::Blame], None),
@@ -197,6 +199,9 @@ args! {
     WorktreeArgs {
         /// `all` (default), `staged` or `unstaged`.
         scope: Option<String>,
+        /// A checkpoint id from `list_checkpoints`: list only the files that differ from it.
+        /// Needs scope `all`.
+        since: Option<String>,
         /// Cap on diff lines returned across all files. Defaults to 400.
         max_lines: Option<usize>,
     }
@@ -363,9 +368,35 @@ impl McpServer {
         Parameters(a): Parameters<WorktreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("worktree_diff", a.repo.clone(), move |s| {
-            s.worktree_diff(a.scope.as_deref(), Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)))
+            s.worktree_diff_since(
+                a.scope.as_deref(),
+                Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)),
+                a.since.as_deref(),
+            )
         })
         .await
+    }
+
+    /// Checkpoints of the uncommitted work, newest first: id, time, file count and the bytes
+    /// of copies held. Pass an id as `since` to `worktree_diff` to see only what changed after
+    /// it. Taking one is a button on the working tree page: this server never writes. Refused
+    /// on a public server.
+    #[tool(name = "list_checkpoints", annotations(read_only_hint = true))]
+    async fn list_checkpoints(
+        &self,
+        Parameters(a): Parameters<RepoArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.run("list_checkpoints", a.repo, ApiState::checkpoints).await
+    }
+
+    /// Files the user marked viewed on the working tree page, each with the hash of the patch it
+    /// was marked at: a mark holds only while that hash matches. Refused on a public server.
+    #[tool(name = "list_viewed", annotations(read_only_hint = true))]
+    async fn list_viewed(
+        &self,
+        Parameters(a): Parameters<RepoArgs>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.run("list_viewed", a.repo, ApiState::viewed).await
     }
 
     /// File content at a revision, read from git (not the working tree). Returns text, total line

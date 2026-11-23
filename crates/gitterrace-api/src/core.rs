@@ -1,6 +1,7 @@
 //! Transport-neutral reads. Both the HTTP router and the MCP tools call these,
 //! so the two surfaces cannot drift apart. Everything here is blocking.
 
+mod checkpoints;
 mod diffs;
 mod page_tables;
 mod rebuild;

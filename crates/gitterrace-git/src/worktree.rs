@@ -7,6 +7,10 @@ mod beneath;
 #[cfg(test)]
 mod limit_tests;
 mod pair;
+mod snapshot;
+pub use snapshot::{
+    BIG_HASH, SinceDiff, SnapFile, content_id, worktree_diff_since, worktree_snapshot,
+};
 
 use std::collections::BTreeSet;
 use std::path::Path;

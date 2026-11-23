@@ -39,11 +39,11 @@ fn a_newer_cache_stays_untouched() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     fs::create_dir(&dir)?;
-    fs::write(dir.join(VERSION_FILE), "v3\n")?;
+    fs::write(dir.join(VERSION_FILE), "v4\n")?;
     fs::write(dir.join("seg-9-0.gts"), "future")?;
-    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("3"));
+    assert_eq!(ensure_dir(&dir)?.as_deref(), Some("4"));
     assert_eq!(names(&dir)?, ["VERSION", "seg-9-0.gts"]);
-    assert_eq!(fs::read(dir.join(VERSION_FILE))?, b"v3\n");
+    assert_eq!(fs::read(dir.join(VERSION_FILE))?, b"v4\n");
     assert_eq!(fs::read(dir.join("seg-9-0.gts"))?, b"future");
     Ok(())
 }
@@ -71,9 +71,9 @@ fn the_current_version_opens_normally() -> io::Result<()> {
     let tmp = tempfile::tempdir()?;
     let dir = tmp.path().join("gitterrace");
     assert_eq!(ensure_dir(&dir)?, None);
-    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v2\n");
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v3\n");
     assert_eq!(ensure_dir(&dir)?, None);
-    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v2\n");
+    assert_eq!(fs::read_to_string(dir.join(VERSION_FILE))?, "v3\n");
     Ok(())
 }
 
@@ -442,5 +442,59 @@ fn a_cache_never_makes_a_deleted_git_folder_again() -> io::Result<()> {
     fs::remove_dir_all(t.path().join("repo"))?;
     assert!(ensure_dir(&dir).is_err(), "the cache came back without its repository");
     assert!(!git.exists(), "a deleted .git was made again");
+    Ok(())
+}
+
+/// Class guard: a reset deletes the index and never the user's own data. Every reset path (a
+/// format change, an unreadable manifest, a rebuild) leaves checkpoints, viewed marks and
+/// findings byte for byte.
+#[test]
+fn a_wipe_spares_checkpoints_viewed_and_findings() -> io::Result<()> {
+    let tmp = tempfile::tempdir()?;
+    let dir = tmp.path().join("gitterrace");
+    ensure_dir(&dir)?;
+    for (i, name) in super::USER_FILES.iter().enumerate() {
+        fs::write(dir.join(name), format!("mine {i}"))?;
+    }
+    fs::write(dir.join("tip"), "abc")?;
+    fs::write(dir.join("seg-1-0.gts"), "stray")?;
+    super::wipe(&dir)?;
+    let mut want: Vec<String> =
+        ["checkpoints", "findings", "lock", "viewed", "VERSION"].map(String::from).to_vec();
+    want.sort();
+    assert_eq!(names(&dir)?, want);
+    for (i, name) in super::USER_FILES.iter().enumerate() {
+        assert_eq!(fs::read_to_string(dir.join(name))?, format!("mine {i}"));
+    }
+    // A stale format and a stray file reset the cache the same way.
+    fs::write(dir.join(VERSION_FILE), "v1\n")?;
+    fs::write(dir.join("stray"), "x")?;
+    assert_eq!(ensure_dir(&dir)?, None);
+    assert!(!dir.join("stray").exists());
+    for name in super::USER_FILES {
+        assert!(dir.join(name).exists(), "{name}");
+    }
+    Ok(())
+}
+
+/// The user files are named in the registry too, so no other sweep treats them as foreign.
+#[test]
+fn every_user_file_is_a_documented_cache_file() {
+    for name in super::USER_FILES {
+        assert!(crate::CACHE_FILES.iter().any(|(n, _)| *n == name), "{name}");
+    }
+}
+
+/// A folder claimed by another repository (a hash collision) gives up its user files too: they
+/// are another repository's.
+#[test]
+fn a_collision_wipe_drops_the_other_repositories_user_files() -> io::Result<()> {
+    let tmp = tempfile::tempdir()?;
+    let dir = tmp.path().join("gitterrace");
+    ensure_dir(&dir)?;
+    super::claim(&dir, std::path::Path::new("/repos/a/.git"))?;
+    fs::write(dir.join("viewed"), "[]")?;
+    super::claim(&dir, std::path::Path::new("/repos/b/.git"))?;
+    assert!(!dir.join("viewed").exists());
     Ok(())
 }

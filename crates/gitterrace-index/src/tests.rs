@@ -259,6 +259,10 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
     lines.save(idx.dir())?;
     crate::store::claim(idx.dir(), std::path::Path::new("/repos/a/.git"))?;
     idx.save_state(crate::StateFile::Chain, 1, b"x")?;
+    idx.checkpoint_add(&[], "abc", false, "", 1 << 20, 1)?;
+    idx.viewed_set(&[("a".to_owned(), "h".to_owned())], true, 1)?;
+    // The review basket is written by a later build: its file is named here, not made.
+    std::fs::write(idx.dir().join("findings"), "[]")?;
     let mut have: Vec<String> = std::fs::read_dir(idx.dir())?
         .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
         .collect::<io::Result<_>>()?;
@@ -476,5 +480,55 @@ fn an_inline_merge_past_the_segment_limit_finishes_the_update() -> io::Result<()
         io::Error::other("the update never returned: the inline merge waits on its own lock")
     })??;
     assert!(segs <= crate::store::MAX_SEGMENTS, "{segs} segments: no merge ran");
+    Ok(())
+}
+
+/// Class guard: a write escapes `.git/gitterrace/`. Every user-data write runs beside a
+/// repository and a working tree, and afterwards nothing outside the cache folder changed, so a
+/// future cache file written relative to the worktree or the git dir fails here.
+#[test]
+fn every_user_data_write_stays_under_the_cache_dir() -> io::Result<()> {
+    fn tree(root: &std::path::Path, out: &mut Vec<(String, Vec<u8>)>) -> io::Result<()> {
+        for e in std::fs::read_dir(root)? {
+            let p = e?.path();
+            if p.is_dir() {
+                tree(&p, out)?;
+            } else {
+                out.push((p.display().to_string(), std::fs::read(&p)?));
+            }
+        }
+        Ok(())
+    }
+    let tmp = tempfile::tempdir()?;
+    let work = tmp.path().join("work");
+    let git = work.join(".git");
+    std::fs::create_dir_all(git.join("refs"))?;
+    std::fs::write(work.join("a.txt"), "one\n")?;
+    std::fs::write(git.join("HEAD"), "ref: refs/heads/main\n")?;
+    let cache = git.join("gitterrace");
+    let idx = Index::open_dir(cache.clone())?;
+    let outside = |extra: &mut Vec<(String, Vec<u8>)>| -> io::Result<()> {
+        let mut all = Vec::new();
+        tree(tmp.path(), &mut all)?;
+        let inside = cache.display().to_string();
+        all.retain(|(p, _)| !p.starts_with(&inside));
+        *extra = all;
+        Ok(())
+    };
+    let mut before = Vec::new();
+    outside(&mut before)?;
+    let file = gitterrace_git::SnapFile {
+        path: "a.txt".into(),
+        hash: gitterrace_git::content_id(b"one\n"),
+        text: Some(b"one\n".to_vec()),
+    };
+    idx.checkpoint_add(&[file], "abc", true, "x", 1 << 10, 5)?;
+    idx.viewed_set(&[("../../escape".to_owned(), "h".to_owned())], true, 5)?;
+    idx.rebuild()?;
+    let mut after = Vec::new();
+    outside(&mut after)?;
+    assert_eq!(before, after, "something outside .git/gitterrace changed");
+    assert!(!tmp.path().join("escape").exists());
+    assert!(cache.join("checkpoints").is_file() && cache.join("viewed").is_file());
     Ok(())
 }

@@ -30,7 +30,9 @@ pub use form::{Field, fields};
 pub use gitterrace_types::home::{expand_tilde, home_dir, home_var};
 pub use locate::{Located, located, syntax};
 pub use rows::{RowKey, row_editable, row_literal, rows, table_literal};
-pub use schema::{Api, BOUNDS, Config, DEFAULT_ADDR, Display, Key, Reload, RepoOverride, keys};
+pub use schema::{
+    Api, BOUNDS, Config, DEFAULT_ADDR, Display, Key, Reload, RepoOverride, Review, keys,
+};
 pub use value::{Control, Show};
 pub use write::{MAX_FILE_BYTES, SaveError, Saved, Stamp, save, save_config};
 

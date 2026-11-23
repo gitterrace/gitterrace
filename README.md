@@ -12,6 +12,14 @@ Review your repo before you push, and hand findings to any tool.
 
 Code, commits, blame, branches, worktrees, stashes and insights, with no
 database, accounts or network ([why](https://gitterrace.dev/docs/why/)).
+gitterrace never writes your repository or your working tree: no object, ref,
+config or working file changes. It keeps one folder of its own,
+`.git/gitterrace/`, for the index and, from 0.2.1, your checkpoints, viewed
+marks and review notes. Delete the folder at any time: the index rebuilds, and
+the marks and notes are forgotten. A checkpoint holds copies of changed text
+files from your working tree (never ignored or binary files), so treat that
+folder like the repository.
+
 Pass what you find to any agent, editor, tracker or script you already use, or
 read the same data over the [JSON API and the MCP server](https://gitterrace.dev/docs/api/).
 

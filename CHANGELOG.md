@@ -5,6 +5,149 @@ All notable changes are listed here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Added
+
+- site: refuse a docs page that does not open with its title and a lead
+- site: deploy-check runs the site guards on the built site
+- site: derive security.txt Expires from the newest release
+- api: serve the languages and ownership insights over HTTP and MCP
+- scripts: take size-report's total and languages from gitterrace
+- web: show the running version at the foot of the actions menu
+- web: keep the view when switching repository
+- web: fit insights charts to the selected range
+- api: serve every insight over MCP from the registry's one list
+- cli: print any insight as JSON through the registry's handler
+- cli: run the server as a systemd or launchd service
+- site: say what the tool is for in the tagline
+- site: lead the landing page with install, trust and the hand-off
+- review: checkpoints of uncommitted work and viewed marks
+
+### Changed
+
+- api: one ParamDoc for endpoint, tool and prompt parameters
+- api: apply request defaults once in ApiState and share diff totals
+- api: one helper each for refused, JSON and joined tool results
+- config: one macro table for the feature enum, keys and file values
+- config: settings fields carry the value Control, not a second Input enum
+- actions: one home lookup and expand_tilde in types, one kind_name
+- actions: share the yes default, label check, id rule, flat line and line
+  fragment
+- export: one link scanner for the followed links and the rewrite
+- open: one HTTP exchange for the probes and the add request, one is_wsl
+- bin: repos_of and server_addr, export arm passes its fields
+- web: one build entry, one bind prelude, one ignore_for
+- web: one poll loop for the actions and config reloaders
+- web: one JSON body and no-store helper for the write routes
+- web: Slots and DirtyMemo types for the shared semaphores and dirty answer
+- web: one add path for the repository table, Served base and href
+- web: Empty, Seg, CommitRow and PageHead render from their own template
+- web: Chrome::from_cfg and Default so the bare bar states only what differs
+- web: one option table for the insights links and query pairs
+- web: insights pages share scope, head and section helpers
+- web: commit type matrix counts its cells once
+- web: compare shares its unreadable state and signed numbers
+- web: highlight merges spans and looks syntax tokens up in one place
+- web: settings replies build their error in one place
+- web: stats tabs are a plain list, one file stat row builder
+- web: diff file sections bind the generated check once
+- web: wrap the page head tab row template
+- xtask: the wordmark check uses the theme's contrast
+- xtask: one footer_of for the site tests
+- xtask: one write path and one fill for generated output
+- xtask: one flag list and one positionals for the command docs
+- scripts: one parse_args, toolchain_pin and fail for the run scripts
+- scripts: one commitFiles and static imports for the browser libs
+- web: keep the non-language extensions in one split string
+- web: keep id and keyword lists as split strings
+- search: share the haystack writer and the regex size limit
+- charts: share the plot geometry and the 1-2-5 step walk
+- search: clip the query with floor_char_boundary
+- web: static scripts read the base and build elements through gtNav
+- web: log and commit types share one pager template
+- bench: keep the cold sample count in one place
+- web: reuse the base and el helper from nav.js in actions, send and settings
+- git: one newest-first rev walk helper
+- git: one commit summary and subject builder
+- git: one counts struct for the numstat memo
+- git: share the blob read, the plain path check and the nudge loop entry
+- git: one no-follow create shared with the index
+- index: one canonical topological sort shared with git
+- index: one warn helper holds the stderr exemption
+- index: the disk source folds its aggregates through the shared folds
+- index: drop the segment merge module nothing ships
+- index: one sums accumulation for the column item and the overflow checked adds
+- index: one identity-pair mapping step for the oracle and the fresh walk
+- web: one repo_router, not a wrapper over its tasks variant
+- web: frequency section without a redundant block
+- web: fold the action menu builder into its only caller
+- web: inline the far page's one-use message builder
+- web: inline the single-use list filter helper
+- index: drop the oracle's clock-injecting reference_time twin
+- git: drop the changed_paths forwarder
+- xtask: one helper prints findings and exits
+- xtask: fold the wrap_line forwarder into fill
+- scripts: drop the docker check's unset port and jobs knobs
+- scripts: reuse empty_commit in the land-check self-test and drop a redundant
+  grep
+- web: share the extension sniff, subjects read, scoped guard, local_state and
+  sha anchor
+- web: build the warm-up router once and trim one-use plumbing
+- web: share the settings file read, the browser refusal and JSON replies
+- web: render media markup from templates
+- api: drop test hooks, one default diff cap, no blob line vec
+- git: one list of public refs, one worker count, no dead reads
+- xtask: drop unwrap in prose file walk
+- scripts: read size-report's languages from the insights command
+- browser: serve the built site from one helper
+- browser: share the per-browser loop, the luminance and the stats page list
+
+### Fixed
+
+- site: every docs page opens with its title and a lead
+- web: wait for the repo id before comparing whole stats pages
+- lint: the deps check's tomllib import passes pyright under an older python3
+- web: keep the Find box above the Viewed count in either load order
+- verify: coverage-check reads lines hit by a race as unstable
+- verify: coverage-check names the unstable lines it forgave
+- web: align the Viewed toggle in a fixed slot and put Find and the count on one
+  row
+- web: give a Markdown file the same pinned page head as every file
+- web: hold a reader at the top of a live page at scroll 0
+- web: offer search on the settings page
+- web: do not throttle an index build for the load its own workers make
+- web: keep a corrupt registry file instead of resetting it
+- git: refuse a committed-only rev with a stray character after its steps
+- web: keep only checkbox inputs in rendered markdown
+- scripts: write the preview log under target, not a fixed /tmp path
+- dev: find busy clones through /proc where lsof is missing
+- dev: sweep after a plan landing too
+- dev: keep a fresh work clone the sweep would take for landed
+- index: refuse tables built over a failed read, look people up without indexing
+- build: point the harness link check at the shared kit's current path
+- browser: serve the working tree's assets through --from-disk
+- browser: wait on conditions instead of fixed sleeps
+- browser: keep the wait helpers inside the line and type gates
+
+### Performance
+
+- web: serve every stylesheet minified
+- web: bundle the shared stylesheets into two requests
+- web: preload only the faces used above the fold
+- web: load the markdown rules only on pages that render markdown
+- site: drop two stylesheet rules no page matches
+- web: read the index once for a filtered log page
+- web: skip the patterns reads when the period counts no commit
+- index: borrow message text in the search scan and encode an item once
+- index: move message items into the merged column instead of cloning
+- export: move the marked page into the footer step instead of cloning it
+- git: drop repeated stats and scans from the watch, nudge and move paths
+- index: dedupe per commit in linear time and stop leaking tip errors
+- config: build the key table once per parse and validate
+- xtask: read the cargo metadata once per run
+- git: keep byte budget free for the items near the head of the stream
+
 <!-- END GENERATED: unreleased -->
 
 ## [0.2.0] - 2026-11-21

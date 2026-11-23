@@ -84,12 +84,21 @@ pub struct CompareResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct WorktreeResponse {
     pub additions: u64,
+    /// Only with `since`: files whose checkpoint copy is gone, diffed against HEAD instead.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub content_gone: Vec<String>,
     pub deletions: u64,
     pub files: Vec<FileItem>,
     /// `all`, `staged` or `unstaged`.
     pub scope: String,
+    /// Only with `since`: the checkpoint the files are compared with.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<String>,
     /// The diff was cut at the line cap.
     pub truncated: bool,
+    /// Only with `since`: files that read the same as in the checkpoint, left out of `files`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub unchanged_files: Option<u64>,
 }
 
 /// `GET /commits/{id}`.

@@ -229,6 +229,7 @@ pub const BOUNDS: &[(&str, u64, u64)] = &[
     ("limits.action_output_kb", 1, 65_536),
     ("limits.registry_entries", 1, 100_000),
     ("limits.export_pages", 1, 10_000_000),
+    ("review.checkpoint_file_kb", 1, 4096),
     ("api.log_page_commits", 1, 100_000),
     ("api.log_skip_commits", 1, 100_000_000),
     ("api.blob_lines", 1, 10_000_000),
@@ -441,6 +442,18 @@ settings! {
         /// Server-wide.
         api_enabled: Option<bool> = None => Live,
     }
+    review: Review {
+        /// Take a checkpoint of the uncommitted work before Mark all viewed, so the next review can
+        /// show only what changed since. A checkpoint holds copies of changed text files from the
+        /// working tree in `.git/gitterrace/`, never ignored or binary ones.
+        has_auto_checkpoint: bool = false => Live,
+        /// Most copies a repository's checkpoints keep, in MiB. The oldest copies go first. 0
+        /// switches checkpoints off: none is taken and none is kept.
+        checkpoint_mb: usize = 20 => Live,
+        /// Largest changed text file a checkpoint copies, in KiB. A larger one is named without a
+        /// copy, so a review since it diffs that file against HEAD and says so.
+        checkpoint_file_kb: usize = 256 => Live,
+    }
     multi: Multi {
         /// Folder levels searched for repositories below a folder given on the command line.
         /// Needs a restart.
@@ -486,6 +499,10 @@ impl Config {
         }
         if self.limits.text_kb == 0 || self.limits.raw_mb == 0 {
             return bad("limits", "text_kb and raw_mb must be at least 1");
+        }
+        // Not in BOUNDS: 0 is a value here (checkpoints off), and BOUNDS keys refuse it.
+        if self.review.checkpoint_mb > 1024 {
+            return bad("review.checkpoint_mb", "must be between 0 and 1024");
         }
         let all = keys();
         for (k, lo, hi) in BOUNDS {

@@ -5,9 +5,9 @@ use std::borrow::Cow;
 
 use axum::routing::{MethodRouter, get};
 use gitterrace_types::api::{
-    BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    IndexResponse, InsightList, InsightResponse, LogResponse, ParamDoc as Param, RefsResponse,
-    RepoResponse, TreeResponse, WorktreeResponse,
+    BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
+    ContributorsResponse, IndexResponse, InsightList, InsightResponse, LogResponse,
+    ParamDoc as Param, RefsResponse, RepoResponse, TreeResponse, ViewedResponse, WorktreeResponse,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator, generate::SchemaSettings};
 use serde::Serialize;
@@ -185,9 +185,30 @@ pub const ENDPOINTS: &[Endpoint] = &[
         params: &[
             p("scope", "string", "`all` (default), `staged` or `unstaged`."),
             p("max_lines", "integer", "Most diff lines, at most `api.diff_lines`."),
+            p(
+                "since",
+                "string",
+                "A checkpoint id from `/checkpoints`: list only the files that differ from it. \
+                Needs scope `all`. An unknown id is 404 `checkpoint_not_found`.",
+            ),
         ],
         schema: of::<WorktreeResponse>,
         route: || get(http::worktree),
+    },
+    Endpoint {
+        path: "/checkpoints",
+        summary: "Checkpoints of the uncommitted work, newest first. Refused on a public server.",
+        params: &[],
+        schema: of::<CheckpointsResponse>,
+        route: || get(http::checkpoints),
+    },
+    Endpoint {
+        path: "/viewed",
+        summary: "Files marked viewed, with the patch hash each mark holds for. Refused on a \
+            public server.",
+        params: &[],
+        schema: of::<ViewedResponse>,
+        route: || get(http::viewed),
     },
     Endpoint {
         path: "/tree",

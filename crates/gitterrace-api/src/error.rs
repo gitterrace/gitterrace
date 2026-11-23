@@ -27,6 +27,9 @@ pub enum ApiError {
     /// answered from.
     #[error(transparent)]
     Unreadable(#[from] gitterrace_index::feed::SourceError),
+    /// No checkpoint has this id: it was never taken, or the cap dropped it whole.
+    #[error("checkpoint not found: {0}")]
+    CheckpointNotFound(String),
     /// A newer build owns the cache: this one never writes it, so it cannot rebuild it.
     #[error("the insights cache has format {0}, written by a newer gitterrace")]
     NewerCache(String),
@@ -39,6 +42,7 @@ pub const ERROR_CODES: &[(&str, u16, &str)] = &[
     ("forbidden", 403, "the read is not served on a public server"),
     ("rev_not_found", 404, "the revision does not exist"),
     ("path_not_found", 404, "the path does not exist at the revision"),
+    ("checkpoint_not_found", 404, "no checkpoint has this id"),
     (
         "needs_reindex",
         409,
@@ -73,7 +77,8 @@ impl ApiError {
             Self::BadRequest(_) => StatusCode::BAD_REQUEST,
             Self::Git(
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
-            ) => StatusCode::NOT_FOUND,
+            )
+            | Self::CheckpointNotFound(_) => StatusCode::NOT_FOUND,
             Self::Forbidden(_) => StatusCode::FORBIDDEN,
             Self::NeedsReindex { .. } => StatusCode::CONFLICT,
             Self::Unreadable(_) | Self::NewerCache(_) => StatusCode::SERVICE_UNAVAILABLE,
@@ -85,6 +90,7 @@ impl ApiError {
         match self {
             Self::BadRequest(_) => "bad_request",
             Self::Forbidden(_) => "forbidden",
+            Self::CheckpointNotFound(_) => "checkpoint_not_found",
             Self::Git(gitterrace_git::Error::RevNotFound(_)) => "rev_not_found",
             Self::Git(gitterrace_git::Error::PathNotFound(_)) => "path_not_found",
             Self::Git(_) => "git",
@@ -149,6 +155,7 @@ mod tests {
             ApiError::NeedsReindex { read: 0, cap: 0 },
             ApiError::Unreadable(gitterrace_index::feed::SourceError(String::new())),
             ApiError::NewerCache(String::new()),
+            ApiError::CheckpointNotFound(String::new()),
         ];
         for e in &all {
             assert!(

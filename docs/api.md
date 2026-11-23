@@ -18,6 +18,7 @@ The API of each repository lives at `/r/{name}/api/v1`.
 | 403 | `forbidden` | the read is not served on a public server |
 | 404 | `rev_not_found` | the revision does not exist |
 | 404 | `path_not_found` | the path does not exist at the revision |
+| 404 | `checkpoint_not_found` | no checkpoint has this id |
 | 409 | `needs_reindex` | the revision is too far from the indexed branch to answer without a reindex |
 | 500 | `git` | reading the repository failed |
 | 500 | `index` | reading the insights cache failed |
@@ -42,7 +43,9 @@ each cap.
 | `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
 | `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
 | `GET /compare` | `base`, `head`, `path`, `three_dot`, `max_lines` | additions, base, deletions, files, from, head, path, three_dot, truncated |
-| `GET /worktree` | `scope`, `max_lines` | additions, deletions, files, scope, truncated |
+| `GET /worktree` | `scope`, `max_lines`, `since` | additions, content_gone, deletions, files, scope, since, truncated, unchanged_files |
+| `GET /checkpoints` |  | bytes_used, cap_bytes, checkpoints, persisted |
+| `GET /viewed` |  | viewed |
 | `GET /tree` | `rev`, `path` | commit, entries, path, rev |
 | `GET /blob` | `rev`, `path`, `start_line`, `limit` | binary, commit, link, path, permalink, rev, size, text, total_lines, truncated |
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
@@ -77,6 +80,9 @@ each cap.
 
 - `scope` (string): `all` (default), `staged` or `unstaged`.
 - `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
+- `since` (string): A checkpoint id from `/checkpoints`: list only the files
+  that differ from it. Needs scope `all`. An unknown id is 404
+  `checkpoint_not_found`.
 
 `/tree`: One directory level.
 
@@ -202,6 +208,11 @@ so to the model.
   "where is the risk" questions. Parameters: `label?` (string), `limit?`
   (integer), `metric?` (string), `name` (string), `period?` (string), `query`
   (string), `repo?` (string), `rev?` (string).
+- `list_checkpoints`: Checkpoints of the uncommitted work, newest first: id,
+  time, file count and the bytes of copies held. Pass an id as `since` to
+  `worktree_diff` to see only what changed after it. Taking one is a button on
+  the working tree page: this server never writes. Refused on a public server.
+  Parameters: `repo?` (string).
 - `list_insights`: The insights this server computes, each with a summary. Every
   one is a value of `name` for `insight`.
 - `list_repos`: The repositories this server may read and which scope it was
@@ -212,6 +223,9 @@ so to the model.
   submodule) and size per entry, one level deep. Use to explore the layout
   before `read_file`. Parameters: `path?` (string), `repo?` (string), `rev?`
   (string).
+- `list_viewed`: Files the user marked viewed on the working tree page, each
+  with the hash of the patch it was marked at: a mark holds only while that hash
+  matches. Refused on a public server. Parameters: `repo?` (string).
 - `log`: Commit history, newest first, with paging. Pass `path` to see only
   commits that touched a file or directory ("who changed this and why"). Returns
   id, parents, author, committer and subject per commit plus `has_more`. For one
@@ -235,7 +249,7 @@ so to the model.
   `staged`, `unstaged` or `all`. Reads this machine's working tree, so it is
   refused on a public server. Use to review work in progress before it is
   committed. Parameters: `max_lines?` (integer), `repo?` (string), `scope?`
-  (string).
+  (string), `since?` (string).
 
 A trailing `?` marks an optional parameter.
 

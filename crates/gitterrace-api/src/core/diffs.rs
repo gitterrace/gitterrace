@@ -63,6 +63,19 @@ impl ApiState {
         scope: Option<&str>,
         max_lines: Option<usize>,
     ) -> Result<WorktreeResponse, ApiError> {
+        self.worktree_diff_since(scope, max_lines, None)
+    }
+
+    /// [`ApiState::worktree_diff`] against a checkpoint when `since` names one: only the files
+    /// whose content differs from it, `unchanged_files` counting the rest and `content_gone` the
+    /// files whose copy was dropped (those diff against HEAD). A checkpoint holds the whole
+    /// working tree, so `since` needs scope `all`.
+    pub fn worktree_diff_since(
+        &self,
+        scope: Option<&str>,
+        max_lines: Option<usize>,
+        since: Option<&str>,
+    ) -> Result<WorktreeResponse, ApiError> {
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden("the working tree"));
         }
@@ -76,15 +89,37 @@ impl ApiState {
                 )));
             }
         };
-        let list = gitterrace_git::worktree_diff_scoped(&self.repo, which)?;
+        let (list, since_part) = match since {
+            None => (gitterrace_git::worktree_diff_scoped(&self.repo, which)?, None),
+            Some(id) => {
+                if which != gitterrace_git::Scope::All {
+                    return Err(ApiError::BadRequest(
+                        "since compares the whole working tree: use scope `all`".to_owned(),
+                    ));
+                }
+                let before = self
+                    .index
+                    .checkpoint_files(id)?
+                    .ok_or_else(|| ApiError::CheckpointNotFound(id.to_owned()))?;
+                let d = gitterrace_git::worktree_diff_since(&self.repo, &before)?;
+                (d.files.clone(), Some((id.to_owned(), d)))
+            }
+        };
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
+        let (since, unchanged_files, content_gone) = since_part
+            .map_or((None, None, Vec::new()), |(id, d)| {
+                (Some(id), Some(d.unchanged as u64), d.gone)
+            });
         Ok(WorktreeResponse {
             additions,
+            content_gone,
             deletions,
             files,
             scope: scope.unwrap_or("all").to_owned(),
+            since,
             truncated,
+            unchanged_files,
         })
     }
 }

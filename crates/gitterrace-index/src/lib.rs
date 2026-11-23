@@ -3,6 +3,7 @@
 //! by [`Insights`].
 
 mod cache;
+mod checkpoints;
 mod conventional;
 pub mod feed;
 pub mod graph;
@@ -18,6 +19,7 @@ mod source;
 mod store;
 mod tip;
 mod update;
+mod viewed;
 mod warm_state;
 
 use std::collections::HashSet;
@@ -27,6 +29,7 @@ use std::path::PathBuf;
 use gitterrace_git::Repo;
 
 /// Re-exported so the cards crate shares the one date rules without a new dependency.
+pub use checkpoints::{CheckpointInfo, CheckpointList};
 pub use conventional::parse_subject;
 pub use gitterrace_git::{civil_from_days, days_from_civil};
 pub use insights::*;
@@ -36,11 +39,12 @@ pub use phases::PhaseTime;
 pub use select::Selected;
 pub use source::CommitSource;
 pub use store::FORMAT_VERSION;
+pub use viewed::Viewed;
 pub use warm_state::StateFile;
 
 /// Every file the cache keeps in `.git/gitterrace/`, with what it holds. The architecture page is
 /// rendered from this, and a test fails when the folder holds a file not listed here.
-pub const CACHE_FILES: [(&str, &str); 6] = [
+pub const CACHE_FILES: [(&str, &str); 9] = [
     (
         store::VERSION_FILE,
         "The cache format, `v` and the number. A mismatch deletes the cache and rebuilds it. The \
@@ -71,7 +75,25 @@ pub const CACHE_FILES: [(&str, &str); 6] = [
         "Languages chain totals, checkpointed every 64 commits; a newer tip walks only new \
         commits. Read only whole, under its rules key.",
     ),
+    (
+        checkpoints::FILE,
+        "Snapshots of uncommitted work, append-only and checksummed. Capped by \
+        `review.checkpoint_mb`, oldest dropped. Not rebuildable.",
+    ),
+    (
+        viewed::FILE,
+        "Viewed marks per file and patch hash, so a mark holds while the patch is the same. \
+        Small, rewritten by atomic rename. Not rebuildable.",
+    ),
+    (
+        FINDINGS_FILE,
+        "The review basket: findings with notes, capped at 500 entries. Rewritten \
+        by atomic rename. Not rebuildable.",
+    ),
 ];
+
+/// See [`CACHE_FILES`]. Only named here: the basket that fills it is not part of this build.
+const FINDINGS_FILE: &str = "findings";
 
 /// See [`CACHE_FILES`].
 const TIP_FILE: &str = "tip";

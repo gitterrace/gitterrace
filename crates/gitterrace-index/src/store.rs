@@ -17,7 +17,7 @@ pub(crate) use segments::{
 ///
 /// The container byte version (`seg::format::VERSION`) is separate: it moves only when the
 /// container bytes change.
-pub const FORMAT_VERSION: &str = "2";
+pub const FORMAT_VERSION: &str = "3";
 
 /// What `VERSION` holds: `v` and then `FORMAT_VERSION`, like `v1`. Builds before the first
 /// release wrote a bare number (2 to 9) and never a `v`, so a bare number is a pre-release
@@ -29,6 +29,13 @@ pub(crate) fn version_stamp() -> String {
 pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
 pub(crate) const OWNER_FILE: &str = "owner";
+
+/// The files that hold the user's own data and cannot be rebuilt from the repository. A reset
+/// of any kind (a format change, an unreadable manifest, a hash collision, a rebuild) spares
+/// them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test checks
+/// both lists agree.
+pub(crate) const USER_FILES: [&str; 3] =
+    [crate::checkpoints::FILE, crate::viewed::FILE, crate::FINDINGS_FILE];
 
 /// Fails when `dir` exists but this process cannot write it: the lock file opens for append.
 pub(crate) fn writable(dir: &Path) -> io::Result<()> {
@@ -79,6 +86,10 @@ pub(crate) fn claim(dir: &Path, real: &Path) -> io::Result<()> {
     let _lock = WriteLock::take(dir)?;
     if cache::read_stamp(dir, OWNER_FILE)?.is_some_and(|h| h != want) {
         wipe(dir)?;
+        // The folder belongs to another repository: its marks and checkpoints are not ours.
+        for name in USER_FILES {
+            cache::remove(dir, name)?;
+        }
     }
     cache::write_atomic(dir, OWNER_FILE, want)
 }
@@ -142,11 +153,15 @@ pub(crate) fn ensure_dir(dir: &Path) -> io::Result<Option<String>> {
     Ok(None)
 }
 
-/// Deletes every file in the cache except the lock and writes our `VERSION`. A cache this build
-/// cannot read is never partly used: whatever it held, old formats, stray or half-written files,
-/// goes. The caller holds the lock and has checked the cache is not a newer build's.
+/// Deletes every file in the cache except the lock and the user's own files ([`USER_FILES`]) and
+/// writes our `VERSION`. A cache this build cannot read is never partly used: whatever it held,
+/// old formats, stray or half-written files, goes. Checkpoints, viewed marks and findings are
+/// not index data: they have their own framing and survive. The caller holds the lock and has
+/// checked the cache is not a newer build's.
 pub(crate) fn wipe(dir: &Path) -> io::Result<()> {
-    sweep(dir, &[LOCK_FILE.to_owned()])?;
+    let keep: Vec<String> =
+        std::iter::once(&LOCK_FILE).chain(&USER_FILES).map(|n| (*n).to_owned()).collect();
+    sweep(dir, &keep)?;
     cache::write_atomic(dir, VERSION_FILE, format!("{}\n", version_stamp()).as_bytes())
 }
 

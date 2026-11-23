@@ -97,6 +97,18 @@ index is ready, the log stops after the newest 2,000 commits.
 Good to know: source outlines work in about 90 languages. In a large file the
 list covers the part already highlighted.
 
+## Checkpoints
+
+A checkpoint records the uncommitted work as it is now, so a later review can
+show only what changed since. `GET /api/v1/worktree?since=<id>` (and the
+`worktree_diff` tool) lists the files whose content differs from it. A file
+whose copy was not kept (binary, over `review.checkpoint_file_kb`, or dropped
+by `review.checkpoint_mb`) is diffed against HEAD and named in `content_gone`.
+Set `review.has_auto_checkpoint` to take one before Mark all viewed.
+Checkpoints live in `.git/gitterrace/checkpoints`, hold only changed text
+files that git does not ignore, and are not rebuildable: deleting the folder
+forgets them.
+
 ## Mark files as viewed
 
 Each file of a commit, compare or working tree diff has a **Viewed** box, and

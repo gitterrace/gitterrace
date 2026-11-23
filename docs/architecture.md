@@ -45,7 +45,10 @@ config keys lives in `gitterrace_config::naming`.
   color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit
   landing mid-request cannot tear a page. Only the uncommitted view reads the
-  worktree.
+  worktree. The repository and the worktree are never written: the only writes
+  are the files of the cache folder, all through `cache.rs`. Of those, the index
+  is disposable, while `checkpoints`, `viewed` and `findings` are the user's and
+  survive every reset (`USER_FILES` in `store.rs`).
 - **Browsing never waits on the cache.** Only insights pages show "Indexing
   history" while the index builds. The overview shows no progress.
 - **The index builds in a child process.** The server starts its own executable
@@ -110,14 +113,22 @@ config keys lives in `gitterrace_config::naming`.
 | `tip` | The commit id the segment files were last built for. Opening insights for that commit skips walking its history to check the files hold exactly it. |
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 | `chain.state` | Languages chain totals, checkpointed every 64 commits; a newer tip walks only new commits. Read only whole, under its rules key. |
+| `checkpoints` | Snapshots of uncommitted work, append-only and checksummed. Capped by `review.checkpoint_mb`, oldest dropped. Not rebuildable. |
+| `viewed` | Viewed marks per file and patch hash, so a mark holds while the patch is the same. Small, rewritten by atomic rename. Not rebuildable. |
+| `findings` | The review basket: findings with notes, capped at 500 entries. Rewritten by atomic rename. Not rebuildable. |
 
-The format version is `2`, stored as `v2`.
+The format version is `3`, stored as `v3`.
 
 <!-- END GENERATED: cache -->
 
 The cache lives in `.git/gitterrace/` when that folder is writable, else in
 `$GITTERRACE_INDEX_FALLBACK/<hash of the git dir>` (the Docker image sets
 `/cache/index`), else nowhere.
+
+`checkpoints`, `viewed` and `findings` hold user state, so a wipe or an older
+build spares them. A checkpoint is a framed record with zstd copies of the
+changed text files. A torn tail is ignored, so a crash mid-write loses only
+that checkpoint.
 
 The index is a set of immutable files named by one manifest, swapped by rename,
 so a crash leaves the previous complete set. Pages read bounded, checksummed

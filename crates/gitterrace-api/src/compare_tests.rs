@@ -139,3 +139,74 @@ async fn compare_endpoint_needs_a_base() {
     assert_eq!(st, StatusCode::OK, "{v}");
     assert_eq!(v["three_dot"], true);
 }
+
+/// A checkpoint then an edit: `since` lists only the edited file, counts the rest and answers
+/// the same JSON bytes as before when `since` is not given.
+#[test]
+fn worktree_since_a_checkpoint_lists_only_what_changed_after_it() {
+    let (d, s) = fixture();
+    let p = d.path();
+    std::fs::write(p.join("a.txt"), "edited\n").expect("write");
+    std::fs::write(p.join("src/b.rs"), "fn edited() {}\n").expect("write");
+    let (id, new) = s.checkpoint_create("", false).expect("checkpoint");
+    assert!(new && id.starts_with("cp-"));
+    assert_eq!(s.checkpoint_create("", false).expect("again"), (id.clone(), false));
+    std::fs::write(p.join("a.txt"), "edited twice\n").expect("write");
+    let w = s.worktree_diff_since(Some("all"), None, Some(&id)).expect("since");
+    assert_eq!(w.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt"]);
+    assert_eq!((w.since.as_deref(), w.unchanged_files), (Some(id.as_str()), Some(1)));
+    assert_eq!(w.content_gone.len(), 0);
+    let plain =
+        serde_json::to_value(s.worktree_diff(Some("all"), None).expect("plain")).expect("json");
+    for k in ["since", "unchanged_files", "content_gone"] {
+        assert!(plain.get(k).is_none(), "{k} must stay out of an answer without since");
+    }
+    assert!(matches!(
+        s.worktree_diff_since(Some("all"), None, Some("cp-000000000000")),
+        Err(crate::ApiError::CheckpointNotFound(_))
+    ));
+    assert!(matches!(
+        s.worktree_diff_since(Some("staged"), None, Some(&id)),
+        Err(crate::ApiError::BadRequest(_))
+    ));
+    let list = s.checkpoints().expect("list");
+    assert!(list.persisted && list.checkpoints.len() == 1 && list.cap_bytes == 20 << 20);
+    assert_eq!(list.checkpoints[0].files, 2);
+}
+
+#[test]
+fn viewed_marks_round_trip_through_the_state() {
+    let (_d, s) = fixture();
+    s.viewed_set(&[("a.txt".to_owned(), "9f2c41ab77d0e1c3".to_owned())], true).expect("set");
+    let v = s.viewed().expect("viewed").viewed;
+    assert_eq!((v[0].path.as_str(), v[0].patch.as_str()), ("a.txt", "9f2c41ab77d0e1c3"));
+    s.viewed_set(&[("a.txt".to_owned(), String::new())], false).expect("clear");
+    assert_eq!(s.viewed().expect("viewed").viewed.len(), 0);
+}
+
+/// Checkpoints and marks are this machine's: a public handle refuses the reads and the writes,
+/// and the routes answer 403.
+#[tokio::test]
+async fn checkpoints_and_viewed_are_refused_on_a_public_server() {
+    let (_d, s) = fixture();
+    let s = s.committed_only();
+    assert!(matches!(s.checkpoints(), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(s.viewed(), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(s.checkpoint_create("", false), Err(crate::ApiError::Forbidden(_))));
+    assert!(matches!(s.viewed_set(&[], true), Err(crate::ApiError::Forbidden(_))));
+    for uri in ["/checkpoints", "/viewed", "/worktree?since=cp-1"] {
+        let (st, v) = get(&s, uri).await;
+        assert_eq!(st, StatusCode::FORBIDDEN, "{uri}: {v}");
+    }
+}
+
+#[test]
+fn checkpoints_are_off_when_the_cap_is_zero() {
+    let (d, s) = fixture();
+    std::fs::write(d.path().join("a.txt"), "x\n").expect("write");
+    let cfg = gitterrace_config::parse("[review]\ncheckpoint_mb = 0\n").expect("parse").config;
+    let s = s.configured(&cfg);
+    let l = s.checkpoints().expect("list");
+    assert!(!l.persisted && l.checkpoints.is_empty() && l.cap_bytes == 0);
+    assert!(matches!(s.checkpoint_create("", false), Err(crate::ApiError::BadRequest(_))));
+}

@@ -61,7 +61,8 @@ In scope:
   (`javascript:`, `data:`, `file:`), is in scope.
 - **The MCP server.** Read-only, over stdio. Reading outside the served
   repository is in scope.
-- **The cache.** In a repository gitterrace writes only `.git/gitterrace/`,
+- **The cache.** In a repository gitterrace writes only `.git/gitterrace/` (the index, and
+  checkpoints, viewed marks and review notes),
   plus one line in `.git/info/exclude` when you export into the worktree, each
   by temp file and a rename that refuses a symlink. Any other write, or a
   symlink that redirects one, is in scope.

@@ -13,6 +13,7 @@ use crate::git::{RefKind, TreeEntryKind};
 
 mod commit;
 mod insights;
+mod review;
 
 #[cfg(test)]
 mod tests;
@@ -28,6 +29,7 @@ pub use insights::{
     InsightPeriod, InsightPeriodStats, InsightPeriodSummary, InsightResponse, InsightRhythm,
     InsightSeriesPoint, InsightUnit,
 };
+pub use review::{CheckpointItem, CheckpointsResponse, ViewedItem, ViewedResponse};
 
 /// Who did something and when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]

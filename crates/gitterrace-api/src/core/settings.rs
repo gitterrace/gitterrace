@@ -19,6 +19,8 @@ pub(super) struct Settings {
     /// commit holds millions of diff lines, one minified line can be megabytes, and a path
     /// filter walks every skipped commit.
     pub(super) caps: gitterrace_config::Api,
+    /// Checkpoint caps from `[review]`.
+    pub(super) review: gitterrace_config::Review,
 }
 
 impl ApiState {
@@ -59,6 +61,7 @@ impl ApiState {
         s.style = cfg.links.style;
         s.defaults = defaults;
         s.caps = cfg.api.clone();
+        s.review = cfg.review.clone();
     }
 
     pub(super) fn write_settings(&self) -> std::sync::RwLockWriteGuard<'_, Settings> {

@@ -3,9 +3,21 @@
 What gitterrace protects, from whom, and what holds each door shut. To report a
 vulnerability, see [SECURITY.md](../SECURITY.md).
 
+## What it writes
+
+gitterrace never writes your repository or your working tree: no object, ref,
+config or working file changes. It keeps one folder of its own,
+`.git/gitterrace/`, for the index and, from 0.2.1, your checkpoints, viewed
+marks and review notes. Delete the folder at any time: the index rebuilds, and
+the marks and notes are forgotten. A checkpoint holds copies of changed text
+files from your working tree (never ignored or binary files), so treat that
+folder like the repository.
+
 ## Assets
 
-- Working tree files, including ignored ones such as `.env`.
+- Working tree files, including ignored ones such as `.env`. A checkpoint copies
+  changed text files that are not ignored into `.git/gitterrace/`, so that
+  folder is as sensitive as the working tree.
 - Git objects and refs, plus `.git/config` with any credentials in remote URLs.
 - `config.toml`, `actions.toml` and the repository registry: editing
   `actions.toml` is code execution by design.

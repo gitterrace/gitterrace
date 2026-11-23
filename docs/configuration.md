@@ -246,6 +246,19 @@ Exceptions, each on purpose:
 - `api_enabled` (bool, default `unset`): Serve the JSON API (`/api/v1`). Unset
   means on locally and off on a public server. Server-wide.
 
+## `[review]`
+
+- `has_auto_checkpoint` (bool, default `false`): Take a checkpoint of the
+  uncommitted work before Mark all viewed, so the next review can show only what
+  changed since. A checkpoint holds copies of changed text files from the
+  working tree in `.git/gitterrace/`, never ignored or binary ones.
+- `checkpoint_mb` (integer, default `20`): Most copies a repository's
+  checkpoints keep, in MiB. The oldest copies go first. 0 switches checkpoints
+  off: none is taken and none is kept.
+- `checkpoint_file_kb` (integer, default `256`): Largest changed text file a
+  checkpoint copies, in KiB. A larger one is named without a copy, so a review
+  since it diffs that file against HEAD and says so.
+
 ## `[multi]`
 
 - `depth` (integer, default `2`): Folder levels searched for repositories below

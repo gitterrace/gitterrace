@@ -5,9 +5,9 @@ use axum::http::{HeaderValue, Request, StatusCode, header};
 use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use gitterrace_types::api::{
-    BlameResponse, BlobResponse, CommitResponse, CompareResponse, ContributorsResponse,
-    EndpointDoc, IndexResponse, InsightList, InsightResponse, LogResponse, ParamDoc, RefsResponse,
-    RepoResponse, TreeResponse, WorktreeResponse,
+    BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
+    ContributorsResponse, EndpointDoc, IndexResponse, InsightList, InsightResponse, LogResponse,
+    ParamDoc, RefsResponse, RepoResponse, TreeResponse, ViewedResponse, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -87,6 +87,11 @@ async fn etag(
     req: Request<axum::body::Body>,
     next: Next,
 ) -> Response {
+    // The working tree, checkpoints and marks change with no ref moving: a tag would answer 304
+    // to a stale copy.
+    if matches!(req.uri().path(), "/worktree" | "/checkpoints" | "/viewed") {
+        return next.run(req).await;
+    }
     let slot = state.job_slot().await;
     let tag = tokio::task::spawn_blocking(move || {
         let _slot = slot;
@@ -112,6 +117,14 @@ async fn etag(
         res.headers_mut().insert(header::ETAG, v);
     }
     res
+}
+
+pub(crate) async fn checkpoints(State(s): State<ApiState>) -> Reply<CheckpointsResponse> {
+    blocking(&s, ApiState::checkpoints).await
+}
+
+pub(crate) async fn viewed(State(s): State<ApiState>) -> Reply<ViewedResponse> {
+    blocking(&s, ApiState::viewed).await
 }
 
 pub(crate) async fn index() -> Json<IndexResponse> {
@@ -198,6 +211,7 @@ pub(crate) async fn compare(
 
 #[derive(Deserialize)]
 pub(crate) struct WorktreeQuery {
+    since: Option<String>,
     scope: Option<String>,
     max_lines: Option<usize>,
 }
@@ -206,7 +220,10 @@ pub(crate) async fn worktree(
     State(s): State<ApiState>,
     Query(q): Query<WorktreeQuery>,
 ) -> Reply<WorktreeResponse> {
-    blocking(&s, move |s| s.worktree_diff(q.scope.as_deref(), q.max_lines)).await
+    blocking(&s, move |s| {
+        s.worktree_diff_since(q.scope.as_deref(), q.max_lines, q.since.as_deref())
+    })
+    .await
 }
 
 #[derive(Deserialize)]
