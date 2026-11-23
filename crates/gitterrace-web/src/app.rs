@@ -27,6 +27,7 @@ pub(crate) const DIRTY_TTL: Duration = Duration::from_secs(2);
 pub(crate) const RECORDS_IDLE: Duration = Duration::from_secs(30);
 
 mod child;
+mod dirty;
 mod events;
 mod history;
 mod jobs;
@@ -36,6 +37,8 @@ mod refresh;
 mod sched;
 mod state;
 mod touched;
+
+pub(crate) use dirty::DirtyMemo;
 
 pub use child::index_child;
 pub(crate) use history::PathLog;
@@ -56,6 +59,8 @@ pub(crate) struct Env {
     actions_note: Arc<RwLock<Option<Arc<crate::actions::Status>>>>,
     /// The `actions.toml` Send to targets, reloaded with the file, read by the commit page.
     sends: Arc<RwLock<Option<SharedActions>>>,
+    /// The owner proof every write checks, set when the server is built (see `owner.rs`).
+    pub(crate) owner: Arc<RwLock<Option<Arc<crate::owner::Owner>>>>,
     /// `server.is_public` at startup. Fixed for the process: a reload never widens what a
     /// public server shows.
     public: bool,
@@ -140,31 +145,6 @@ impl std::ops::Deref for Slots {
     }
 }
 
-/// The worktree's dirty answer and when it was measured, reused for [`DIRTY_TTL`].
-#[derive(Default)]
-pub(crate) struct DirtyMemo(Mutex<Option<(Instant, bool)>>);
-
-impl DirtyMemo {
-    /// The answer when one inside the bound is at hand.
-    pub(crate) fn get(&self) -> Option<bool> {
-        let g = self.0.lock().ok()?;
-        let (at, v) = (*g)?;
-        (at.elapsed() < DIRTY_TTL).then_some(v)
-    }
-
-    pub(crate) fn put(&self, v: bool) {
-        if let Ok(mut g) = self.0.lock() {
-            *g = Some((Instant::now(), v));
-        }
-    }
-
-    pub(crate) fn clear(&self) {
-        if let Ok(mut g) = self.0.lock() {
-            *g = None;
-        }
-    }
-}
-
 impl Env {
     /// One page-building slot, for blocking work outside [`blocking`] such as the
     /// multi-repository home. Move it into the blocking task, so a dropped request frees it
@@ -189,6 +169,7 @@ impl Env {
             stop: Arc::new(watch::channel(false).0),
             actions_note: Arc::default(),
             sends: Arc::default(),
+            owner: Arc::default(),
             changes: None,
             settings_dir: None,
             search: Vec::new(),
@@ -229,6 +210,18 @@ impl Env {
         if let Ok(mut g) = self.sends.write() {
             *g = Some(Arc::clone(sends));
         }
+    }
+
+    /// Hands the owner proof to every repository this server serves, so a page write can check it.
+    pub(crate) fn set_owner(&self, owner: &Arc<crate::owner::Owner>) {
+        if let Ok(mut g) = self.owner.write() {
+            *g = Some(Arc::clone(owner));
+        }
+    }
+
+    /// The owner proof writes check, `None` when none was set (an export, a bare router).
+    pub(crate) fn owner(&self) -> Option<Arc<crate::owner::Owner>> {
+        self.owner.read().ok().and_then(|g| g.as_ref().map(Arc::clone))
     }
 
     /// `(label, url)` for each Send to target with a `lookup`, filled for `sha`.

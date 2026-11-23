@@ -1,0 +1,9 @@
+{% if !persisted %}<span class="cpbar muted" data-cpbar-off>Checkpoints are off: no cache
+folder to keep them in.</span>
+{%- else %}<span class="cpbar" data-cpbar><button type="button" class="btn sm"
+data-checkpoint title="Saves a copy of your changed text files in .git/gitterrace.
+Your repository and working tree are not changed.">Checkpoint</button>
+{%- if mark_all %} <button type="button" class="btn sm" data-mark-all>Mark all
+viewed</button>{% endif %}
+ <span class="cpnote muted" role="status" aria-live="polite"></span></span>
+{%- endif %}

@@ -34,6 +34,7 @@ All notable changes are listed here. The format follows
 - web: style the not-found and error pages and say why a repository failed
 - web: give the commit page two header rows and a readable message
 - insights: explore which files change together
+- web: checkpoint button, since tab and server-kept viewed marks
 
 ### Changed
 

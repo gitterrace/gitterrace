@@ -52,6 +52,9 @@ pub(crate) const PUBLIC: &[&str] = &[
 #[cfg(test)]
 pub(crate) const LOCAL: &[&str] = &[
     "/worktree",
+    "/_checkpoint",
+    "/_viewed",
+    "/_viewed/all",
     "/worktree/diff/{*path}",
     "/worktree/find",
     "/worktree/raw/{*path}",

@@ -114,6 +114,7 @@ fn the_working_tree_folds_too_and_loads_by_path() {
         DiffSource::Worktree {
             generated: &std::collections::HashSet::new(),
             scope: gitterrace_git::Scope::All,
+            since: None,
         },
         &files,
     );

@@ -7,7 +7,7 @@ use axum::{
     Json, Router,
     extract::{Query, State},
     response::{Html, Redirect, Response},
-    routing::get,
+    routing::{get, post},
 };
 use gitterrace_git::RefKind;
 use serde::Deserialize;
@@ -68,6 +68,9 @@ pub(crate) fn router(app: Arc<App>) -> Router {
         .route("/refs", get(refs))
         .route("/search", get(crate::search::search))
         .route("/worktree", get(worktree))
+        .route("/_checkpoint", post(crate::checkpoints_web::checkpoint))
+        .route("/_viewed", post(crate::checkpoints_web::viewed))
+        .route("/_viewed/all", post(crate::checkpoints_web::viewed_all))
         .route("/worktree/diff/{*path}", get(views::worktree_fragment))
         .route("/worktree/raw/{*path}", get(raw::worktree_raw))
         .route("/worktree/blob/{*path}", get(files::worktree_blob))
@@ -460,6 +463,7 @@ async fn worktree(
     Query(q): Query<crate::worktree_scope::ScopeQuery>,
 ) -> Result<Html<String>> {
     let scope = q.scope();
+    let since = q.since().map(str::to_owned);
     let p = blocking(&app, move |a| {
         // Taken before the diff: an edit in between shows once more, never not at all. The
         // oldest render not yet compared stays: a newer one may already hold an edit an older
@@ -470,8 +474,10 @@ async fn worktree(
         {
             *g = sig;
         }
-        let files = gitterrace_git::worktree_diff_scoped(&a.repo, scope)?;
-        let tabs = crate::worktree_scope::tabs(scope, gitterrace_git::worktree_counts(&a.repo)?);
+        let review = crate::checkpoints_web::read(a, scope, since.as_deref())?;
+        let files = &review.files;
+        let tabs = review
+            .tabs(crate::worktree_scope::tabs(scope, gitterrace_git::worktree_counts(&a.repo)?));
         let (adds, dels) =
             files.iter().fold((0, 0), |(x, y), f| (x + f.additions, y + f.deletions));
         let stats: Vec<WorktreeFileRow> = files
@@ -486,24 +492,28 @@ async fn worktree(
                 },
             })
             .collect();
+        let mut head = crate::pagehead::worktree_head(files.len(), adds.into(), dels.into(), tabs);
+        head.tools = review.bar();
         Ok(WorktreePage {
-            head: crate::pagehead::worktree_head(files.len(), adds.into(), dels.into(), tabs),
+            head,
             c: views::chrome(a, "files").live(Mode::WORKTREE),
-            clean: files.is_empty(),
+            // A checkpoint page has its own note to show even when nothing changed since.
+            clean: files.is_empty() && review.since_id().is_none(),
             empty: Empty::new(crate::worktree_scope::empty_text(scope))
                 .step("Browse the commits", fmt::href("/log/HEAD")),
             diff: views::diff_html_with(
                 &views::Render::of(a),
                 views::DiffSource::Worktree {
-                    generated: &views::worktree_generated(&a.repo, &files),
+                    generated: &views::worktree_generated(&a.repo, files),
                     scope,
+                    since: review.since_id(),
                 },
-                &files,
+                files,
             ),
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),
-            tools: crate::diff_find::toolbar(stats.len()),
+            tools: review.since_note() + &crate::diff_find::toolbar(stats.len()),
             files: stats,
         })
     })

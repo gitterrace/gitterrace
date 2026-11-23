@@ -9,11 +9,18 @@ use crate::pagehead::Tab;
 #[derive(Debug, Default, serde::Deserialize)]
 pub(crate) struct ScopeQuery {
     scope: Option<String>,
+    since: Option<String>,
 }
 
 impl ScopeQuery {
     pub(crate) fn scope(&self) -> Scope {
         named(self.scope.as_deref())
+    }
+
+    /// `?since=<checkpoint id>`: the page lists what differs from that checkpoint, whatever the
+    /// scope says.
+    pub(crate) fn since(&self) -> Option<&str> {
+        self.since.as_deref().filter(|s| !s.is_empty())
     }
 }
 
@@ -32,6 +39,12 @@ pub(crate) const fn query(scope: Scope) -> &'static str {
         Scope::Staged => "?scope=staged",
         Scope::Unstaged => "?scope=unstaged",
     }
+}
+
+/// The query string of a page that compares with checkpoint `since` when one is named, else the
+/// one `scope` selects.
+pub(crate) fn query_of(scope: Scope, since: Option<&str>) -> String {
+    since.map_or_else(|| query(scope).to_owned(), |id| format!("?since={}", fmt::enc_seg(id)))
 }
 
 /// The scope tabs for the page head: "Staged (n)" and so on, the current one on.
@@ -84,7 +97,7 @@ mod tests {
             (Some("bogus"), Scope::All),
             (None, Scope::All),
         ] {
-            let q = ScopeQuery { scope: raw.map(str::to_owned) };
+            let q = ScopeQuery { scope: raw.map(str::to_owned), since: None };
             assert_eq!(q.scope(), want);
         }
     }

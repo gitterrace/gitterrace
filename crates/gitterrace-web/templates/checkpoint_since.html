@@ -1,0 +1,9 @@
+<div class="cp-since" data-cp-since><p class="muted">Changes since the checkpoint taken
+{{ when }}
+{%- if !label.is_empty() %} ({{ label }}){% endif %}. A checkpoint copies your changed text
+files into <code>.git/gitterrace</code> and writes nothing else.</p>
+{%- if !gone.is_empty() %}<p class="muted">{{ gone }} show changes against HEAD: their old
+content is gone.</p>{% endif %}
+{%- if !unchanged.is_empty() %}<details><summary>{{ unchanged_count }}
+unchanged since</summary><ul>
+{%- for p in unchanged %}<li>{{ p }}</li>{% endfor %}</ul></details>{% endif %}</div>

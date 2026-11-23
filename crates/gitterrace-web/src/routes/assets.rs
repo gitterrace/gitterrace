@@ -12,7 +12,7 @@ use axum::{
 pub const MERMAID_JS: &str = "/static/vendor/mermaid-12.3.0.min.js";
 
 /// The scripts and styles `app.js` adds on first use: no page links them, so `export` seeds them.
-pub const LAZY_ASSETS: [&str; 10] = [
+pub const LAZY_ASSETS: [&str; 12] = [
     "/static/actions.js",
     "/static/send.js",
     "/static/send.css",
@@ -23,6 +23,8 @@ pub const LAZY_ASSETS: [&str; 10] = [
     "/static/diffs-find.js",
     "/static/card.js",
     "/static/card.css",
+    "/static/checkpoints.js",
+    "/static/checkpoints.css",
 ];
 
 const JS: &str = "text/javascript; charset=utf-8";
@@ -32,7 +34,7 @@ const CSS: &str = "text/css; charset=utf-8";
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 /// Every embedded script and stylesheet: (name under `/static/`, type, body).
-const TABLE: [(&str, &str, &str); 33] = [
+const TABLE: [(&str, &str, &str); 35] = [
     ("loc.js", JS, include_str!("../../static/loc.js")),
     ("tokens.css", CSS, include_str!("../../static/tokens.css")),
     ("app.css", CSS, include_str!("../../static/app.css")),
@@ -52,6 +54,8 @@ const TABLE: [(&str, &str, &str); 33] = [
     ("graph.css", CSS, include_str!("../../static/graph.css")),
     ("card.js", JS, include_str!("../../static/card.js")),
     ("card.css", CSS, include_str!("../../static/card.css")),
+    ("checkpoints.js", JS, include_str!("../../static/checkpoints.js")),
+    ("checkpoints.css", CSS, include_str!("../../static/checkpoints.css")),
     ("font.js", JS, include_str!("../../static/font.js")),
     ("markdown.js", JS, include_str!("../../static/markdown.js")),
     ("outline.js", JS, include_str!("../../static/outline.js")),

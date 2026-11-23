@@ -10,6 +10,9 @@ mod caches;
 mod card;
 mod charts;
 mod charttip;
+mod checkpoints_web;
+#[cfg(test)]
+mod checkpoints_web_tests;
 mod commit_line;
 mod commit_types;
 mod compare;
@@ -293,6 +296,7 @@ fn build_server(
         None => gitterrace_actions::Token::generate().map_err(io::Error::other)?,
     });
     let owner = Arc::new(owner::Owner::new(Arc::clone(&secret)));
+    env.set_owner(&owner);
     #[cfg(test)]
     owner.remember_for_tests();
     let (live, status) = actions::start(actions_file, &roots, local, output_kb, &owner);

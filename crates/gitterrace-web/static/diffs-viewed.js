@@ -1,11 +1,21 @@
 // Viewed marks on a diff page: a checkbox per file, a count, a hide switch and a badge on a
-// marked file whose content changed since. Kept in localStorage under the page's own address
-// (a commit, a compare range or a working tree tab), so nothing leaves the machine.
+// marked file whose content changed since. Two stores. The working tree page keeps them in the
+// cache folder through the server (its Checkpoint bar is on the page, and a mark holds while the
+// file's patch id, data-p, is the same). Every other page, and a working tree page with no cache
+// folder, keeps them in localStorage under the page's own address, so nothing leaves the machine.
 // app.js loads this only on a page with diff files.
 (function () {
   "use strict";
   var KEY = "gt-viewed:" + location.pathname + location.search;
+  var B = window.gtNav.B;
+  var el = window.gtNav.el;
+  // Server marks by path, the patch id of each. Null until the first read has come back.
+  var served = null;
+  function server() { return !!document.querySelector("[data-cpbar]"); }
+  // The id a mark is compared with on a file: the patch id on the server, the content tag here.
+  function tag(s) { return server() ? s.dataset.p : s.dataset.h; }
   function read() {
+    if (server()) return served || {};
     try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; }
   }
   function write(m) {
@@ -14,17 +24,62 @@
       else localStorage.removeItem(KEY);
     } catch (e) { /* storage refused: the marks last for this page view only */ }
   }
-  var el = window.gtNav.el;
+  function post(url, body) {
+    return fetch(B + url, {
+      method: "POST", cache: "no-store", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body)
+    }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
+  }
+  function note(text) {
+    var n = document.querySelector("[data-cpbar] .cpnote");
+    if (n) n.textContent = text;
+  }
+  // The marks the server holds, then, once, the ones this browser kept for the same address: a
+  // local mark whose content tag still matches the file is sent up and the local copy dropped.
+  var reads = 0;
+  function load() {
+    // Only the newest read counts: an older one that lands late holds marks from before a save.
+    var mine = ++reads;
+    return fetch(B + "/api/v1/viewed", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
+      .then(function (j) {
+        if (mine !== reads) return null;
+        served = {};
+        j.viewed.forEach(function (v) { served[v.path] = v.patch; });
+        return migrate();
+      })
+      .catch(function () { served = served || {}; note("Viewed marks could not be read."); });
+  }
+  function migrate() {
+    var old = null;
+    try { old = JSON.parse(localStorage.getItem(KEY)); } catch (e) { old = null; }
+    if (!old) return null;
+    var items = [];
+    files().forEach(function (s) {
+      var p = s.dataset.path;
+      if (old[p] && old[p] === s.dataset.h && s.dataset.p && !(p in served)) {
+        items.push({ path: p, patch: s.dataset.p });
+      }
+    });
+    try { localStorage.removeItem(KEY); } catch (e) { /* nothing to drop */ }
+    if (!items.length) return null;
+    return post("/_viewed/all", { items: items }).then(function () {
+      items.forEach(function (i) { served[i.path] = i.patch; });
+    }).catch(function () { note("Earlier viewed marks could not be moved."); });
+  }
+  function files() {
+    return Array.prototype.slice.call(document.querySelectorAll("section.file[data-path]"));
+  }
   // The bar is server rendered: this only fills in its numbers, so nothing moves when it runs.
-  function count(files, marks) {
+  function count(list, marks) {
     var n = 0, p = document.querySelector(".difftools .viewed-count");
     var bar = document.querySelector(".difftools .dt-bar");
-    files.forEach(function (s) {
-      var on = marks[s.dataset.path] === s.dataset.h;
+    list.forEach(function (s) {
+      var on = marks[s.dataset.path] === tag(s);
       if (on) n++;
       if (on) s.setAttribute("data-viewed", ""); else s.removeAttribute("data-viewed");
     });
-    if (p) p.textContent = "Viewed " + n + " of " + files.length;
+    if (p) p.textContent = "Viewed " + n + " of " + list.length;
     if (bar) bar.value = n;
     var hide = document.querySelector(".difftools .dt-hide-box");
     if (hide) hide.checked = document.body.classList.contains("hide-viewed");
@@ -32,12 +87,25 @@
   // One handler for every box, so a file a live refresh brings in needs no binding of its own.
   document.addEventListener("change", function (e) {
     var t = e.target, s = t.classList.contains("viewed") && t.closest("section.file");
-    if (s) {
-      var m = read();
-      if (t.checked) m[s.dataset.path] = s.dataset.h; else delete m[s.dataset.path];
-      write(m);
+    if (!s) return;
+    if (server()) {
+      // Shown at once and saved after: a refused save puts the old mark back.
+      var on = t.checked, patch = s.dataset.p, path = s.dataset.path;
+      served = served || {};
+      var before = served[path];
+      if (on) served[path] = patch; else delete served[path];
       decorate();
+      post("/_viewed", { path: path, patch: patch, viewed: on }).catch(function () {
+        if (before === undefined) delete served[path]; else served[path] = before;
+        note("The viewed mark was not saved.");
+        decorate();
+      });
+      return;
     }
+    var m = read();
+    if (t.checked) m[s.dataset.path] = s.dataset.h; else delete m[s.dataset.path];
+    write(m);
+    decorate();
   });
   document.addEventListener("change", function (e) {
     if (e.target.classList && e.target.classList.contains("dt-hide-box")) {
@@ -45,10 +113,10 @@
     }
   });
   function decorate() {
-    var files = Array.prototype.slice.call(document.querySelectorAll("section.file[data-path]"));
+    var list = files();
     var marks = read();
-    files.forEach(function (s) {
-      var head = s.querySelector("header"), path = s.dataset.path, h = s.dataset.h;
+    list.forEach(function (s) {
+      var head = s.querySelector("header"), path = s.dataset.path, h = tag(s);
       var box = s.querySelector("input.viewed");
       if (!box) {
         var lab = el("label", "viewed-mark");
@@ -71,8 +139,18 @@
         badge.remove();
       }
     });
-    count(files, marks);
+    count(list, marks);
   }
-  decorate();
-  document.addEventListener("gt:live-refreshed", decorate);
+  // The boxes at once, so nothing shifts, then the server's marks fill them in.
+  function start() {
+    decorate();
+    if (server() && served === null) load().then(decorate);
+  }
+  start();
+  document.addEventListener("gt:live-refreshed", start);
+  // The Checkpoint bar's Mark all viewed wrote marks: read them again.
+  document.addEventListener("gt:viewed-changed", function () {
+    served = null;
+    start();
+  });
 })();

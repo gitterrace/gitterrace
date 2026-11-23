@@ -27,6 +27,9 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
         Feature::Worktree,
         &[
             "/worktree",
+            "/_checkpoint",
+            "/_viewed",
+            "/_viewed/all",
             "/api/v1/worktree",
             "/api/v1/checkpoints",
             "/api/v1/viewed",

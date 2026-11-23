@@ -20,6 +20,7 @@ const MAX_LINES: usize = 2000;
 pub(crate) struct FindQuery {
     q: Option<String>,
     scope: Option<String>,
+    since: Option<String>,
 }
 
 /// One matching line: where it sits in its file (`kind` and `no` name the line the page marks)
@@ -169,8 +170,13 @@ pub(crate) async fn worktree(
 ) -> Result<Json<Found>> {
     let n = needle(&q);
     let scope = crate::worktree_scope::named(q.scope.as_deref());
+    let since = q.since.filter(|s| !s.is_empty());
     let found = blocking(&app, move |a| {
-        Ok(find(&gitterrace_git::worktree_diff_scoped(&a.repo, scope)?, &n))
+        let files = match &since {
+            Some(id) => crate::checkpoints_web::since_files(a, id)?,
+            None => gitterrace_git::worktree_diff_scoped(&a.repo, scope)?,
+        };
+        Ok(find(&files, &n))
     })
     .await?;
     Ok(Json(found))

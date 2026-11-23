@@ -133,6 +133,8 @@ pub(crate) enum DiffSource<'a> {
         generated: &'a std::collections::HashSet<String>,
         /// The tab the page shows, carried to the folded files' URLs.
         scope: gitterrace_git::Scope,
+        /// The checkpoint the page compares with: folded files load against it too.
+        since: Option<&'a str>,
     },
 }
 
@@ -141,10 +143,10 @@ pub(crate) enum DiffSource<'a> {
 fn fold_button(src: DiffSource<'_>, i: usize, f: &FileDiff, label: &str, lazy: bool) -> String {
     let url = match src {
         DiffSource::Commit { rev, .. } => crate::fmt::href(&format!("/diff/{}/{i}", enc_seg(rev))),
-        DiffSource::Worktree { scope, .. } => crate::fmt::href(&format!(
+        DiffSource::Worktree { scope, since, .. } => crate::fmt::href(&format!(
             "/worktree/diff/{}{}",
             enc_path(&f.path),
-            crate::worktree_scope::query(scope)
+            crate::worktree_scope::query_of(scope, since)
         )),
     };
     // A link, so it is reachable by keyboard, works without script and is a page an export
@@ -201,13 +203,14 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         let gen_attr = if generated { " data-generated" } else { "" };
         let _ = write!(
             out,
-            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{gen_attr}>\
+            "<section class=\"file\" id=\"f{i}\" data-path=\"{p}\" data-h=\"{h}\"{patch}{gen_attr}>\
                 <header id=\"{a}\" tabindex=\"-1\" role=\"heading\" \
                 aria-level=\"2\" aria-label=\"{p}\"><span class=\"badge {k}\">{k}</span> ",
             k = f.kind.as_str(),
             p = esc(&f.path),
             a = esc(&crate::fmt::file_anchor(&f.path)),
-            h = content_tag(f)
+            h = content_tag(f),
+            patch = patch_attr(src, f)
         );
         if generated {
             out.push_str("<span class=\"tag\">Generated</span> ");
@@ -280,6 +283,31 @@ fn content_tag(f: &FileDiff) -> String {
         }
     }
     format!("{:x}", h.finish())
+}
+
+/// `data-p`, the id a saved viewed mark holds: the first 16 hex digits of the git hash of the
+/// file's unified diff text as the page renders it. Only the working tree keeps marks on the
+/// server, so only its sections carry one.
+fn patch_attr(src: DiffSource<'_>, f: &FileDiff) -> String {
+    if !matches!(src, DiffSource::Worktree { .. }) {
+        return String::new();
+    }
+    let mut text = format!("--- {}\n", f.path);
+    for h in &f.hunks {
+        text.push_str(&h.header);
+        text.push('\n');
+        for l in &h.lines {
+            text.push(match l.kind {
+                LineKind::Added => '+',
+                LineKind::Removed => '-',
+                LineKind::Context => ' ',
+            });
+            text.push_str(&l.text);
+            text.push('\n');
+        }
+    }
+    let id = gitterrace_git::content_id(text.as_bytes());
+    format!(" data-p=\"{}\"", id.get(..16).unwrap_or(&id))
 }
 
 /// What the files rendered in full so far cost.
@@ -377,10 +405,16 @@ pub(crate) async fn worktree_fragment(
     Query(q): Query<ScopeQuery>,
 ) -> Result<Html<String>> {
     let scope = q.scope();
+    let since = q.since().map(str::to_owned);
     let html = crate::app::blocking(&app, move |a| {
         let r = Render::of(a);
-        Ok(gitterrace_git::worktree_file_diff_scoped(&a.repo, &path, scope)?
-            .map(|f| if f.hunks.is_empty() { no_hunks_line(&f) } else { diff_body_html(&r, &f) }))
+        let one = match &since {
+            None => gitterrace_git::worktree_file_diff_scoped(&a.repo, &path, scope)?,
+            Some(id) => {
+                crate::checkpoints_web::since_files(a, id)?.into_iter().find(|f| f.path == path)
+            }
+        };
+        Ok(one.map(|f| if f.hunks.is_empty() { no_hunks_line(&f) } else { diff_body_html(&r, &f) }))
     })
     .await?;
     // A file committed or reverted since the page loaded has nothing left to show.

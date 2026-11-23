@@ -121,6 +121,8 @@ export function checks(env) {
     const srv = await serve(bin, dir, cfg);
     try {
       await eachBrowser(browsers, context, async (ctx, name) => {
+        // This server's owner cookie: the working tree page keeps viewed marks through it.
+        await ctx.addCookies([await srv.owner()]);
         const where = `diff-find ${name}`;
         const raw = await (await fetch(`${srv.base}/worktree`)).text();
         say(/<form class="difftools"/.test(raw), `${where}: the bar is server rendered`,

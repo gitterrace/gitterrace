@@ -337,6 +337,9 @@ const NOT_PAGES: &[&str] = &[
     "/_launch",
     "/_settings/file",
     "/_settings/check",
+    "/_checkpoint",
+    "/_viewed",
+    "/_viewed/all",
 ];
 
 /// Class: every route the sitemap lists is either a page the anatomy check walks or named as

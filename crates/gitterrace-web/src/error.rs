@@ -11,6 +11,9 @@ pub(crate) enum Error {
     Git(#[from] gitterrace_git::Error),
     #[error("index: {0}")]
     Index(#[from] std::io::Error),
+    /// A named thing that is not there (a checkpoint the cap dropped).
+    #[error("{0}")]
+    Missing(String),
     #[error("render: {0}")]
     Render(#[from] askama::Error),
     #[error("task: {0}")]
@@ -28,7 +31,8 @@ impl IntoResponse for Error {
         let status = match &self {
             Self::Git(
                 gitterrace_git::Error::RevNotFound(_) | gitterrace_git::Error::PathNotFound(_),
-            ) => StatusCode::NOT_FOUND,
+            )
+            | Self::Missing(_) => StatusCode::NOT_FOUND,
             Self::Source(_) => StatusCode::SERVICE_UNAVAILABLE,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };

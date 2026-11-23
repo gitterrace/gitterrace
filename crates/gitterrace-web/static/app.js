@@ -237,7 +237,7 @@
   var V = new URL(HERE).search;
   var body = document.body;
   var STATIC = body.dataset.static !== undefined;
-  var CSS = { send: "send.css", card: "card.css" };
+  var CSS = { send: "send.css", card: "card.css", checkpoints: "checkpoints.css" };
   var state = {};
   window.gtLazy = function (name, done) {
     var s = state[name];
@@ -294,6 +294,7 @@
     if (!document.querySelector("section.file[data-path]")) return;
     window.gtLazy("diffs-viewed");
     window.gtLazy("diffs-find");
+    if (document.querySelector("[data-cpbar]")) window.gtLazy("checkpoints");
   }
   withDiffs();
   document.addEventListener("gt:live-refreshed", withDiffs);

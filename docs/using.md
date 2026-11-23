@@ -100,14 +100,33 @@ list covers the part already highlighted.
 ## Checkpoints
 
 A checkpoint records the uncommitted work as it is now, so a later review can
-show only what changed since. `GET /api/v1/worktree?since=<id>` (and the
+show only what changed since.
+
+1. Open **Working tree** and click **Checkpoint**. A **Since checkpoint** tab
+   appears.
+2. Edit more files, then open the tab. It lists only the files whose content
+   differs from the checkpoint. The files it already holds are folded into a
+   count you can open.
+3. Tick **Viewed** on a file as you read it, or click **Mark all viewed**. A
+   mark holds while the file's patch is the same: edit the file again and it
+   reads **Changed since viewed**.
+
+The Checkpoint button and the viewed marks write only the cache folder
+`.git/gitterrace`. Your repository and working tree are never changed. Marks
+survive a reload and show in a second tab. Marks an older version kept in the
+browser move to the cache folder the first time you open the page.
+Without a writable cache folder the buttons are replaced by a note and viewed
+marks stay in the browser.
+
+`GET /api/v1/worktree?since=<id>` (and the
 `worktree_diff` tool) lists the files whose content differs from it. A file
 whose copy was not kept (binary, over `review.checkpoint_file_kb`, or dropped
 by `review.checkpoint_mb`) is diffed against HEAD and named in `content_gone`.
 Set `review.has_auto_checkpoint` to take one before Mark all viewed.
 Checkpoints live in `.git/gitterrace/checkpoints`, hold only changed text
 files that git does not ignore, and are not rebuildable: deleting the folder
-forgets them.
+forgets them. The buttons are on local servers only, a public server leaves
+them out.
 
 ## Review basket
 
