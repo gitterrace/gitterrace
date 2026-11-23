@@ -91,6 +91,9 @@ fn pairs() -> Vec<Pair> {
     add(&own(&["add"]), &own(&["add-hl"]), 4.5);
     add(&own(&["del"]), &own(&["del-hl"]), 4.5);
     add(&own(&["on-accent"]), &own(&["accent"]), 4.5);
+    for i in 0..5 {
+        add(&[format!("ink-on-heat-{i}")], &[format!("seq-{i}")], 4.5);
+    }
     add(&own(&["accent"]), &own(&["n-1", "raised", "header"]), 3.0);
     add(&own(&["n-5"]), &page, 3.0);
     add(&own(&["n-4"]), &own(&["n-1", "n-2", "header", "raised"]), 1.15);
@@ -156,6 +159,9 @@ fn colours(tokens: &Value, mode: &str) -> Result<Colours> {
     ];
     for i in 0..5 {
         out.push((format!("seq-{i}"), h(&format!("heat.{i}"))?));
+    }
+    for i in 0..5 {
+        out.push((format!("ink-on-heat-{i}"), h(&format!("ink-on-heat.{i}"))?));
     }
     for i in 1..9 {
         out.push((format!("cat-{i}"), h(&format!("series.{i}"))?));
@@ -255,11 +261,27 @@ fn scales(d: &Value) -> Result<String> {
     let ms = |k: &str| m["durationMs"][k].as_u64().with_context(|| format!("motion {k}"));
     let motion =
         format!("--ease:{easing};--dur-fast:{}ms;--dur-slow:{}ms;", ms("hover")?, ms("progress")?);
+    let px = |v: &Value, what: &str| -> Result<u64> { v.as_u64().with_context(|| what.to_owned()) };
+    let size = &d["size"];
+    let sizes = format!(
+        "--row-h:{}px;--control-h:{}px;--control-h-sm:{}px;--bar-h:{}px;--bar-h-sm:{}px;",
+        px(&size["rowPx"], "size.rowPx")?,
+        px(&size["controlPx"], "size.controlPx")?,
+        px(&size["controlSmPx"], "size.controlSmPx")?,
+        px(&size["barPx"], "size.barPx")?,
+        px(&size["barSmPx"], "size.barSmPx")?
+    );
+    let prose = format!(
+        "--tracking-label:{};--measure:{};",
+        d["type"]["trackingLabel"].as_str().context("type.trackingLabel")?,
+        d["type"]["measure"].as_str().context("type.measure")?
+    );
     Ok(format!(
-        ":root{{{}\n{}\n--radius:{}px;\n{motion}}}",
+        ":root{{{}\n{}\n{sizes}\n{prose}\n--radius:{}px;--radius-round:{};\n{motion}}}",
         text.concat(),
         space.concat(),
-        d["radius"]["webPx"]
+        d["radius"]["webPx"],
+        d["radius"]["round"].as_str().context("radius.round")?
     ))
 }
 
