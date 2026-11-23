@@ -51,7 +51,19 @@ git terrace          # joins the server already running, no second port
 
 Next: [using it](using.md) and the [command line](cli.md).
 
-To start the server at login, see [Run it as a service](service.md).
+## How it runs
+
+There is nothing to set up. `git terrace` starts a small local web server on
+`127.0.0.1` for as long as it runs, and Ctrl-C stops it. There is no database
+or account, and nothing listens once it stops. Each later `git terrace` adds its
+repository to the server already running.
+
+That is all most people need. Two options build on it:
+
+- Keep it running from login: [Run it as a service](service.md) installs a
+  systemd user unit or a launchd agent, so the address always answers.
+- Share without a running process: [`git terrace export`](online.md) writes
+  static files for any host.
 
 ## Windows
 

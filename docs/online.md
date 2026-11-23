@@ -6,10 +6,10 @@ else binds to another address.
 
 ## Publish a static export
 
-The safest option is no server at all. `git terrace export` writes files,
-commits, diffs, blame, history and insights for the newest commits as plain
-files for any static host. There is no process to attack, no working tree to
-leak and no action to run.
+The safest option is no running gitterrace at all. `git terrace export`
+writes files, commits, diffs, blame, history and insights for the newest
+commits as plain files for any static host. There is no process to attack, no
+working tree to leak and no action to run.
 
 ```sh
 git terrace export site ~/src/project --commits 300

@@ -36,8 +36,9 @@ beside the history.
 - gitweb and cgit: web browsers for git, read-only as well, but dated. They
   show plain listings: no rendered docs or diagrams, no insights, and no way
   to send a finding on.
-- A self-hosted code server: a service to run. gitterrace is one binary you
-  start and stop.
+- A self-hosted code server: a service to set up and keep running. gitterrace
+  is one binary you run when you need it, or from login if you like
+  ([how it runs](getting-started.md#how-it-runs)).
 - Your editor's git view: tied to that editor. gitterrace works beside any.
 - Diff review apps: built for reviewing and commenting in the app, with
   integrations for the agents and hosts they support. gitterrace is for reading,

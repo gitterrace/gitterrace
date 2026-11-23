@@ -35,7 +35,7 @@ One server holds all your repositories, each under `/r/<name>/`.
 Good to know: a folder is searched `multi.depth` levels down (2 by default). It
 skips hidden folders and `multi.skip_dirs`. `git terrace` in another repository
 joins the running server, and `git terrace remove` takes one off. To keep one
-server running from login, see [Run it as a service](service.md).
+server running from login (optional), see [Run it as a service](service.md).
 
 ## See branches and worktrees together
 

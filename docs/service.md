@@ -1,7 +1,9 @@
 # Run it as a service
 
-`git terrace service` writes a systemd user unit (Linux) or a launchd
-LaunchAgent (macOS) that runs one gitterrace server for you.
+Optional. `git terrace` on its own runs until you stop it
+([how it runs](getting-started.md#how-it-runs)). If you would rather not start
+it each time, `git terrace service` writes a systemd user unit (Linux) or a
+launchd LaunchAgent (macOS) that runs the same server from login.
 
 ## Why
 
