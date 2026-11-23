@@ -3,12 +3,9 @@
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
-import { spawn } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  root, sh, sweep, reloadUntil, synced, freePort, makeRepo,
+  root, sh, sweep, reloadUntil, synced, serve, makeRepo,
 } from '../../lib/browser-lib.mjs';
 
 const SCHEMES = ['light', 'dark'];
@@ -215,7 +212,7 @@ export function checks(env) {
           await p.addScriptTag({ path: axePath });
           /** @type {Array<[string, number, string]>} */
           const found = await p.evaluate(async (tags) => {
-            // @ts-ignore injected by addScriptTag
+            const { axe } = /** @type {any} */ (window);
             const res = await axe.run(document, { runOnly: tags.tags });
             const more = await axe.run(document, { runOnly: { type: 'rule', values: tags.rules } });
             return [...res.violations, ...more.violations].map((v) => [v.id, v.nodes.length,
@@ -340,16 +337,9 @@ export function checks(env) {
    * the single-key shortcuts off checks that `/` does not take focus into the filter.
    */
   async function reposPage() {
-    const b2 = makeRepo();
-    const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
-    const port = await freePort();
-    const child = spawn(env.bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir, b2], { stdio: 'ignore' });
-    const origin = `http://127.0.0.1:${port}`;
+    const srv = await serve(env.bin, [dir, makeRepo()]);
+    const { origin } = srv;
     try {
-      for (let i = 0; i < 100; i++) {
-        try { if ((await fetch(origin + '/')).ok) break; } catch {}
-        await new Promise((ok) => setTimeout(ok, 100));
-      }
       const axePath = createRequire(`${root}/package.json`).resolve('axe-core');
       for (const name of browsers) {
         const { b, ctx } = await context(name, { bypassCSP: true });
@@ -359,7 +349,11 @@ export function checks(env) {
           await p.setViewportSize({ width, height: 900 });
           await p.goto(origin + '/', { waitUntil: 'load' });
           const where = `repos-page ${name} ${scheme} ${width}`;
-          if (!(await p.$('.repolist'))) { r.fail(`${where}: not the repository list`); await p.close(); continue; }
+          if (!(await p.$('.repolist'))) {
+            r.fail(`${where}: not the repository list`);
+            await p.close();
+            continue;
+          }
           await p.addScriptTag({ path: axePath });
           const found = await p.evaluate(async (t) => {
             // @ts-ignore injected by addScriptTag
@@ -377,20 +371,24 @@ export function checks(env) {
         await p.goto(origin + '/', { waitUntil: 'load' });
         await p.keyboard.press('/');
         const into = await p.evaluate(() => document.activeElement && document.activeElement.id);
-        r.verdict(`repos-page ${name} slash with shortcuts off`, into === 'repoq' ? ['the slash key focused the filter'] : []);
+        r.verdict(`repos-page ${name} slash with shortcuts off`,
+          into === 'repoq' ? ['the slash key focused the filter'] : []);
         const q = await ctx.newPage();
         await q.goto(origin + '/', { waitUntil: 'load' });
         await q.evaluate(() => localStorage.removeItem('gitterrace-keys'));
         await q.reload({ waitUntil: 'load' });
         await q.keyboard.press('/');
         const on = await q.evaluate(() => document.activeElement && document.activeElement.id);
-        r.verdict(`repos-page ${name} slash with shortcuts on`, on === 'repoq' ? [] : ['the slash key did not focus the filter']);
+        r.verdict(`repos-page ${name} slash with shortcuts on`,
+          on === 'repoq' ? [] : ['the slash key did not focus the filter']);
         await b.close();
       }
     } finally {
-      child.kill();
+      srv.stop();
     }
   }
 
-  return { markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion, reposPage };
+  return {
+    markFlat, tabStops, helpKeys, sideOrder, axeAll, forcedColors, reducedMotion, reposPage,
+  };
 }

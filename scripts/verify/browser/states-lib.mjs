@@ -1,15 +1,14 @@
 // Empty and error states: the not-found page is the app shell with the requested path and next
 // steps, a bare error page keeps the header, a clean working tree and an empty ref group use the
 // one empty state, and a repository whose build failed says why. Imported by browser-check.mjs.
-import { spawn } from 'node:child_process';
-import { mkdirSync, writeFileSync, mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { sweep, makeRepo, freePort } from '../../lib/browser-lib.mjs';
+import { sweep, makeRepo, serve, reloadUntil } from '../../lib/browser-lib.mjs';
 
 export function checks({ srv, r, browsers, context, bin }) {
   async function notFoundStates() {
-    await sweep({ browsers, context, widths: [1440, 390], height: 800 }, async (p, { name, scheme, width }) => {
+    const sw = { browsers, context, widths: [1440, 390], height: 800 };
+    await sweep(sw, async (p, { name, scheme, width }) => {
       const where = `not-found ${name} ${scheme} ${width}`;
       const res = await p.goto(srv.base + '/nothing-here', { waitUntil: 'load' });
       const bad = [];
@@ -19,7 +18,8 @@ export function checks({ srv, r, browsers, context, bin }) {
         h1: document.querySelector('h1')?.textContent.trim(),
         tag: document.querySelector('.ph-tag')?.textContent.trim(),
         path: document.querySelector('.lost-path code')?.textContent,
-        steps: [...document.querySelectorAll('.lost .steps a.btn')].map((a) => a.textContent.trim()),
+        steps: [...document.querySelectorAll('.lost .steps a.btn')]
+          .map((a) => a.textContent.trim()),
         align: getComputedStyle(document.querySelector('.lost')).textAlign,
       }));
       if (!m.header) bad.push('no app header');
@@ -46,29 +46,24 @@ export function checks({ srv, r, browsers, context, bin }) {
     const a = makeRepo(), b = makeRepo();
     mkdirSync(join(b, '.git/gitterrace'), { recursive: true });
     writeFileSync(join(b, '.git/gitterrace/VERSION'), 'v99\n');
-    const cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'));
-    const port = await freePort();
-    const child = spawn(bin, ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, a, b], { stdio: 'ignore' });
-    const origin = `http://127.0.0.1:${port}`;
+    const srv = await serve(bin, [a, b]);
+    const origin = srv.origin;
     try {
-      for (let i = 0; i < 100; i++) {
-        try { if ((await fetch(origin + '/')).ok) break; } catch {}
-        await new Promise((ok) => setTimeout(ok, 100));
-      }
       for (const name of browsers) {
         const { b: br, ctx } = await context(name);
         const p = await ctx.newPage();
         let why = '';
-        for (let i = 0; i < 60 && !why; i++) {
-          await p.goto(origin + '/', { waitUntil: 'load' });
+        await reloadUntil(p, async () => {
           why = await p.evaluate(() => document.querySelector('.reporow .why')?.textContent || '');
-          if (!why) await p.waitForTimeout(250);
-        }
-        r.verdict(`failed-repo ${name}`, /failed/i.test(why) && why.length > 20 ? [] : [`no reason on the list (${JSON.stringify(why)})`]);
+          return why;
+        }, origin + '/', 'the repository list to say why a build failed');
+        const ok = /failed/i.test(why) && why.length > 20;
+        const left = ok ? [] : [`no reason on the list (${JSON.stringify(why)})`];
+        r.verdict(`failed-repo ${name}`, left);
         await br.close();
       }
     } finally {
-      child.kill();
+      srv.stop();
     }
   }
   return { notFoundStates, failedRepo };

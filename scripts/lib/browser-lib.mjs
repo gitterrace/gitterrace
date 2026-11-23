@@ -286,17 +286,19 @@ process.on('uncaughtException', (e) => { stopAll(); console.error(e); process.ex
 process.on('unhandledRejection', (e) => { stopAll(); console.error(e); process.exit(1); });
 
 /**
- * Serves `dir` with `bin` on a free port. Returns { origin, base, stop }, where `base` is the
+ * Serves `dir` (one folder, or a list of them) with `bin` on a free port. Returns
+ * { origin, base, stop }, where `base` is the
  * repository's own root, wherever it is mounted. `cfg` is the config folder; it must sit outside
  * `dir`, since actions.toml inside a served repository is refused. The server is stopped when
  * this process ends, however it ends.
  */
 export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'))) {
+  const dirs = [].concat(dir);
   const port = await freePort();
   // Its own state folder: the owner secret the launch link needs is written there.
   const state = mkdtempSync(join(tmpdir(), 'gt-state-'));
   const env = { ...process.env, XDG_STATE_HOME: state };
-  const args = ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, dir];
+  const args = ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, ...dirs];
   const child = spawn(bin, args, { stdio: 'ignore', env });
   servers.add(child);
   child.on('exit', () => servers.delete(child));

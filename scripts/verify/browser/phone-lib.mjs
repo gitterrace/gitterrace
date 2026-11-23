@@ -25,14 +25,17 @@ export function checks({ srv, r, browsers, context }) {
       }
       for (const e of document.querySelectorAll('.tools button')) {
         const q = e.getBoundingClientRect();
-        if (q.width && (q.height < 44 || q.width < 44)) bad.push(`tool ${e.id} is ${Math.round(q.width)}x${Math.round(q.height)}`);
+        if (q.width && (q.height < 44 || q.width < 44)) {
+          bad.push(`tool ${e.id} is ${Math.round(q.width)}x${Math.round(q.height)}`);
+        }
       }
       const ref = document.querySelector('#refbtn .name');
       if (!ref || getComputedStyle(ref).display === 'none' || !ref.getBoundingClientRect().width) {
         bad.push('the current ref is not shown');
       }
       const md = document.querySelector('.readme .markdown-body, .readme .doc-plain');
-      if (md && md.getBoundingClientRect().left + parseFloat(getComputedStyle(md).paddingLeft) > 36) {
+      const pad = md ? parseFloat(getComputedStyle(md).paddingLeft) : 0;
+      if (md && md.getBoundingClientRect().left + pad > 36) {
         bad.push('README text starts more than 36px from the edge');
       }
       return bad;
@@ -43,8 +46,11 @@ export function checks({ srv, r, browsers, context }) {
       if (!row) return ['no commit row'];
       const subj = row.querySelector('.subj').getBoundingClientRect();
       const sha = row.querySelector('.sha').getBoundingClientRect();
-      if (sha.left < subj.right - 1 && sha.top < subj.bottom - 1) bad.push('the sha shares the subject line');
-      if (subj.width < row.getBoundingClientRect().width * 0.7) bad.push(`subject is ${Math.round(subj.width)}px wide`);
+      if (sha.left < subj.right - 1 && sha.top < subj.bottom - 1) {
+        bad.push('the sha shares the subject line');
+      }
+      const full = row.getBoundingClientRect().width;
+      if (subj.width < full * 0.7) bad.push(`subject is ${Math.round(subj.width)}px wide`);
       return bad;
     }));
   }

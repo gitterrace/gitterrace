@@ -32,11 +32,12 @@ const CSS: &str = "text/css; charset=utf-8";
 const IMMUTABLE: &str = "public, max-age=31536000, immutable";
 
 /// Every embedded script and stylesheet: (name under `/static/`, type, body).
-const TABLE: [(&str, &str, &str); 32] = [
+const TABLE: [(&str, &str, &str); 33] = [
     ("loc.js", JS, include_str!("../../static/loc.js")),
     ("tokens.css", CSS, include_str!("../../static/tokens.css")),
     ("app.css", CSS, include_str!("../../static/app.css")),
     ("pagehead.css", CSS, include_str!("../../static/pagehead.css")),
+    ("screens.css", CSS, include_str!("../../static/screens.css")),
     ("charts.css", CSS, include_str!("../../static/charts.css")),
     ("insights.css", CSS, include_str!("../../static/insights.css")),
     ("tip.js", JS, include_str!("../../static/tip.js")),
@@ -129,7 +130,15 @@ fn served(name: &str, kind: &str, body: &'static str) -> &'static str {
 const BUNDLES: [(&str, &[&str]); 3] = [
     (
         "base.css",
-        &["tokens.css", "buttons.css", "app.css", "pagehead.css", "charts.css", "syntax.css"],
+        &[
+            "tokens.css",
+            "buttons.css",
+            "app.css",
+            "pagehead.css",
+            "screens.css",
+            "charts.css",
+            "syntax.css",
+        ],
     ),
     ("late.css", &["media.css", "docnav.css", "diffview.css"]),
     // The same, led by the rendered-markdown rules, for the pages that render markdown.

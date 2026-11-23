@@ -10,7 +10,8 @@
 {% call kp::kpis(kpis) %}{% endcall %}
 {% if empty %}{{ fb.nothing }}{% else %}
 <p class="hint" id="activity-counts">{{ span }}.</p>
-<div class="card"><table class="entries">{% call t::caption("Activity counts") %}{% endcall %}
+<div class="card"><table class="entries">
+{%- call t::caption("Activity counts") %}{% endcall %}
 <tr class="th"><th scope="col"><span class="vh">Count</span></th><th scope="col" class="r">This period</th>{% if compared %}<th scope="col" class="r">Before</th><th scope="col" class="r">Change</th>{% endif %}</tr>
 {% for r in rows %}<tr><th scope="row"{% if !r.tip.is_empty() %} data-tip="{{ r.tip }}"{% endif %}>{{ r.label }}</th><td class="r"><b>{{ r.now }}</b></td>{% if compared %}<td class="r muted">{{ r.before }}</td><td class="r delta {{ r.tone }}">{{ r.delta }}</td>{% endif %}</tr>{% endfor %}
 </table></div>{% if let Some(r) = range %}

@@ -113,16 +113,21 @@ export function checks({ srv, r, browsers, context }) {
         const b = ids.querySelector('#actcommit');
         const q = b?.getBoundingClientRect();
         if (!b || !b.getAttribute('aria-label')) bad.push('the actions button has no label');
-        else if (Math.abs(q.right - ids.getBoundingClientRect().right) > 2) bad.push('the actions button is not at the row end');
+        else if (Math.abs(q.right - ids.getBoundingClientRect().right) > 2) {
+          bad.push('the actions button is not at the row end');
+        }
       }
       const c = sum?.querySelector('.counts');
       if (c && getComputedStyle(c).textTransform !== 'none') bad.push('the counts are uppercase');
-      if (c && getComputedStyle(c).letterSpacing !== 'normal' && parseFloat(getComputedStyle(c).letterSpacing) !== 0) bad.push('the counts are tracked');
-      if (sum && getComputedStyle(sum, '::before').content === 'none') bad.push('no caret on the files summary');
+      const track = c ? parseFloat(getComputedStyle(c).letterSpacing) : 0;
+      if (track > 0) bad.push('the counts are tracked');
+      if (sum && getComputedStyle(sum, '::before').content === 'none') {
+        bad.push('no caret on the files summary');
+      }
       const body = document.querySelector('pre.body');
       if (body) {
         if (/\n\n\n/.test(body.textContent)) bad.push('three newlines in the message body');
-        if (!/mono|Mono/.test(getComputedStyle(body).fontFamily)) bad.push('the body is not set in mono');
+        if (!/mono/i.test(getComputedStyle(body).fontFamily)) bad.push('the body is not mono');
       }
       return bad;
     }));
