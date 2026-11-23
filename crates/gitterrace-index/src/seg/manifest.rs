@@ -134,7 +134,9 @@ impl Manifest {
         if n > MAX_TOC {
             return Err(c.err("live count over limit"));
         }
-        let mut live = Vec::with_capacity(n);
+        // A live entry is a kind, a name length, a length and a crc at least.
+        let n = c.fit(n as u64, 1 + 1 + 8 + 4)?;
+        let mut live = Vec::with_capacity(n); // bounded
         for _ in 0..n {
             let kind = c.u8()?;
             live.push(FileEntry { kind, name: name(&mut c)?, len: c.u64()?, footer_crc: c.u32()? });
@@ -143,7 +145,8 @@ impl Manifest {
         if n > MAX_TOC {
             return Err(c.err("retired count over limit"));
         }
-        let mut retired = Vec::with_capacity(n);
+        let n = c.fit(n as u64, 1)?;
+        let mut retired = Vec::with_capacity(n); // bounded
         for _ in 0..n {
             retired.push(name(&mut c)?);
         }
@@ -328,6 +331,21 @@ mod tests {
         assert_eq!(a, shallow_fingerprint(&[[2; 20], [1; 20]]));
         assert_ne!(a, 0);
         assert_ne!(a, shallow_fingerprint(&[[1; 20]]));
+        Ok(())
+    }
+
+    /// A count of ~4e9 entries behind a valid crc is unreadable, not a huge reservation.
+    #[test]
+    fn counts_the_bytes_cannot_hold_are_unreadable() -> SegResult<()> {
+        let good = sample().encode()?;
+        let live_at = 4 + 4 + 8 + 8 + 8 + 4 + 4;
+        for at in [live_at, good.len() - 4 - 4 - 12] {
+            let mut b = good[..good.len() - 4].to_vec();
+            b[at..at + 4].copy_from_slice(&4000u32.to_le_bytes());
+            let crc = crc32fast::hash(&b);
+            b.extend_from_slice(&crc.to_le_bytes());
+            assert!(Manifest::decode(&b).is_err_and(|e| e.is_unreadable()), "at {at}");
+        }
         Ok(())
     }
 

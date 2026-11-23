@@ -205,15 +205,18 @@ pub(crate) fn decode_toc(bytes: &[u8], footer: &Footer, file: &str) -> SegResult
         return Err(SegError::unreadable(file, footer.toc_offset, "toc crc"));
     }
     let mut c = Cursor::new(bytes, file, footer.toc_offset);
-    let mut out: Vec<TocEntry> = Vec::with_capacity(footer.toc_count as usize);
+    let count = c.fit(u64::from(footer.toc_count), TOC_ENTRY_LEN as usize)?;
+    let mut out: Vec<TocEntry> = Vec::with_capacity(count); // bounded
     let mut items = 0u64;
-    for _ in 0..footer.toc_count {
+    for _ in 0..count {
         let section = c.u16()?;
         let zero = c.u16()?;
         let e =
             TocEntry { section, items: c.u32()?, offset: c.u64()?, len: c.u32()?, crc: c.u32()? };
         let end = e.offset.checked_add(u64::from(e.len));
-        if zero != 0 || e.len as usize > MAX_BLOCK || e.offset < HEADER_LEN {
+        // Every item takes a byte of a block, so more items than a block holds is hostile.
+        let big = e.len as usize > MAX_BLOCK || e.items as usize > MAX_BLOCK;
+        if zero != 0 || big || e.offset < HEADER_LEN {
             return Err(c.err("toc entry"));
         }
         if end.is_none_or(|end| end > footer.toc_offset) {
@@ -303,6 +306,17 @@ mod tests {
             let r = Footer::decode(&bad.encode(), bad.file_len, Kind::Segment, "t");
             assert!(r.is_err_and(|e| e.is_unreadable()), "{bad:?}");
         }
+    }
+
+    /// A huge count or item total behind a valid crc is an error before anything is sized.
+    #[test]
+    fn toc_counts_the_bytes_cannot_hold_are_unreadable() {
+        let e = TocEntry { section: 1, items: u32::MAX, offset: 16, len: 24, crc: 0 };
+        let b = encode_toc(&[e]);
+        let f = Footer { toc_count: u32::MAX, toc_crc: crc32fast::hash(&b), ..footer() };
+        assert!(decode_toc(&b, &f, "t").is_err_and(|e| e.is_unreadable()));
+        let f = Footer { toc_count: 1, items: u32::MAX, toc_crc: crc32fast::hash(&b), ..footer() };
+        assert!(decode_toc(&b, &f, "t").is_err_and(|e| e.is_unreadable()));
     }
 
     #[test]

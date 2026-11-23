@@ -27,6 +27,8 @@ const BLOCK_RAW: usize = 64 * 1024;
 const INLINE_MAX: usize = 512 * 1024;
 /// Largest decompressed block a reader accepts: a full block plus one largest item.
 const MAX_RAW: usize = 1 << 20;
+/// Fewest bytes an item takes: the flag, a time and a parent count.
+const MIN_ITEM: usize = 3;
 /// Threads a scan decompresses on. Not configurable: like the index's parse threads, capped so
 /// one search never takes every core of a large machine.
 const MAX_THREADS: usize = 8;
@@ -274,13 +276,14 @@ impl MessageColumn {
     }
 
     pub(crate) fn items(&self) -> SegResult<Vec<Item<'static>>> {
-        let mut out = Vec::with_capacity(self.commits as usize);
+        let mut out = Vec::new();
         let mut z = codec::Unpacker::new()?;
         let mut buf = Vec::new();
         for f in &self.files {
             for e in f.toc() {
                 let raw = block(f, e, &mut z, &mut buf)?;
                 let mut c = Cursor::new(&raw, f.name(), e.offset);
+                out.reserve(c.fit(u64::from(e.items), MIN_ITEM)?);
                 for _ in 0..e.items {
                     out.push(Item::decode(&mut c, self.commits)?.into_owned());
                 }
@@ -344,11 +347,11 @@ impl MessageIndex for MessageColumn {
                 parts[i] = Some(p);
             }
         }
-        let n = self.commits as usize;
+        let n = parts.iter().flatten().map(|p| p.hits.len()).sum::<usize>();
         let mut out = Scan {
-            hits: Vec::with_capacity(n),
-            time: Vec::with_capacity(n),
-            offsets: Vec::with_capacity(n + 1),
+            hits: Vec::with_capacity(n),        // bounded
+            time: Vec::with_capacity(n),        // bounded
+            offsets: Vec::with_capacity(n + 1), // bounded
             parents: Vec::new(),
             in_git: Vec::new(),
         };
@@ -361,7 +364,7 @@ impl MessageIndex for MessageColumn {
             out.parents.extend(p.parents);
             out.in_git.extend(p.in_git);
         }
-        if out.hits.len() != n {
+        if out.hits.len() != self.commits as usize {
             return Err(SegError::unreadable("MANIFEST", 0, "message column short"));
         }
         Ok(out)
@@ -398,11 +401,11 @@ fn scan_block(
     query: &MessageQuery<'_>,
     names: &mut HashMap<Vec<u8>, String>,
 ) -> SegResult<Part> {
-    let n = entry.items as usize;
+    let n = Cursor::new(raw, file.name(), entry.offset).fit(u64::from(entry.items), MIN_ITEM)?;
     let mut part = Part {
-        hits: Vec::with_capacity(n),
-        time: Vec::with_capacity(n),
-        ends: Vec::with_capacity(n),
+        hits: Vec::with_capacity(n), // bounded
+        time: Vec::with_capacity(n), // bounded
+        ends: Vec::with_capacity(n), // bounded
         parents: Vec::new(),
         in_git: Vec::new(),
     };

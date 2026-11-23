@@ -179,3 +179,14 @@ fn a_failed_message_block_stops_the_text_stream() {
     assert!(r.is_err(), "the update reports the failed block");
     assert_eq!(src.1.get(), 2, "the stream stops at the push whose block failed");
 }
+
+/// A block that claims more items than its bytes can hold is refused before any column is
+/// sized from the claim.
+#[test]
+fn an_item_count_the_block_cannot_hold_is_refused() {
+    use crate::seg::bounds::Cursor;
+    let c = Cursor::new(&[0; 30], "t", 0);
+    assert!(c.fit(u64::from(u32::MAX), super::MIN_ITEM).is_err());
+    assert!(c.fit(10, super::MIN_ITEM).is_ok());
+    assert!(c.fit(11, super::MIN_ITEM).is_err());
+}

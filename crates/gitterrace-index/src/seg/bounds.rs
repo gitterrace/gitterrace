@@ -84,11 +84,28 @@ impl<'a> Cursor<'a> {
         Err(self.err("varint longer than 10 bytes"))
     }
 
+    /// Bytes not yet read.
+    pub(crate) const fn remaining(&self) -> usize {
+        self.buf.len().saturating_sub(self.pos)
+    }
+
+    /// A count read from disk, accepted only when `count` items of at least `min` bytes fit
+    /// in what is left. Every buffer sized from a stored count goes through this first.
+    pub(crate) fn fit(&self, count: u64, min: usize) -> SegResult<usize> {
+        bounded_len(count, min, self.remaining()).ok_or_else(|| self.err("count past the bytes"))
+    }
+
     /// A count that must fit `max`, for sizing a buffer.
     pub(crate) fn count(&mut self, max: usize) -> SegResult<usize> {
         let n = self.varint()?;
         usize::try_from(n).ok().filter(|&n| n <= max).ok_or_else(|| self.err("count over limit"))
     }
+}
+
+/// `count` as a length when `count * min` bytes fit in `remaining`, else `None`.
+pub(crate) fn bounded_len(count: u64, min: usize, remaining: usize) -> Option<usize> {
+    let n = usize::try_from(count).ok()?;
+    (n.checked_mul(min.max(1))? <= remaining).then_some(n)
 }
 
 /// Appends a LEB128 varint.
@@ -114,6 +131,32 @@ mod tests {
 
     fn read(bytes: &[u8]) -> SegResult<u64> {
         Cursor::new(bytes, "t", 0).varint()
+    }
+
+    #[test]
+    fn bounded_len_refuses_counts_the_bytes_cannot_hold() {
+        assert_eq!(bounded_len(4, 5, 20), Some(4));
+        assert_eq!(bounded_len(5, 5, 20), None);
+        assert_eq!(bounded_len(u64::MAX, 1, 1 << 20), None);
+        assert_eq!(bounded_len(u64::MAX, usize::MAX, usize::MAX), None);
+        assert_eq!(bounded_len(3, 0, 3), Some(3));
+    }
+
+    /// A decoder sizes nothing from a stored count before `fit` or `bounded_len` ran: every
+    /// `with_capacity`, `vec!` or `reserve` in a non-test decode file names a bounded value.
+    #[test]
+    fn decoders_do_not_size_buffers_from_stored_counts() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src");
+        for file in ["messages.rs", "seg/format.rs", "seg/manifest.rs"] {
+            let text = std::fs::read_to_string(root.join(file)).expect("source");
+            let code = text.split("#[cfg(test)]").next().unwrap_or_default();
+            for (i, l) in code.lines().enumerate() {
+                let sized = l.contains("with_capacity(") || l.contains(".reserve(");
+                let known = ["fit(", "bounded_len(", "BLOCK_RAW", "META_LEN", "(64)", "len()"];
+                let ok = known.iter().any(|k| l.contains(k)) || l.contains("// bounded");
+                assert!(!sized || ok, "{file}:{} sizes a buffer from an unchecked count", i + 1);
+            }
+        }
     }
 
     #[test]
