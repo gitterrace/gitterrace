@@ -168,3 +168,27 @@ command = [
 ]
 stdin   = "json"
 vars    = { url = "https://example.test/hook" }
+
+# Searches the web for the selection's title (`open` on macOS, use `xdg-open` on Linux). `:url`
+# percent-encodes the title so it stays one query value.
+[[action]]
+id      = "search"
+label   = "Search the web"
+enabled = false
+kinds   = ["line", "commit"]
+command = ["open", "https://duckduckgo.com/?q={title:url}"]
+
+# A command written once, for the `obsidian-daily` action below. Needs `obsidian.sh` from
+# docs/actions in your config folder.
+[[script]]
+id      = "obsidian"
+command = ["~/.config/gitterrace/obsidian.sh"]
+
+# Appends the selection to today's Obsidian daily note, in the `folder` of `vars`.
+[[action]]
+id      = "obsidian-daily"
+label   = "Obsidian daily note"
+enabled = false
+kinds   = ["line", "commit"]
+script  = "obsidian"
+vars    = { folder = "Daily" }

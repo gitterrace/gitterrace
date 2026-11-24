@@ -11,21 +11,18 @@ A `[[send]]` target is a URL template. A small window opens with the title and
 notes filled in. Press Send and the browser opens the destination's own add
 screen, where you confirm. gitterrace starts no process and makes no request.
 
+<!-- BEGIN GENERATED: example-send -->
 ```toml
-version = 1
-
 [[send]]
-id    = "issue"
-label = "New issue"
-url   = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
-vars  = { repo = "owner/name" }
-
-[[send]]
-id    = "mail"
-label = "Mail draft"
-url   = "mailto:{var.to}?subject={title}&body={notes}"
-vars  = { to = "me@example.com" }
+id      = "github-issue"
+label   = "New issue"
+enabled = false
+url     = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
+lookup  = "https://github.com/{var.repo}/search?q={sha}&type=commits"
+vars    = { repo = "owner/name" }
 ```
+
+<!-- END GENERATED: example-send -->
 
 Page values are always percent-encoded and can never reach the scheme or the
 host: the text before the first placeholder must hold the scheme and end the
@@ -75,6 +72,8 @@ Switch on the ones you use (`enabled = true`) and fill in their `vars`.
 | `kiro` | action | no | Hands the selection to Kiro CLI in a new terminal, in the repository |  |
 | `gemini` | action | no | Hands the selection to Gemini CLI in a new terminal, in the... |  |
 | `webhook` | action | no | Posts the payload as JSON to a webhook of yours | `url` |
+| `search` | action | no | Searches the web for the selection's title (`open` on macOS, use... |  |
+| `obsidian-daily` | action | no | Appends the selection to today's Obsidian daily... | `folder` |
 
 A cell ending in `...` is cut short. The whole text of every entry is in the
 file `git terrace init` writes:
@@ -121,10 +120,12 @@ An action runs a program of yours with no shell. Placeholders such as `{title}`
 fill whole arguments, and stdin carries the payload as JSON or the markdown
 alone. Use one for a write with no add screen, a script or a webhook.
 
+<!-- BEGIN GENERATED: example-webhook -->
 ```toml
 [[action]]
 id      = "webhook"
 label   = "Post to webhook"
+enabled = false
 kinds   = ["line", "commit"]
 command = [
   "curl", "-fsS", "-m", "8",
@@ -136,17 +137,11 @@ stdin   = "json"
 vars    = { url = "https://example.test/hook" }
 ```
 
-`:url` encodes a value for a URL, so a title with `&` or `#` stays one query
-value. This one searches the web for the selection's title (`open` on macOS,
-`xdg-open` on Linux):
+<!-- END GENERATED: example-webhook -->
 
-```toml
-[[action]]
-id      = "search"
-label   = "Search the web"
-kinds   = ["line", "commit"]
-command = ["open", "https://duckduckgo.com/?q={title:url}"]
-```
+`:url` encodes a value for a URL, so a title with `&` or `#` stays one query
+value. The starter `search` entry uses it to search the web for the selection's
+title (`open` on macOS, `xdg-open` on Linux).
 
 ### Hand a finding to an agent
 
@@ -179,20 +174,24 @@ when the action completes normally. Only a timeout triggers `taskkill /T` (then 
 ### Scripts shared by actions
 
 Declare a command once as a `[[script]]` and point actions at it, each with its
-own settings. The starter `copy` and `edit` entries use the scripts below.
+own settings. The starter `obsidian-daily` entry points at the `obsidian` script below.
 
+<!-- BEGIN GENERATED: example-script -->
 ```toml
 [[script]]
 id      = "obsidian"
 command = ["~/.config/gitterrace/obsidian.sh"]
 
 [[action]]
-id     = "obsidian-daily"
-label  = "Obsidian daily note"
-kinds  = ["line", "commit"]
-script = "obsidian"
-vars   = { folder = "Daily" }
+id      = "obsidian-daily"
+label   = "Obsidian daily note"
+enabled = false
+kinds   = ["line", "commit"]
+script  = "obsidian"
+vars    = { folder = "Daily" }
 ```
+
+<!-- END GENERATED: example-script -->
 
 ## Placeholders
 

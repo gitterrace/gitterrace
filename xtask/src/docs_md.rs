@@ -31,6 +31,9 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "placeholders", placeholders()),
         Out::block(ACTIONS, "starter", starter()),
         Out::block(ACTIONS, "send", send()),
+        Out::block(ACTIONS, "example-send", example(&["github-issue"])?),
+        Out::block(ACTIONS, "example-webhook", example(&["webhook"])?),
+        Out::block(ACTIONS, "example-script", example(&["obsidian", "obsidian-daily"])?),
         Out::block(ACTIONS, "scripts", script_table(scripts)),
         Out::block(ACTIONS, "limits", limits()),
         Out::block(ARCH, "crates", crate_diagram(ws)?),
@@ -167,6 +170,26 @@ pub fn starter_entries() -> Vec<Entry> {
             })
         })
         .collect()
+}
+
+/// A toml fence holding the starter chunks with these ids, verbatim and without their comment
+/// lines. An id the starter lacks fails generation, so a doc cannot name an entry that is gone.
+fn example(ids: &[&str]) -> Result<String> {
+    let mut parts = Vec::new();
+    for id in ids {
+        let want = format!("id=\"{id}\"");
+        let chunk = Config::STARTER
+            .split("\n\n")
+            .find(|c| {
+                let mut body = c.lines().filter(|l| !l.starts_with('#'));
+                body.next().is_some_and(|h| h.starts_with("[["))
+                    && body.any(|l| l.split_whitespace().collect::<String>() == want)
+            })
+            .with_context(|| format!("docs example: no starter entry with id `{id}`"))?;
+        let body: Vec<&str> = chunk.lines().filter(|l| !l.starts_with('#')).collect();
+        parts.push(body.join("\n"));
+    }
+    Ok(format!("```toml\n{}\n```\n", parts.join("\n\n")))
 }
 
 /// The widest a generated markdown table row may be, so the page stays readable and short.
@@ -343,6 +366,39 @@ mod tests {
     ];
     use crate::facts;
     use crate::out::Out;
+
+    #[test]
+    fn example_with_an_unknown_id_fails() {
+        assert!(super::example(&["no-such-entry"]).is_err());
+        assert!(super::example(&["webhook"]).expect("known id").contains("curl"));
+    }
+
+    /// Every example in `docs/actions.md` sits in a generated block, so it is a copy of the
+    /// starter. Catches a hand-written toml fence, and a fence that holds a `[[send]]`,
+    /// `[[action]]` or `[[script]]` header under another language tag, which drifts the same way.
+    #[test]
+    fn actions_doc_has_no_hand_written_example() {
+        let doc = include_str!("../../docs/actions.md");
+        let (mut in_block, mut in_fence, mut bad) = (false, false, Vec::new());
+        for (n, line) in doc.lines().enumerate() {
+            if line.starts_with("<!-- BEGIN GENERATED") {
+                in_block = true;
+            } else if line.starts_with("<!-- END GENERATED") {
+                in_block = false;
+            } else if line.starts_with("```") {
+                if !in_fence && !in_block && line.starts_with("```toml") {
+                    bad.push(format!("line {}: toml fence outside a generated block", n + 1));
+                }
+                in_fence = !in_fence;
+            } else if in_fence
+                && !in_block
+                && ["[[send]]", "[[action]]", "[[script]]"].contains(&line.trim())
+            {
+                bad.push(format!("line {}: {} in a hand-written fence", n + 1, line.trim()));
+            }
+        }
+        assert!(bad.is_empty(), "{}", bad.join("\n"));
+    }
 
     /// No generated markdown table row is wider than `TABLE_ROW_MAX`, in any block. A long cell
     /// grows the page past its line cap once the rows wrap.
