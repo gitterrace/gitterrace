@@ -8,6 +8,7 @@
 // - after an edit to the noted lines the chip reads "lines changed"
 // - a note with markup shows as text, never as an element
 // - with no owner cookie a write answers 403 and nothing is kept
+// - a basket of 501 entries sends a chosen subset of 500 and keeps every entry
 // A screenshot of the panel goes to $TMPDIR/gt-basket-<browser>.png.
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -97,5 +98,80 @@ export function checks(env) {
       }
     }
   }
-  return { basketSendAll };
+  // 501 entries are above what one review payload carries: the panel must let the user pick
+  // 500 of them, send those, and delete nothing.
+  async function basketSendSubset() {
+    for (const name of browsers) {
+      const dir = mkdtempSync(join(tmpdir(), 'gt-basket-'));
+      const cfg = mkdtempSync(join(tmpdir(), 'gt-basket-cfg-'));
+      const sent = join(cfg, 'sent.json');
+      sh(dir, 'git', 'init', '-q', '-b', 'main');
+      writeFileSync(join(dir, 'a.txt'), BODY);
+      commitAll(dir, 'init');
+      writeFileSync(join(cfg, 'config.toml'), '[review]\nfindings_entries = 600\n');
+      writeFileSync(join(cfg, 'actions.toml'), `version = 1\n[[action]]\nid = "keep"\n`
+        + `label = "Keep"\nkinds = ["review"]\nshell = true\n`
+        + `command = 'cat > "${sent}"; echo kept'\n`, { mode: 0o600 });
+      const srv = await serve(bin, dir, cfg);
+      const w = `basket-send-subset ${name}`;
+      try {
+        const { b, ctx } = await context(name);
+        try {
+          await ctx.addCookies([await srv.owner()]);
+          const p = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+          await p.addInitScript(() => {
+            window['baseOf'] = () => document.querySelector('meta[name="gt-base"]')
+              .getAttribute('content').replace(/\/$/, '');
+          });
+          await p.goto(`${srv.base}/blob/main/a.txt`, { waitUntil: 'load' });
+          await p.waitForSelector('#basketbtn', WAIT);
+          const added = await p.evaluate(async (n) => {
+            let ok = 0;
+            const base = window['baseOf']();
+            for (let i = 0; i < n; i++) {
+              const r = await fetch(`${base}/_findings`, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: 'line', rev: 'HEAD', path: 'a.txt',
+                  lines: { start: 1 + (i % 10), end: 1 + (i % 10) }, note: `n${i}` }),
+              });
+              if (r.ok) ok++;
+              else if (i === 0) throw new Error(`POST ${r.status} ${await r.text()}`);
+            }
+            return ok;
+          }, 501);
+          say(added === 501, `${w}: 501 entries added`, `${w}: only ${added} added`);
+          await p.goto(`${srv.base}/`, { waitUntil: 'load' });
+          await p.click('#basketbtn');
+          await p.waitForSelector('.basket-row', WAIT);
+          const go = p.locator('.basket-foot .primary');
+          say(await go.isDisabled(), `${w}: sending 501 at once is held back`,
+            `${w}: Send is enabled with 501 chosen`);
+          await p.click('.basket-foot .basket-first');
+          await p.waitForFunction(
+            () => !document.querySelector('.basket-foot .primary').hasAttribute('disabled'),
+            null, WAIT);
+          await go.click();
+          await p.waitForSelector('.basket-msg:text("kept")', WAIT).then(
+            () => r.ok(`${w}: the chosen 500 were sent`), () => r.fail(`${w}: no sent status`));
+          const got = existsSync(sent) ? JSON.parse(readFileSync(sent, 'utf8')) : {};
+          say((got.findings || []).length === 500,
+            `${w}: one payload with 500 findings`, `${w}: ${(got.findings || []).length} sent`);
+          const left = await p.evaluate(async () => {
+            const m = window['baseOf']();
+            return (await (await fetch(`${m}/_findings?count=1`)).json()).count;
+          });
+          say(left === 501, `${w}: every entry is still in the basket`, `${w}: ${left} left`);
+          await p.close();
+        } finally { await b.close(); }
+      } catch (e) {
+        r.fail(`${w}: ${e && e.stack}`);
+      } finally {
+        srv.stop();
+        const gone = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
+        for (const d of [dir, cfg]) rmSync(d, gone);
+      }
+    }
+  }
+  return { basketSendAll, basketSendSubset };
 }

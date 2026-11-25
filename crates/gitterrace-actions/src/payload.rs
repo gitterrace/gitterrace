@@ -27,7 +27,7 @@ const MAX_ENV_BYTES: usize = 4096;
 const MARKDOWN_LINES: usize = 40;
 /// Most findings one `review` payload carries, so the stdin and the markdown stay bounded.
 /// Not configurable: a bound on what one action run is handed.
-const MAX_REVIEW_FINDINGS: usize = 500;
+pub const MAX_REVIEW_FINDINGS: usize = 500;
 
 /// The run request body. Strict: an unknown field (say `command`) is a 400, never ignored.
 #[derive(Debug, Clone, Deserialize)]

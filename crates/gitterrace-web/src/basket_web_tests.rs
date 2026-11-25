@@ -127,3 +127,10 @@ async fn the_worktree_switch_gates_the_basket_on_the_page_and_the_api() {
         }
     }
 }
+
+#[test]
+fn the_panel_send_limit_is_the_payload_limit() {
+    let js = include_str!("../static/basket.js");
+    let want = format!("var SEND_MAX = {};", gitterrace_actions::MAX_REVIEW_FINDINGS);
+    assert!(js.contains(&want), "basket.js must carry `{want}`");
+}

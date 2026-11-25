@@ -18,6 +18,9 @@
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("data-tip", "Review basket");
   }
+  // Most findings one review payload carries (gitterrace-actions MAX_REVIEW_FINDINGS, held equal
+  // by a test). A larger basket is sent in chosen parts, never trimmed.
+  var SEND_MAX = 500;
   var badge = null;
   var cur = null;
 
@@ -135,10 +138,19 @@
   }
 
   // ---- the panel -------------------------------------------------------------
-  function row(f, again) {
+  function row(f, again, picked, changed) {
     var li = el("li", "basket-row");
     li.dataset.id = f.id;
     var top = el("div", "basket-top");
+    var tick = el("input", "basket-tick");
+    tick.type = "checkbox";
+    tick.checked = picked.has(f.id);
+    tick.setAttribute("aria-label", "Send " + where(f));
+    tick.addEventListener("change", function () {
+      if (tick.checked) picked.add(f.id); else picked.delete(f.id);
+      changed();
+    });
+    top.appendChild(tick);
     top.appendChild(el("span", "basket-where", where(f)));
     var chip = el("span", "basket-chip", f.anchor.status);
     chip.dataset.status = f.anchor.status;
@@ -193,6 +205,14 @@
       pick.appendChild(o);
     });
     var go = el("button", "primary sm", "Send all");
+    var first = button("Select first " + SEND_MAX, "sm basket-first", function () {
+      picked.clear();
+      ids.slice(0, SEND_MAX).forEach(function (id) { picked.add(id); });
+      load();
+    });
+    first.hidden = true;
+    var picked = new Set();
+    var known = new Set();
     go.type = "button";
     var clear = button("Clear", "sm", function () {
       json("DELETE", B + "/_findings", { ids: [] }).then(load, function () {});
@@ -201,23 +221,42 @@
       "Add an action with kinds = [\"review\"] to send the basket.");
     if (acts.length) { foot.appendChild(pick); foot.appendChild(msg); } else foot.appendChild(hint);
     foot.appendChild(clear);
-    if (acts.length) foot.appendChild(go);
+    if (acts.length) { foot.appendChild(first); foot.appendChild(go); }
     foot.appendChild(button("Close", "sm", function () { ov.close(); }));
     [note, list, foot].forEach(function (n) { s.box.appendChild(n); });
     var ids = [];
     go.addEventListener("click", function (e) {
-      if (e.isTrusted && ids.length) sendAll(ids, pick, msg, go);
+      var chosen = ids.filter(function (id) { return picked.has(id); });
+      if (e.isTrusted && chosen.length && chosen.length <= SEND_MAX) sendAll(chosen, pick, msg, go);
     });
+    // Send all, or Send n of m once some are unticked; held back above what one send takes.
+    function sync() {
+      var n = ids.filter(function (id) { return picked.has(id); }).length;
+      go.textContent = n === ids.length ? "Send all" : "Send " + n + " of " + ids.length;
+      var over = n > SEND_MAX;
+      go.disabled = n === 0 || over;
+      first.hidden = ids.length <= SEND_MAX;
+      if (over) {
+        msg.textContent = n + " chosen: one send takes at most " + SEND_MAX
+          + ". Untick some or select the first " + SEND_MAX + ".";
+      }
+      else if (msg.dataset.over) msg.textContent = "";
+      if (over) msg.dataset.over = "1"; else delete msg.dataset.over;
+    }
     function load() {
       return json("GET", B + "/_findings").then(function (j) {
         ids = j.findings.map(function (f) { return f.id; });
+        // An entry new to the panel starts ticked; a choice the user made stays.
+        ids.forEach(function (id) { if (!known.has(id)) { known.add(id); picked.add(id); } });
+        picked.forEach(function (id) { if (ids.indexOf(id) < 0) picked.delete(id); });
         list.textContent = "";
-        j.findings.forEach(function (f) { list.appendChild(row(f, load)); });
+        j.findings.forEach(function (f) { list.appendChild(row(f, load, picked, sync)); });
         note.hidden = ids.length > 0 && j.persisted;
         note.textContent = !j.persisted
           ? "The basket cannot be kept: there is no writable cache folder."
           : "Nothing here yet. Use Add to review in the . menu on a line, file or commit.";
-        go.disabled = clear.disabled = !ids.length;
+        clear.disabled = !ids.length;
+        sync();
         count(ids.length);
       }, function () { note.hidden = false; note.textContent = "The basket could not be read."; });
     }

@@ -21,7 +21,8 @@ pub mod token;
 pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, RESERVED_KEYS, Reloader};
 pub use link::{Link, LinkError, styled};
 pub use payload::{
-    Lines, Locator, Payload, PayloadError, ReviewFinding, RunRequest, kind_name, permalink,
+    Lines, Locator, MAX_REVIEW_FINDINGS, Payload, PayloadError, ReviewFinding, RunRequest,
+    kind_name, permalink,
 };
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};
