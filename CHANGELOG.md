@@ -5,6 +5,12 @@ All notable changes are listed here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 <!-- BEGIN GENERATED: unreleased -->
+## [Unreleased]
+
+### Performance
+
+- index: build the per-rank person table once per request
+
 <!-- END GENERATED: unreleased -->
 
 ## [0.2.1] - 2026-11-25

@@ -434,17 +434,20 @@ impl Insights<'_> {
         // Per rank, its author's person when `c` counts it, else none: 4 bytes a commit, so
         // the touch loop reads this, not a commit row, for each touch.
         let skip = u32::MAX;
-        let who: Vec<u32> = tip
-            .cols
-            .iter()
-            .map(|row| {
-                if c.contains_columns(row) {
-                    self.person_of(row.ident).and_then(|p| u32::try_from(p).ok()).unwrap_or(skip)
-                } else {
-                    skip
-                }
-            })
-            .collect();
+        let who = c.who(|| {
+            tip.cols
+                .iter()
+                .map(|row| {
+                    if c.contains_columns(row) {
+                        self.person_of(row.ident)
+                            .and_then(|p| u32::try_from(p).ok())
+                            .unwrap_or(skip)
+                    } else {
+                        skip
+                    }
+                })
+                .collect()
+        });
         for (i, p) in paths.iter().enumerate() {
             let Some(list) = self.head_id(p).and_then(|id| tip.of(id)) else {
                 continue;

@@ -36,6 +36,9 @@ pub struct Counted<'a> {
     /// True for [`Counted::before`]: the days are not the scope's own, so the shared tables
     /// (which see the scope only) may not answer.
     shifted: bool,
+    /// Per tip rank, the person its commit counts for, built on the first tip visit: a read
+    /// in chunks visits the touches once per chunk and must not rebuild it each time.
+    who: std::sync::OnceLock<Vec<u32>>,
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +81,12 @@ impl<'a> Counted<'a> {
     ) -> Self {
         let axis = cx.axis(scope);
         let span = crate::insights::scope::span_of(&days);
-        Self { ins, scope, cx, axis, days, span, shifted }
+        Self { ins, scope, cx, axis, days, span, shifted, who: std::sync::OnceLock::new() }
+    }
+
+    /// [`Counted::who`]'s table, filled by `build` on the first call.
+    pub(crate) fn who(&self, build: impl FnOnce() -> Vec<u32>) -> &[u32] {
+        self.who.get_or_init(build)
     }
 
     /// The same scope one period earlier, for the "before" column. `None` for `All` and for a
