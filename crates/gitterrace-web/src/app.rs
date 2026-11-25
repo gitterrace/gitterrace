@@ -42,7 +42,7 @@ pub(crate) use dirty::DirtyMemo;
 
 pub use child::index_child;
 pub(crate) use history::PathLog;
-pub(crate) use jobs::blocking;
+pub(crate) use jobs::{blocking, cancel_flag};
 pub(crate) use refresh::{keep_index_fresh_supervised, release_when_idle};
 pub(crate) use state::RepoState;
 

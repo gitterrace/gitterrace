@@ -1,14 +1,67 @@
 //! zip, jar, tar and tar.gz blobs as a list of their entries: name, size and date. Only the
 //! directory is read, nothing is extracted, and the count is capped, so a zip bomb costs no
-//! more than its central directory and a tar.gz no more than one pass of inflate.
+//! more than its central directory and a tar.gz no more than `INFLATE_CAP` inflated bytes,
+//! counted by [`Bounded`], which also stops when the request that asked is gone.
 
-use std::io::{Cursor, Read};
+use std::io::{self, Cursor, Read};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use askama::Template;
 
 /// Entries past this many are counted out, not listed. Not configurable: a read bound on a
 /// file from the repository, which may be hostile.
 pub(crate) const ENTRY_CAP: usize = 1000;
+
+/// Inflated bytes a tar.gz listing may read, headers and skipped members together. Not
+/// configurable, as `ENTRY_CAP`: a hostile archive inflates a thousandfold.
+pub(crate) const INFLATE_CAP: u64 = 64 << 20;
+
+/// What one listing may spend: inflated bytes, and a flag the request raises when it is gone.
+pub(crate) struct Work {
+    cap: u64,
+    cancel: Arc<AtomicBool>,
+    inflated: Arc<AtomicU64>,
+    stopped: Arc<AtomicBool>,
+}
+
+impl Work {
+    pub(crate) fn new(cap: u64, cancel: Arc<AtomicBool>) -> Self {
+        Self { cap, cancel, inflated: Arc::default(), stopped: Arc::default() }
+    }
+}
+
+/// A reader that counts what it hands out and fails at the cap or once `cancel` is raised.
+/// Every inflated byte a tar walk skips passes through here, so no member size, declared or
+/// real, can make the walk longer than the cap.
+struct Bounded<R> {
+    inner: R,
+    work: Arc<Work>,
+}
+
+impl<R: Read> Read for Bounded<R> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let w = &self.work;
+        if w.cancel.load(Ordering::Relaxed) {
+            w.stopped.store(true, Ordering::Relaxed);
+            return Err(io::Error::other("preview cancelled"));
+        }
+        let left = w.cap.saturating_sub(w.inflated.load(Ordering::Relaxed));
+        if left == 0 {
+            // At the cap exactly: only more data is over it, the end of the stream is not.
+            let mut probe = [0u8; 1];
+            if self.inner.read(&mut probe)? == 0 {
+                return Ok(0);
+            }
+            w.stopped.store(true, Ordering::Relaxed);
+            return Err(io::Error::other("inflate cap reached"));
+        }
+        let take = buf.len().min(usize::try_from(left).unwrap_or(usize::MAX));
+        let n = self.inner.read(&mut buf[..take])?;
+        w.inflated.fetch_add(n as u64, Ordering::Relaxed);
+        Ok(n)
+    }
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -29,6 +82,8 @@ pub(crate) struct Entry {
 pub(crate) struct Listing {
     pub(crate) entries: Vec<Entry>,
     pub(crate) more: bool,
+    /// The walk stopped at the inflate cap or on cancel: the entries are the ones read so far.
+    pub(crate) truncated: bool,
 }
 
 #[derive(Template)]
@@ -54,10 +109,19 @@ pub(crate) fn kind(path: &str) -> Option<Kind> {
 
 /// The first `cap` entries of the archive in `bytes`, or `None` when it does not read.
 pub(crate) fn list(kind: Kind, bytes: &[u8], cap: usize) -> Option<Listing> {
+    list_within(kind, bytes, cap, Work::new(INFLATE_CAP, crate::app::cancel_flag()))
+}
+
+/// [`list`] under `work`.
+pub(crate) fn list_within(kind: Kind, bytes: &[u8], cap: usize, work: Work) -> Option<Listing> {
     match kind {
         Kind::Zip => zip_list(bytes, cap),
-        Kind::Tar => tar_list(bytes, cap),
-        Kind::TarGz => tar_list(flate2::read::GzDecoder::new(bytes), cap),
+        Kind::Tar => tar_list(bytes, cap, None),
+        Kind::TarGz => {
+            let work = Arc::new(work);
+            let r = Bounded { inner: flate2::read::GzDecoder::new(bytes), work: Arc::clone(&work) };
+            tar_list(r, cap, Some(&work))
+        }
     }
 }
 
@@ -84,15 +148,29 @@ fn zip_list(bytes: &[u8], cap: usize) -> Option<Listing> {
             date,
         });
     }
-    Some(Listing { entries, more: n > cap })
+    Some(Listing { entries, more: n > cap, truncated: false })
 }
 
-fn tar_list(r: impl Read, cap: usize) -> Option<Listing> {
+fn tar_list(r: impl Read, cap: usize, work: Option<&Work>) -> Option<Listing> {
+    let stopped = || work.is_some_and(|w| w.stopped.load(Ordering::Relaxed));
     let mut a = tar::Archive::new(r);
     let mut entries = Vec::new();
     let mut more = false;
-    for e in a.entries().ok()? {
-        let e = e.ok()?;
+    let mut truncated = false;
+    let it = match a.entries() {
+        Ok(it) => it,
+        Err(_) if stopped() => return Some(Listing { entries, more, truncated: true }),
+        Err(_) => return None,
+    };
+    for e in it {
+        let e = match e {
+            Ok(e) => e,
+            Err(_) if stopped() => {
+                truncated = true;
+                break;
+            }
+            Err(_) => return None,
+        };
         if entries.len() == cap {
             more = true;
             break;
@@ -109,7 +187,7 @@ fn tar_list(r: impl Read, cap: usize) -> Option<Listing> {
             date,
         });
     }
-    Some(Listing { entries, more })
+    Some(Listing { entries, more, truncated })
 }
 
 /// The listing's markup, every name escaped by the template.
@@ -210,6 +288,76 @@ mod tests {
         let mut e = flate2::write::GzEncoder::new(Vec::new(), flate2::Compression::fast());
         e.write_all(b).expect("gz");
         e.finish().expect("gz")
+    }
+
+    /// A tar of one member declaring `declared` bytes, holding `real` zero bytes, gzipped.
+    fn zero_member_tgz(declared: u64, real: usize) -> Vec<u8> {
+        let mut h = tar::Header::new_gnu();
+        h.set_path("big.bin").expect("path");
+        h.set_size(declared);
+        h.set_cksum();
+        let mut t = h.as_bytes().to_vec();
+        t.resize(t.len() + real, 0);
+        gz(&t)
+    }
+
+    fn work(cap: u64) -> (Work, Arc<AtomicU64>) {
+        let w = Work::new(cap, Arc::default());
+        let n = Arc::clone(&w.inflated);
+        (w, n)
+    }
+
+    #[test]
+    fn a_gzip_bomb_inflates_no_more_than_the_cap() {
+        let bomb = zero_member_tgz(8 << 20, 8 << 20);
+        let (w, n) = work(1 << 20);
+        let l = list_within(Kind::TarGz, &bomb, 10, w).expect("listing");
+        assert!(l.truncated);
+        assert_eq!(n.load(Ordering::Relaxed), 1 << 20);
+    }
+
+    #[test]
+    fn a_huge_declared_member_is_cut_at_the_cap() {
+        let bomb = zero_member_tgz(1 << 40, 4 << 20);
+        let (w, n) = work(1 << 20);
+        let l = list_within(Kind::TarGz, &bomb, 10, w).expect("listing");
+        assert!(l.truncated);
+        assert_eq!(n.load(Ordering::Relaxed), 1 << 20);
+    }
+
+    #[test]
+    fn an_archive_inflating_exactly_to_the_cap_lists_whole() {
+        let tar = tar_of(&["a.txt", "d/b.txt"]);
+        let (w, n) = work(tar.len() as u64);
+        let l = list_within(Kind::TarGz, &gz(&tar), 10, w).expect("listing");
+        assert!(!l.truncated);
+        assert_eq!(l.entries.len(), 2);
+        assert!(n.load(Ordering::Relaxed) <= tar.len() as u64);
+    }
+
+    #[test]
+    fn a_raised_cancel_flag_stops_the_walk_before_it_inflates() {
+        let (w, n) = work(INFLATE_CAP);
+        w.cancel.store(true, Ordering::Relaxed);
+        let l = list_within(Kind::TarGz, &zero_member_tgz(8 << 20, 8 << 20), 10, w);
+        assert!(l.is_none_or(|l| l.truncated));
+        assert_eq!(n.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn a_flag_raised_mid_walk_stops_the_count_where_it_was() {
+        let (w, n) = work(INFLATE_CAP);
+        let cancel = Arc::clone(&w.cancel);
+        let w = Arc::new(w);
+        let tgz = zero_member_tgz(0, 4 << 20);
+        let mut z = Bounded { inner: flate2::read::GzDecoder::new(&tgz[..]), work: Arc::clone(&w) };
+        let mut buf = [0u8; 4096];
+        z.read_exact(&mut buf).expect("first read");
+        cancel.store(true, Ordering::Relaxed);
+        let at = n.load(Ordering::Relaxed);
+        while z.read(&mut buf).is_ok_and(|k| k > 0) {}
+        assert!(w.stopped.load(Ordering::Relaxed));
+        assert!(n.load(Ordering::Relaxed) <= at + 64 * 1024);
     }
 
     proptest! {

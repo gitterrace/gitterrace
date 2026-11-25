@@ -6,3 +6,6 @@
 <td>{{ e.date }}</td></tr>
 {% endfor %}</tbody></table>
 {%- if l.more %}<p class="muted pad">Showing the first {{ cap }} entries.</p>{% endif %}
+
+{%- if l.truncated %}<p class="muted pad">Listing stopped early: the archive inflates
+past the preview limit.</p>{% endif %}
