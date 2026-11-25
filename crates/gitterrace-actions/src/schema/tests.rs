@@ -159,3 +159,29 @@ fn stated_limits_hold() {
     let long = format!("{head}[action.vars]\nv = \"{}\"\n", "x".repeat(4097));
     assert!(Config::parse(&long, Path::new("/")).is_err());
 }
+
+/// The reserved keys the `key` row names are the keys the loader refuses, split as the loader
+/// splits them into the menu's and the page's. A key added to or dropped from `RESERVED_KEYS`
+/// fails here until the row says so.
+#[test]
+fn reserved_keys_named_in_the_key_row_are_the_reserved_keys() {
+    let doc = ACTION_KEYS.iter().find(|i| i.name == "key").expect("key row").doc;
+    let named = |after: &str| -> Vec<char> {
+        let part = doc.split(after).nth(1).and_then(|r| r.split(')').next()).expect(after);
+        let mut keys: Vec<char> =
+            part.split('`').skip(1).step_by(2).filter_map(|k| k.chars().next()).collect();
+        keys.sort_unstable();
+        keys
+    };
+    let reserved = |menu: bool| -> Vec<char> {
+        let mut keys: Vec<char> = crate::config::RESERVED_KEYS
+            .iter()
+            .filter(|(_, who)| who.starts_with("the menu's") == menu)
+            .map(|(k, _)| *k)
+            .collect();
+        keys.sort_unstable();
+        keys
+    };
+    assert_eq!(named("Not a menu key ("), reserved(true), "menu keys in the key row");
+    assert_eq!(named("or a page key ("), reserved(false), "page keys in the key row");
+}

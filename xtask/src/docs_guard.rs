@@ -176,6 +176,16 @@ mod tests {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..")
     }
 
+    /// Fails with the problems when `page` has any.
+    fn clean(page: &str) {
+        let bad = found(page);
+        assert!(bad.is_empty(), "{bad:?}");
+    }
+
+    fn is_md(name: &str) -> bool {
+        std::path::Path::new(name).extension().is_some_and(|e| e == "md")
+    }
+
     fn found(page: &str) -> Vec<String> {
         let root = root();
         problems("t.md", page, &Owners::new(&root, MAKEFILE))
@@ -190,7 +200,7 @@ mod tests {
         let mut pages = vec!["README.md".to_owned(), "CONTRIBUTING.md".to_owned()];
         for e in std::fs::read_dir(root.join("docs")).expect("docs").flatten() {
             let n = e.file_name().to_string_lossy().into_owned();
-            if n.ends_with(".md") {
+            if is_md(&n) {
                 pages.push(format!("docs/{n}"));
             }
         }
@@ -203,6 +213,41 @@ mod tests {
             })
             .collect();
         assert!(bad.is_empty(), "docs name what the code lacks:\n{}", bad.join("\n"));
+    }
+
+    /// Every `source:` line a doc shows, generated blocks included, is one `parse_source` reads,
+    /// once its `<placeholders>` hold values.
+    #[test]
+    fn every_source_line_in_the_docs_parses() {
+        let root = root();
+        let mut pages = vec!["README.md".to_owned(), "CONTRIBUTING.md".to_owned()];
+        for e in std::fs::read_dir(root.join("docs")).expect("docs").flatten() {
+            pages.push(format!("docs/{}", e.file_name().to_string_lossy()));
+        }
+        let mut seen = 0;
+        for p in pages.iter().filter(|p| is_md(p)) {
+            let text = std::fs::read_to_string(root.join(p)).expect("page");
+            for line in text.lines().filter(|l| l.starts_with("source: ")) {
+                let line = line
+                    .replace("<repo>", "repo")
+                    .replace("<sha>", "abcdef0")
+                    .replace("<path>", "dir/file.rs")
+                    .replace("<a>", "3")
+                    .replace("<b>", "7");
+                assert!(
+                    gitterrace_actions::parse_source(&line).is_some(),
+                    "{p}: `{line}` is not a source line"
+                );
+                seen += 1;
+            }
+        }
+        assert!(seen >= 2, "found {seen} source lines, the README and actions page have one each");
+    }
+
+    #[test]
+    fn a_source_line_that_does_not_parse_is_refused() {
+        assert!(gitterrace_actions::parse_source("source: repo@zz:path").is_none());
+        assert!(gitterrace_actions::parse_source("source: repo@abcdef0:p#L3").is_none());
     }
 
     /// The defect that happened: code renames a key, the docs keep the old name.
@@ -221,19 +266,20 @@ mod tests {
 
     #[test]
     fn a_current_config_key_and_a_file_name_pass() {
-        assert!(found("Set `display.diff_palette`, in `config.toml`, at `a.b`.\n").is_empty());
+        clean("Set `display.diff_palette`, in `config.toml`, at `a.b`.\n");
     }
 
     #[test]
     fn a_missing_repo_path_is_found_and_a_present_one_passes() {
         assert_eq!(found("See `docs/gone.md` and `crates/nope/src/lib.rs`.\n").len(), 2);
-        assert!(found("See `docs/using.md`, `docs/*.md` and `crates/`.\n").is_empty());
+        clean("See `docs/using.md`, `docs/*.md` and `crates/`.\n");
     }
 
     #[test]
     fn a_missing_make_target_is_found_in_prose_and_in_a_shell_fence() {
-        assert!(found("Run `make check` and `make fmt`.\n").is_empty());
-        let bad = found("Run `make nothing`.\n\n```sh\nmake gone\nmake fmt\n```\n");
+        clean("Run `make check` and `make fmt`.\n");
+        let bad =
+            found(&"Run `MK nothing`.\n\n```sh\nMK gone\nMK fmt\n```\n".replace("MK", "make"));
         assert_eq!(bad.len(), 2, "{bad:?}");
     }
 
@@ -245,13 +291,13 @@ mod tests {
         let act = "```toml\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\ncommand = \
                    [\"nope\"]\nbogus = 1\n```\n";
         assert_eq!(found(act).len(), 1);
-        assert!(found("```toml\n[server]\nis_public = true\n```\n").is_empty());
+        clean("```toml\n[server]\nis_public = true\n```\n");
     }
 
     #[test]
     fn a_generated_block_is_left_to_the_generator() {
         let page =
-            "<!-- BEGIN GENERATED: x -->\n`limits.gone` `make gone`\n<!-- END GENERATED: x -->\n";
-        assert!(found(page).is_empty());
+            "<!-- BEGIN GENERATED: x -->\n`limits.gone` `MK gone`\n<!-- END GENERATED: x -->\n";
+        clean(&page.replace("MK", "make"));
     }
 }

@@ -13,7 +13,6 @@ use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
     SEND_KEYS, SEND_PLACEHOLDERS,
 };
-use gitterrace_actions::send::{DENIED_SCHEMES, PLAINTEXT_SCHEME};
 use gitterrace_actions::{Config, kind_name};
 
 use crate::action_scripts::Script;
@@ -178,13 +177,7 @@ pub(crate) fn send() -> String {
     for (name, doc) in SEND_PLACEHOLDERS {
         let _ = writeln!(s, "| `{{{name}}}` | {doc} |");
     }
-    let denied: Vec<String> = DENIED_SCHEMES.iter().map(|d| format!("`{d}:`")).collect();
-    let _ = writeln!(
-        s,
-        "\nA scheme is allowed unless it is refused. `{PLAINTEXT_SCHEME}:` is allowed only for a \
-         loopback host. Refused schemes: {}.\n",
-        denied.join(", ")
-    );
+    let _ = writeln!(s, "\n{}\n", gitterrace_actions::send::scheme_rule());
     s.push_str(&key_table("`[[send]]`", "One Send to target: a `url` template.", &SEND_KEYS));
     s
 }

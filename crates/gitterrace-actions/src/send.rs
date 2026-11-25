@@ -31,6 +31,18 @@ pub const DENIED_SCHEMES: [&str; 8] =
 /// [`DENIED_SCHEMES`] is allowed.
 pub const PLAINTEXT_SCHEME: &str = "http";
 
+/// The rule for which schemes a `url` may use, as the docs state it, from the two constants the
+/// loader checks with.
+#[must_use]
+pub fn scheme_rule() -> String {
+    let denied: Vec<String> = DENIED_SCHEMES.iter().map(|d| format!("`{d}:`")).collect();
+    format!(
+        "A scheme is allowed unless it is refused. `{PLAINTEXT_SCHEME}:` is allowed only for a \
+         loopback host. Refused schemes: {}.",
+        denied.join(", ")
+    )
+}
+
 /// One part of a template as the page receives it: `{"lit": "..."}` is copied as is,
 /// `{"ph": "title"}` is replaced by the encoded value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -258,6 +270,15 @@ mod tests {
         assert_eq!(e.to_string(), "url: {var.v}: no vars.v");
         let e = SendError::PlainHttp { key: "url".into() };
         assert_eq!(e.to_string(), "url: http is allowed only for loopback. Use https");
+    }
+
+    #[test]
+    fn the_scheme_rule_names_every_refused_scheme_and_the_loopback_one() {
+        let rule = scheme_rule();
+        for s in DENIED_SCHEMES {
+            assert!(rule.contains(&format!("`{s}:`")), "{s} missing: {rule}");
+        }
+        assert!(rule.contains(&format!("`{PLAINTEXT_SCHEME}:` is allowed only for a loopback")));
     }
 
     #[test]
