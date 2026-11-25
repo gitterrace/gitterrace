@@ -13,6 +13,8 @@ use anyhow::Context;
 use gitterrace_actions::Link;
 use gitterrace_git::Repo;
 
+use crate::open::launch::{opener_arg, path_query};
+
 /// How long a freshly started server gets to answer. Opening the index of a large repository
 /// takes a second or two; past this the browser opens anyway and shows its own error.
 const READY_WAIT: Duration = Duration::from_secs(8);
@@ -178,7 +180,12 @@ pub(super) fn show(
         println!("{url}");
         return Ok(());
     }
-    browse(&launch_url(addr, state.as_deref(), &target.path).unwrap_or(url))
+    browse(&opener_arg(
+        state.as_deref(),
+        addr.port(),
+        launch_url(addr, state.as_deref(), &target.path),
+        url,
+    ))
 }
 
 #[expect(
@@ -199,7 +206,7 @@ pub(crate) fn launch_cmd(addr: SocketAddr, print: bool) -> anyhow::Result<()> {
         println!("{url}");
         return Ok(());
     }
-    browse(&url)
+    browse(&opener_arg(state.as_deref(), addr.port(), Some(url.clone()), url))
 }
 
 /// The one-time link that hands the browser the owner cookie before it lands on `path`.
@@ -216,15 +223,6 @@ fn launch_url(addr: SocketAddr, state: Option<&Path>, path: &str) -> Option<Stri
     let ok =
         status == 200 && t.ticket.bytes().all(|b| b.is_ascii_alphanumeric() || b"-_".contains(&b));
     ok.then(|| format!("http://{addr}/_launch?t={}&to={}", t.ticket, path_query(path)))
-}
-
-/// `path` as a query value: every byte outside the unreserved set is escaped, so a `?` or `&`
-/// in the link stays inside `to`.
-fn path_query(path: &str) -> String {
-    let plain = |b: &u8| b.is_ascii_alphanumeric() || b"-._~/".contains(b);
-    path.bytes()
-        .map(|b| if plain(&b) { char::from(b).to_string() } else { format!("%{b:02X}") })
-        .collect()
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -590,6 +588,7 @@ fn browse(url: &str) -> anyhow::Result<()> {
 }
 
 pub(crate) use range::run_range;
+mod launch;
 mod range;
 
 #[cfg(test)]

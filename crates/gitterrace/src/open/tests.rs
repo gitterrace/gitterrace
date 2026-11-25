@@ -385,3 +385,51 @@ fn request_bodies_keep_their_bytes() {
     let by_path = serde_json::to_string(&RemoveBody::Path { path: "/r".into() }).expect("json");
     assert_eq!(by_path, serde_json::json!({ "path": "/r" }).to_string());
 }
+
+/// Guard class: no argument of a program the launcher starts holds a live credential, since
+/// every user of the machine reads process arguments. The opener gets a page in the 0600 state
+/// folder that carries the link, never the link. A second defect it catches: a handoff file
+/// anyone else can read, which would leak the ticket as the argument did.
+#[test]
+fn the_opener_argument_never_holds_the_ticket() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let state = tmp.path().join("state");
+    std::fs::create_dir_all(&state).expect("dir");
+    let link = "http://127.0.0.1:7878/_launch?t=TICKET-abc_123&to=/r/x/";
+    let plain = "http://127.0.0.1:7878/".to_owned();
+    let arg =
+        crate::open::launch::opener_arg(Some(&state), 7878, Some(link.to_owned()), plain.clone());
+    assert!(!arg.contains("TICKET") && !arg.contains("_launch"), "the argument leaks: {arg}");
+    let file = arg.strip_prefix("file://").expect("a file page");
+    let page = std::fs::read_to_string(file).expect("page");
+    assert!(page.contains("TICKET-abc_123"), "the page carries the link: {page}");
+    assert!(page.contains("t=TICKET-abc_123&amp;to=/r/x/"), "attribute-escaped: {page}");
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = std::fs::metadata(file).expect("meta").permissions().mode() & 0o777;
+        assert_eq!(mode, 0o600, "owner only");
+    }
+    // Without a launch link or a place to write one, the plain page opens and no ticket exists.
+    assert_eq!(crate::open::launch::opener_arg(Some(&state), 7878, None, plain.clone()), plain);
+    assert_eq!(
+        crate::open::launch::opener_arg(None, 7878, Some(link.to_owned()), plain.clone()),
+        plain
+    );
+    // A link planted at the page's name is refused, never written through.
+    #[cfg(unix)]
+    {
+        let victim = tmp.path().join("victim");
+        std::fs::write(&victim, "keep").expect("w");
+        std::fs::remove_file(file).expect("rm");
+        std::os::unix::fs::symlink(&victim, file).expect("link");
+        let got = crate::open::launch::opener_arg(
+            Some(&state),
+            7878,
+            Some(link.to_owned()),
+            plain.clone(),
+        );
+        assert_eq!(got, plain, "refused, so the plain page opens");
+        assert_eq!(std::fs::read_to_string(&victim).expect("r"), "keep");
+    }
+}
