@@ -82,3 +82,48 @@ async fn a_note_with_markup_never_reaches_a_page_unescaped() {
         assert!(html.contains("id=\"basketbtn\""), "{uri} lacks the basket button");
     }
 }
+
+/// The page, the JSON API and the basket agree on the switch: with `worktree_enabled` on the
+/// anchor sees the edit made only in the working tree, with it off (file or this repository)
+/// both answer as an unknown route and no anchor is derived.
+#[tokio::test(flavor = "multi_thread")]
+async fn the_worktree_switch_gates_the_basket_on_the_page_and_the_api() {
+    for (off, cfg) in [
+        (false, ""),
+        (true, "[features]\nworktree_enabled = false\n"),
+        (true, "[repo.r.features]\nworktree_enabled = false\n"),
+    ] {
+        let tmp = tempfile::tempdir().expect("tmp");
+        let p = tmp.path().join("r");
+        let f = Fixture::init(&p).write("a.txt", "a\nb\nc\n").commit("feat: one");
+        let config = gitterrace_config::parse(cfg).expect("parse").config;
+        let app = crate::build_server(
+            vec![f.path().to_path_buf()],
+            None,
+            None,
+            &Env::new(config),
+            None,
+            None,
+        )
+        .expect("router")
+        .0;
+        // Added straight into the cache: the page route is itself switched off here.
+        let state = gitterrace_api::ApiState::open(&p).expect("open");
+        let new = gitterrace_types::api::NewFinding {
+            kind: "file".into(),
+            lines: None,
+            note: "n".into(),
+            path: Some("a.txt".into()),
+            query: None,
+            rev: "HEAD".into(),
+            sha: None,
+        };
+        state.finding_add(&new).expect("add");
+        std::fs::write(p.join("a.txt"), "changed\n").expect("write");
+        for uri in ["/r/r/_findings", "/r/r/api/v1/findings"] {
+            let (s, body) = call(&app, "GET", uri, "", false).await;
+            assert_eq!(s == 404, off, "{cfg:?} {uri}: {s} {body}");
+            assert_eq!(body.contains("file changed"), !off, "{cfg:?} {uri}: {body}");
+        }
+    }
+}

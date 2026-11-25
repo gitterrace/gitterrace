@@ -10,7 +10,7 @@ use gitterrace_testkit::{Fixture, base, get, links};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-use crate::features::{FEATURE_ROUTES, INSIGHT_ROUTES, route_on, warm};
+use crate::features::{FEATURE_ROUTES, INSIGHT_ROUTES, features_of, route_on, warm};
 
 /// Every route no switch turns off: the pages a code browser is made of and their plumbing.
 /// `/api/v1` ones still need `api_enabled`. The coverage test below reads it: a route the gate
@@ -45,8 +45,6 @@ const CORE_ROUTES: &[&str] = &[
     "/api/v1/commits/{id}",
     "/api/v1/tree",
     "/api/v1/blob",
-    // The basket is not a working tree feature: it needs no switch beyond `api_enabled`.
-    "/api/v1/findings",
 ];
 
 /// Every route the server answers: the classified page routes, the API registry and the one
@@ -438,4 +436,47 @@ fn mcp_tools_follow_the_public_api_policy() {
     assert!(!gitterrace_api::tool_on(&public, None, "log"));
     assert!(gitterrace_api::tool_on(&asked, None, "log"));
     assert!(!gitterrace_api::tool_on(&asked, None, "not_a_tool"));
+}
+
+/// Class guard: whatever the registries say is refused on a public server reads this machine's
+/// working tree, and so must sit under `Feature::Worktree` on the web, the JSON API and MCP
+/// alike. A new endpoint or tool that documents the refusal fails here until it is classified;
+/// a surface classified on one transport and not the other fails too.
+#[test]
+fn every_local_only_surface_is_classified_under_worktree() {
+    const MARK: &str = "refused on a public server";
+    let squeeze = |t: &str| t.split_whitespace().collect::<Vec<_>>().join(" ").to_lowercase();
+    let routes: Vec<String> = gitterrace_api::ENDPOINTS
+        .iter()
+        .filter(|e| squeeze(e.summary).contains(MARK))
+        .map(|e| format!("/api/v1{}", e.path))
+        .collect();
+    let tools: Vec<String> = gitterrace_api::McpServer::tool_docs()
+        .into_iter()
+        .filter(|d| squeeze(&d.description).contains(MARK))
+        .map(|d| d.name)
+        .collect();
+    assert!(routes.len() >= 4 && tools.len() >= 4, "{routes:?} {tools:?}");
+    // A surface with a `source` parameter gates the working tree source in `ApiState` (its
+    // `compare` source needs none), so the route itself is not under the switch.
+    let per_source = |route: &str| {
+        gitterrace_api::ENDPOINTS.iter().any(|e| {
+            format!("/api/v1{}", e.path) == route && e.params.iter().any(|p| p.name == "source")
+        })
+    };
+    for route in routes.iter().filter(|r| !per_source(r)) {
+        assert!(
+            features_of(route).any(|f| f == Feature::Worktree),
+            "{route} is refused on a public server but not under Feature::Worktree"
+        );
+    }
+    let off = parse("[features]\nworktree_enabled = false\n").expect("parse").config;
+    for (tool, route) in TOOL_ROUTES {
+        if tools.iter().any(|t| t == tool) && !per_source(route) {
+            assert!(!gitterrace_api::tool_on(&off, None, tool), "{tool} ignores worktree_enabled");
+        }
+        if routes.iter().any(|r| r == route) {
+            assert!(tools.iter().any(|t| t == tool), "{tool} does not document the refusal");
+        }
+    }
 }

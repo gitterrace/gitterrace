@@ -267,3 +267,34 @@ fn the_review_prompt_lists_the_basket_only_when_asked() {
     r.findings.clear();
     assert!(crate::mcp::prompts::basket_text(&r).contains("empty"));
 }
+
+/// With `worktree_enabled` off the basket answers no anchor from the working tree, through the
+/// tool and through the review prompt alike.
+#[tokio::test]
+async fn the_basket_is_refused_over_mcp_when_the_worktree_switch_is_off() {
+    use gitterrace_types::api::NewFinding;
+    for cfg in ["[features]\nworktree_enabled = false\n", "[features]\n"] {
+        let (d, s) = server(cfg);
+        let state = ApiState::open(d.path()).expect("open");
+        let new = NewFinding {
+            kind: "file".into(),
+            lines: None,
+            note: "n".into(),
+            path: Some("a.txt".into()),
+            query: None,
+            rev: "HEAD".into(),
+            sha: None,
+        };
+        state.finding_add(&new).expect("add");
+        std::fs::write(d.path().join("a.txt"), "edited\n").expect("write");
+        let res = s
+            .list_findings(rmcp::handler::server::wrapper::Parameters(super::RepoArgs::default()))
+            .await
+            .expect("result");
+        let off = cfg.contains("false");
+        assert_eq!(res.is_error, Some(off), "{cfg}: {}", text(&res));
+        assert_eq!(text(&res).contains("file changed"), !off, "{cfg}: {}", text(&res));
+        let basket = s.basket(None).await;
+        assert_eq!(basket.is_err(), off, "{cfg}");
+    }
+}

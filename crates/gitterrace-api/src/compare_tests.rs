@@ -300,3 +300,36 @@ async fn findings_are_refused_on_a_public_server() {
     let (st, v) = get(&s, "/findings").await;
     assert_eq!(st, StatusCode::FORBIDDEN, "{v}");
 }
+
+/// A finding on `a.txt` whose file then changes only in the working tree, read with
+/// `worktree_enabled` off in the file or for this repository alone: no answer carries a state
+/// derived from the working tree, the read is refused like the page's own route.
+#[test]
+fn findings_are_refused_when_the_worktree_switch_is_off() {
+    for cfg in [
+        "[features]\nworktree_enabled = false\n",
+        "[repo.\"NAME\".features]\nworktree_enabled = false\n",
+    ] {
+        let (d, s) = fixture();
+        let id = s.finding_add(&new_finding(Some("a.txt"), Some((1, 1)), "n")).expect("add");
+        std::fs::write(d.path().join("a.txt"), "edited\n").expect("write");
+        let name = d.path().file_name().expect("name").to_string_lossy().into_owned();
+        let on = s.findings().expect("on by default");
+        assert_eq!(on.findings[0].anchor.status, AnchorStatus::LinesChanged);
+        let cfg = gitterrace_config::parse(&cfg.replace("NAME", &name)).expect("parse").config;
+        let s = s.configured(&cfg);
+        assert!(matches!(s.findings(), Err(crate::ApiError::Forbidden(_))), "{cfg:?}");
+        assert!(matches!(s.findings_by_id(&[id]), Err(crate::ApiError::Forbidden(_))));
+    }
+}
+
+/// The other repository of a per-repository override keeps its basket.
+#[test]
+fn a_repository_override_leaves_other_repositories_their_findings() {
+    let (d, s) = fixture();
+    let cfg = gitterrace_config::parse("[repo.elsewhere.features]\nworktree_enabled = false\n")
+        .expect("parse")
+        .config;
+    let s = s.configured(&cfg);
+    assert!(s.findings().is_ok(), "{:?}", d.path());
+}

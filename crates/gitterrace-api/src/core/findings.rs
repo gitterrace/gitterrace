@@ -53,9 +53,19 @@ impl ApiState {
         self.index.newer_owner().is_none() && self.index.dir().is_dir()
     }
 
+    /// Refuses a read of anchors when `worktree_enabled` is off for this repository: an anchor
+    /// is checked against the working tree, so the switch gates the basket on every transport.
+    fn worktree_only(&self) -> Result<(), ApiError> {
+        if !self.settings().worktree_on {
+            return Err(ApiError::Forbidden("the working tree"));
+        }
+        Ok(())
+    }
+
     /// The basket, oldest first, each entry with where its code is now.
     pub fn findings(&self) -> Result<FindingsResponse, ApiError> {
         self.only_here("findings")?;
+        self.worktree_only()?;
         let persisted = self.basket_persists();
         let stored = if persisted { self.index.findings_list()? } else { Vec::new() };
         Ok(FindingsResponse {
@@ -79,6 +89,7 @@ impl ApiState {
     /// not in the basket is a 400: the page asked for something the server never stored.
     pub fn findings_by_id(&self, ids: &[String]) -> Result<Vec<Finding>, ApiError> {
         self.only_here("findings")?;
+        self.worktree_only()?;
         let stored = self.index.findings_list()?;
         if let Some(missing) = ids.iter().find(|i| !stored.iter().any(|f| f.id == **i)) {
             return Err(ApiError::BadRequest(format!("no finding {missing} in the basket")));

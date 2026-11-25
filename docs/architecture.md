@@ -43,7 +43,11 @@ keys lives in `gitterrace_config::naming`.
   color, and charts are server-rendered SVG colored by class.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit
   landing mid-request cannot tear a page. Only the uncommitted view reads the
-  worktree. The repository and the worktree are never written: the only writes
+  worktree, and so does the review basket: an anchor is checked against it.
+  Every findings surface (page, JSON API, MCP tool and review prompt) is
+  gated on `worktree_enabled`, file-wide or per repository, and is refused on
+  a public server. The repository and the worktree are never written: the
+  only writes
   are the files of the cache folder, all through `cache.rs`. Of those, the index
   is disposable, while the user's files (see [Cache](#cache)) survive every
   reset (`USER_FILES` in `store.rs`).

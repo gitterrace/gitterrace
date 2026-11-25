@@ -214,7 +214,7 @@ pub const ENDPOINTS: &[Endpoint] = &[
     Endpoint {
         path: "/findings",
         summary: "The review basket: findings with their notes, oldest first, and where the \
-            code of each is now. Refused on a public server.",
+            code of each is now. Refused on a public server and when `worktree_enabled` is off.",
         params: &[],
         schema: of::<FindingsResponse>,
         route: || get(http::findings),
