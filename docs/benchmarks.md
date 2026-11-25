@@ -156,27 +156,24 @@ their charts and pages there.
 
 <!-- BEGIN GENERATED: results -->
 Run 2026-11-25 on Apple M1 Max, 10 cores, 64 GB RAM, 4.0 TB SSD disk, macOS
-26.6.2 (arm64). gitterrace v0.2.0-6f1fed8, git version 2.54.0 (Apple Git-157).
+26.6.2 (arm64). gitterrace v0.2.1-e2587e5, git version 2.54.0 (Apple Git-157).
 Measured on a quiet machine.
-
-- **git:** not measured on a quiet machine (other processes used 5 or more cores
-  during export), so its numbers are withheld.
 
 | Repo | Metric | Value | Budget | Status | Change against an earlier run |
 | --- | --- | --- | --- | --- | --- |
-| control | index build | 0.4 s (0.4 to 0.5) | 30 s | pass | 9% faster (vs 2026-11-23) |
-| control | warm page | 2 ms | 300 ms | pass | 3% slower (vs 2026-11-23) |
-| control | cold page | 39 ms (38 to 40) | 1500 ms | pass | 30% slower (vs 2026-11-23) |
-| control | peak memory | 97 MB | 500 MB | pass | 11% less memory (vs 2026-11-23) |
-| control | export | 32.8 s (32.8 to 33.4) | 60 s | pass | unchanged (vs 2026-11-23) |
-| rust | index build | 87.0 s (84.8 to 93.6) | 2400 s | pass | 6% slower (vs 2026-11-23) |
-| rust | warm page | 30 ms | 300 ms | pass | unchanged (vs 2026-11-23) |
-| rust | cold page | 1501 ms (1500 to 1504) | 10000 ms | pass | unchanged (vs 2026-11-23) |
-| rust | peak memory | 956 MB | 6000 MB | pass | 1% more memory (vs 2026-11-23) |
-| git | index build | withheld (load) | - | withheld | - |
-| git | warm page | withheld (load) | - | withheld | - |
-| git | cold page | withheld (load) | - | withheld | - |
-| git | peak memory | withheld (load) | - | withheld | - |
-| git | export | withheld (load) | - | withheld | - |
+| control | index build | 0.5 s (0.4 to 0.7) | 30 s | pass | unchanged (vs 2026-11-23) |
+| control | warm page | 2 ms | 300 ms | pass | 8% slower (vs 2026-11-23) |
+| control | cold page | 53 ms (3 to 54) | 1500 ms | pass | 76% slower (vs 2026-11-23) |
+| control | peak memory | 49 MB | 500 MB | pass | 55% less memory (vs 2026-11-23) |
+| control | export | 31.4 s (30.6 to 31.4) | 60 s | pass | 5% faster (vs 2026-11-23) |
+| git | index build | 12.7 s (12.3 to 13.0) | 300 s | pass | 20% slower (vs 2026-11-23) |
+| git | warm page | 13 ms | 300 ms | pass | 2% faster (vs 2026-11-23) |
+| git | cold page | 2416 ms (2414 to 2434) | 3000 ms | pass | 1% slower (vs 2026-11-23) |
+| git | peak memory | 390 MB | 1500 MB | pass | 2% less memory (vs 2026-11-23) |
+| git | export | 25.8 s (25.2 to 25.8) | 300 s | pass | 2% faster (vs 2026-11-23) |
+| rust | index build | 111.2 s (101.1 to 124.8) | 2400 s | pass | 35% slower (vs 2026-11-23) |
+| rust | warm page | 31 ms | 300 ms | pass | 4% slower (vs 2026-11-23) |
+| rust | cold page | 1466 ms (1455 to 1495) | 10000 ms | pass | 2% faster (vs 2026-11-23) |
+| rust | peak memory | 917 MB | 6000 MB | pass | 3% less memory (vs 2026-11-23) |
 
 <!-- END GENERATED: results -->
