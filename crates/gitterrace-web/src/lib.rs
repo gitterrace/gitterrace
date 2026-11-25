@@ -55,6 +55,8 @@ mod multi;
 mod multi_tests;
 mod overview_side;
 mod owner;
+#[cfg(test)]
+mod owner_wire_tests;
 mod ownership;
 mod pagehead;
 mod patterns;

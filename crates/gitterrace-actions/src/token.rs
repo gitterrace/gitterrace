@@ -34,7 +34,7 @@ impl Token {
     /// What a browser holds after the launch link: a hash of the secret, so the cookie jar
     /// and a browser history never hold the secret from the 0600 file itself.
     pub fn session(&self) -> String {
-        proof(&self.0, "session")
+        tag(&self.0, Purpose::Session, "")
     }
 
     /// Whether `offered` is this secret's `session` value.
@@ -45,7 +45,7 @@ impl Token {
     /// The cookie's name. Cookies ignore ports, so two servers on `localhost` must not
     /// overwrite each other's: the name carries a few hex digits of a hash of the secret.
     pub fn cookie_name(&self) -> String {
-        format!("gt-owner-{}", &proof(&self.0, "cookie-name")[..8])
+        format!("gt-owner-{}", &tag(&self.0, Purpose::CookieName, "")[..8])
     }
 
     /// The answer to a challenge: proves the holder knows the secret without sending it.
@@ -58,21 +58,68 @@ fn ct_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-/// SHA-256 over `secret:nonce`, lowercase hex.
-///
-/// A client that read the secret from its 0600 file checks a server's answer before telling
-/// it anything, so a foreign listener that only mimics the replies never learns a path.
-pub fn proof(secret: &str, nonce: &str) -> String {
-    let digest = Sha256::new()
-        .chain_update(secret.as_bytes())
-        .chain_update(b":")
-        .chain_update(nonce.as_bytes())
-        .finalize();
+/// What a value derived from the secret is for. Every purpose has a key of its own, so a
+/// value made for one can never be a value of another: the challenge answers whatever nonce a
+/// client picks, and no nonce reaches the session or the cookie name.
+#[derive(Clone, Copy)]
+enum Purpose {
+    /// The answer to a client's nonce, given to any local program that asks.
+    Challenge,
+    /// The cookie value of a launched browser.
+    Session,
+    /// The cookie name of a launched browser.
+    CookieName,
+}
+
+impl Purpose {
+    #[cfg(test)]
+    const ALL: [Self; 3] = [Self::Challenge, Self::Session, Self::CookieName];
+
+    const fn label(self) -> &'static [u8] {
+        match self {
+            Self::Challenge => b"challenge",
+            Self::Session => b"session",
+            Self::CookieName => b"cookie-name",
+        }
+    }
+}
+
+/// SHA-256 over `parts`, each preceded by its length, so no two lists of parts hash the same
+/// bytes and a part cannot borrow from its neighbor.
+fn framed(parts: &[&[u8]]) -> [u8; 32] {
+    let mut h = Sha256::new();
+    for part in parts {
+        h.update((part.len() as u64).to_be_bytes());
+        h.update(part);
+    }
+    h.finalize().into()
+}
+
+/// The key of `purpose`: unrelated to the secret and to every other purpose's key, and one
+/// way, so a value made with it reveals none of them.
+fn key(secret: &str, purpose: Purpose) -> [u8; 32] {
+    framed(&[b"gitterrace key v2", purpose.label(), secret.as_bytes()])
+}
+
+/// The value of `purpose` over `data`, lowercase hex. The purpose is in the message as well
+/// as in the key, so a value of one purpose is wrong for another even by a key collision.
+fn tag(secret: &str, purpose: Purpose, data: &str) -> String {
+    let k = key(secret, purpose);
+    let digest = framed(&[b"gitterrace tag v2", purpose.label(), &k, data.as_bytes()]);
     digest.iter().fold(String::with_capacity(64), |mut s, b| {
         s.push(char::from(b"0123456789abcdef"[usize::from(b >> 4)]));
         s.push(char::from(b"0123456789abcdef"[usize::from(b & 15)]));
         s
     })
+}
+
+/// The answer to a challenge `nonce`: the one value of the secret that leaves the process.
+///
+/// A client that read the secret from its 0600 file checks a server's answer before telling
+/// it anything, so a foreign listener that only mimics the replies never learns a path. Any
+/// local program may ask, so the answer is made with a key that makes nothing else.
+pub fn proof(secret: &str, nonce: &str) -> String {
+    tag(secret, Purpose::Challenge, nonce)
 }
 
 impl fmt::Debug for Token {
@@ -122,17 +169,60 @@ pub fn base64(bytes: &[u8], form: Base64) -> String {
 #[cfg(test)]
 mod tests {
     use crate::Token;
-    use crate::token::{Base64, base64, proof};
+    use crate::token::{Base64, Purpose, base64, key, proof, tag};
 
     #[test]
-    fn proof_is_sha256_of_secret_and_nonce() {
-        // printf 'abc:n1' | shasum -a 256
+    fn values_match_the_documented_derivation() {
+        // Length-prefixed (u64 big endian) SHA-256 of ("gitterrace key v2", purpose, secret),
+        // then of ("gitterrace tag v2", purpose, key, data): see `framed`.
         assert_eq!(
             proof("abc", "n1"),
-            "4fd321db886a203ea5ddbf0c3b79a25315577abda03f8cb75d3a09d32b18eef0"
+            "29fdbe6e162fdef8356ca5ff2fc1b6803a0b83b38c09f397c8d1f0cbec260937"
         );
+        assert_eq!(
+            tag("abc", Purpose::Session, ""),
+            "c8605d5eb9aba59d2987dde0b8f64638928a93c45f70c311590e6484aec7f877"
+        );
+        assert_eq!(&tag("abc", Purpose::CookieName, "")[..8], "3921fc9d");
         assert_ne!(proof("abc", "n1"), proof("abx", "n1"));
         assert_ne!(proof("abc", "n1"), proof("abc", "n2"));
+    }
+
+    /// Class: a value made for one purpose is never a value of another, whatever data a client
+    /// can pick. The challenge answers any nonce, so no nonce may reach the session or the
+    /// cookie name. Also catches a purpose added to `ALL` that reuses a label, and so a key.
+    #[test]
+    fn no_challenge_answer_is_a_session_or_cookie_name() {
+        let t = Token::generate().expect("rng");
+        let s = t.as_str();
+        let (session, name) = (t.session(), t.cookie_name());
+        let picked = [
+            "session",
+            "cookie-name",
+            "challenge",
+            "",
+            "gt-owner-",
+            &session,
+            &name,
+            s,
+            &format!("{s}:session"),
+            &format!("{s}:cookie-name"),
+            &session[..8],
+        ];
+        for nonce in picked {
+            let answer = t.prove(nonce);
+            assert_ne!(answer, session, "{nonce:?}");
+            assert_ne!(&answer[..8], &name["gt-owner-".len()..], "{nonce:?}");
+        }
+        for (i, a) in Purpose::ALL.iter().enumerate() {
+            for b in &Purpose::ALL[i + 1..] {
+                assert_ne!(a.label(), b.label());
+                assert_ne!(key(s, *a), key(s, *b), "two purposes share a key");
+                for data in picked {
+                    assert_ne!(tag(s, *a, data), tag(s, *b, data), "{data:?}");
+                }
+            }
+        }
     }
 
     #[test]

@@ -73,6 +73,11 @@ nothing about who is asking, and a secret in a page is a secret given away.
 - The owner secret lives in `add-token-PORT` in the state folder, mode 0600 in a
   0700 folder, read without following a link and refused when another user owns
   or can read it.
+- The challenge `GET /_repos?nonce=N` answers any local program, so its answer
+  is made with a key of its own. The cookie name, the cookie value and the
+  challenge answer each use an independent, domain-separated key, so no nonce
+  yields the cookie (`no_challenge_answer_is_a_session_or_cookie_name`,
+  `challenge_answers_open_no_write_and_the_launch_flow_still_does`).
 - `git terrace open` and `git terrace launch` read that file and ask `POST /_launch`
   for a ticket. A browser opens `/_launch?t=TICKET`, which spends the ticket and
   sets an HttpOnly, SameSite=Strict cookie holding a hash of the secret. The
