@@ -5,17 +5,42 @@ All notable changes are listed here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 <!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
+<!-- END GENERATED: unreleased -->
+
+## [0.2.2] - 2026-11-25
+
+### Added
+
+- site: highlight the landing snippets and lay the gallery in even pairs
+- web: send a large review basket in a chosen part
+- api: flag a worktree file list the scan cut short
+
+### Changed
+
+- index: reuse the API coupling types
 
 ### Fixed
 
 - release: show gitterrace at its release in the demo
+- web: keep viewed marks until the server confirms the move
+- index: write the cache with owner-only permissions
+- web: bound inflate work of archive previews
+- api: gate the review basket on the worktree switch
+- web: handle rejected promises in the browser scripts
+- web: derive the challenge answer, session and cookie name from independent
+  keys
+- open: keep the launch ticket out of process arguments
+- index: bound and validate checkpoint logs before reading them
+- index: apply the checkpoint cap to the first snapshot
+- git: compare a checkpoint with the HEAD it recorded
+- web: keep author and time whole on long rows
+- mcp: point a truncated review plan at the full changed-file list
+- actions: start every child through one process-wide lock
+- site: drop the phone shot from the landing gallery
 
 ### Performance
 
 - index: build the per-rank person table once per request
-
-<!-- END GENERATED: unreleased -->
 
 ## [0.2.1] - 2026-11-25
 
