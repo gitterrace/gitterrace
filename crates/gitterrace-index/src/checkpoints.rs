@@ -223,19 +223,22 @@ fn held(meta: &Meta) -> u64 {
     meta.files.iter().filter_map(|f| f.copy.as_ref()).fold(0, |n, c| n.saturating_add(c.len))
 }
 
-/// A checkpoint of `files` as one frame.
+/// A checkpoint of `files` as one frame. Compression stops once the copies packed so far pass
+/// `cap`: the frame could not be kept whole then, so peak memory is the cap and one file, not
+/// every file of the snapshot. The files after that keep their names and hashes.
 fn build(
     files: &[SnapFile],
     head: &str,
     auto: bool,
     label: &str,
     created: i64,
+    cap: u64,
 ) -> io::Result<(Meta, Vec<u8>)> {
     let mut blobs = Vec::new();
     let mut metas = Vec::with_capacity(files.len());
     for f in files {
         let copy = match &f.text {
-            Some(t) => {
+            Some(t) if (blobs.len() as u64) <= cap => {
                 let z = zstd::bulk::compress(t, ZSTD_LEVEL)?;
                 let c = Copy {
                     off: blobs.len() as u64,
@@ -246,7 +249,7 @@ fn build(
                 blobs.extend_from_slice(&z);
                 Some(c)
             }
-            None => None,
+            _ => None,
         };
         metas.push(FileMeta { path: f.path.clone(), hash: f.hash.clone(), copy });
     }
@@ -292,13 +295,21 @@ fn trimmed(
             out.extend(encode(&m, &blobs)?);
         }
     }
-    let (mut meta, mut blobs) = newest;
-    if total > cap {
-        meta.files.iter_mut().for_each(|x| x.copy = None);
-        blobs.clear();
-    }
-    out.extend(encode(&meta, &blobs)?);
+    let fitted = if total > cap { bare(newest.0) } else { newest };
+    out.extend(encode(&fitted.0, &fitted.1)?);
     Ok(out)
+}
+
+/// `frame` without its copies: every path and hash stays.
+fn bare(mut meta: Meta) -> (Meta, Vec<u8>) {
+    meta.files.iter_mut().for_each(|x| x.copy = None);
+    (meta, Vec::new())
+}
+
+/// The frame as bytes, without its copies when they pass `cap`.
+fn fit(frame: (Meta, Vec<u8>), cap: u64) -> io::Result<Vec<u8>> {
+    let (meta, blobs) = if held(&frame.0) > cap { bare(frame.0) } else { frame };
+    encode(&meta, &blobs)
 }
 
 impl Index {
@@ -340,9 +351,11 @@ impl Index {
         if frames.as_ref().is_some_and(|(_, fr)| fr.iter().any(|x| x.meta.id == id)) {
             return Ok((id, false));
         }
-        let (meta, blobs) = build(files, head, auto, label, now)?;
+        let (meta, blobs) = build(files, head, auto, label, now, cap_bytes)?;
         let Some((f, fr)) = frames.as_mut() else {
-            cache::write_atomic(self.dir(), FILE, &encode(&meta, &blobs)?)?;
+            // The first frame meets the same cap as every later one.
+            let bytes = fit((meta, blobs), cap_bytes)?;
+            cache::write_atomic(self.dir(), FILE, &bytes)?;
             return Ok((id, true));
         };
         let size = f.metadata()?.len();

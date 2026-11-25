@@ -254,7 +254,9 @@ Exceptions, each on purpose:
   working tree in `.git/gitterrace/`, never ignored or binary ones.
 - `checkpoint_mb` (integer, default `20`): Most copies a repository's
   checkpoints keep, in MiB. The oldest copies go first. 0 switches checkpoints
-  off: none is taken and none is kept.
+  off: none is taken and none is shown. Checkpoints already kept stay in
+  `.git/gitterrace/checkpoints` untouched, and come back when the value does;
+  delete that file to discard them.
 - `checkpoint_file_kb` (integer, default `256`): Largest changed text file a
   checkpoint copies, in KiB. A larger one is named without a copy, so a review
   since it diffs that file against HEAD and says so.

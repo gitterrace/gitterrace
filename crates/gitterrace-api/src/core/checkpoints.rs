@@ -11,6 +11,11 @@ use crate::error::ApiError;
 /// entry, and a label is a short name, not a note.
 const MAX_LABEL: usize = 200;
 
+/// How many bytes of text a snapshot gathers for each byte of cap. Text packs several to one, so
+/// this keeps what the cap would, and bounds memory while the files are read. A file past it
+/// keeps its name and hash.
+const UNPACKED_PER_PACKED: u64 = 8;
+
 fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -76,7 +81,11 @@ impl ApiState {
             ));
         }
         let copy = (self.settings().review.checkpoint_file_kb as u64) << 10;
-        let files = gitterrace_git::worktree_snapshot(&self.repo, copy)?;
+        let files = gitterrace_git::worktree_snapshot(
+            &self.repo,
+            copy,
+            self.cap_bytes().saturating_mul(UNPACKED_PER_PACKED),
+        )?;
         let head = self.repo.resolve("HEAD").unwrap_or_default();
         let label: String = label.chars().take(MAX_LABEL).collect();
         Ok(self.index.checkpoint_add(&files, &head, auto, &label, self.cap_bytes(), now())?)

@@ -18,7 +18,7 @@ fn a_snapshot_copies_small_text_and_hashes_the_rest() {
     std::fs::write(p.join("bin.dat"), b"\0\x01\x02").expect("write");
     std::fs::write(p.join("big.txt"), "y".repeat(100)).expect("write");
     std::fs::remove_file(p.join("b.txt")).expect("rm");
-    let snap = worktree_snapshot(&repo, 50).expect("snap");
+    let snap = worktree_snapshot(&repo, 50, u64::MAX).expect("snap");
     let by = |n: &str| snap.iter().find(|f| f.path == n).expect(n);
     assert_eq!(by("a.txt").text.as_deref(), Some(&b"1\nx\n"[..]));
     assert_eq!(by("a.txt").hash, content_id(b"1\nx\n"));
@@ -34,7 +34,7 @@ fn an_ignored_file_is_never_in_a_snapshot() {
     let p = d.path();
     std::fs::write(p.join(".gitignore"), "secret.txt\n").expect("write");
     std::fs::write(p.join("secret.txt"), "key\n").expect("write");
-    let snap = worktree_snapshot(&repo, 1 << 20).expect("snap");
+    let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap");
     assert!(snap.iter().all(|f| f.path != "secret.txt"));
 }
 
@@ -44,7 +44,7 @@ fn since_lists_only_what_changed_after_the_checkpoint() {
     let p = d.path();
     std::fs::write(p.join("a.txt"), "1\nx\n").expect("write");
     std::fs::write(p.join("b.txt"), "B\n").expect("write");
-    let snap = worktree_snapshot(&repo, 1 << 20).expect("snap");
+    let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap");
     std::fs::write(p.join("a.txt"), "1\nx\ny\n").expect("write");
     let d = worktree_diff_since(&repo, &snap).expect("since");
     assert_eq!(d.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt"]);
@@ -58,7 +58,7 @@ fn since_a_copy_that_is_gone_diffs_against_head_and_says_so() {
     let (d, repo) = repo();
     let p = d.path();
     std::fs::write(p.join("a.txt"), "1\nx\n").expect("write");
-    let snap = worktree_snapshot(&repo, 0).expect("snap");
+    let snap = worktree_snapshot(&repo, 0, u64::MAX).expect("snap");
     assert!(snap[0].text.is_none());
     let same = worktree_diff_since(&repo, &snap).expect("since");
     assert!(same.files.is_empty() && same.unchanged == 1 && same.gone.is_empty());
@@ -75,8 +75,22 @@ fn a_file_reverted_to_head_since_the_checkpoint_shows_as_changed() {
     let (d, repo) = repo();
     let p = d.path();
     std::fs::write(p.join("a.txt"), "1\nx\n").expect("write");
-    let snap: Vec<SnapFile> = worktree_snapshot(&repo, 1 << 20).expect("snap");
+    let snap: Vec<SnapFile> = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap");
     std::fs::write(p.join("a.txt"), "1\n2\n").expect("write");
     let d = worktree_diff_since(&repo, &snap).expect("since");
     assert_eq!(d.files.iter().map(|f| f.path.as_str()).collect::<Vec<_>>(), ["a.txt"]);
+}
+
+#[test]
+fn a_snapshot_stops_copying_at_its_budget_but_still_hashes_every_file() {
+    let (d, repo) = repo();
+    let p = d.path();
+    for i in 0..5 {
+        std::fs::write(p.join(format!("n{i}.txt")), "z".repeat(100)).expect("write");
+    }
+    let snap = worktree_snapshot(&repo, 1 << 20, 250).expect("snap");
+    let n: Vec<&SnapFile> = snap.iter().filter(|f| f.path.starts_with('n')).collect();
+    assert_eq!(n.len(), 5, "every path stays");
+    assert!(n.iter().all(|f| f.hash == content_id(&[b'z'; 100])));
+    assert_eq!(n.iter().filter(|f| f.text.is_some()).count(), 2);
 }

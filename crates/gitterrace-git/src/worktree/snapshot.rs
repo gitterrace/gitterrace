@@ -48,26 +48,32 @@ pub fn content_id(bytes: &[u8]) -> String {
     )
 }
 
-/// Every changed file as it is now. `copy_bytes` is the largest file whose bytes are kept.
-pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64) -> Result<Vec<SnapFile>> {
+/// Every changed file as it is now. `copy_bytes` is the largest file whose bytes are kept and
+/// `budget_bytes` the most bytes kept in all: past it a file keeps its hash and no copy, so a
+/// worktree of many large text files cannot fill memory before the caller packs and caps them.
+pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Result<Vec<SnapFile>> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
     let Some(root) = r.workdir().and_then(|w| w.canonicalize().ok()) else {
         return Ok(Vec::new());
     };
     let mut out = Vec::new();
+    let mut kept = 0u64;
     for path in scoped_paths(&r, Scope::All, repo.worktree_files())? {
         if !is_plain(&path) {
             continue;
         }
         let read = read_worktree(&root, &path, big);
         out.push(match &read {
-            Read::Data(d) => SnapFile {
-                hash: content_id(d),
-                text: (d.len() as u64 <= copy_bytes && !crate::diff::is_binary(d))
-                    .then(|| d.clone()),
-                path,
-            },
+            Read::Data(d) => {
+                let keep = d.len() as u64 <= copy_bytes
+                    && kept.saturating_add(d.len() as u64) <= budget_bytes
+                    && !crate::diff::is_binary(d);
+                if keep {
+                    kept += d.len() as u64;
+                }
+                SnapFile { hash: content_id(d), text: keep.then(|| d.clone()), path }
+            }
             Read::Big => SnapFile { path, hash: BIG_HASH.to_owned(), text: None },
             Read::Missing => SnapFile { path, hash: String::new(), text: None },
             Read::Skip => continue,

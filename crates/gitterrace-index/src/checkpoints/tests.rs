@@ -225,3 +225,48 @@ fn a_copy_that_unpacks_past_its_stated_size_or_the_cap_reads_as_gone() -> io::Re
     assert!(got.iter().all(|f| f.text.is_none()));
     Ok(())
 }
+
+/// Text zstd cannot shrink, so a snapshot of a few of them is bigger than a small cap.
+fn noise(seed: u32, n: usize) -> String {
+    let mut x = seed;
+    (0..n)
+        .map(|_| {
+            x = x.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+            char::from(b'a' + u8::try_from((x >> 16) % 26).unwrap_or(0))
+        })
+        .collect()
+}
+
+#[test]
+fn the_first_checkpoint_keeps_within_the_cap_and_names_what_it_dropped() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let files: Vec<SnapFile> =
+        (0..6).map(|i| snap(&format!("f{i}"), &noise(i + 1, 4000))).collect();
+    let (id, _) = idx.checkpoint_add(&files, "h", false, "", 3000, 1)?;
+    let list = idx.checkpoint_list()?;
+    assert!(list.bytes_used <= 3000, "{}", list.bytes_used);
+    let back = idx.checkpoint_files(&id)?.expect("kept");
+    assert_eq!(back.len(), 6, "every path stays");
+    assert!(back.iter().all(|f| !f.hash.is_empty()));
+    assert!(back.iter().all(|f| f.text.is_none()), "a frame over the cap keeps no copy");
+    Ok(())
+}
+
+#[test]
+fn a_zero_cap_keeps_names_and_hashes_but_no_copies() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (id, _) = idx.checkpoint_add(&[snap("a", "x\n")], "h", false, "", 0, 1)?;
+    assert_eq!(idx.checkpoint_list()?.bytes_used, 0);
+    assert!(idx.checkpoint_files(&id)?.expect("kept")[0].text.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_cap_stored_log_survives_a_lower_cap_unread_until_the_next_write() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (id, _) = idx.checkpoint_add(&[snap("a", "x\n")], "h", false, "", 1 << 20, 1)?;
+    let before = std::fs::read(idx.dir().join(FILE))?;
+    assert!(idx.checkpoint_files(&id)?.is_some(), "a reader never deletes");
+    assert_eq!(std::fs::read(idx.dir().join(FILE))?, before);
+    Ok(())
+}

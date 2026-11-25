@@ -450,7 +450,9 @@ settings! {
         /// working tree in `.git/gitterrace/`, never ignored or binary ones.
         has_auto_checkpoint: bool = false => Live,
         /// Most copies a repository's checkpoints keep, in MiB. The oldest copies go first. 0
-        /// switches checkpoints off: none is taken and none is kept.
+        /// switches checkpoints off: none is taken and none is shown. Checkpoints already kept
+        /// stay in `.git/gitterrace/checkpoints` untouched, and come back when the value does;
+        /// delete that file to discard them.
         checkpoint_mb: usize = 20 => Live,
         /// Largest changed text file a checkpoint copies, in KiB. A larger one is named without a
         /// copy, so a review since it diffs that file against HEAD and says so.
