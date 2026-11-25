@@ -24,8 +24,16 @@ const FIXED: u64 = 20;
 const MAX_HEADER: u32 = 16 << 20;
 /// Checkpoints kept whatever the byte cap says: each holds a header of path names.
 const MAX_CHECKPOINTS: usize = 200;
-/// Largest copy read back, so a planted size cannot ask for gigabytes.
-const MAX_COPY: u64 = 64 << 20;
+/// Largest copy, packed or unpacked: `review.checkpoint_file_kb` tops out at 4 MiB, so a larger
+/// claim is a planted size.
+const MAX_COPY: u64 = 4 << 20;
+/// Most bytes of copies one read unpacks, so many small claims cannot add up to gigabytes.
+const MAX_RESTORE: u64 = 256 << 20;
+/// Largest blob of one frame: `review.checkpoint_mb` tops out at 1 GiB.
+const MAX_BLOB: u64 = 1 << 30;
+/// Most bytes of headers one log holds, so a planted log cannot make every list parse
+/// gigabytes of JSON.
+const MAX_HEADERS: u64 = 64 << 20;
 const ZSTD_LEVEL: i32 = 3;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,11 +81,10 @@ pub struct CheckpointList {
     pub bytes_used: u64,
 }
 
-/// A frame found in the log: where its blobs start and how long they are.
+/// A frame found in the log and where its blobs start.
 struct Frame {
     meta: Meta,
     blob_at: u64,
-    blob_len: u64,
 }
 
 /// The id of a state: `cp-` and 12 hex of the git blob id of its manifest (paths and content
@@ -97,43 +104,107 @@ const fn u64_at(b: &[u8], i: usize) -> u64 {
     u64::from_le_bytes([b[i], b[i + 1], b[i + 2], b[i + 3], b[i + 4], b[i + 5], b[i + 6], b[i + 7]])
 }
 
-/// The whole frames of the log and where the last one ends. Anything after that is a torn tail.
-fn scan(f: &mut std::fs::File) -> io::Result<(Vec<Frame>, u64)> {
+/// What a scan of the log found.
+struct Scan {
+    frames: Vec<Frame>,
+    /// Where the last whole frame ends. Anything after that is a torn tail or damage.
+    valid: u64,
+    /// The bytes after `valid` are not a frame cut short but data this build cannot read: a bad
+    /// magic, a size past a bound, a header that fails its checksum or parse, or too many frames.
+    damaged: bool,
+}
+
+/// Keeps the copies of `meta` that lie inside a blob of `blob_len` bytes and are within bounds.
+/// A frame we wrote always passes. A planted one loses the copy and so reads as gone, instead of
+/// feeding an offset or a size it made up to a read.
+fn sound(meta: &mut Meta, blob_len: u64) {
+    let mut used = 0u64;
+    for f in &mut meta.files {
+        let Some(c) = &f.copy else { continue };
+        let fits = c.len <= MAX_COPY
+            && c.size <= MAX_COPY
+            && c.off.checked_add(c.len).is_some_and(|e| e <= blob_len)
+            && used.checked_add(c.len).is_some_and(|u| u <= blob_len);
+        if fits {
+            used += c.len;
+        } else {
+            f.copy = None;
+        }
+    }
+}
+
+/// The whole frames of the log and where the last one ends.
+fn scan(f: &mut std::fs::File) -> io::Result<Scan> {
     let len = f.metadata()?.len();
-    let mut out = Vec::new();
-    let mut at = 0;
-    while at + FIXED <= len {
+    let mut out = Scan { frames: Vec::new(), valid: 0, damaged: false };
+    let (mut at, mut headers, mut blobs) = (0u64, 0u64, 0u64);
+    while at.saturating_add(FIXED) <= len {
         f.seek(SeekFrom::Start(at))?;
         let mut fixed = [0u8; FIXED as usize];
         f.read_exact(&mut fixed)?;
         let (hdr_len, hdr_crc, blob_len) =
             (u32_at(&fixed, 4), u32_at(&fixed, 8), u64_at(&fixed, 12));
-        if &fixed[..4] != MAGIC || hdr_len > MAX_HEADER {
+        headers += u64::from(hdr_len);
+        blobs = blobs.saturating_add(blob_len);
+        if &fixed[..4] != MAGIC
+            || hdr_len > MAX_HEADER
+            || headers > MAX_HEADERS
+            || blob_len > MAX_BLOB
+            || blobs > MAX_BLOB.saturating_mul(2)
+            || out.frames.len() >= MAX_CHECKPOINTS
+        {
+            out.damaged = true;
             break;
         }
-        let end = at + FIXED + u64::from(hdr_len) + blob_len;
+        let Some(end) = (at + FIXED).checked_add(u64::from(hdr_len) + blob_len) else {
+            out.damaged = true;
+            break;
+        };
         if end > len {
             break;
         }
         let mut hdr = vec![0; hdr_len as usize];
         f.read_exact(&mut hdr)?;
-        if crc32fast::hash(&hdr) != hdr_crc {
-            break;
-        }
-        let Ok(meta) = serde_json::from_slice::<Meta>(&hdr) else {
+        let Ok(mut meta) = serde_json::from_slice::<Meta>(&hdr)
+            .map_err(drop)
+            .and_then(|m| (crc32fast::hash(&hdr) == hdr_crc).then_some(m).ok_or(()))
+        else {
+            out.damaged = true;
             break;
         };
-        out.push(Frame { meta, blob_at: at + FIXED + u64::from(hdr_len), blob_len });
+        sound(&mut meta, blob_len);
+        out.frames.push(Frame { meta, blob_at: at + FIXED + u64::from(hdr_len) });
         at = end;
     }
-    Ok((out, at))
+    out.valid = at;
+    Ok(out)
 }
 
-fn blob_of(f: &mut std::fs::File, frame: &Frame) -> io::Result<Vec<u8>> {
-    f.seek(SeekFrom::Start(frame.blob_at))?;
-    let mut b = vec![0; usize::try_from(frame.blob_len).map_err(io::Error::other)?];
-    f.read_exact(&mut b)?;
-    Ok(b)
+/// The packed bytes of one copy, read by its own offset and length, `None` when they fail the
+/// copy's checksum. `sound` has already bounded both.
+fn packed(f: &mut std::fs::File, frame: &Frame, c: &Copy) -> io::Result<Option<Vec<u8>>> {
+    f.seek(SeekFrom::Start(frame.blob_at + c.off))?;
+    let mut z = vec![0; usize::try_from(c.len).map_err(io::Error::other)?];
+    f.read_exact(&mut z)?;
+    Ok((crc32fast::hash(&z) == c.crc).then_some(z))
+}
+
+/// The frame as it will be written again: its sound copies packed one after another, so bytes
+/// the log held but no copy names are not carried over.
+fn repack(f: &mut std::fs::File, frame: &Frame) -> io::Result<(Meta, Vec<u8>)> {
+    let mut meta = frame.meta.clone();
+    let mut blobs = Vec::new();
+    for m in &mut meta.files {
+        let Some(c) = m.copy.as_mut() else { continue };
+        match packed(f, frame, c)? {
+            Some(z) => {
+                c.off = blobs.len() as u64;
+                blobs.extend_from_slice(&z);
+            }
+            None => m.copy = None,
+        }
+    }
+    Ok((meta, blobs))
 }
 
 fn encode(meta: &Meta, blobs: &[u8]) -> io::Result<Vec<u8>> {
@@ -149,7 +220,7 @@ fn encode(meta: &Meta, blobs: &[u8]) -> io::Result<Vec<u8>> {
 }
 
 fn held(meta: &Meta) -> u64 {
-    meta.files.iter().filter_map(|f| f.copy.as_ref()).map(|c| c.len).sum()
+    meta.files.iter().filter_map(|f| f.copy.as_ref()).fold(0, |n, c| n.saturating_add(c.len))
 }
 
 /// A checkpoint of `files` as one frame.
@@ -217,8 +288,8 @@ fn trimmed(
             m.files.iter_mut().for_each(|x| x.copy = None);
             out.extend(encode(&m, &[])?);
         } else {
-            let blobs = blob_of(f, fr)?;
-            out.extend(encode(&fr.meta, &blobs)?);
+            let (m, blobs) = repack(f, fr)?;
+            out.extend(encode(&m, &blobs)?);
         }
     }
     let (mut meta, mut blobs) = newest;
@@ -251,8 +322,17 @@ impl Index {
         let _lock = crate::store::WriteLock::take(self.dir())?;
         let (mut frames, valid) = match cache::open_read(self.dir(), FILE)? {
             Some(mut f) => {
-                let (frames, valid) = scan(&mut f)?;
-                (Some((f, frames)), valid)
+                let found = scan(&mut f)?;
+                if found.damaged {
+                    // A rewrite would drop what this build cannot read. That is the user's
+                    // call, not ours.
+                    return Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "the checkpoints file holds data this build cannot read; move or delete \
+                         .git/gitterrace/checkpoints to start a new one",
+                    ));
+                }
+                (Some((f, found.frames)), found.valid)
             }
             None => (None, 0),
         };
@@ -288,7 +368,7 @@ impl Index {
         let Some(mut f) = cache::open_read(self.dir(), FILE)? else {
             return Ok(CheckpointList::default());
         };
-        let (frames, _) = scan(&mut f)?;
+        let frames = scan(&mut f)?.frames;
         let items: Vec<CheckpointInfo> = frames
             .iter()
             .rev()
@@ -315,32 +395,34 @@ impl Index {
         let Some(mut f) = cache::open_read(self.dir(), FILE)? else {
             return Ok(None);
         };
-        let (frames, _) = scan(&mut f)?;
+        let frames = scan(&mut f)?.frames;
         let Some(fr) = frames.iter().find(|x| x.meta.id == id) else {
             return Ok(None);
         };
-        let blobs = blob_of(&mut f, fr)?;
-        let files = fr
-            .meta
-            .files
-            .iter()
-            .map(|m| SnapFile {
-                path: m.path.clone(),
-                hash: m.hash.clone(),
-                text: m.copy.as_ref().and_then(|c| copy_of(&blobs, c)),
-            })
-            .collect();
+        let mut left = MAX_RESTORE;
+        let mut files = Vec::with_capacity(fr.meta.files.len());
+        for m in &fr.meta.files {
+            let text = match &m.copy {
+                Some(c) if c.size <= left => {
+                    let text = copy_of(&mut f, fr, c)?;
+                    if text.is_some() {
+                        left -= c.size;
+                    }
+                    text
+                }
+                _ => None,
+            };
+            files.push(SnapFile { path: m.path.clone(), hash: m.hash.clone(), text });
+        }
         Ok(Some(files))
     }
 }
 
-fn copy_of(blobs: &[u8], c: &Copy) -> Option<Vec<u8>> {
-    let end = c.off.checked_add(c.len)?;
-    let z = blobs.get(usize::try_from(c.off).ok()?..usize::try_from(end).ok()?)?;
-    if c.size > MAX_COPY || crc32fast::hash(z) != c.crc {
-        return None;
-    }
-    zstd::bulk::decompress(z, usize::try_from(c.size).ok()?).ok()
+/// One copy unpacked, `None` when it fails its checksum or does not unpack to its stated size.
+fn copy_of(f: &mut std::fs::File, frame: &Frame, c: &Copy) -> io::Result<Option<Vec<u8>>> {
+    let Some(z) = packed(f, frame, c)? else { return Ok(None) };
+    let size = usize::try_from(c.size).map_err(io::Error::other)?;
+    Ok(zstd::bulk::decompress(&z, size).ok())
 }
 
 #[cfg(test)]

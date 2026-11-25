@@ -112,3 +112,116 @@ fn the_id_does_not_depend_on_file_order() {
     assert_eq!(id_of(&a), id_of(&b));
     assert_ne!(id_of(&a), id_of(&[snap("a", "1"), snap("b", "3")]));
 }
+
+/// One hand-built frame: the way a planted log gets past the checksums.
+fn frame(files: Vec<super::FileMeta>, blobs: &[u8]) -> io::Result<Vec<u8>> {
+    let meta = super::Meta {
+        id: "cp-planted00000".to_owned(),
+        created: 1,
+        head: "h".to_owned(),
+        auto: false,
+        label: String::new(),
+        files,
+    };
+    super::encode(&meta, blobs)
+}
+
+fn planted(idx: &Index, bytes: &[u8]) -> io::Result<std::path::PathBuf> {
+    let path = idx.dir().join(FILE);
+    std::fs::write(&path, bytes)?;
+    Ok(path)
+}
+
+fn file_with(copy: super::Copy) -> super::FileMeta {
+    super::FileMeta { path: "a".to_owned(), hash: "x".to_owned(), copy: Some(copy) }
+}
+
+/// A fixed part that declares `blob_len` blob bytes after a one-byte header.
+fn fixed_claiming(blob_len: u64) -> Vec<u8> {
+    let hdr = b"{";
+    let mut b = super::MAGIC.to_vec();
+    b.extend_from_slice(&1u32.to_le_bytes());
+    b.extend_from_slice(&crc32fast::hash(hdr).to_le_bytes());
+    b.extend_from_slice(&blob_len.to_le_bytes());
+    b.extend_from_slice(hdr);
+    b
+}
+
+#[test]
+fn a_length_that_wraps_the_end_offset_is_damage_not_a_panic() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    planted(&idx, &fixed_claiming(u64::MAX - 5))?;
+    assert!(idx.checkpoint_list()?.items.is_empty());
+    assert!(idx.checkpoint_files("cp-planted00000")?.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_sparse_file_claiming_a_huge_blob_is_refused_before_any_allocation() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let claim = 3u64 << 30;
+    let path = planted(&idx, &fixed_claiming(claim))?;
+    let f = std::fs::OpenOptions::new().write(true).open(&path)?;
+    f.set_len(super::FIXED + 1 + claim)?;
+    drop(f);
+    assert!(idx.checkpoint_list()?.items.is_empty());
+    assert!(idx.checkpoint_files("cp-planted00000")?.is_none());
+    Ok(())
+}
+
+#[test]
+fn a_log_with_too_many_frames_lists_only_the_cap() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let one = frame(Vec::new(), &[])?;
+    planted(&idx, &one.repeat(super::MAX_CHECKPOINTS + 50))?;
+    assert_eq!(idx.checkpoint_list()?.items.len(), super::MAX_CHECKPOINTS);
+    Ok(())
+}
+
+#[test]
+fn a_write_refuses_a_log_it_cannot_read_and_leaves_it_alone() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let mut bytes = frame(Vec::new(), &[])?;
+    bytes.extend_from_slice(&fixed_claiming(u64::MAX));
+    let path = planted(&idx, &bytes)?;
+    let err = idx.checkpoint_add(&[snap("a", "1\n")], "h", false, "", 1 << 20, 2).unwrap_err();
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData);
+    assert_eq!(std::fs::read(&path)?, bytes, "the user's bytes are not rewritten");
+    assert_eq!(idx.checkpoint_list()?.items.len(), 1, "the readable frame still lists");
+    Ok(())
+}
+
+#[test]
+fn copies_that_point_outside_their_blob_read_as_gone() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let z = zstd::bulk::compress(b"hello\n", 3)?;
+    let ok = super::Copy { off: 0, len: z.len() as u64, size: 6, crc: crc32fast::hash(&z) };
+    let wild = |off, len| super::Copy { off, len, ..ok.clone() };
+    let files = vec![
+        file_with(ok.clone()),
+        file_with(wild(u64::MAX, 4)),
+        file_with(wild(2, u64::MAX)),
+        file_with(wild(0, super::MAX_COPY + 1)),
+        file_with(wild(z.len() as u64, 1)),
+    ];
+    planted(&idx, &frame(files, &z)?)?;
+    let got = idx.checkpoint_files("cp-planted00000")?.expect("header sound");
+    let texts: Vec<bool> = got.iter().map(|f| f.text.is_some()).collect();
+    assert_eq!(texts, [true, false, false, false, false]);
+    Ok(())
+}
+
+#[test]
+fn a_copy_that_unpacks_past_its_stated_size_or_the_cap_reads_as_gone() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let big = vec![b'a'; 100_000];
+    let z = zstd::bulk::compress(&big, 3)?;
+    let crc = crc32fast::hash(&z);
+    let len = z.len() as u64;
+    let lies = super::Copy { off: 0, len, size: 10, crc };
+    let huge = super::Copy { off: 0, len, size: super::MAX_COPY + 1, crc };
+    planted(&idx, &frame(vec![file_with(lies), file_with(huge)], &z)?)?;
+    let got = idx.checkpoint_files("cp-planted00000")?.expect("header sound");
+    assert!(got.iter().all(|f| f.text.is_none()));
+    Ok(())
+}
