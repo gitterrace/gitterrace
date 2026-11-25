@@ -11,7 +11,7 @@ mod review_plan;
 mod settings;
 
 pub use page_tables::Pages;
-pub use review_plan::PlanRequest;
+pub use review_plan::{PlanRequest, risk_terms};
 
 use std::path::Path;
 use std::sync::{Arc, Mutex, RwLock};

@@ -57,6 +57,8 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(START, "upgrade", upgrade_md(ws)),
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
+        Out::block(README, "source-line", crate::docs_actions_md::source_line()),
+        Out::block(README, "send-defaults", crate::docs_using_md::send_defaults()),
         Out::block(README, "license", license_md(bin)),
         Out::block(README, "demo", demo_md(ws)),
         Out::block(README, "shots", shots_md()),

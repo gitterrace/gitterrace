@@ -13,7 +13,7 @@ mod insights;
 mod mcp;
 mod wire;
 
-pub use core::{ApiState, Pages, PlanRequest, Rebuild, options_from};
+pub use core::{ApiState, Pages, PlanRequest, Rebuild, options_from, risk_terms};
 pub use endpoints::{ENDPOINTS, Endpoint, generator as schema_generator};
 pub use error::{ApiError, ERROR_CODES, RETRY_AFTER_SECS, SERVER_ERROR_MESSAGE};
 pub use gitterrace_types::api::ParamDoc as Param;

@@ -115,6 +115,24 @@ pub fn entry_keys() -> Vec<(&'static str, String, Vec<String>)> {
     all_chunks().into_iter().map(|c| (c.table, c.id, c.keys)).collect()
 }
 
+/// The starter's send targets and actions that are on out of the box, as `(id, label)`.
+#[must_use]
+pub fn enabled_by_default() -> Vec<(String, String)> {
+    let Ok(value) = toml::from_str::<toml::Table>(Config::STARTER) else {
+        return Vec::new();
+    };
+    ["send", "action"]
+        .iter()
+        .filter_map(|t| value.get(*t).and_then(toml::Value::as_array))
+        .flatten()
+        .filter_map(toml::Value::as_table)
+        .filter(|a| a.get("enabled").and_then(toml::Value::as_bool) != Some(false))
+        .filter_map(|a| {
+            Some((a.get("id")?.as_str()?.to_owned(), a.get("label")?.as_str()?.to_owned()))
+        })
+        .collect()
+}
+
 /// The starter's coding agents: the entries that run `agent.sh`, as `(id, label)`.
 #[must_use]
 pub fn agents() -> Vec<(String, String)> {
@@ -141,7 +159,7 @@ pub fn agents() -> Vec<(String, String)> {
 mod tests {
     use std::collections::BTreeSet;
 
-    use super::{SPECS, Spec, agents, entry_keys, render};
+    use super::{SPECS, Spec, agents, enabled_by_default, entry_keys, render};
     use crate::schema::{ACTION_KEYS, Item, SCRIPT_KEYS, SEND_KEYS};
 
     const DOCS: [(&str, &str); 2] = [
@@ -242,5 +260,11 @@ mod tests {
     fn the_agents_are_the_starter_entries_that_run_agent_sh() {
         let ids: Vec<String> = agents().into_iter().map(|a| a.0).collect();
         assert_eq!(ids, ["claude", "codex", "kiro", "gemini"]);
+    }
+
+    #[test]
+    fn only_mail_is_on_in_the_starter() {
+        let ids: Vec<String> = enabled_by_default().into_iter().map(|a| a.0).collect();
+        assert_eq!(ids, ["mail"]);
     }
 }

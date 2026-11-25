@@ -32,7 +32,7 @@ One server holds all your repositories, each under `/r/<name>/`.
 2. Open `/` for the list.
 3. Press `/` to filter the list, then Enter to open the first match.
 
-Good to know: a folder is searched `multi.depth` levels down (2 by default). It
+Good to know: a folder is searched `multi.depth` levels down. It
 skips hidden folders and `multi.skip_dirs`. `git terrace` in another repository
 joins the running server, and `git terrace remove` takes one off. To keep one
 server running from login (optional), see [Run it as a service](service.md).
@@ -87,15 +87,17 @@ A period is `1w`, `1m`, `3m` or `1y`, counted back from the newest commit.
 <!-- END GENERATED: log-filter -->
 
 Good to know: `|`, parentheses and `committer:` are not supported. Until the
-index is ready, the log stops after the newest 2,000 commits.
+index is ready, the log shows only the newest commits
+(`limits.unindexed_commits`).
 
 ## Jump within a file
 
 1. Open a Markdown file with three or more headings, or a source file.
 2. Use **On this page** to jump to a heading, function, type or method.
 
-Good to know: source outlines work in about 90 languages. In a large file the
-list covers the part already highlighted.
+Good to know: source outlines work in every
+[language](architecture.md#syntax-highlighting) the code view highlights. In a
+large file the list covers the part already highlighted.
 
 ## Checkpoints
 
@@ -132,9 +134,10 @@ them out.
 
 The Working tree and Compare pages open with a **Review order** panel: the
 changed files, riskiest first. Each row links to its diff and has a **Why**
-list with the four terms of its risk (churn, size, ownership, untested) and the
-plain facts behind them. Lockfiles, generated, binary and oversized files are
-under **Not scored**. Press `]` and `[` to walk the diff files in this order.
+list with the terms of its risk ([listed for agents](mcp.md#review-a-change))
+and the plain facts behind them. Lockfiles, generated, binary and oversized
+files are under **Not scored**. Press `]` and `[` to walk the diff files in
+this order.
 The panel is the same plan that `GET /api/v1/review_plan` and the `review_plan`
 tool answer, and it needs the insights index.
 
@@ -142,8 +145,8 @@ tool answer, and it needs the insights index.
 
 The basket collects findings: a line, file, commit or hunk you flagged, each
 with a note of your own. It lives in `.git/gitterrace/findings`, is capped by
-`review.findings_entries` (500 by default, oldest dropped) and is not
-rebuildable: deleting the folder forgets it. `GET /api/v1/findings` and the
+`review.findings_entries` (oldest dropped) and is not rebuildable: deleting
+the folder forgets it. `GET /api/v1/findings` and the
 `list_findings` tool list it, oldest first, and say where the code of each
 finding is now: `untouched`, `lines changed`, `file changed` or `file gone`. A
 status says what happened to the code, never whether the finding was dealt
@@ -189,9 +192,9 @@ and a click opens the file. Case is ignored.
 
 Two ways, and you can use both:
 
-- **Hand it a finding.** Mark lines, press `.` and pick **Ask Claude Code**,
-  **Ask Codex**, **Ask Kiro** or **Ask Gemini**. The agent opens in a terminal
-  in the repository with your note as its first prompt.
+- **Hand it a finding.** Mark lines, press `.` and pick an **Ask** entry,
+  one per [coding agent](actions.md#hand-a-finding-to-an-agent). The agent
+  opens in a terminal in the repository with your note as its first prompt.
   [Hand a finding to an agent](actions.md#hand-a-finding-to-an-agent) switches
   them on.
 - **Let it read the repository.** `git terrace mcp` is a read-only MCP server
@@ -250,12 +253,8 @@ same, with `path` to drill, `author` for one person and `limit`.
 Good to know: Settings is never on a public server or in an export.
 The actions menu (`.`) ends with the running version, small and muted.
 Search works on the Settings page too: it looks through the first
-repository served and stays off with `features.search_enabled = false`.
-`features.settings_enabled = false` removes it. `display.diff_palette = "colorblind"` marks diff additions blue and
-removals orange instead of green and red.
-`display.has_diff_wrap`, `display.diff_tab_chars` and `display.diff_font_px` wrap diff
-lines, set the tab width and the code font size in every diff.
-[Configuration](configuration.md) lists every key.
+repository served. Search, Settings, the diff palette, wrapping, tab width and
+font size each have a key: [Configuration](configuration.md) lists them.
 
 ## Keys
 

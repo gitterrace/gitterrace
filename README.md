@@ -86,9 +86,12 @@ uncommitted changes, or any file, diff or commit. Select the lines, press `.`
 and pick a **Send to** target. The note carries the marked source lines and
 ends with a line agents and scripts can parse:
 
+<!-- BEGIN GENERATED: source-line -->
 ```text
 source: <repo>@<sha>:<path>#L<a>-L<b>
 ```
+
+<!-- END GENERATED: source-line -->
 
 `<sha>` is the full commit id, so the reference holds after more commits.
 Without a target, **Copy as markdown** puts the same note on the clipboard.
@@ -120,8 +123,14 @@ Run your own program on a selection (`line`, `file`, `commit`, `hunk`, `blame`,
 
 <!-- END GENERATED: actions -->
 
-Or send it to a tracker, notes app or mail draft. Mail draft works out of the
-box. `git terrace init` writes `actions.toml` with the other targets, switched
+Or send it to a tracker, notes app or mail draft.
+
+<!-- BEGIN GENERATED: send-defaults -->
+Out of the box only **Mail draft** works.
+
+<!-- END GENERATED: send-defaults -->
+
+`git terrace init` writes `actions.toml` with the other targets, switched
 off until you enable them ([set up](https://gitterrace.dev/docs/actions/)).
 
 gitterrace binds to `127.0.0.1` and never changes your files or history

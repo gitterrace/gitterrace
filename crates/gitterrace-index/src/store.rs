@@ -30,9 +30,10 @@ pub(crate) const VERSION_FILE: &str = "VERSION";
 pub(crate) const LOCK_FILE: &str = "lock";
 pub(crate) const OWNER_FILE: &str = "owner";
 
-/// The files that hold the user's own data and cannot be rebuilt from the repository. A reset
-/// of any kind (a format change, an unreadable manifest, a hash collision, a rebuild) spares
-/// them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test checks
+/// The files that hold the user's own data, which no rebuild can recreate.
+///
+/// A reset of any kind (a format change, an unreadable manifest, a hash collision, a rebuild)
+/// spares them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test checks
 /// both lists agree.
 pub(crate) const USER_FILES: [&str; 3] =
     [crate::checkpoints::FILE, crate::viewed::FILE, crate::findings::FILE];

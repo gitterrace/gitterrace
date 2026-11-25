@@ -119,6 +119,7 @@ All notable changes are listed here. The format follows
 - browser: share the per-browser loop, the luminance and the stats page list
 - dev: one usage branch in the run scripts' argument parser
 - web: move the screen fixes to screens.css and wrap the new lines
+- xtask: split the docs generator into one module per page
 
 ### Fixed
 
@@ -155,6 +156,9 @@ All notable changes are listed here. The format follows
 - web: tighten the page head, order headings and share the header brand
 - web: touch targets, focus rings inside scrollers and sizes on the tokens
 - web: the page key handlers for b, dot and slash read the shortcuts switch
+- web: close the page head 16px below the tagline again
+- site: refuse a partial raw shot set before replacing the screenshots
+- deps: keep the unmaintained advisory scope on the whole graph
 
 ### Performance
 

@@ -25,6 +25,21 @@ const SOLE_POINTS: u32 = 25;
 const BUS_ONE_POINTS: u32 = 12;
 /// Points of the untested term.
 const UNTESTED_POINTS: u32 = 20;
+
+/// The terms of `risk` with what each earns, for the docs: `(name, rule)`.
+#[must_use]
+pub fn risk_terms() -> [(&'static str, String); 4] {
+    [
+        ("churn", format!("up to {CHURN_POINTS}, the hotspot rank")),
+        ("size", format!("up to {SIZE_POINTS}, changed lines against `limits.diff_fold_lines`")),
+        (
+            "ownership",
+            format!("{SOLE_POINTS} for a sole owner, {BUS_ONE_POINTS} for a bus factor of one"),
+        ),
+        ("untested", format!("{UNTESTED_POINTS} for a source file with no test beside it")),
+    ]
+}
+
 /// Folders whose files are tests themselves.
 const TEST_DIRS: [&str; 4] = ["test", "tests", "__tests__", "spec"];
 

@@ -26,21 +26,42 @@ history and find risky code. It needs the
    branches split, like a pull request. For uncommitted work leave `source`
    at `worktree`, which a public server refuses.
 2. Read the order. The files come riskiest first. `risk` runs from 0 to 100
-   and is the sum of `terms`: `churn` (up to 30, the hotspot rank), `size`
-   (up to 25, changed lines against `limits.diff_fold_lines`), `ownership`
-   (25 for a sole owner, 12 for a bus factor of one) and `untested` (20 for a
-   source file with no test beside it). Lockfiles, generated and binary files
-   sit in `skipped`, unscored. If `truncated` is true, narrow with `limit` or
-   `query`. `review.plan_files` caps the list and `review.test_siblings`
-   says what a test beside a file looks like.
+   and is the sum of `terms`, listed after
+   the steps. Lockfiles, generated and binary files sit in `skipped`,
+   unscored. If `truncated` is true, narrow with `limit` or `query`.
+   `review.plan_files` caps the list and `review.test_siblings` says what a
+   test beside a file looks like.
 3. For the top files call `compare` or `worktree_diff` and `read_file` to
    read the change, and `blame` on the touched lines to see who holds them.
 4. Report each risk with the evidence from the tools: hotspot rank, owners
    and a missing test.
 
-The server also offers the `review_change` prompt (`base`, `head`, `repo`,
-`worktree`, `findings`), which holds the same steps. With `findings` it also lists
-the user's review basket (`list_findings`), notes quoted as data.
+<!-- BEGIN GENERATED: risk-terms -->
+| Term | Points |
+| --- | --- |
+| `churn` | up to 30, the hotspot rank |
+| `size` | up to 25, changed lines against `limits.diff_fold_lines` |
+| `ownership` | 25 for a sole owner, 12 for a bus factor of one |
+| `untested` | 20 for a source file with no test beside it |
+
+<!-- END GENERATED: risk-terms -->
+
+The server also offers the `review_change` prompt, which holds the same steps
+and takes these arguments:
+
+<!-- BEGIN GENERATED: prompt-args -->
+| Argument | Meaning |
+| --- | --- |
+| `base` | Revision to review from. With `head`, reviews what head changed since base. |
+| `findings` | True adds the user's review basket (the notes they collected) to the recipe. |
+| `head` | Revision to review to. Defaults to HEAD. |
+| `repo` | Repository name from `list_repos`. Required when more than one is in scope. |
+| `worktree` | True reviews the uncommitted working tree instead of two revisions. |
+
+<!-- END GENERATED: prompt-args -->
+
+With `findings` it also lists the user's review basket (`list_findings`),
+notes quoted as data.
 
 ## Explore history
 

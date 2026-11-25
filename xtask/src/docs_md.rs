@@ -19,6 +19,7 @@ const ACTIONS: &str = "docs/actions.md";
 const LANDING: &str = "docs/landing.md";
 const ARCH: &str = "docs/architecture.md";
 const BENCH: &str = "docs/benchmarks.md";
+const MCP: &str = "docs/mcp.md";
 const USING: &str = "docs/using.md";
 
 pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out>> {
@@ -53,6 +54,8 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(BENCH, "corpus", bench::bench_report(root, "--corpus")?),
         Out::block(BENCH, "results", bench::bench_report(root, "--print")?),
         Out::block(USING, "log-filter", using::log_filter()),
+        Out::block(MCP, "risk-terms", using::risk_terms()),
+        Out::block(MCP, "prompt-args", using::prompt_args()),
     ])
 }
 
