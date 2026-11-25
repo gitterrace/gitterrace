@@ -35,15 +35,27 @@ fn peak(files: usize) -> u64 {
         format!("{base}/api/v1/insights/knowledge_risk?period=all&author={who}"),
     ];
     // The first read builds the shared tables; the measured one is the second, as another key.
-    for p in shown.iter().chain(&pages) {
-        assert_eq!(s.get(&format!("{p}&bots=0")).0, 200, "{p}");
-    }
+    // An idle release between the two (a slow runner) makes the measured read rebuild them,
+    // which is not this request's cost: warm again and measure again.
     let mut top = 0;
     for p in &pages {
-        let before = s.heap();
-        s.reset_peak();
-        assert_eq!(s.get(p).0, 200, "{p}");
-        let over = s.heap_peak().saturating_sub(before);
+        let mut tries = 0;
+        let over = loop {
+            let released = s.releases(&base);
+            for w in shown.iter().chain(&pages) {
+                assert_eq!(s.get(&format!("{w}&bots=0")).0, 200, "{w}");
+            }
+            let before = s.heap();
+            s.reset_peak();
+            assert_eq!(s.get(p).0, 200, "{p}");
+            let over = s.heap_peak().saturating_sub(before);
+            tries += 1;
+            if s.releases(&base) == released || tries == 3 {
+                break over;
+            }
+            writeln!(std::io::stderr(), "{files} files: {p}: released mid-read, again")
+                .expect("stderr");
+        };
         writeln!(std::io::stderr(), "{files} files: {p}: {} KB", over / 1024).expect("stderr");
         top = top.max(over);
     }

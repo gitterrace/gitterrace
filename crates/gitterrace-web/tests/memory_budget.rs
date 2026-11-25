@@ -184,11 +184,15 @@ impl Server {
             .expect("/ forwards to the repository")
     }
 
+    /// Waits until the repository is ready: indexed and warmed. `/stats` serves while the
+    /// warm-up still runs, and the warm-up's allocations would count toward the next read.
     fn wait_ready(&self, base: &str) {
         let end = Instant::now() + Duration::from_secs(3600);
         loop {
-            let (_, body) = self.get(&format!("{base}/stats"));
-            if !body.contains("data-progress") {
+            let (_, body) = self.get(&format!("{base}/api/progress"));
+            let json = body.split("\r\n\r\n").nth(1).unwrap_or_default();
+            let v: serde_json::Value = serde_json::from_str(json.trim()).expect("progress json");
+            if v.get("ready").and_then(serde_json::Value::as_bool).expect("progress has ready") {
                 return;
             }
             assert!(Instant::now() < end, "index never became ready");
