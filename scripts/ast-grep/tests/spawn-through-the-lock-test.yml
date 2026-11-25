@@ -1,0 +1,11 @@
+id: spawn-through-the-lock
+valid:
+  - 'fn f() { spawn_locked(&mut cmd)?; }'
+  - 'fn f() { let s = res.status(); }'
+  - 'fn f() { std::thread::Builder::new().spawn(move || {}); }'
+  - 'mod tests { fn f() { Command::new("sh").spawn(); } }'
+  - 'pub(crate) mod actions_tests { fn f() { Command::new("sh").status(); } }'
+invalid:
+  - 'fn f() { let c = cmd.spawn()?; }'
+  - 'fn f() { let o = Command::new("sysctl").args(["-n"]).output(); }'
+  - 'fn f() { let ok = std::process::Command::new("x").status(); }'

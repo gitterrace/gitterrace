@@ -11,6 +11,7 @@ pub mod config;
 pub mod git;
 pub mod home;
 pub mod markup;
+pub mod spawn;
 
 #[cfg(test)]
 mod registry_tests;

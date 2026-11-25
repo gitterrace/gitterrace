@@ -1,0 +1,40 @@
+id: spawn-through-the-lock
+language: rust
+severity: error
+message: Starts a child process without the process-wide spawn lock.
+note: >-
+  Use `gitterrace_types::spawn::{spawn_locked, output_locked, status_locked}`. On macOS a fork
+  between std's pipe creation and its close-on-exec hands that pipe end to the other child, and
+  an action's script then waits for an EOF only the other child's exit brings. The server
+  spawns actions, the index child and sysctl from threads of one process, so all go through
+  the one lock. The CLI-only files are exempt because the `gitterrace` binary runs one
+  subcommand per process: `handler`, `service`, `open` and `launch` never run inside `serve`
+  (main.rs matches on the command, and `serve` calls only `open::join_running`, which makes
+  an HTTP request). The web and api crates do not depend on the binary crate.
+  The rule sees a receiver by its text: `Command...` chains and a variable named `cmd`.
+files: [crates/**/*.rs]
+ignores:
+  - crates/gitterrace-types/src/spawn.rs
+  - crates/gitterrace-testkit/**
+  - crates/*/tests/**
+  - crates/**/tests.rs
+  - crates/**/*_tests.rs
+  # Build-time stamping, never part of a server.
+  - crates/gitterrace/build.rs
+  - crates/gitterrace/stamp.rs
+  - crates/gitterrace/src/handler.rs
+  - crates/gitterrace/src/service.rs
+  - crates/gitterrace/src/open.rs
+rule:
+  any:
+    - all:
+        - any:
+            - pattern: $C.spawn()
+            - pattern: $C.output()
+            - pattern: $C.status()
+        - regex: '^(std::process::|process::)?(Command|cmd)\b'
+    # Macro bodies are bare tokens, invisible to the patterns above.
+    - kind: token_tree
+      inside: {stopBy: end, any: [{kind: macro_invocation}, {kind: macro_definition}]}
+      regex: '(Command::new|\bcmd)\b[^;]*\.(spawn|output|status)\s*\(\s*\)'
+  not: {inside: {stopBy: end, kind: mod_item, regex: '^(pub(\(crate\))? )?mod \w*tests'}}

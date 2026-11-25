@@ -239,6 +239,8 @@ async fn run_route_security_table() {
     // Each nap marks itself started and runs until released, so all four hold a slot now. A
     // nap that answers before the release did not run (refused, or its spawn failed under load):
     // the wait ends there and names its answer instead of running out the deadline.
+    // Written on every exit, a failed assert included, so no nap outlives the test.
+    let release = Release(cfg.path().join("release"));
     let up = |id: &str| cfg.path().join(format!("{id}.up")).exists();
     let settled = || async {
         ["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id))
@@ -247,12 +249,13 @@ async fn run_route_security_table() {
     gitterrace_testkit::wait::within(gitterrace_testkit::wait::deadline(), settled).await;
     if let Some(i) = runs.iter().position(tokio::task::JoinHandle::is_finished) {
         let (s, res) = runs.swap_remove(i).await.expect("join");
-        std::fs::write(cfg.path().join("release"), "").expect("release");
         panic!("nap run {} answered {s} before the release: {res}", i + 1);
     }
-    assert!(["nap1", "nap2", "nap3", "nap4"].iter().all(|id| up(id)), "four runs started");
+    let missing: Vec<_> =
+        ["nap1", "nap2", "nap3", "nap4"].into_iter().filter(|id| !up(id)).collect();
+    assert!(missing.is_empty(), "four runs started, never came up: {missing:?}");
     let (s, res) = send(&on, Req::ok(&tok, body("echo", "page", ""))).await;
-    std::fs::write(cfg.path().join("release"), "").expect("release");
+    drop(release);
     assert_eq!(s, 429, "5th concurrent: {res}");
     for r in runs {
         assert_eq!(r.await.expect("join").0, 200);
@@ -280,6 +283,17 @@ async fn run_route_security_table() {
     write_config(gw.path(), ECHO, 0o620);
     let r = router(&repo, Some(gw.path()), None);
     assert_eq!(send(&r, Req::ok("x", body("echo", "page", ""))).await.0, 404, "group writable");
+}
+
+/// Lets the naps go when dropped.
+struct Release(std::path::PathBuf);
+
+impl Drop for Release {
+    fn drop(&mut self) {
+        if std::fs::write(&self.0, "").is_err() {
+            // The folder is gone with the test; the naps went with it.
+        }
+    }
 }
 
 /// Repo content shows up escaped on every page that carries the action menu.

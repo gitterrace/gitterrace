@@ -1,4 +1,5 @@
 use std::path::Path;
+use std::sync::{Arc, Barrier};
 use std::time::{Duration, Instant};
 
 use gitterrace_git::Repo;
@@ -491,4 +492,64 @@ fn a_script_that_ignores_a_large_stdin_still_finishes() {
     let r = Runner::new(Limits::default()).run(&a, &p, &repo.root()).expect("run");
     assert!(r.ok && r.first_line == "done", "{r:?}");
     assert!(began.elapsed() < Duration::from_secs(5));
+}
+
+/// Runs started together, and a long-lived child spawned beside them, each see their own stdin
+/// end: a pipe end that leaked into another child would hold a script's `cat` open until that
+/// child exited, and a sibling waits on the first. Red on macOS when spawns overlap without
+/// the process-wide lock.
+#[test]
+fn concurrent_runs_never_share_a_stdin_pipe() {
+    let (t, repo) = fixture();
+    let p = payload(&repo, Kind::Commit);
+    for round in 0..40 {
+        let dir = t.path().join(format!("round{round}"));
+        std::fs::create_dir(&dir).expect("dir");
+        let runner = Arc::new(Runner::new(Limits::default()));
+        let gate = Arc::new(Barrier::new(5));
+        let runs: Vec<_> = (1..=4)
+            .map(|n| {
+                let (runner, gate, p, root, dir) =
+                    (runner.clone(), gate.clone(), p.clone(), repo.root(), dir.clone());
+                let script = format!(
+                    "cat >/dev/null; touch {d}/{n}.up; \
+                     while [ ! -e {d}/release ]; do sleep 0.02; done",
+                    d = dir.display()
+                );
+                let a = shell(&format!("nap{n}"), &script, Duration::from_secs(20));
+                std::thread::spawn(move || {
+                    gate.wait();
+                    runner.run(&a, &p, &root)
+                })
+            })
+            .collect();
+        // A long-lived child with a piped stdin, as the server's index child is, spawned as the
+        // runs start: a pipe end it inherited would hold a nap's `cat` open until it ends.
+        let bystander = {
+            std::thread::spawn(move || {
+                gate.wait();
+                (0..8)
+                    .map(|_| {
+                        let mut cmd = std::process::Command::new("sleep");
+                        cmd.arg("60").stdin(std::process::Stdio::piped());
+                        gitterrace_types::spawn::spawn_locked(&mut cmd).expect("sleep")
+                    })
+                    .collect::<Vec<_>>()
+            })
+        };
+        let missing =
+            || -> Vec<u32> { (1..=4).filter(|n| !dir.join(format!("{n}.up")).exists()).collect() };
+        gitterrace_testkit::wait::until_blocking("every run reads its stdin to the end", || {
+            missing().is_empty() || runs.iter().any(std::thread::JoinHandle::is_finished)
+        });
+        let stuck = missing();
+        for mut kid in bystander.join().expect("join") {
+            kid.kill().expect("kill");
+            kid.wait().expect("wait");
+        }
+        std::fs::write(dir.join("release"), "").expect("release");
+        let done: Vec<_> = runs.into_iter().map(|r| r.join().expect("join")).collect();
+        assert!(stuck.is_empty(), "round {round}: naps {stuck:?} never read their stdin to EOF");
+        assert!(done.iter().all(|r| r.as_ref().is_ok_and(|o| o.ok)), "{done:?}");
+    }
 }

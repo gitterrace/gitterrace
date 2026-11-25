@@ -181,7 +181,8 @@ impl Runner {
         // Vars first, payload last: even a colliding name could not replace a payload value.
         cmd.envs(payload.var_env());
         cmd.envs(payload.env());
-        let child = cmd.spawn().map_err(|e| RunError::Spawn(action.argv[0].clone(), e))?;
+        let child = gitterrace_types::spawn::spawn_locked(&mut cmd)
+            .map_err(|e| RunError::Spawn(action.argv[0].clone(), e))?;
         Ok(supervise(child, stdin, action.timeout, self.limits.output_bytes))
     }
 
@@ -410,7 +411,7 @@ fn signal_group(pid: Group, sig: Sig) {
         .stdin(Stdio::null())
         .stdout(Stdio::null())
         .stderr(Stdio::null());
-    if cmd.status().is_err() {
+    if gitterrace_types::spawn::status_locked(&mut cmd).is_err() {
         // taskkill missing or the tree already gone.
     }
 }

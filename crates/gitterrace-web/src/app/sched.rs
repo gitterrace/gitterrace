@@ -213,7 +213,10 @@ fn system_load() -> Option<u32> {
         return Some(fixed);
     }
     let text = std::fs::read_to_string("/proc/loadavg").ok().or_else(|| {
-        let out = std::process::Command::new("sysctl").args(["-n", "vm.loadavg"]).output().ok()?;
+        let out = gitterrace_types::spawn::output_locked(
+            std::process::Command::new("sysctl").args(["-n", "vm.loadavg"]),
+        )
+        .ok()?;
         String::from_utf8(out.stdout).ok()
     })?;
     let one: f64 = text.trim_start_matches(['{', ' ']).split_whitespace().next()?.parse().ok()?;

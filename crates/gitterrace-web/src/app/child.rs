@@ -178,7 +178,7 @@ pub(crate) fn update(app: &App, rev: &str) -> io::Result<()> {
         if app.index.halted() {
             return Err(halted());
         }
-        let mut child = cmd.spawn()?;
+        let mut child = gitterrace_types::spawn::spawn_locked(&mut cmd)?;
         // The stdin goes to the thread that forwards budgets, which ends with the lease. It
         // closes with the child or with this process, which is what stops a child whose
         // server died.
