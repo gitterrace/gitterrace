@@ -21,7 +21,7 @@ pub const RISK_LIMIT: usize = 50;
 pub const RISK_MAX_LIMIT: usize = 500;
 /// Head files read per visit of the touches.
 /// Not configurable: it bounds the per-file maps held at once, the answer is the same.
-const RISK_CHUNK: usize = 4096;
+const RISK_CHUNK: usize = 2048;
 /// A person with at least this share of a file's changes counts as one of its main authors.
 /// Not configurable: it defines an orphan, so a setting would change the numbers.
 const MAIN_SHARE: f64 = 0.1;
@@ -218,17 +218,21 @@ impl Insights<'_> {
         };
         let m = c.scope().matcher();
         // The person block reads the whole tree; the directories and orphans only the subtree.
-        let scan: Vec<&HeadFile> = files
+        let mut scan = files
             .iter()
             .filter(|f| f.lines != 0 && m.row(&f.path) && !self.skips_head(&f.path))
             .filter(|f| who.is_some() || ask.prefix.is_none_or(|x| f.path.starts_with(x)))
-            .collect();
+            .peekable();
         let s = c.scope();
         let whole = s.period() == Period::All && s.range().is_none() && s.matcher().is_empty();
-        let chunk = if self.source().has_tip() { RISK_CHUNK } else { usize::MAX };
+        let chunk = if self.source().has_tip() { RISK_CHUNK } else { files.len().max(1) };
         let mut got = Scan::new(q.limit.min(RISK_MAX_LIMIT));
-        for part in scan.chunks(chunk.min(scan.len().max(1))) {
-            for (file, held) in part.iter().zip(self.owner_lines(part, c, whole)) {
+        // One chunk of the tree is held at a time, never a list of the whole of it.
+        let mut part: Vec<&HeadFile> = Vec::with_capacity(chunk.min(files.len()));
+        while scan.peek().is_some() {
+            part.clear();
+            part.extend(scan.by_ref().take(chunk));
+            for (file, held) in part.iter().zip(self.owner_lines(&part, c, whole)) {
                 self.take(&mut got, &ask, file, &held);
             }
         }

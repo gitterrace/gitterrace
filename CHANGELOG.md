@@ -182,6 +182,7 @@ All notable changes are listed here. The format follows
 - xtask: read the cargo metadata once per run
 - git: keep byte budget free for the items near the head of the stream
 - web: cut one element per file from diff headers and file rows
+- index: hold one chunk of the tree per knowledge risk read
 
 ## [0.2.0] - 2026-11-21
 

@@ -8,9 +8,11 @@ use crate::{Server, apply_and_assert_allocator, serve_if_child};
 
 /// Most that a knowledge risk request may add to the live heap at the wide tree over the same
 /// request at the narrow one: its heaps hold `limit` rows and its directory table holds
-/// people, so only the 4096-file chunk it reads grows. Measured on an M1 Max: 0 KB at 1k
-/// files and 1.4 MB at 50k. A map kept per file would add 12 MB or more at 50k files.
-const REQUEST_GROWTH_KB: u64 = 3072;
+/// people, so only the 2048-file chunk it reads grows. With a 4096-file chunk and the
+/// filtered tree collected first, it was 1.4 MB at 50k files on an M1 Max and 3.1 MB on
+/// ubuntu CI. Now 0.5 MB on the M1 Max. A map kept per file would add 12 MB or more at
+/// 50k files.
+const REQUEST_GROWTH_KB: u64 = 1536;
 
 /// The section, the person page and the two API answers, read once each and, for the API ones,
 /// measured over a warm idle: the highest live heap they reach above it. The pages carry the
