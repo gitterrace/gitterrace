@@ -7,6 +7,10 @@ All notable changes are listed here. The format follows
 <!-- BEGIN GENERATED: unreleased -->
 ## [Unreleased]
 
+### Fixed
+
+- release: show gitterrace at its release in the demo
+
 ### Performance
 
 - index: build the per-rank person table once per request

@@ -199,6 +199,17 @@ mod tests {
         assert_eq!(ws.demo_repos, pinned, "Cargo.toml demo repos vs scripts/lib/corpus-lib.mjs");
     }
 
+    /// The demo shows gitterrace at the release it runs: a version bump that leaves the pin
+    /// behind serves the old tree under the new binary.
+    #[test]
+    fn demo_pins_gitterrace_at_the_workspace_version() {
+        let ws = load(root()).expect("cargo metadata");
+        let own = ws.demo_repos.iter().find(|(name, _)| name == "gitterrace");
+        let tag = own.map(|(_, tag)| tag.as_str()).expect("the demo shows gitterrace");
+        let version = &ws.packages.get("gitterrace").expect("the gitterrace package").version;
+        assert_eq!(tag, format!("v{version}"), "move the demo pin with the version bump");
+    }
+
     /// The demo's Cloudflare route serves the URL the README and the site link.
     #[test]
     fn demo_config_routes_the_metadata_url() {

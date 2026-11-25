@@ -25,7 +25,7 @@ read the same data over the [JSON API and the MCP server](https://gitterrace.dev
 
 <!-- BEGIN GENERATED: demo -->
 Try it without installing: [the live demo](https://demo.gitterrace.dev): jq
-1.8.2, ripgrep 15.2.0 and gitterrace v0.2.0, exported.
+1.8.2, ripgrep 15.2.0 and gitterrace v0.2.1, exported.
 
 [The screenshots](docs/screenshots/) show the open source projects
 [jq](https://github.com/jqlang/jq/tree/jq-1.8.2) and

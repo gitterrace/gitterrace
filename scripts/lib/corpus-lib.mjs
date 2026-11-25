@@ -28,7 +28,7 @@ export const PINS = {
   // resolves it. Each release moves this pin and the Cargo.toml demo entry to the new tag.
   gitterrace: {
     url: 'https://github.com/gitterrace/gitterrace',
-    tag: 'v0.2.0',
+    tag: 'v0.2.1',
   },
 };
 
