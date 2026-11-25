@@ -56,6 +56,10 @@ gate = [
   # release check's on a tag: seconds, no build.
   "make deny",
 ]
+# Gate commands land.sh never takes from its cache: the advisory database moves without the tree
+# moving. A gate that names one is never cached. scripts/lint/land-cache-check.py holds every
+# deny gate command to this list, and every release path that calls land.sh to `--no-cache`.
+fresh = ["make deny"]
 # The landing runs in a fresh clone, which has no core.hooksPath yet: set it there first. The
 # dates of the landed commits are read by the shared commit-dates lint.
 messages = """git config core.hooksPath scripts/hooks \

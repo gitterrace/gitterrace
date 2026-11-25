@@ -159,6 +159,8 @@ steps = [
   "site-installer-test|python3|install python3|python3 scripts/release/site/site-check.py --self-test",
   "gate|python3|install python 3.11|$PY scripts/lint/gate-check.py",
   "gate-test|python3|install python 3.11|$PY scripts/lint/gate-check.py --self-test",
+  "land-cache|python3|install python 3.11|$PY scripts/lint/land-cache-check.py",
+  "land-cache-test|python3|install python 3.11|$PY scripts/lint/land-cache-check.py --self-test",
   "py-steps|python3|install python3|python3 scripts/lint/py-check.py",
   "py-steps-test|python3|install python3|python3 scripts/lint/py-check.py --self-test",
   "ci-inject|python3|install python3|python3 scripts/lint/inject-check.py",
