@@ -81,18 +81,26 @@ pub struct CheckpointList {
     pub bytes_used: u64,
 }
 
+/// One checkpoint read back: where HEAD was and what the working tree held that differed from it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Checkpoint {
+    pub head: String,
+    pub files: Vec<SnapFile>,
+}
+
 /// A frame found in the log and where its blobs start.
 struct Frame {
     meta: Meta,
     blob_at: u64,
 }
 
-/// The id of a state: `cp-` and 12 hex of the git blob id of its manifest (paths and content
-/// hashes), so an identical state is the same checkpoint.
-fn id_of(files: &[SnapFile]) -> String {
+/// The id of a state: `cp-` and 12 hex of the git blob id of its HEAD and manifest (paths and
+/// content hashes). The same files at another HEAD are another state: the files a checkpoint
+/// does not list read as HEAD then.
+fn id_of(files: &[SnapFile], head: &str) -> String {
     let mut rows: Vec<String> = files.iter().map(|f| format!("{}\0{}\n", f.path, f.hash)).collect();
     rows.sort();
-    let id = content_id(rows.concat().as_bytes());
+    let id = content_id(format!("{head}\n{}", rows.concat()).as_bytes());
     format!("cp-{}", &id[..12])
 }
 
@@ -254,7 +262,7 @@ fn build(
         metas.push(FileMeta { path: f.path.clone(), hash: f.hash.clone(), copy });
     }
     let meta = Meta {
-        id: id_of(files),
+        id: id_of(files, head),
         created,
         head: head.to_owned(),
         auto,
@@ -314,7 +322,8 @@ fn fit(frame: (Meta, Vec<u8>), cap: u64) -> io::Result<Vec<u8>> {
 
 impl Index {
     /// Records `files` as a checkpoint at `now` and returns its id and whether it is new. The
-    /// same state again returns the existing id. Copies past `cap_bytes` drop oldest first.
+    /// same state as the newest checkpoint returns its id; one that matches only an older
+    /// checkpoint is recorded again, and the id then names the newest of them. Copies past `cap_bytes` drop oldest first.
     ///
     /// # Errors
     /// When the cache cannot be written: a newer build owns it, or the disk refuses.
@@ -347,8 +356,11 @@ impl Index {
             }
             None => (None, 0),
         };
-        let id = id_of(files);
-        if frames.as_ref().is_some_and(|(_, fr)| fr.iter().any(|x| x.meta.id == id)) {
+        let id = id_of(files, head);
+        // Only the newest frame stands for "nothing changed since the last checkpoint". A state
+        // that matches an older frame (A, then B, then A again) is a new checkpoint, so the
+        // newest one is always the state the user last saved, whatever the cap dropped.
+        if frames.as_ref().and_then(|(_, fr)| fr.last()).is_some_and(|x| x.meta.id == id) {
             return Ok((id, false));
         }
         let (meta, blobs) = build(files, head, auto, label, now, cap_bytes)?;
@@ -405,11 +417,20 @@ impl Index {
     /// # Errors
     /// When the file cannot be read.
     pub fn checkpoint_files(&self, id: &str) -> io::Result<Option<Vec<SnapFile>>> {
+        Ok(self.checkpoint(id)?.map(|c| c.files))
+    }
+
+    /// Checkpoint `id`: the HEAD it was taken at and its files with their copies, `None` for an
+    /// unknown id. When a state was taken twice the newest frame answers.
+    ///
+    /// # Errors
+    /// When the file cannot be read.
+    pub fn checkpoint(&self, id: &str) -> io::Result<Option<Checkpoint>> {
         let Some(mut f) = cache::open_read(self.dir(), FILE)? else {
             return Ok(None);
         };
         let frames = scan(&mut f)?.frames;
-        let Some(fr) = frames.iter().find(|x| x.meta.id == id) else {
+        let Some(fr) = frames.iter().rev().find(|x| x.meta.id == id) else {
             return Ok(None);
         };
         let mut left = MAX_RESTORE;
@@ -427,7 +448,7 @@ impl Index {
             };
             files.push(SnapFile { path: m.path.clone(), hash: m.hash.clone(), text });
         }
-        Ok(Some(files))
+        Ok(Some(Checkpoint { head: fr.meta.head.clone(), files }))
     }
 }
 

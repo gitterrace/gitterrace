@@ -82,12 +82,14 @@ impl ApiState {
         let (list, since_part) = self.worktree_list(scope, since)?;
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
+        let baseline_missing = since_part.as_ref().is_some_and(|(_, d)| d.baseline_missing);
         let (since, unchanged_files, content_gone) = since_part
             .map_or((None, None, Vec::new()), |(id, d)| {
                 (Some(id), Some(d.unchanged as u64), d.gone)
             });
         Ok(WorktreeResponse {
             additions,
+            baseline_missing,
             content_gone,
             deletions,
             files,
@@ -126,11 +128,11 @@ impl ApiState {
                         "since compares the whole working tree: use scope `all`".to_owned(),
                     ));
                 }
-                let before = self
+                let cp = self
                     .index
-                    .checkpoint_files(id)?
+                    .checkpoint(id)?
                     .ok_or_else(|| ApiError::CheckpointNotFound(id.to_owned()))?;
-                let d = gitterrace_git::worktree_diff_since(&self.repo, &before)?;
+                let d = gitterrace_git::worktree_diff_since(&self.repo, &cp.files, &cp.head)?;
                 (d.files.clone(), Some((id.to_owned(), d)))
             }
         };

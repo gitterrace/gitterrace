@@ -36,6 +36,10 @@ pub struct SinceDiff {
     pub unchanged: usize,
     /// Files whose checkpoint copy is gone (binary, too large, dropped): diffed against HEAD.
     pub gone: Vec<String>,
+    /// The commit the checkpoint was taken at is not in this repository (a reset, a gc, a
+    /// different clone), so the files it did not list were compared with the current HEAD
+    /// instead. The comparison may then miss changes the commits in between made.
+    pub baseline_missing: bool,
 }
 
 /// The git blob id of `bytes` as hex. Hashed as SHA-1 whatever the repository uses, so an id
@@ -82,22 +86,67 @@ pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Res
     Ok(out)
 }
 
-/// The working tree against a checkpoint: only files whose content differs are listed.
+/// The tree of commit `hex`: the empty tree for an empty id (the checkpoint was taken before
+/// the first commit), `None` when the commit is not here.
+fn baseline_tree<'r>(r: &'r gix::Repository, hex: &str) -> Option<gix::Tree<'r>> {
+    if hex.is_empty() {
+        return Some(r.empty_tree());
+    }
+    let id = gix::ObjectId::from_hex(hex.as_bytes()).ok()?;
+    r.find_commit(id).ok()?.tree().ok()
+}
+
+/// The paths that differ between two trees, both sides of a rename.
+fn tree_paths(r: &gix::Repository, old: &gix::Tree<'_>, new: &gix::Tree<'_>) -> Vec<String> {
+    use gix::bstr::ByteSlice;
+    use gix::object::tree::diff::ChangeDetached as C;
+
+    let Ok(mut cache) = crate::diff::resource_cache(r) else {
+        return Vec::new();
+    };
+    let exact = gix::diff::Rewrites { percentage: None, limit: 0, ..Default::default() };
+    let Ok(changes) = crate::diff::tree_changes(r, Some(old), new, &mut cache, exact) else {
+        return Vec::new();
+    };
+    let mut out = Vec::new();
+    for c in &changes {
+        if let C::Rewrite { source_location, .. } = c {
+            out.push(source_location.to_str_lossy().into_owned());
+        }
+        out.push(c.location().to_str_lossy().into_owned());
+    }
+    out
+}
+
+/// The working tree against a checkpoint taken at `base_head`: only files whose content differs
+/// are listed.
 ///
-/// A file the checkpoint did not list was equal to HEAD then, so it is diffed against HEAD. A
-/// file whose copy is gone is diffed against HEAD too and named in `gone`.
-pub fn worktree_diff_since(repo: &Repo, before: &[SnapFile]) -> Result<SinceDiff> {
+/// A file the checkpoint did not list was equal to `base_head` then, so it is diffed against
+/// that commit, and the files the commits since changed are walked too: a file committed after
+/// the checkpoint still differs from what it was. A file whose copy is gone is diffed against
+/// the current HEAD and named in `gone`.
+pub fn worktree_diff_since(repo: &Repo, before: &[SnapFile], base_head: &str) -> Result<SinceDiff> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    let paths = scoped_paths(&r, Scope::All, repo.worktree_files())?;
+    let mut paths: BTreeSet<String> = scoped_paths(&r, Scope::All, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let mut out = SinceDiff::default();
+    let base = baseline_tree(&r, base_head);
+    out.baseline_missing = base.is_none();
+    if let Some(base) = &base {
+        let now = head.clone().unwrap_or_else(|| r.empty_tree());
+        paths.extend(tree_paths(&r, base, &now));
+    }
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
     let known: BTreeMap<&str, &SnapFile> = before.iter().map(|f| (f.path.as_str(), f)).collect();
     let all: BTreeSet<&str> =
         paths.iter().map(String::as_str).chain(known.keys().copied()).collect();
     let from_head =
         |path: &str| head.as_ref().map_or(Read::Missing, |t| head_blob(&r, t, path, big));
-    let mut out = SinceDiff::default();
+    let from_base = |path: &str| match &base {
+        Some(t) => head_blob(&r, t, path, big),
+        None => from_head(path),
+    };
     for path in all {
         if !is_plain(path) {
             continue;
@@ -115,7 +164,7 @@ pub fn worktree_diff_since(repo: &Repo, before: &[SnapFile]) -> Result<SinceDiff
                     (from_head(path), true)
                 }
             },
-            None => (from_head(path), false),
+            None => (from_base(path), false),
         };
         if gone {
             out.gone.push(path.to_owned());

@@ -30,7 +30,7 @@ use std::path::PathBuf;
 use gitterrace_git::Repo;
 
 /// Re-exported so the cards crate shares the one date rules without a new dependency.
-pub use checkpoints::{CheckpointInfo, CheckpointList};
+pub use checkpoints::{Checkpoint, CheckpointInfo, CheckpointList};
 pub use conventional::parse_subject;
 pub use findings::{MAX_NOTE, StoredFinding, cut_note};
 pub use gitterrace_git::{civil_from_days, days_from_civil};

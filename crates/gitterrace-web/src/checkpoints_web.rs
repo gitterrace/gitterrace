@@ -46,6 +46,8 @@ struct Since {
     unchanged: Vec<String>,
     /// Files whose copy was not kept: they show against HEAD.
     gone: usize,
+    /// The checkpoint's HEAD is not in the repository: the comparison may miss commits.
+    baseline_missing: bool,
 }
 
 fn missing(id: &str) -> Error {
@@ -55,8 +57,8 @@ fn missing(id: &str) -> Error {
 }
 
 fn since_diff(a: &App, id: &str) -> Result<SinceDiff> {
-    let before = a.index.checkpoint_files(id)?.ok_or_else(|| missing(id))?;
-    Ok(gitterrace_git::worktree_diff_since(&a.repo, &before)?)
+    let cp = a.index.checkpoint(id)?.ok_or_else(|| missing(id))?;
+    Ok(gitterrace_git::worktree_diff_since(&a.repo, &cp.files, &cp.head)?)
 }
 
 /// The files that differ from checkpoint `id`, for the folded files and find in the diff.
@@ -89,6 +91,7 @@ pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review>
         label: info.label,
         unchanged,
         gone: d.gone.len(),
+        baseline_missing: d.baseline_missing,
     };
     Ok(Review { files: d.files, since: Some(since), latest, persisted })
 }
@@ -136,6 +139,7 @@ impl Review {
             gone: if s.gone > 0 { fmt::count(s.gone, "file", "files") } else { String::new() },
             unchanged_count: fmt::count(s.unchanged.len(), "file", "files"),
             unchanged: s.unchanged.clone(),
+            baseline_missing: s.baseline_missing,
         }
         .render()
         .unwrap_or_default()
@@ -157,6 +161,7 @@ struct SinceNote {
     gone: String,
     unchanged_count: String,
     unchanged: Vec<String>,
+    baseline_missing: bool,
 }
 
 /// Why a write is refused before its body is read: the owner proof and same-origin rules every

@@ -2,6 +2,9 @@
 {{ when }}
 {%- if !label.is_empty() %} ({{ label }}){% endif %}. A checkpoint copies your changed text
 files into <code>.git/gitterrace</code> and writes nothing else.</p>
+{%- if baseline_missing %}<p class="muted" data-cp-baseline-missing>The commit this checkpoint
+was taken at is not in this repository, so files it did not list are compared with the current
+HEAD. Changes made by commits since then may be missing here.</p>{% endif %}
 {%- if !gone.is_empty() %}<p class="muted">{{ gone }} show changes against HEAD: their old
 content is gone.</p>{% endif %}
 {%- if !unchanged.is_empty() %}<details><summary>{{ unchanged_count }}

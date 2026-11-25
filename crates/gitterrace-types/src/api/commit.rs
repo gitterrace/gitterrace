@@ -84,6 +84,11 @@ pub struct CompareResponse {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct WorktreeResponse {
     pub additions: u64,
+    /// Only with `since`: the checkpoint's HEAD is not in this repository (reset, gc, another
+    /// clone), so the files it did not list were compared with the current HEAD and commits in
+    /// between may be missed.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub baseline_missing: bool,
     /// Only with `since`: files whose checkpoint copy is gone, diffed against HEAD instead.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub content_gone: Vec<String>,

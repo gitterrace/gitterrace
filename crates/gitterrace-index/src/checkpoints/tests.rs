@@ -109,8 +109,8 @@ fn a_flipped_byte_in_a_copy_reads_as_a_gone_copy() -> io::Result<()> {
 fn the_id_does_not_depend_on_file_order() {
     let a = [snap("a", "1"), snap("b", "2")];
     let b = [snap("b", "2"), snap("a", "1")];
-    assert_eq!(id_of(&a), id_of(&b));
-    assert_ne!(id_of(&a), id_of(&[snap("a", "1"), snap("b", "3")]));
+    assert_eq!(id_of(&a, ""), id_of(&b, ""));
+    assert_ne!(id_of(&a, ""), id_of(&[snap("a", "1"), snap("b", "3")], ""));
 }
 
 /// One hand-built frame: the way a planted log gets past the checksums.
@@ -268,5 +268,47 @@ fn a_cap_stored_log_survives_a_lower_cap_unread_until_the_next_write() -> io::Re
     let before = std::fs::read(idx.dir().join(FILE))?;
     assert!(idx.checkpoint_files(&id)?.is_some(), "a reader never deletes");
     assert_eq!(std::fs::read(idx.dir().join(FILE))?, before);
+    Ok(())
+}
+
+#[test]
+fn the_same_files_at_another_head_are_another_checkpoint() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (one, _) = idx.checkpoint_add(&[], "aaa", false, "", 1 << 20, 1)?;
+    let (two, new) = idx.checkpoint_add(&[], "bbb", false, "", 1 << 20, 2)?;
+    assert!(new && one != two);
+    assert_eq!(idx.checkpoint(&two)?.expect("kept").head, "bbb");
+    Ok(())
+}
+
+/// Guard class: any state that matches an older frame but not the newest. The newest checkpoint
+/// must be the state last saved, and the id returned must be the one the list shows first.
+#[test]
+fn returning_to_an_older_state_is_a_new_newest_checkpoint() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let a = [snap("f", "A\n")];
+    let b = [snap("f", "B\n")];
+    let (ida, _) = idx.checkpoint_add(&a, "h", false, "", 1 << 20, 1)?;
+    idx.checkpoint_add(&b, "h", false, "", 1 << 20, 2)?;
+    let (again, new) = idx.checkpoint_add(&a, "h", false, "", 1 << 20, 3)?;
+    assert!(new, "A after B is not nothing-changed");
+    assert_eq!(again, ida);
+    let list = idx.checkpoint_list()?;
+    assert_eq!(list.items.len(), 3);
+    assert_eq!((list.items[0].id.as_str(), list.items[0].created), (ida.as_str(), 3));
+    let (_, new) = idx.checkpoint_add(&a, "h", false, "", 1 << 20, 4)?;
+    assert!(!new, "the same state as the newest still dedupes");
+    Ok(())
+}
+
+#[test]
+fn an_id_with_two_frames_reads_the_newest_one() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let a = [snap("f", "A\n")];
+    let (id, _) = idx.checkpoint_add(&a, "h", false, "", 0, 1)?;
+    idx.checkpoint_add(&[snap("f", "B\n")], "h", false, "", 1 << 20, 2)?;
+    idx.checkpoint_add(&a, "h", false, "", 1 << 20, 3)?;
+    let back = idx.checkpoint_files(&id)?.expect("kept");
+    assert!(back[0].text.is_some(), "the old frame lost its copy, the newest has it");
     Ok(())
 }
