@@ -1,4 +1,5 @@
-// Checks of the page layout: truncation, live tabs, mermaid, chip, doctabs, chords, header.
+// Checks of the page layout: truncation, live tabs, mermaid, csp-style, chip, doctabs, chords,
+// header.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -183,6 +184,51 @@ async function mermaid() {
   await b.close();
 }
 
+// ---- csp-style --------------------------------------------------------------------------------
+// The page policy refuses inline styles except on a response that renders a mermaid block. The
+// README page draws a diagram and must report no violation under the loosened policy, a page
+// without one must send the strict policy and report none either.
+async function cspStyle() {
+  const seen = (p) => {
+    const hits = [];
+    const csp = /Content Security Policy|violates/i;
+    p.on('console', (m) => csp.test(m.text()) && hits.push(m.text()));
+    p.on('pageerror', (e) => /Content Security Policy/i.test(String(e)) && hits.push(String(e)));
+    return p.addInitScript(() => {
+      document.addEventListener('securitypolicyviolation', (e) =>
+        console.error(`violates ${e.violatedDirective} ${e.blockedURI}`));
+    }).then(() => hits);
+  };
+  for (const name of browsers) {
+    const b = await launch(pw, name);
+    const open = async (path) => {
+      const p = await b.newPage();
+      const hits = await seen(p);
+      const res = await p.goto(srv.base + path, { waitUntil: 'load', timeout: 15000 });
+      return { p, hits, csp: (await res.allHeaders())['content-security-policy'] || '' };
+    };
+    const diagram = await open('/');
+    await diagram.p.waitForSelector('pre.mermaid svg', { timeout: 10000 }).catch(() => {});
+    const drawn = await diagram.p.$$('pre.mermaid svg');
+    const loose = /style-src 'self' 'unsafe-inline'/.test(diagram.csp);
+    if (!drawn.length) r.fail(`csp-style ${name}: the diagram did not render`);
+    else if (!loose) r.fail(`csp-style ${name}: diagram page policy: ${diagram.csp}`);
+    else if (diagram.hits.length) r.fail(`csp-style ${name}: ${diagram.hits.join(' | ')}`);
+    else r.ok(`csp-style ${name}: diagram drawn, 0 violations`);
+    for (const path of ['/log/HEAD', '/refs', '/languages']) {
+      const plain = await open(path);
+      await plain.p.waitForLoadState('networkidle');
+      const strict = /style-src 'self';/.test(plain.csp) && !plain.csp.includes('unsafe-inline');
+      if (!strict) r.fail(`csp-style ${name} ${path}: not strict: ${plain.csp}`);
+      else if (plain.hits.length) r.fail(`csp-style ${name} ${path}: ${plain.hits.join(' | ')}`);
+      else r.ok(`csp-style ${name} ${path}: strict policy, 0 violations`);
+      await plain.p.close();
+    }
+    await diagram.p.close();
+    await b.close();
+  }
+}
+
 // ---- chip -------------------------------------------------------------------------------------
 async function chip() {
   writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
@@ -310,5 +356,5 @@ async function header() {
     await b.close();
   }
 }
-  return { truncation, liveTabs, mermaid, chip, doctabs, chords, header };
+  return { truncation, liveTabs, mermaid, cspStyle, chip, doctabs, chords, header };
 }

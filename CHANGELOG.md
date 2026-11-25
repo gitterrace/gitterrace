@@ -159,6 +159,7 @@ All notable changes are listed here. The format follows
 - web: close the page head 16px below the tagline again
 - site: refuse a partial raw shot set before replacing the screenshots
 - deps: keep the unmaintained advisory scope on the whole graph
+- web: refuse inline styles except on pages that render a mermaid diagram
 
 ### Performance
 

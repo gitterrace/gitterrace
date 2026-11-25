@@ -12,18 +12,54 @@ use axum::{
     response::{IntoResponse, Response},
 };
 
+/// The page policy with `$style` as its `style-src`, so the two policies below differ in that
+/// one directive and nowhere else.
+macro_rules! policy {
+    ($style:literal) => {
+        concat!(
+            "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src ",
+            $style,
+            "; script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
+             'sha256-sTYFCmpcG70tpbnxf2wd5UdeZwg8HujkRWb3okhcpTY='; object-src 'none'; \
+             frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+        )
+    };
+}
+
 /// The page policy, also written into an export's `_headers`.
 ///
 /// Scripts are locked to this origin plus the hashes of the inline theme snippets in
 /// `_base.html` and `repos.html`; the `inline_scripts_are_hashed` test fails when a template
-/// changes without this. Styles allow `unsafe-inline` for one reason: mermaid writes its
-/// diagram styles at runtime and cannot be given a hash. The app's own markup carries no
-/// style attribute (`markup_owners` and `shared_markup_pages` tests), and a style cannot run code.
-pub const CSP: &str = "default-src 'self'; img-src 'self' data:; media-src 'self'; \
-    style-src 'self' 'unsafe-inline'; \
-    script-src 'self' 'sha256-fYt56R17Pz3RaWQCK4ngD4kWxzR9lHjYqQRanR4kAxk=' \
-    'sha256-sTYFCmpcG70tpbnxf2wd5UdeZwg8HujkRWb3okhcpTY='; object-src 'none'; \
-    frame-ancestors 'none'; base-uri 'none'; form-action 'self'";
+/// changes without this. Styles are strict: the app's own markup carries no style attribute
+/// or `<style>` (`markup_owners` and `shared_markup_pages` tests, and the crawl in
+/// `security_class_tests`).
+pub const CSP: &str = policy!("'self'");
+
+/// [`CSP`] with inline styles, for a response that renders a mermaid diagram only.
+///
+/// Mermaid writes a `<style>` and style attributes into its SVG, and neither takes a nonce or
+/// a hash. A response asks for it with the `NeedsInlineStyle` extension; absent, the policy is
+/// strict.
+pub const CSP_MERMAID: &str = policy!("'self' 'unsafe-inline'");
+
+/// Response extension: this page renders content that needs inline styles (a mermaid block).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct NeedsInlineStyle;
+
+/// A page that may carry Markdown: HTML, marked [`NeedsInlineStyle`] when its body renders a
+/// mermaid block, so the guard sends the loosened policy for that response alone.
+pub(crate) struct Styled(pub String);
+
+impl IntoResponse for Styled {
+    fn into_response(self) -> Response {
+        let needs = crate::markdown::needs_inline_style(&self.0);
+        let mut res = axum::response::Html(self.0).into_response();
+        if needs {
+            res.extensions_mut().insert(NeedsInlineStyle);
+        }
+        res
+    }
+}
 
 /// Whether the request declares a JSON body.
 pub(crate) fn is_json(h: &HeaderMap) -> bool {
@@ -168,6 +204,7 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
         }
         None => next.run(req).await,
     };
+    let inline = res.extensions().get::<NeedsInlineStyle>().is_some();
     let h = res.headers_mut();
     h.insert("cross-origin-resource-policy", HeaderValue::from_static("same-origin"));
     h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
@@ -183,7 +220,8 @@ pub(crate) async fn guard(State(gate): State<Arc<Gate>>, req: Request, next: Nex
     }
     let html = h.get(header::CONTENT_TYPE).is_some_and(|v| v.as_bytes().starts_with(b"text/html"));
     if html && !h.contains_key(header::CONTENT_SECURITY_POLICY) {
-        h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(CSP));
+        let csp = if inline { CSP_MERMAID } else { CSP };
+        h.insert(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static(csp));
     }
     res
 }

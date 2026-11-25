@@ -158,7 +158,7 @@ struct OverviewPage {
     no_side: bool,
 }
 
-async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<String>> {
+async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<crate::guard::Styled> {
     let p = blocking(&app, move |a| {
         let rev = fmt::selected();
         let head = a.repo.resolve(&rev)?;
@@ -208,7 +208,7 @@ async fn overview(State(app): Shared, Query(q): Query<DocQuery>) -> Result<Html<
         })
     })
     .await?;
-    page(&p)
+    Ok(crate::guard::Styled(p.render()?))
 }
 
 /// "(1 merge, 2 by bots, 3 counted)": what sets every commit apart from the counted ones, and

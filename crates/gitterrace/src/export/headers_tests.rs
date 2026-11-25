@@ -9,17 +9,49 @@ fn scope(force: bool) -> crate::export::Scope {
 
 #[test]
 fn headers_file_carries_the_page_policy() {
-    let h = crate::export::headers_file();
+    let h = crate::export::headers_file(&std::collections::BTreeSet::default());
     assert!(h.contains("font-src 'self' data:"), "{h}");
     assert!(!gitterrace_web::PAGE_CSP.contains("font-src"), "the served app takes no data: fonts");
     assert!(!h.contains("script-src 'self' 'unsafe-inline'"));
+}
+
+/// The strict policy is the default for every path, and a page that renders a mermaid block
+/// gets its own rules that swap in the loosened one: `unsafe-inline` appears nowhere else.
+#[test]
+fn headers_file_loosens_styles_only_on_the_named_mermaid_pages() {
+    let strict = crate::export::headers_file(&std::collections::BTreeSet::default());
+    assert!(!strict.contains("style-src 'self' 'unsafe-inline'"), "{strict}");
+    let pages = std::collections::BTreeSet::from(["/r/a/blob/HEAD/doc.md".to_owned()]);
+    let h = crate::export::headers_file(&pages);
+    let top = h.split("\n\n").next().unwrap_or_default();
+    assert!(top.contains("style-src 'self';"), "{top}");
+    assert!(!top.contains("unsafe-inline"), "{top}");
+    for rule in ["/r/a/blob/HEAD/doc.md", "/r/a/blob/HEAD/doc.md/"] {
+        let at = h.find(&format!("\n{rule}\n")).unwrap_or_else(|| panic!("{rule} in {h}"));
+        let block = h[at + 1..].split("\n\n").next().unwrap_or_default();
+        assert!(block.contains("  ! Content-Security-Policy\n"), "{block}");
+        assert!(block.contains("style-src 'self' 'unsafe-inline'"), "{block}");
+        assert!(block.contains("font-src 'self' data:"), "{block}");
+    }
+    // The detach has to come after the `/*` rule it removes from.
+    assert!(h.find("! Content-Security-Policy") > h.find("/*\n"));
+    let unsafe_rules = h.matches("unsafe-inline").count();
+    assert_eq!(unsafe_rules, 3, "the raw sandbox and the two mermaid rules only: {h}");
+}
+
+/// A path a host cannot match literally never loosens anything.
+#[test]
+fn headers_file_skips_a_path_with_a_splat() {
+    let pages = std::collections::BTreeSet::from(["/r/a/*/x".to_owned()]);
+    let h = crate::export::headers_file(&pages);
+    assert_eq!(h.matches("unsafe-inline").count(), 1, "{h}");
 }
 
 /// A published export revalidates its pages like the server does, and the page rule stays off
 /// `/*`, where a host would merge it into the static lifetime.
 #[test]
 fn headers_file_revalidates_pages_but_not_static() {
-    let h = crate::export::headers_file();
+    let h = crate::export::headers_file(&std::collections::BTreeSet::default());
     for rule in ["/\n", "/r/*\n"] {
         let at = h.find(&format!("\n{rule}")).unwrap_or_else(|| panic!("{rule:?} in {h}"));
         let block = h[at + 1..].split("\n\n").next().unwrap_or_default();
@@ -33,7 +65,7 @@ fn headers_file_revalidates_pages_but_not_static() {
 /// rule with two, so a raw file would lose its sandbox. Every rule path has at most one.
 #[test]
 fn every_header_rule_has_at_most_one_splat() {
-    let h = crate::export::headers_file();
+    let h = crate::export::headers_file(&std::collections::BTreeSet::default());
     let rules: Vec<&str> = h.lines().filter(|l| l.starts_with('/')).collect();
     assert!(rules.iter().any(|r| r.contains("/raw/")), "{h}");
     for r in rules {

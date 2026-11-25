@@ -100,4 +100,17 @@ nothing about who is asking, and a secret in a page is a secret given away.
   the temp file a settings save writes takes the ACL its folder passes down.
   Both rely on `%APPDATA%` being private to one user, its default. A shared
   account or a folder other users can write to is not supported.
-- Styles allow inline rules for mermaid diagrams. A style cannot run code.
+- Styles allow inline rules on a response that renders a mermaid diagram, and
+  on no other page. Mermaid writes a `<style>` and style attributes into its
+  SVG, and neither takes a nonce or a hash. The page policy is strict by
+  default (`style-src 'self'`). A page that renders a diagram carries a
+  response extension the guard reads, and only that response gets
+  `'unsafe-inline'`. An absent extension means strict. A style cannot run
+  code, but it can restyle the page or leak through selectors, so the scope
+  stays as narrow as the diagram. A static export writes the strict policy for
+  every path and one rule per page with a diagram that swaps in the loose one.
+  A host applies rules in file order, so the swap detaches the header and sets
+  it again. A path a host rule cannot name, or a page past the rule limit,
+  keeps the strict policy and its diagram stays unstyled. The crawl in
+  `crawl_tests.rs` fails on an inline style or a loose policy anywhere else,
+  and the `csp-style` browser check loads a diagram page and plain pages.

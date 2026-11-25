@@ -221,6 +221,8 @@ async fn crawl(
 
     let mut seen = Seen::from_iter(&queue);
     let mut written = 0usize;
+    // Pages whose body renders a mermaid block: each gets the loosened policy in `_headers`.
+    let mut mermaid = BTreeSet::new();
     let mut count = Caps::new(export_pages, scope);
     progress.phase("writing pages");
     // Pages render on blocking threads, so one at a time leaves the cores idle.
@@ -245,6 +247,7 @@ async fn crawl(
                 continue;
             }
             count.take(&path)?;
+            note_mermaid(&mut mermaid, &path, &content_type, &body);
             let site = site_for(&path);
             let body = if content_type.starts_with("text/html") {
                 // The index of several repositories names no revision.
@@ -283,7 +286,7 @@ async fn crawl(
             }
         }
     }
-    write::write_fixed(out, &router, SNAPSHOT_CSS, &headers_file()).await?;
+    write::write_fixed(out, &router, SNAPSHOT_CSS, &headers_file(&mermaid)).await?;
     unlink::unlink_dead(out)?;
     Ok(written + 3)
 }
@@ -402,12 +405,8 @@ async fn wait_for_index(
 /// Host headers for a static copy: the app's own page policy, since the pages are its HTML,
 /// so the two cannot drift, plus fonts from `data:` URLs, which is how the copy carries them
 /// (see `fonts.rs`). Raw files are sandboxed.
-fn export_csp() -> String {
-    gitterrace_web::PAGE_CSP.replacen(
-        "default-src 'self';",
-        "default-src 'self'; font-src 'self' data:;",
-        1,
-    )
+fn export_csp(policy: &str) -> String {
+    policy.replacen("default-src 'self';", "default-src 'self'; font-src 'self' data:;", 1)
 }
 
 // Hosts join the values of every matching rule, so the page cache rule names the page trees
@@ -415,8 +414,9 @@ fn export_csp() -> String {
 // Pages name each asset as `/static/<file>?v=<build>`: a host serves the file and ignores the
 // query, and a new export brings new URLs, so a year under `/static/*` never serves a stale
 // asset to a fresh page.
-fn headers_file() -> String {
-    let page = export_csp();
+fn headers_file(mermaid: &BTreeSet<String>) -> String {
+    let page = export_csp(gitterrace_web::PAGE_CSP);
+    let loose = export_csp(gitterrace_web::PAGE_CSP_MERMAID);
     format!(
         "/*\n  Content-Security-Policy: {page}\n  X-Content-Type-Options: nosniff\n  \
          X-Frame-Options: DENY\n  Referrer-Policy: strict-origin-when-cross-origin\n  \
@@ -426,8 +426,43 @@ fn headers_file() -> String {
          /r/*\n  Cache-Control: no-cache\n\n\
          /r/:name/raw/*\n  Content-Security-Policy: sandbox; \
          default-src 'none'; style-src 'unsafe-inline'\n\n\
-         /static/*\n  Cache-Control: public, max-age=31536000, immutable\n"
+         /static/*\n  Cache-Control: public, max-age=31536000, immutable\n{}",
+        mermaid_rules(mermaid, &loose)
     )
+}
+
+/// Remembers `path` when its page renders a mermaid block.
+fn note_mermaid(into: &mut BTreeSet<String>, path: &str, content_type: &str, body: &[u8]) {
+    if content_type.starts_with("text/html")
+        && gitterrace_web::needs_inline_style(&String::from_utf8_lossy(body))
+    {
+        into.insert(path.split(['?', '#']).next().unwrap_or_default().to_owned());
+    }
+}
+
+/// Cloudflare takes 100 rules a file. The fixed rules and a margin come off that, and each page
+/// takes two (with and without the trailing slash a host may serve it under). A mermaid page
+/// past the rest keeps the strict policy: its diagram fails, nothing loosens. Not configurable:
+/// the host's limit is fixed.
+const MAX_MERMAID_PAGES: usize = 45;
+
+/// Two rules per exported page that renders a mermaid block, after the `/*` rule so the detach
+/// finds the strict policy to remove: a host joins the values of every matching rule, and two
+/// policies in one header would both apply. A path a rule cannot name literally (`*`, `:`,
+/// whitespace) is left out the same way.
+fn mermaid_rules(paths: &BTreeSet<String>, loose: &str) -> String {
+    let literal = |p: &&String| !p.contains(['*', ':', ' ', '\t', '\n', '\r']);
+    let mut rules = Vec::new();
+    for path in paths.iter().filter(literal).take(MAX_MERMAID_PAGES) {
+        let bare = path.trim_end_matches('/');
+        if bare.is_empty() {
+            rules.push("/".to_owned());
+        } else {
+            rules.extend([bare.to_owned(), format!("{bare}/")]);
+        }
+    }
+    let tail = format!("\n  ! Content-Security-Policy\n  Content-Security-Policy: {loose}\n");
+    rules.iter().fold(String::new(), |out, rule| out + "\n" + rule + &tail)
 }
 
 struct Allowed {

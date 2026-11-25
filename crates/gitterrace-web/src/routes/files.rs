@@ -11,8 +11,9 @@ use axum::{
 use gitterrace_config::Feature;
 use gitterrace_index::feed::{CommitRange, InsightsSource, Rank};
 
+use crate::guard::Styled;
 use crate::pagehead::{Action, FileView, PageHead, Tagline};
-use crate::routes::{DocQuery, Shared, page};
+use crate::routes::{DocQuery, Shared};
 use crate::{
     app::{App, blocking},
     error::Result,
@@ -38,7 +39,7 @@ pub(super) async fn tree_root(
     state: Shared,
     Path(rev): Path<String>,
     q: Query<DocQuery>,
-) -> Result<Html<String>> {
+) -> Result<Styled> {
     tree(state, Path((rev, String::new())), q).await
 }
 
@@ -48,7 +49,7 @@ pub(super) async fn tree(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
     Query(q): Query<DocQuery>,
-) -> Result<Html<String>> {
+) -> Result<Styled> {
     let (key, rev, path, q) = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let query = format!(
@@ -60,7 +61,7 @@ pub(super) async fn tree(
     })
     .await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html(h));
+        return Ok(Styled(h));
     }
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
@@ -103,7 +104,7 @@ pub(super) async fn tree(
     .await?;
     let html = p.render()?;
     app.memo_put(key, &html);
-    Ok(Html(html))
+    Ok(Styled(html))
 }
 
 /// A folder's page head: its path as the title, what it holds as the tagline, and its history
@@ -194,7 +195,7 @@ pub(super) async fn highlight_tail(
 pub(super) async fn blob(
     State(app): Shared,
     Path((rev, path)): Path<(String, String)>,
-) -> Result<Html<String>> {
+) -> Result<Styled> {
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let path = path.trim_matches('/').to_owned();
@@ -209,7 +210,7 @@ pub(super) async fn blob(
         Ok(blob_page(a, BlobAt::Rev(&rev), path, &b, &bytes))
     })
     .await?;
-    page(&p)
+    Ok(Styled(p.render()?))
 }
 
 /// `/worktree/blob/{path}`: the blob view over one changed file as it is on disk, read only
@@ -228,7 +229,7 @@ pub(super) async fn worktree_blob(
     })
     .await?;
     match p {
-        Some(p) => Ok(page(&p)?.into_response()),
+        Some(p) => Ok(Styled(p.render()?).into_response()),
         None => Ok(crate::error::not_found("This file is not a changed file of the working tree.")),
     }
 }

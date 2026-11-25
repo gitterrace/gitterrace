@@ -230,3 +230,90 @@ async fn a_versioned_asset_is_immutable_and_an_unversioned_one_revalidates() {
     assert!(css.contains(&format!(".woff2{v})")), "fonts carry the version");
     assert!(page.contains(&format!("app.js{v}")), "pages link the versioned URL");
 }
+
+/// What a page's policy and markup owe the strict `style-src`: no `'unsafe-inline'` unless the
+/// body renders a mermaid block, and no style attribute or `<style>` element unless it does.
+/// A template that adds an inline style would otherwise break silently, since nothing in the
+/// page says the browser dropped it.
+fn style_faults(u: &str, csp: &str, body: &str) -> Vec<String> {
+    let mermaid = crate::markdown::needs_inline_style(body);
+    let mut bad = Vec::new();
+    if csp.contains("'unsafe-inline'") && !mermaid {
+        bad.push(format!("{u}: unsafe-inline without a mermaid block"));
+    }
+    if !mermaid && !csp.contains("style-src 'self';") {
+        bad.push(format!("{u}: style-src is not strict: {csp}"));
+    }
+    if mermaid && csp != crate::guard::CSP_MERMAID {
+        bad.push(format!("{u}: a mermaid page without the mermaid policy"));
+    }
+    if !mermaid && (body.contains(" style=") || body.contains("<style")) {
+        bad.push(format!("{u}: an inline style the strict policy refuses"));
+    }
+    bad
+}
+
+#[test]
+fn a_page_with_an_inline_style_or_a_loose_policy_is_caught() {
+    let strict = crate::guard::CSP;
+    assert_eq!(style_faults("/x", strict, "<p>").len(), 0);
+    assert_eq!(style_faults("/x", strict, "<p style=\"color:red\">").len(), 1, "style attribute");
+    assert_eq!(style_faults("/x", strict, "<style>p{}</style>").len(), 1, "style element");
+    assert_eq!(style_faults("/x", crate::guard::CSP_MERMAID, "<p>").len(), 2, "loose, no diagram");
+    let diagram = "<pre class=\"mermaid\">a</pre>";
+    assert_eq!(style_faults("/x", crate::guard::CSP_MERMAID, diagram).len(), 0);
+    assert_eq!(style_faults("/x", strict, diagram).len(), 1, "a diagram on the strict policy");
+}
+
+/// The two policies differ in the `style-src` token and nowhere else.
+#[test]
+fn the_mermaid_policy_differs_only_in_inline_styles() {
+    let loose =
+        crate::guard::CSP_MERMAID.replace("style-src 'self' 'unsafe-inline'", "style-src 'self'");
+    assert_eq!(loose, crate::guard::CSP);
+    assert!(!crate::guard::CSP.contains("unsafe-inline"));
+}
+
+/// Crawls a repository whose Markdown holds a diagram and a table: every HTML page sends the
+/// strict policy unless it renders the diagram, and none but a diagram page carries an inline
+/// style. Pages are the crawl's own, so a new template is checked the day it is linked.
+#[tokio::test]
+async fn every_page_without_mermaid_has_a_strict_style_policy() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let root = dir.path().join("m");
+    let f = gitterrace_testkit::Fixture::init(&root)
+        .write("README.md", "# plain\n\n|a|b|\n|:-|-:|\n|1|2|\n")
+        .write("docs/flow.md", "# flow\n\n```mermaid\ngraph TD; A-->B\n```\n")
+        .write("src/a.rs", "fn a() {}\n")
+        .commit("feat: docs");
+    let router = crate::app_router(f.path()).expect("router");
+    let mut todo = vec!["/r/m/".to_owned(), "/r/m/blob/HEAD/docs/flow.md".to_owned()];
+    let (mut seen, mut diagrams, mut bad) = (HashSet::new(), 0, Vec::new());
+    while let Some(u) = todo.pop() {
+        if !seen.insert(u.clone()) || seen.len() > 300 {
+            continue;
+        }
+        let req = Request::get(&u).header("host", "localhost").body(Body::empty()).expect("req");
+        let res = router.clone().oneshot(req).await.expect("response");
+        let head = |n: &str| {
+            res.headers().get(n).and_then(|v| v.to_str().ok()).unwrap_or_default().to_owned()
+        };
+        let (csp, kind) = (head("content-security-policy"), head("content-type"));
+        let bytes = http_body_util::BodyExt::collect(res.into_body()).await.expect("body");
+        let body = String::from_utf8_lossy(&bytes.to_bytes()).into_owned();
+        if !kind.starts_with("text/html") {
+            continue;
+        }
+        diagrams += usize::from(crate::markdown::needs_inline_style(&body));
+        bad.extend(style_faults(&u, &csp, &body));
+        for l in links(&body) {
+            let l = l.split('#').next().unwrap_or_default().to_owned();
+            if l.starts_with("/r/m/") && !l.contains("/raw/") {
+                todo.push(l);
+            }
+        }
+    }
+    assert!(seen.len() > 10, "crawl too shallow: {}", seen.len());
+    assert!(diagrams > 0, "no crawled page rendered the diagram");
+    assert!(bad.is_empty(), "{}", bad.join("\n"));
+}

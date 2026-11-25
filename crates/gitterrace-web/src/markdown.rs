@@ -291,6 +291,22 @@ fn sanitizer(base: Base) -> ammonia::Builder<'static> {
     b
 }
 
+/// Column alignment as the `align` attribute: a `style` attribute needs `unsafe-inline`, and
+/// the sanitizer keeps only the three alignments the parser writes, so each is swapped 1:1.
+fn aligned(html: &str) -> String {
+    let mut out = html.to_owned();
+    for side in ["left", "right", "center"] {
+        out = out.replace(&format!(" style=\"text-align: {side}\""), &format!(" align=\"{side}\""));
+    }
+    out
+}
+
+/// Whether a page holds a rendered mermaid block, which is the one thing that needs inline
+/// styles. Read from the page itself, so a memoized page answers the same as a fresh one.
+pub fn needs_inline_style(page: &str) -> bool {
+    page.contains("<pre class=\"mermaid\"")
+}
+
 /// A rendered document with the outline of its headings.
 pub(crate) struct Doc {
     pub(crate) html: String,
@@ -328,6 +344,7 @@ pub(crate) fn render_doc(src: &str, base: Base) -> Doc {
     html::push_html(&mut raw, events.into_iter());
     // Spans are added after sanitizing, which drops every data-line the file wrote.
     let clean = levels::demote(&sanitizer(base).clean(&raw).to_string());
+    let clean = aligned(&clean);
     Doc { html: head + &lines::place(&clean), outline }
 }
 
@@ -505,7 +522,7 @@ mod tests {
             note\n\nhttps://example.com\n",
         );
         assert!(out.contains("<table data-line=\"1-3\">"), "{out}");
-        assert!(out.contains("text-align: left"));
+        assert!(out.contains("align=\"left\"") && !out.contains("style="), "{out}");
         assert!(out.contains("type=\"checkbox\""));
         assert!(out.contains("<del>gone</del>"));
         assert!(out.contains("footnote-reference"));
