@@ -38,46 +38,10 @@ pub struct CouplingQuery<'a> {
     pub limit: usize,
 }
 
-/// Two files that changed in the same commits. `a` sorts before `b` by name.
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct CouplingPair {
-    pub a: String,
-    pub a_changes: usize,
-    pub b: String,
-    pub b_changes: usize,
-    /// `together / a_changes`: how often a change to `a` came with one to `b`.
-    pub confidence_ab: f64,
-    pub confidence_ba: f64,
-    /// The files are not in the same directory.
-    pub cross_dir: bool,
-    /// `together / min(a_changes, b_changes)`, as [`crate::Coupling::degree`].
-    pub degree: f64,
-    /// Author time of the newest commit that changed both.
-    pub last_together: i64,
-    pub together: usize,
-}
-
-/// Commits that touched both top-level directories. `""` is the files at the root.
-#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
-pub struct DirPair {
-    pub a: String,
-    pub b: String,
-    pub together: usize,
-}
-
-#[derive(Debug, Clone, PartialEq, serde::Serialize)]
-pub struct CouplingReport {
-    pub cross_dir: bool,
-    /// Top-level directory pairs, only without a focus file.
-    pub matrix: Vec<DirPair>,
-    /// Commits touching more than this many files are left out.
-    pub max_commit_files: usize,
-    pub min_support: usize,
-    pub pairs: Vec<CouplingPair>,
-    pub path: Option<String>,
-    /// Counted commits left out for touching more than `max_commit_files` files.
-    pub skipped_commits: usize,
-}
+pub use gitterrace_types::api::{
+    InsightCoupling as CouplingReport, InsightCouplingPair as CouplingPair,
+    InsightDirPair as DirPair,
+};
 
 /// (file a, file b, together, newest shared commit time), a before b.
 type Cand = (u32, u32, usize, i64);
