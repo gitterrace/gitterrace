@@ -166,7 +166,8 @@
   // The boxes at once, so nothing shifts, then the server's marks fill them in.
   function start() {
     decorate();
-    if (server() && served === null) load().then(decorate);
+    // load() settles every failure itself, so nothing here can reject.
+    if (server() && served === null) void load().then(decorate);
   }
   start();
   document.addEventListener("gt:live-refreshed", start);

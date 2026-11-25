@@ -1,0 +1,18 @@
+id: no-floating-promise
+valid:
+  - 'function f() { return fetch(u).then(ok); }'
+  - 'function f() { fetch(u).then(ok, fail); }'
+  - 'function f() { fetch(u).then(ok).catch(fail); }'
+  - 'function f() { fetch(u).catch(fail).then(done); }'
+  - 'function f() { void fetch(u).then(ok); }'
+  - 'function f() { fetch(u).then(ok).then(a, b); }'
+  - 'function f() { fetch(u).catch(fail); }'
+  - 'function f() { void fetch(u); }'
+invalid:
+  - 'function f() { fetch(u); }'
+  - 'function f() { Promise.all(xs); }'
+  - 'function f() { g(x, y).then(ok); }'
+  - 'function f() { fetch(u).then(function () { h.catch(z); }); }'
+  - 'function f() { fetch(u).then(ok); }'
+  - 'function f() { fetch(u).then(ok).finally(done); }'
+  - 'function f() { a.then(ok).then(done); }'

@@ -1,0 +1,41 @@
+id: no-floating-promise
+language: javascript
+severity: error
+message: A promise chain ends a statement without a rejection handler.
+note: A rejected fetch or json() reaches no one, so the control stays in its busy state and the user sees nothing. End the chain with .catch(handler) or a second then argument that shows the error, or write `void` in front when the result truly does not matter.
+files: [crates/gitterrace-web/static/*.js]
+rule:
+  kind: expression_statement
+  any:
+    # A chain: .then / .finally ends it.
+    - has:
+        kind: call_expression
+        has:
+          field: function
+          kind: member_expression
+          has:
+            field: property
+            regex: '^(then|finally)$'
+    # A promise nobody chains: fetch or a Promise combinator as a whole statement.
+    - has:
+        kind: call_expression
+        any:
+          - has: {field: function, regex: '^fetch$'}
+          - has: {field: function, regex: '^Promise\.(all|race|any|allSettled|resolve|reject)$'}
+  # A handler anywhere in the chain counts, a callback's own body does not.
+  not:
+    has:
+      stopBy: {kind: arguments}
+      kind: call_expression
+      has:
+        field: function
+        kind: member_expression
+        has: {field: property, regex: '^(catch|then)$'}
+      any:
+        - has:
+            field: function
+            has: {field: property, regex: '^catch$'}
+        - has:
+            field: arguments
+            kind: arguments
+            has: {nthChild: 2}

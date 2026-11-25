@@ -43,7 +43,8 @@
     n.ov.place(box, btn);
     if (refs) p.refresh();
     else if (!STATIC) fetch(B + "/api/refs").then(function (r) { return r.json(); })
-      .then(function (l) { refs = l; p.refresh(); });
+      .then(function (l) { refs = l; p.refresh(); },
+        function () { window.gtToast && window.gtToast("Could not load the refs", true); });
   }
 
   // ---- repository switcher (shown while the server holds several repos) --
@@ -101,7 +102,11 @@
     }, "Enter to open", "No repositories match");
     n.ov.place(box, btn);
     if (repos) p.refresh();
-    else load(function (l) { repos = l; p.refresh(); });
+    else {
+      load(function (l) { repos = l; p.refresh(); }).catch(function () {
+        window.gtToast("Could not load the repositories", true);
+      });
+    }
   }
   var repoBtn = document.getElementById("repobtn");
   // An export has no /api: it lists its repositories as hidden links on every page, already

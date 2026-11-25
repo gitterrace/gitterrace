@@ -92,7 +92,7 @@
   fitTabs();
   addEventListener("resize", fitTabs);
   // Web fonts change the widths once they arrive.
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { fitSegs(); fitTabs(); });
+  if (document.fonts && document.fonts.ready) void document.fonts.ready.then(function () { fitSegs(); fitTabs(); });
   var boxes = document.querySelectorAll("[data-progress]");
   if (!boxes.length) return;
   var timer = setInterval(async function () {

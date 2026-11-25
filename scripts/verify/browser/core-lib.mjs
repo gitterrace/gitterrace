@@ -381,6 +381,8 @@ async function settings() {
     // Each browser starts from the same file, never the one the last browser saved.
     rmSync(join(cfg, 'config.toml'), { force: true });
     const { b, ctx } = await context(name);
+    // Saving a setting is a write: it needs the owner cookie.
+    await ctx.addCookies([await srv.owner()]);
     const p = await ctx.newPage();
     try {
       await p.goto(srv.base + '/', { waitUntil: 'load' });

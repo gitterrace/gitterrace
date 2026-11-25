@@ -188,7 +188,8 @@
   function check() {
     clearTimeout(timer);
     timer = setTimeout(function () {
-      call("POST", "/_settings/check", edit()).then(function (r) { if (r.json) show(r.json); });
+      call("POST", "/_settings/check", edit()).then(function (r) { if (r.json) show(r.json); },
+        function () { note.textContent = "Could not check the settings."; });
     }, 250);
   }
 
@@ -205,6 +206,9 @@
       call("POST", "/_settings/check", edit()).then(function (r) {
         if (r.json && typeof r.json.text === "string") text.value = r.json.text;
         swap(to);
+      }, function () {
+        note.textContent = "Could not read the plain text.";
+        mark(view);
       });
       return;
     }
@@ -272,6 +276,10 @@
       }
       if (r.json) show(r.json);
       else note.textContent = r.text.trim() || "Not saved.";
+      save.disabled = false;
+    }, function () {
+      saving = false;
+      note.textContent = "Not saved: no response.";
       save.disabled = false;
     });
   });

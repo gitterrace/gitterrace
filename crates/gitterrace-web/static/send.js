@@ -133,14 +133,16 @@
       if (last === COPY) pick.value = COPY;
     }
     fillPick([]);
-    load().then(function (l) { if (cur && cur.box === dlg && Array.isArray(l)) fillPick(l); });
+    // load() answers [] on any failure, so the picker keeps its copy entry.
+    void load().then(function (l) { if (cur && cur.box === dlg && Array.isArray(l)) fillPick(l); });
 
     function send() {
       var id = pick.value;
       remember(id);
       if (id === COPY) {
         var text = title.value + "\n\n" + ctx.value;
-        window.gtCopy(text, "Copied with context").then(function () { close(); });
+        // gtCopy toasts its own failure and never rejects.
+        void window.gtCopy(text, "Copied with context").then(function () { close(); });
         return;
       }
       var t = cur.targets.filter(function (x) { return x.id === id; })[0];
