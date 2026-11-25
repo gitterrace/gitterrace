@@ -14,6 +14,8 @@ markdown sanitizer strips inline <svg> and <style>, and the doc links them throu
   scripts/bench/bench-report.py --print          print the short results block that
                                                  `cargo xtask` splices
   scripts/bench/bench-report.py --corpus         print the corpus list, one source link per repo
+  scripts/bench/bench-report.py --budgets        print the budget table and the run defaults
+  scripts/bench/bench-report.py --gates          print the cold insights page targets
   scripts/bench/bench-report.py --normalize F    rewrite one result file in the published format
 
 --check also guards publication: no result file, chart or doc may carry this machine's hostname
@@ -39,6 +41,7 @@ bc = importlib.import_module("bench-chart-lib")
 bd = importlib.import_module("bench-doc-lib")
 bl = importlib.import_module("bench-lib")
 bq = importlib.import_module("bench-quiet-lib")
+bb = importlib.import_module("bench-budget-lib")
 
 Json = dict[str, Any]
 _own: set[str] = set()
@@ -547,6 +550,12 @@ def write() -> None:
 
 def main() -> None:
     args = sys.argv[1:]
+    if "--budgets" in args:
+        sys.stdout.write(bb.budgets_md())
+        return
+    if "--gates" in args:
+        sys.stdout.write(bb.gates_md())
+        return
     if "--corpus" in args:
         sys.stdout.write(bc.corpus_list())
         return

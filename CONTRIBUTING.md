@@ -10,11 +10,11 @@ A pull request is offered under the MIT license ([LICENSE](LICENSE)).
 ## Setup
 
 You need git. `make deps` installs the rest at the versions CI uses: the Rust
-toolchain `rust-toolchain.toml` pins, Python 3.11 or newer, node and the
+toolchain `rust-toolchain.toml` pins, Python, node and the
 linters `make check` runs. On macOS it uses Homebrew, so install that first.
-`make deps BROWSERS=1` also fetches the browsers the browser checks drive:
-Chromium, WebKit and Firefox, all three run by default. A `make lint` step fails
-if the harness can launch one that the install lines skip.
+`make deps BROWSERS=1` also fetches the browsers the browser checks drive, all
+of them run by default. A `make lint` step fails if the harness can launch one
+that the install lines skip.
 
 ```sh
 git clone https://github.com/gitterrace/gitterrace && cd gitterrace
@@ -47,27 +47,13 @@ numbers of the Languages page for the HEAD tree. `make size` prints it.
 
 ## Lint
 
-`make lint` runs these, one pass or fail each, and `make check` includes it.
-Install any tool it reports as missing.
-
-- typos (`_typos.toml`): misspellings in code and prose
-- vale (`.vale.ini`, `schwarzwald/styles/`): American spelling, no praise
-  or history words, rules stated outright
-- gitleaks (`.gitleaks.toml`): committed secrets
-- markdownlint-cli2 (`.markdownlint-cli2.jsonc`): Markdown structure
-- shellcheck and shfmt: the shell scripts under `scripts/`
-- ruff (`ruff.toml`): the Python scripts under `scripts/`
-- cargo-machete: unused dependencies
-- ast-grep (`sgconfig.yml`, `scripts/ast-grep/`): the structural rules from
-  AGENTS.md, each with a test
-- the shared house checks (personal data, own commit ids, internal references,
-  the theme copy, the commit message hook), plus the repository's own: pinned
-  actions, CSS scope, the site's content security policy, test configuration
-- tsc and pyright: types for the scripts
-- actionlint: the workflows
-- the shared root check (`[root] allow` in `schwarzwald/config/lint.toml`):
-  new files go under `scripts/`, `tests/`, `docs/`, `deploy/` or
-  `schwarzwald/config/`
+`make lint` runs every linter and shared check, one pass or fail each, and
+`make check` includes it. The list lives in
+`vendor/schwarzwald/kit/lint/run.sh` and `schwarzwald/config/lint.toml`, so it
+cannot go stale here. Install any tool it reports as missing. Prose is held to
+`.vale.ini` (American spelling, no praise or history words, rules stated
+outright), and the structural code rules in `scripts/ast-grep/` each carry a
+test.
 
 ## Testing
 

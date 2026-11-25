@@ -53,6 +53,8 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ARCH, "cache", arch::cache()),
         Out::block(ARCH, "user-files", arch::user_files()),
         Out::block(BENCH, "corpus", bench::bench_report(root, "--corpus")?),
+        Out::block(BENCH, "budgets", bench::bench_report(root, "--budgets")?),
+        Out::block(BENCH, "gates", bench::bench_report(root, "--gates")?),
         Out::block(BENCH, "results", bench::bench_report(root, "--print")?),
         Out::block(USING, "log-filter", using::log_filter()),
         Out::block(MCP, "risk-terms", using::risk_terms()),

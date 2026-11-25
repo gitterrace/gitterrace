@@ -5,8 +5,8 @@ date and CPU, and each warm time is compared with the previous run.
 
 ## What is measured
 
-Release build only. Every page metric is the median of N warm runs (default 5)
-with min and max. Cold is the first request after the index is ready, with the
+Release build only. Every page metric is the median of the warm runs with
+min and max. Cold is the first request after the index is ready, with the
 OS file cache warmed by one untimed read of the repository. Warm is the runs
 after it.
 
@@ -20,7 +20,7 @@ after it.
    file, `/log/HEAD`, `/commit` and `/diff` fragment of the newest commit,
    `/search` for a common identifier, `/refs`, and every `/stats` page. Every
    page must answer 200, with an empty config directory.
-3. **Idle.** CPU percent over a 60 s window with no client, and again with one
+3. **Idle.** CPU percent over a window with no client, and again with one
    `/events` client open, which is the cost of the live watcher.
 4. **Memory.** RSS after the index is ready and after every page, then the dirty
    footprint (`footprint` on macOS, `Private_Dirty` on Linux) after the idle
@@ -48,8 +48,8 @@ disk is under the corpus `need_gb`.
 ## Budgets
 
 Each size class has a target per metric in the corpus file: the first measured
-run plus headroom, except three product goals: a warm page in 300 ms, idle at 1%
-CPU and the huge index in 600 s. The time to ready holds the index budget until
+run plus headroom, except the product goals: the warm page, idle CPU and the
+huge index. The time to ready holds the index budget until
 a run calibrates it. An index time, time to ready or memory over budget fails
 the run. Any other metric over budget fails it only with `BENCH_STRICT=1`.
 
@@ -65,12 +65,24 @@ recorded measured something else, so the comparison table calls its peak memory
 a new measure and never puts a percentage on it.
 
 The comparison table sets each repo against the newest earlier kept run that
-measured it, and names that run in the change column. The newest three runs are
-kept.
+measured it, and names that run in the change column.
+
+<!-- BEGIN GENERATED: budgets -->
+| Class | Warm ms | Cold ms | Index s | Ready s | Idle CPU % | Peak MB | Idle MB | Export s |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| small | 300 | 1500 | 30 | 30 | 1 | 500 | 48 | 60 |
+| medium | 300 | 3000 | 300 | 300 | 1 | 1500 | 48 | 300 |
+| large | 300 | 10000 | 2400 | 2400 | 1 | 6000 | 48 | - |
+| huge | 500 | 20000 | 600 | 600 | 1 | 8000 | 48 | - |
+
+A published run takes the median of 5 warm runs and idles over a 60 s window.
+The newest 3 runs are kept.
+
+<!-- END GENERATED: budgets -->
 
 Serving memory does not grow with the history: once the index is ready, idle
-footprint stays at most 48 MB above a just-started server (`footprint_idle_mb`,
-the 32 MB `resources.cache_mb` plus 16 MB), on every size and after every
+footprint stays within `footprint_idle_mb` of a just-started server (the cache
+budget `resources.cache_mb` plus a margin), on every size and after every
 insights page. A peak during the index build is fine. `make memory-check`
 measures it on a real clone.
 
@@ -82,45 +94,44 @@ once per release, on the release candidate commit.
 
 The pages that read every change of every file have a cold target for the first
 request after the index is ready. Hotspots and ownership hold at most 1.5 times
-the time of building them in memory. Languages has an absolute goal. Measured on
-rust (345k commits, 64k files at HEAD), release build, M1 Max, median of 3 cold
-runs:
+the time of building them in memory. Languages has an absolute goal. The
+targets:
 
-| Page      | Period | Target | Measured | Result |
-| --------- | ------ | ------ | -------- | ------ |
-| Hotspots  | all    | 230 ms | 185 ms   | met    |
-| Hotspots  | 1 year | 230 ms | 144 ms   | met    |
-| Ownership | all    | 115 ms | 79 ms    | met    |
-| Ownership | 1 year | 115 ms | 35 ms    | met    |
-| Languages | -      | 66 ms  | 3 ms     | met    |
+<!-- BEGIN GENERATED: gates -->
+| Repository | Page | Target (ms) |
+| --- | --- | --- |
+| rust | languages | 66 |
+| rust | hotspots-all | 230 |
+| rust | hotspots-1y | 300 |
+| rust | hotspots-90d | 300 |
+| rust | ownership-all | 115 |
+| rust | ownership-1y | 115 |
+| rust | overview | 300 |
+| rust | stats-overview | 300 |
+| rust | contributors | 300 |
+| linux | hotspots-1y | 300 |
+| linux | hotspots-90d | 300 |
+| linux | overview | 300 |
+| linux | stats-overview | 300 |
+| linux | contributors | 300 |
 
-Languages was 589 ms when its chain walk (every first-parent commit of the
-history) ran in the first visitor's request. The warm-up now builds the chain
-and renders the page before the repository turns ready, so that request is a
-memo hit. The walk's cost moved into the warm-up (about 5 s from the index
-holding HEAD to ready on rust, with every page), and `the_first_page_after_ready_is_served_from_the_warm_up`
+<!-- END GENERATED: gates -->
+
+The warm-up builds the languages chain and renders the page before the
+repository turns ready, so the first request is a memo hit. The walk's cost
+sits in the warm-up, and `the_first_page_after_ready_is_served_from_the_warm_up`
 fails on a render or a chain walk after ready. The server renders these pages
 right after the index is ready, so most visitors get them from memory in a few
-milliseconds. `make speed-check` measures them on the rust and
-linux clones and fails on a page over its target. The overview, statistics,
+milliseconds. `make speed-check` measures them on the rust and linux clones
+and fails on a page over its target. The overview, statistics,
 contributors and hotspot period pages are rendered before the repository turns
 ready, so their target is a memory hit's, 300 ms.
 
 ### Commit search with the message column
 
-`index.has_messages` keeps every commit message in the index. Measured on rust
-(345,460 commits), release build, M1 Max, median of 5, page cache warm, with the
-default `limits.search_commits` of 200:
-
-| Query                             | Column on | Column off |
-| --------------------------------- | --------- | ---------- |
-| Literal hit (`Option`)            | 68 ms     | 108 ms     |
-| Literal miss                      | 68 ms     | 3134 ms    |
-| Regex hit (`fix(es\|ed)? #\d{5}`) | 80 ms     | 596 ms     |
-| Regex miss                        | 58 ms     | 3361 ms    |
-
-The cost: the cache grows from 256 MB to 287 MB (12%). Turning it on takes one
-16 s pass. An update of 100 commits takes 11 s.
+`index.has_messages` keeps every commit message in the index, so a commit
+search reads a column instead of walking git. The cache grows and turning it on
+takes one pass: both are in the results above.
 
 ## Reproduce
 
