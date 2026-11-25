@@ -1014,7 +1014,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "axum",
@@ -1042,7 +1042,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-actions"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "getrandom",
  "gitterrace-config",
@@ -1061,7 +1061,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-api"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "axum",
  "gitterrace-actions",
@@ -1084,7 +1084,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-config"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "gitterrace-types",
  "tempfile",
@@ -1095,7 +1095,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-git"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "gitterrace-testkit",
  "gitterrace-types",
@@ -1109,7 +1109,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-index"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "cap",
  "crc32fast",
@@ -1130,7 +1130,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-testkit"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "axum",
  "gitterrace-config",
@@ -1142,7 +1142,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-types"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "schemars",
  "serde",
@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "gitterrace-web"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ammonia",
  "askama",
@@ -4012,7 +4012,7 @@ dependencies = [
 
 [[package]]
 name = "xtask"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "askama",

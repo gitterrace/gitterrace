@@ -5,7 +5,9 @@ All notable changes are listed here. The format follows
 [Semantic Versioning](https://semver.org/).
 
 <!-- BEGIN GENERATED: unreleased -->
-## [Unreleased]
+<!-- END GENERATED: unreleased -->
+
+## [0.2.1] - 2026-11-25
 
 ### Added
 
@@ -38,6 +40,7 @@ All notable changes are listed here. The format follows
 - web: add findings to the review basket and send them all
 - web: review order panel on the working tree and compare pages
 - insights: show which knowledge rests on people who left
+- web: build the shortcut sheet and the docs Keys table from one list
 
 ### Changed
 
@@ -179,8 +182,6 @@ All notable changes are listed here. The format follows
 - xtask: read the cargo metadata once per run
 - git: keep byte budget free for the items near the head of the stream
 - web: cut one element per file from diff headers and file rows
-
-<!-- END GENERATED: unreleased -->
 
 ## [0.2.0] - 2026-11-21
 
