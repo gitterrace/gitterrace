@@ -153,14 +153,16 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
 .day::before{content:"";width:12px;border-top:1px solid var(--line-strong)}
 .crow{flex-direction:row!important;align-items:center;gap:var(--space-3)!important;padding-top:var(--space-2)!important;padding-bottom:var(--space-2)!important}
 .crow .av{width:var(--space-5);height:var(--space-5);flex:none}
-/* One line per commit: subject takes the room, author and time sit after it,
-   muted, and give way first when the line is short. */
-.cmain{display:flex;flex-direction:row;flex-wrap:nowrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
+/* One line per commit: subject takes the room, author and time sit after it, muted. The
+   subject gives way first: when it has less than its base of room the author and time drop to
+   their own line whole, and are never squeezed into a narrow column. */
+.cmain{display:flex;flex-direction:row;flex-wrap:wrap;align-items:baseline;gap:0 var(--space-3);flex:1;min-width:0}
 /* The one place text is cut: a commit message is a single line that ends in an ellipsis
    when the room runs out, and carries the full text as a hover (tip.js). */
 .subj{display:block;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.cmain>.subj{color:var(--fg);font-weight:var(--weight-semibold);flex:0 1 auto}.cmain>.subj:hover{color:var(--accent-fg)}
-.cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto}
+.cmain>.subj{color:var(--fg);font-weight:var(--weight-semibold);flex:1 1 12rem}.cmain>.subj:hover{color:var(--accent-fg)}
+.cmain .muted{flex:0 0 auto;max-width:100%;overflow-wrap:break-word;margin-left:auto;
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;line-clamp:2;overflow:hidden}
 .cmain .muted b{color:var(--muted);font-weight:var(--weight-regular)}
 .crow .sha{flex:none}
 .crow>.ref>a{text-decoration:underline}
@@ -173,7 +175,7 @@ thead.quiet th{padding:0;border:0;line-height:0;height:0}
    what it shows: a long author line wraps, and the commit id and the ahead and behind counts
    move under the text when the row has no room for them, so no part of a row is drawn over
    another. The Graph view keeps one line per row, its cell must meet the rows around it. */
-@media (max-width:600px){.list:not(.graphed)>.crow{flex-wrap:wrap}.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap;flex:1 1 9rem;min-width:min(9rem,100%)}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0;overflow-wrap:anywhere}}
+@media (max-width:600px){.list:not(.graphed)>.crow{flex-wrap:wrap}.crow>.ref{flex-basis:6rem}.cmain{flex-wrap:wrap;flex:1 1 9rem;min-width:min(9rem,100%)}.cmain>.subj{flex:1 0 100%}.cmain .muted{margin-left:0}}
 
 /* commit page and diff */
 .meta{color:var(--muted);margin:var(--space-2) 0 var(--space-6)}.meta b{color:var(--fg)}

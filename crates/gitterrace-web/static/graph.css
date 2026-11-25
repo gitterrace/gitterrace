@@ -52,9 +52,21 @@ stroke-width:1px;stroke-dasharray:2 2}
 gap:2px;flex:none;width:var(--gw);box-sizing:border-box;
 margin:0 0 0 calc(-1 * (var(--gw) + var(--space-3)));
 font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
-max-width:100%;overflow-wrap:anywhere;text-align:right}
-@media (max-width:600px){.graphed{--gw:min(var(--lw,104px),6.5rem)}
-.graphed .cmain{min-width:0;flex-basis:0}
+max-width:100%;text-align:right}
+/* A label breaks after a slash or a hyphen only, shows 3 lines and carries its full name as a
+   tip; a part wider than the gutter is clipped, never split. */
+.glabels .gref{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
+overflow:hidden;overflow-wrap:normal;word-break:normal}
+/* Labels get a narrow gutter here and wrap inside it, so a long branch name grows its row taller
+   and the subject keeps the width. */
+@media (max-width:600px){.graphed{--gw:min(var(--lw,104px),5rem)}
+/* The subject keeps 8rem: when the cell, avatar and commit id leave less, the commit id drops
+   under the text, and the cell stretches over both lines. */
+.graphed .crow{flex-wrap:wrap}.graphed .cmain{min-width:8rem;flex:1 1 8rem}
+.graphed .crow>.sha{margin-left:auto}
+/* The row stays one line here, so the cell meets its neighbors and the text gets what is left.
+   Author and time stay on one line and are clipped, never broken inside a word. */
+.graphed .cmain .muted{display:block;overflow:hidden;white-space:nowrap}
 .graph{max-width:36px}.graph .xn,.graph .ow{display:none}.graph .on{display:inline}
 .graph .gedge.n{display:block}.graph .gedge.w{display:none}.graph .gfold.n{display:block}
 .graph .gfold.w{display:none}.cmain:has(.grefs)>.subj{flex:1 1 0}.grefs{max-width:50%;

@@ -52,8 +52,8 @@ async fn the_graph_view_draws_a_hidden_cell_per_row_and_marks_refs() {
     let (_, body) = page(&router, "/log/HEAD?view=graph").await;
     assert_eq!(cells(&body), 5, "{body}");
     assert!(body.contains("class=\"m main "), "the merge is a hollow mainline dot");
-    assert!(body.contains("<span class=\"gref cur\">main</span>"), "{body}");
-    assert!(body.contains("<span class=\"gref\">v1</span>"), "{body}");
+    assert!(body.contains("<span class=\"gref cur\" title=\"main\">main</span>"), "{body}");
+    assert!(body.contains("<span class=\"gref\" title=\"v1\">v1</span>"), "{body}");
     assert!(body.contains("aria-current=\"page\">Graph</a>"), "{body}");
     assert!(!body.contains("class=\"day\""), "no day header cuts the lines");
 }
@@ -127,10 +127,10 @@ async fn the_graph_draws_every_branch_and_worktree_lane_with_its_label() {
     }
     assert_eq!(cells(&all), 6, "{all}");
     for b in ["l1", "l2", "l3"] {
-        assert!(all.contains(&format!("<span class=\"gref\">{b}</span>")), "{all}");
+        assert!(all.contains(&format!("<span class=\"gref\" title=\"{b}\">{b}</span>")), "{all}");
     }
-    assert!(all.contains("<span class=\"gref cur\">main</span>"), "{all}");
-    assert!(all.contains("<span class=\"gref\">worktree wt</span>"), "{all}");
+    assert!(all.contains("<span class=\"gref cur\" title=\"main\">main</span>"), "{all}");
+    assert!(all.contains("<span class=\"gref\" title=\"worktree wt\">worktree wt</span>"), "{all}");
     // Every tip row leads with its labels in its column's color, joined to the dot by a
     // dashed line. Colour follows the column: `wt` sits on main's tip, so the two share
     // column 0, and tips in different columns get different colors.
@@ -199,7 +199,7 @@ async fn lanes_of_many_branches_run_on_across_pages() {
     let (_, two) = page(&router, "/log/HEAD?view=graph&page=1").await;
     assert_eq!(cells(&one), 50);
     for b in ["b1", "b2", "b3", "b4"] {
-        assert!(one.contains(&format!("<span class=\"gref\">{b}</span>")), "{b}");
+        assert!(one.contains(&format!("<span class=\"gref\" title=\"{b}\">{b}</span>")), "{b}");
     }
     // Mainline plus four branch lines leave page one and enter page two.
     let last = one.rsplit("class=\"graph\"").next().expect("cell");

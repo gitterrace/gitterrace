@@ -28,7 +28,7 @@ a83d7cbee01b2b89fd1e539f6997d48f 89df12e8c2b1a85e02ee6b2d1ce9d277 [browse] /log/
 8ea1804c3386b79a5869a90b3ea25914 8ea1804c3386b79a5869a90b3ea25914 [browse] /log/HEAD?q=author:bob%40y.io
 3266d74d2ab342eaefefc72f2f7dd899 3266d74d2ab342eaefefc72f2f7dd899 [browse] /log/HEAD?q=path:src
 6aa9af99e8dbadd21c449b7d0a8b341a 6aa9af99e8dbadd21c449b7d0a8b341a [browse] /log/HEAD?q=path:src%20author:bob%40y.io
-07946ad7307c13670dd2cc52717a949e 1959932205677e005e345d347a6308ae [browse] /log/HEAD?view=graph
+062bcedb06ff411f96bbac1b5d0c52d4 f314c2fe1acdb7cebe08a67d4e4a0e5c [browse] /log/HEAD?view=graph
 8044d30c3f0226268343a82db77a7c26 8044d30c3f0226268343a82db77a7c26 [browse] /log/HEAD?view=graph&page=2
 ef75cee8ee2a713ccd396528df568f25 58bd80635d8bd53715c60b8ca4e3ae95 [browse] /log/nope
 6377562e8ed7c6d0a4255a4d9bd84b4d a3dfa3b6780605258cb4fe39c4bfcf1d [browse] /raw/HEAD/missing.rs
