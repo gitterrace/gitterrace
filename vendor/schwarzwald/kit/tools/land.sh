@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Land one checked commit from a clone onto the local main of a repository.
 #
-#   land.sh [--full-gate|--no-gate|--gate-change] <repo> <clone-dir> <sha>        (or LAND_REPO=<repo> land.sh <clone-dir> <sha>)
-#   land.sh [--full-gate|--no-gate|--gate-change] --plan <repo> <clone-dir> <base> <plan-file>
+#   land.sh [--full-gate|--no-gate|--gate-change|--no-cache] <repo> <clone-dir> <sha>        (or LAND_REPO=<repo> land.sh <clone-dir> <sha>)
+#   land.sh [--full-gate|--no-gate|--gate-change|--no-cache] --plan <repo> <clone-dir> <base> <plan-file>
 #
 # Cherry-picks the commit onto main, stamps author and committer date to now (one second after
 # main's tip if the clock is behind), keeps the message and the author identity. The message gets
@@ -38,6 +38,12 @@
 # gate's own scripts (a kit move) can land, an empty candidate gate is refused, and every command of
 # main's gate whose files all still exist in the result runs too, so a candidate cannot drop a
 # check by rewriting the list.
+#
+# Gate cache: a green run of the whole gate is kept in <git-common-dir>/land-cache/, keyed by the
+# result tree, the commands, the kit version, the toolchain and the gate env. A hit skips the gate
+# and prints one note with the cached run's date and log. Red runs are never kept, an entry expires
+# after 24h, and a command named in land.toml `[landing] fresh = ["cmd"]` (time-dependent, such as
+# an advisory check) is never cached. --no-cache always runs the gate.
 #
 # Refusals are remembered. A gate that sends a tip back records it with
 #   land.sh --sent-back <repo> <sha> <reason>
@@ -86,9 +92,9 @@ if [[ ${1:-} == --rewritten ]]; then
   echo "land-tip moved from $(git -C "$2" rev-parse --short "$old") to $(git -C "$2" rev-parse --short "$new")"
   exit 0
 fi
-plan_mode=0 full_gate=0 no_gate=0 gate_change=0
-while [[ ${1:-} == --full-gate || ${1:-} == --no-gate || ${1:-} == --plan || ${1:-} == --gate-change ]]; do
-  case $1 in --full-gate) full_gate=1 ;; --no-gate) no_gate=1 ;; --plan) plan_mode=1 ;; --gate-change) gate_change=1 ;; esac; shift
+plan_mode=0 full_gate=0 no_gate=0 gate_change=0 no_cache=0
+while [[ ${1:-} == --full-gate || ${1:-} == --no-gate || ${1:-} == --plan || ${1:-} == --gate-change || ${1:-} == --no-cache ]]; do
+  case $1 in --full-gate) full_gate=1 ;; --no-gate) no_gate=1 ;; --plan) plan_mode=1 ;; --gate-change) gate_change=1 ;; --no-cache) no_cache=1 ;; esac; shift
 done
 usage() { sed -n '2,33s/^# \{0,1\}//p' "$0" >&2; exit 1; }
 GATE_FILES=(schwarzwald/config/land.toml scripts/land-check.sh)
@@ -137,8 +143,8 @@ sys.exit(0 if any(re.search(p, sys.argv[2]) for p in pats) else 1)' "$deny" "$1"
 
 # landed_log <git log args...>: sha, author|committer identity, the dates, the subject
 landed_log() { git log --format='%h %an <%ae>|%cn <%ce> %ad|%cd %s' --date=iso "$@"; }
-# landing_cfg <land.toml>: print the [landing] gate commands, a "--" marker, then the messages
-# command (with {base} left in), NUL separated. Nothing for an empty or missing file.
+# landing_cfg <land.toml>: print the [landing] gate commands, a "--" marker, the messages command
+# (with {base} left in), a "--" marker, then the time-dependent `fresh` commands, NUL separated. Nothing for an empty or missing file.
 landing_cfg() {
   [[ -s $1 ]] || return 0
   "$py" -c '
@@ -146,7 +152,8 @@ import sys, tomllib
 c = tomllib.load(open(sys.argv[1], "rb")).get("landing")
 if c is None: sys.exit(0)
 for g in c.get("gate", []): sys.stdout.write(g + "\0")
-sys.stdout.write("--\0" + c.get("messages", "") + "\0")' "$1"
+sys.stdout.write("--\0" + c.get("messages", "") + "\0--\0")
+for g in c.get("fresh", []): sys.stdout.write(g + "\0")' "$1"
 }
 
 # gate_out <text>: a red gate's FAIL and error lines (the failing check), then its last 10 lines.
@@ -192,12 +199,58 @@ make_retired() {
   echo "make ${flags[*]+${flags[*]} }${kept[*]}"
 }
 
+# The gate cache: a green run of the whole gate is kept in <git-common-dir>/land-cache/<key>,
+# a file with the run's epoch and date and a .log beside it. The key covers the result tree, the
+# commit messages (the message gate reads them), every command, the full-gate flag and
+# land-check.sh, the kit version (this file and its manifest.json), the toolchain (rustc,
+# xcodebuild, the python) and the gate env allowlist. An entry older than 24h misses.
+CACHE_TTL=86400
+cache_dir() {
+  local c
+  c=$(git -C "$repo" rev-parse --git-common-dir)
+  [[ $c == /* ]] || c="$repo/$c"
+  echo "$c/land-cache"
+}
+cache_key() { # cache_key <base> <gate-changed>: a hash of everything that judged the tree
+  local here
+  here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+  {
+    git rev-parse 'HEAD^{tree}'
+    git log --format=%B "$1..HEAD" | git hash-object --stdin
+    printf 'full=%s change=%s\n' "$full_gate" "$2"
+    printf 'gate=%s\n' "${gates[@]+"${gates[@]}"}"
+    printf 'messages=%s\n' "$msgcmd"
+    if [ -s scripts/land-check.sh ]; then git hash-object scripts/land-check.sh; fi
+    git hash-object "$here/land.sh"
+    if [ -f "$here/../manifest.json" ]; then git hash-object "$here/../manifest.json"; fi
+    rustc -V 2>&1 || true
+    if command -v xcodebuild >/dev/null; then xcodebuild -version 2>&1 || true; fi
+    "$py" -V 2>&1
+    env | grep -E '^(CARGO|RUST|RUSTUP|RUSTFLAGS|PYTHON|CC|CXX|CFLAGS|CXXFLAGS|LDFLAGS|MAKEFLAGS|MACOSX_DEPLOYMENT_TARGET|SDKROOT|DEVELOPER_DIR)[A-Z_]*=' | LC_ALL=C sort || true
+  } | git hash-object --stdin
+}
+cache_hit() { # cache_hit <entry>: succeeds, with one note, for a fresh entry
+  local f=$1 ts=0 when="" now
+  [ -f "$f" ] || return 1
+  { read -r ts; read -r when; } <"$f" || true
+  [[ $ts =~ ^[0-9]+$ ]] || return 1
+  now=$(date +%s)
+  { [ $((now - ts)) -lt "$CACHE_TTL" ] && [ "$ts" -le "$now" ]; } || return 1
+  echo "gate cached: the same tree passed this gate on $when (log $f.log). --no-cache runs it again." >&2
+}
+cache_store() { # cache_store <dir> <key> <log>
+  mkdir -p "$1"
+  printf '%s' "$3" >"$1/$2.log"
+  printf '%s\n%s\n' "$(date +%s)" "$(date '+%Y-%m-%d %H:%M:%S %z')" >"$1/$2.tmp.$$"
+  mv "$1/$2.tmp.$$" "$1/$2"
+}
+
 # run_gate <base>: the product's gate, in the current directory (a temporary clone holding the
 # result exactly as main would get it). Exits refusing on a red gate, or on no gate without
 # --no-gate.
 run_gate() {
-  local base=$1 item g out seen=0 msgcmd="" hooks gd changed f tree
-  local -a gates=()
+  local base=$1 item g out seen=0 msgcmd="" hooks gd changed f tree st=0
+  local -a gates=() fresh=()
   # A tree a gate sent back stays refused, whatever commit carries it now.
   tree=$(git rev-parse 'HEAD^{tree}')
   if git -C "$repo" show-ref --verify -q "refs/gate/sent-back/$tree"; then
@@ -229,18 +282,27 @@ run_gate() {
   hooks=$(gate_env git -C "$repo" config --get core.hooksPath 2>/dev/null || true)
   [ -z "$hooks" ] || git config core.hooksPath "$hooks"
   while IFS= read -r -d '' item; do
-    if [ "$seen" = 0 ] && [ "$item" = -- ]; then seen=1; elif [ "$seen" = 0 ]; then gates+=("$item"); else msgcmd=$item; fi
+    case $st in
+      0) if [ "$item" = -- ]; then seen=1 st=1; else gates+=("$item"); fi ;;
+      1) msgcmd=$item st=2 ;;
+      2) st=3 ;;
+      *) fresh+=("$item") ;;
+    esac
   done < <(landing_cfg "$cfg")
   if [ -n "$changed" ]; then
     [ "${#gates[@]}" -gt 0 ] || { echo "refused: the candidate's gate is empty, so nothing would judge this gate change" >&2; exit 1; }
     # Every command of main's gate whose files the result still has runs as well: a candidate
     # cannot drop a check by rewriting the list, only by moving a file it runs. Every word with a
     # slash counts: a runner script that stayed put must not run a script that moved.
-    local mitem mseen=0 mcmd w x
+    local mitem mseen=0 mcmd w x mst=0
     local -a ws=()
     while IFS= read -r -d '' mitem; do
-      if [ "$mseen" = 0 ] && [ "$mitem" = -- ]; then mseen=1; continue; fi
-      [ "$mseen" = 0 ] || continue
+      case $mst in
+        0) if [ "$mitem" = -- ]; then mseen=1 mst=1; continue; fi ;;
+        1) mst=2; continue ;;
+        2) mst=3; continue ;;
+        *) continue ;;
+      esac
       for mcmd in "${gates[@]}"; do [ "$mcmd" = "$mitem" ] && continue 2; done
       read -ra ws <<<"$mitem"
       w=""
@@ -256,11 +318,24 @@ run_gate() {
     echo "landing gate: none configured (schwarzwald/config/land.toml [landing] is missing)" >&2
     [ "$no_gate" = 1 ] || { echo "refused: no landing gate. Add [landing] to schwarzwald/config/land.toml, or pass --no-gate." >&2; exit 1; }
   fi
+  # A green run of the whole gate is cached by what judged it (see cache_key). Only a gate with
+  # something to run is cached, and never one that names a time-dependent (`fresh`) command.
+  local ckey="" clog="" cdir
+  if [ "$no_cache" = 0 ] && { [ "${#gates[@]}" -gt 0 ] || [ -n "$msgcmd" ]; }; then
+    ckey=$(cache_key "$base" "$changed")
+    for g in "${gates[@]+"${gates[@]}"}" ${msgcmd:+"$msgcmd"}; do
+      for f in "${fresh[@]+"${fresh[@]}"}"; do [ "$g" != "$f" ] || { ckey=""; break 2; }; done
+    done
+  fi
+  cdir=$(cache_dir)
+  if [ -n "$ckey" ] && cache_hit "$cdir/$ckey"; then return 0; fi
   for g in "${gates[@]+"${gates[@]}"}"; do
     out=$(gate_env bash -c "$g" 2>&1) || { echo "refused: the product gate failed ($g):" >&2; gate_out "$out"; exit 1; }
+    clog+="== $g"$'\n'"$out"$'\n'
   done
   if [ -n "$msgcmd" ]; then
     out=$(gate_env bash -c "${msgcmd//\{base\}/$base}" 2>&1) || { echo "refused: the message gate failed:" >&2; gate_out "$out"; exit 1; }
+    clog+="== messages"$'\n'"$out"$'\n'
   fi
   # The tree's own land-check.sh runs in place. For a gate change that is the candidate's, like
   # its land.toml. Without one, main must have had one for --full-gate to run anything.
@@ -268,8 +343,11 @@ run_gate() {
   if [ -n "$changed" ]; then [ -s "$check" ] && run_full=1; else [ -s "$gd/land-check.sh" ] && run_full=1; fi
   if [ "$full_gate" = 1 ] && [ "$run_full" = 1 ]; then
     out=$(gate_env bash "$check" 2>&1) || { echo "refused: the full product gate failed:" >&2; gate_out "$out"; exit 1; }
+    clog+="== land-check.sh"$'\n'"$out"$'\n'
     out=$(gate_env bash "$check" --messages "$base" 2>&1) || { echo "refused: the message gate failed:" >&2; gate_out "$out"; exit 1; }
+    clog+="== land-check.sh --messages"$'\n'"$out"$'\n'
   fi
+  [ -z "$ckey" ] || cache_store "$cdir" "$ckey" "$clog"
 }
 
 cd "$repo"
