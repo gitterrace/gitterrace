@@ -12,7 +12,7 @@ fn landing() -> String {
 #[test]
 fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
     let page = landing();
-    let shown = ["insights", "ownership", "commit", "blame", "narrow", "send", "agent"];
+    let shown = ["insights", "ownership", "blame", "commit", "narrow", "send", "agent"];
     assert_eq!(page.matches("<figure ").count(), shown.len());
     assert_eq!(page.matches("class=\"x\"").count(), shown.len());
     for name in shown {
@@ -21,6 +21,27 @@ fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
         assert_eq!(page.matches(&format!("screenshots/{name}-dark.thumb.webp")).count(), 1);
     }
     assert!(!page.contains("class=\"lightbox\""));
+    // The phone sits beside the commit page in one equal-height pair, and only those two.
+    let pair = page.split("<div class=\"pair\">").nth(1).expect("pair").split("</div>").next();
+    let pair = pair.expect("pair body");
+    assert!(pair.contains("id=\"shot-commit\"") && pair.contains("id=\"shot-narrow\""));
+    assert_eq!(pair.matches("<figure ").count(), 2);
+    assert_eq!(page.matches("class=\"pair\"").count(), 1);
+}
+
+/// Every code fence on the landing page carries `s-*` highlight classes. A fence that bypasses
+/// the shared handler comes out bare, and so does a fence whose language the highlighter does
+/// not know (a typo such as `tomll`), which would otherwise pass as plain text unseen.
+#[test]
+fn every_landing_code_block_is_highlighted() {
+    let page = landing();
+    let mut seen = 0;
+    for block in page.split("<pre>").skip(1) {
+        let block = block.split("</pre>").next().expect("pre body");
+        seen += 1;
+        assert!(block.contains("class=\"s-"), "unhighlighted code block: {block}");
+    }
+    assert!(seen >= 5, "{seen} code blocks");
 }
 
 /// Only the hero loads at once, and it is the one marked high priority.

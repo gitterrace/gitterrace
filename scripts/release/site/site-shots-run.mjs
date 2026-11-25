@@ -88,7 +88,7 @@ const SHOTS = [
 
 SHOTS.push(
   // The repository page on a phone: the 390 px layout, 2x like the rest.
-  { name: 'narrow', path: '/r/ripgrep/', viewport: { width: 390, height: 780 } },
+  { name: 'narrow', path: '/r/ripgrep/commit/068a63e', viewport: { width: 390, height: 780 } },
   {
     // The actions menu on a marked line, with the coding agent entry beside the other targets.
     name: 'agent',
@@ -115,7 +115,7 @@ const todo = SHOTS.filter((s) => !only.length || only.includes(s.name));
 const pw = await loadPlaywright();
 const browser = await launch(pw, 'chromium');
 for (const scheme of ['light', 'dark']) {
-  const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ colorScheme: scheme, viewport: { width: 1280, height: 800 }, deviceScaleFactor: 2, bypassCSP: true });
   for (const s of todo) {
     const p = await ctx.newPage();
     if (s.viewport) await p.setViewportSize(s.viewport);

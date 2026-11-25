@@ -24,17 +24,6 @@ Ownership: bus factor, solo and stale lines, and who holds each directory.
 
 Shows [jq jq-1.8.2](https://github.com/jqlang/jq/tree/jq-1.8.2).
 
-## Commit
-
-Commit: the message, the changed files and a highlighted diff.
-
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="commit-dark.webp">
-<img src="commit-light.webp" alt="Commit: the message, the changed files and a highlighted diff.">
-</picture>
-
-Shows [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/tree/15.2.0).
-
 ## Blame
 
 Blame: who last changed each line, with the commit and its age beside the code.
@@ -46,13 +35,24 @@ Blame: who last changed each line, with the commit and its age beside the code.
 
 Shows [jq jq-1.8.2](https://github.com/jqlang/jq/tree/jq-1.8.2).
 
+## Commit
+
+Commit: the message, the changed files and a highlighted diff.
+
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="commit-dark.webp">
+<img src="commit-light.webp" alt="Commit: the message, the changed files and a highlighted diff.">
+</picture>
+
+Shows [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/tree/15.2.0).
+
 ## Phone
 
-Phone: the repository page on a 390 px wide screen.
+Phone: the commit page on a 390 px wide screen.
 
 <picture>
 <source media="(prefers-color-scheme: dark)" srcset="narrow-dark.webp">
-<img src="narrow-light.webp" alt="Phone: the repository page on a 390 px wide screen.">
+<img src="narrow-light.webp" alt="Phone: the commit page on a 390 px wide screen.">
 </picture>
 
 Shows [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/tree/15.2.0).

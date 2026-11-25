@@ -23,8 +23,12 @@ height="800" loading="eager" fetchpriority="high" decoding="async"></picture>
 <h2>Find what a diff never shows</h2>
 <div class="shots" id="gallery">
 {%- for s in shots %}
+{%- if loop.index == 4 %}
+<div class="pair">
+{%- endif %}
 {% include "landing-figure.html" %}
 {%- endfor %}
+</div>
 </div>
 <ul class="lines" data-from="docs">
 {%- for l in lines %}

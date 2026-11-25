@@ -191,14 +191,14 @@ pub(super) fn body(
         }
     }
     let mut out = String::new();
-    html::push_html(&mut out, diagrams(events, from)?.into_iter());
+    html::push_html(&mut out, fences(events, from)?.into_iter());
     Ok(wrap_wide(&out))
 }
 
 /// `events` with each fenced `mermaid` block drawn as an inline SVG, numbered in page order so
 /// two diagrams on one page keep their ids apart, and each other fence in a language the app
 /// highlights coloured with its `s-*` classes. A block the site cannot draw is an error.
-fn diagrams<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
+pub(super) fn fences<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
     let mut out = Vec::with_capacity(events.len());
     let mut src: Option<(String, String)> = None;
     let mut n = 0;
@@ -232,8 +232,26 @@ fn diagrams<'a>(events: Vec<Event<'a>>, from: &str) -> Result<Vec<Event<'a>>> {
 pub(super) fn code_block(code: &str, lang: &str) -> String {
     const MOST: usize = 64 * 1024;
     let lang = lang.split_whitespace().next().unwrap_or("");
-    let body = gitterrace_web::highlight_block(code, lang, MOST).unwrap_or_else(|| esc(code));
+    let body = gitterrace_web::highlight_block(code, lang, MOST)
+        .map_or_else(|| esc(code), |b| bare_punctuation(&b));
     format!("<pre><code class=\"language-{}\">{body}</code></pre>\n", esc(lang))
+}
+
+/// `html` without its `s-punctuation` spans. The site paints punctuation in the text colour
+/// already, so the span only costs bytes. The highlighter's spans are flat, never nested.
+fn bare_punctuation(html: &str) -> String {
+    const OPEN: &str = "<span class=\"s-punctuation\">";
+    let mut out = String::with_capacity(html.len());
+    let mut rest = html;
+    while let Some(at) = rest.find(OPEN) {
+        out.push_str(&rest[..at]);
+        let inner = &rest[at + OPEN.len()..];
+        let Some(end) = inner.find("</span>") else { break };
+        out.push_str(&inner[..end]);
+        rest = &inner[end + "</span>".len()..];
+    }
+    out.push_str(rest);
+    out
 }
 
 /// `text` escaped for HTML text and attribute values.
@@ -509,6 +527,12 @@ pub(super) fn sentence(what: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn punctuation_spans_unwrap_and_other_spans_stay() {
+        let h = "<span class=\"s-tag\">id</span><span class=\"s-punctuation\">=</span>x";
+        assert_eq!(bare_punctuation(h), "<span class=\"s-tag\">id</span>=x");
+    }
 
     /// Fences in a language the app highlights come out with its `s-*` spans and a language class;
     /// `text` and unknown fences stay plain and escaped.

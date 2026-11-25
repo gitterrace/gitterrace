@@ -8,7 +8,7 @@ use pulldown_cmark::{Parser, html};
 
 use crate::facts::Workspace;
 use crate::readme_agents_md;
-use crate::site::docs::{Links, code_block};
+use crate::site::docs::{Links, code_block, fences};
 
 /// The landing page's words, one `##` section per block, each sentence here once.
 pub(crate) const LANDING: &str = "docs/landing.md";
@@ -20,9 +20,9 @@ const WHY: &str = "Why";
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
 
-/// The screenshots, in gallery order (pairs side by side): file stem, alt text ("Caption: what
-/// it shows"), caption. The site has a WebP pair per entry; the README shows the first, and
-/// `docs/screenshots/` keeps only the PNG files the README links.
+/// The screenshots, in gallery order (the last two sit as one equal-height pair): file stem,
+/// alt text ("Caption: what it shows"), caption. The site has a WebP pair per entry; the
+/// README shows the first, and `docs/screenshots/` keeps only the PNG files the README links.
 pub const SHOTS: [(&str, &str, &str); 8] = [
     (
         "insights",
@@ -34,13 +34,13 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
         "Ownership: bus factor, solo and stale lines, and who holds each directory.",
         "Ownership",
     ),
-    ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
     (
         "blame",
         "Blame: who last changed each line, with the commit and its age beside the code.",
         "Blame",
     ),
-    ("narrow", "Phone: the repository page on a 390 px wide screen.", "Phone"),
+    ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
+    ("narrow", "Phone: the commit page on a 390 px wide screen.", "Phone"),
     (
         "send",
         "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
@@ -60,7 +60,7 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
 ];
 
 /// The gallery's stems, in order, and the hand-off's: the rest of `SHOTS` is the hero.
-const GALLERY: [&str; 5] = ["insights", "ownership", "commit", "blame", "narrow"];
+const GALLERY: [&str; 5] = ["insights", "ownership", "blame", "commit", "narrow"];
 const HAND: [&str; 2] = ["send", "agent"];
 const HERO: &str = "overview";
 
@@ -173,13 +173,13 @@ pub(crate) fn body(
             &format!("{}\ngit terrace\n", install.first().map_or("", |(_, l)| l.as_str())),
             "bash",
         ),
-        handoff: md(handoff, links),
+        handoff: md(handoff, links)?,
         hand,
         demo: &ws.demo,
         repo: &pkg.repository,
         lines: rows,
-        promises: &md(promises, links),
-        story: &md(story, links),
+        promises: &md(promises, links)?,
+        story: &md(story, links)?,
         destinations: &DESTINATIONS,
     }
     .render()?;
@@ -276,7 +276,7 @@ pub(crate) fn check_facts(text: &str) -> anyhow::Result<()> {
 
 /// Markdown from the landing copy as HTML, with its relative links pointed at the site's
 /// pages, as from any doc.
-fn md(text: &str, links: &Links) -> String {
+fn md(text: &str, links: &Links) -> anyhow::Result<String> {
     let mut out = String::new();
     let events = Parser::new_ext(text, gitterrace_web::markdown_options()).map(|ev| match ev {
         pulldown_cmark::Event::Start(pulldown_cmark::Tag::Link {
@@ -298,8 +298,8 @@ fn md(text: &str, links: &Links) -> String {
             if h.trim_start().starts_with("<!-- BEGIN GENERATED: ")
                 || h.trim_start().starts_with("<!-- END GENERATED: "))
     });
-    html::push_html(&mut out, events);
-    out
+    html::push_html(&mut out, fences(events.collect(), LANDING)?.into_iter());
+    Ok(out)
 }
 
 #[cfg(test)]
@@ -349,7 +349,7 @@ mod tests {
     #[test]
     fn why_links_point_at_the_site_pages() {
         let links = Links::new("R");
-        let s = md("[a](online.md) [b](../SECURITY.md#x) [c](https://e.org)", &links);
+        let s = md("[a](online.md) [b](../SECURITY.md#x) [c](https://e.org)", &links).expect("md");
         assert!(s.contains("href=\"/docs/online/\""), "{s}");
         assert!(s.contains("href=\"R/blob/main/SECURITY.md#x\""), "{s}");
         assert!(s.contains("href=\"https://e.org\""), "{s}");
