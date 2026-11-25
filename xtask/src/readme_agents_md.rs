@@ -55,6 +55,8 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         Out::block(START, "install", install),
         Out::block(START, "quickstart", quickstart_md()),
         Out::block(START, "upgrade", upgrade_md(ws)),
+        Out::block(START, "verify", verify_md(ws)),
+        Out::block(START, "windows-paths", windows_paths_md()),
         Out::block(README, "commands", commands()),
         Out::block(README, "actions", actions),
         Out::block(README, "source-line", crate::docs_actions_md::source_line()),
@@ -92,6 +94,28 @@ pub fn demo_md(ws: &Workspace) -> String {
 }
 
 /// [`quickstart`] as a fenced block.
+/// The Windows digest check, naming the archive the release ships.
+fn verify_md(ws: &Workspace) -> String {
+    let zip = &ws.windows_archive;
+    let archive = ws
+        .targets
+        .iter()
+        .find(|t| t.contains("windows"))
+        .map_or_else(|| zip.clone(), |t| format!("gitterrace-{t}.{}", zip.trim_start_matches('.')));
+    format!(
+        "```powershell\n(Get-FileHash .\\{archive}).Hash\nGet-Content .\\{archive}.sha256\n```\n"
+    )
+}
+
+/// Where Windows keeps the config and the repository list, from the variables the code reads.
+fn windows_paths_md() -> String {
+    format!(
+        "Config lives in `%{}%\\gitterrace`, the repository list in `%{}%\\gitterrace`.\n",
+        gitterrace_config::WINDOWS_CONFIG_ENV,
+        gitterrace_config::WINDOWS_STATE_ENV
+    )
+}
+
 fn quickstart_md() -> String {
     format!("```bash\n{}```\n", quickstart())
 }

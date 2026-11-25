@@ -74,8 +74,8 @@ launchctl kickstart -k gui/$(id -u)/dev.gitterrace.server
 ```
 
 The other ways to upgrade (the prebuilt download, then cargo) are in
-[Getting started](getting-started.md#upgrade). If the program moved, run `git terrace service install` again. It rewrites its
-own file.
+[Getting started](getting-started.md#upgrade). If the program moved, run
+`git terrace service install` again. It rewrites its own file.
 
 ## Uninstall
 

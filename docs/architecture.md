@@ -235,7 +235,8 @@ public, headers on every method, path escapes in the tail and in `?path=`,
 Code, diffs, blame and fenced blocks in markdown are highlighted with the
 grammars of [bat](https://github.com/sharkdp/bat) (through `two-face` and
 `syntect`), compiled into the binary. A file is matched by name, then extension,
-then its `#!` line. Text over `limits.highlight_kb` shows plain. These are the languages:
+then its `#!` line. Text over `limits.highlight_kb` shows plain. These are the
+languages:
 
 <!-- BEGIN GENERATED: languages -->
 182 languages: ActionScript, Ada, Apache Conf, AppleScript, ARM Assembly,

@@ -59,7 +59,7 @@ pub struct Entry {
 pub fn state_dir() -> Option<PathBuf> {
     #[cfg(windows)]
     {
-        if let Some(a) = std::env::var_os("LOCALAPPDATA").map(PathBuf::from) {
+        if let Some(a) = std::env::var_os(gitterrace_config::WINDOWS_STATE_ENV).map(PathBuf::from) {
             return Some(a.join("gitterrace"));
         }
     }

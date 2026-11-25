@@ -15,14 +15,15 @@ working tree to leak and no action to run.
 git terrace export site ~/src/project --commits 300
 ```
 
-Several repositories go into one site (`export site repo1 repo2`), and
-`--project name=url` credits someone else's repository in every page's banner.
-The export writes a `_headers` file with the content security policy and
-`Cache-Control: no-cache` on the pages. A browser then revalidates them after a
-new export. Scripts, styles and fonts carry the build's version
-(`app.css?v=...`) and are kept a year. A new export names new versions, so a
-fresh page never runs a stale script. Netlify and Cloudflare Pages apply the
-file. Elsewhere, set the same headers on the host.
+Several repositories go into one site, and a project flag credits someone
+else's repository in every page's banner (see
+[the export flags](cli.md#git-terrace-export)). The export writes a `_headers`
+file with the content security policy and `Cache-Control: no-cache` on the
+pages. A browser then revalidates them after a new export. Scripts, styles and
+fonts carry the build's version (`app.css?v=...`) and are kept a year. A new
+export names new versions, so a fresh page never runs a stale script.
+Netlify and Cloudflare Pages apply the file. Elsewhere, set the same headers
+on the host.
 
 Every page ends with a credit line such as
 `Source: name, MIT license, github.com/owner/name.`. The license comes
@@ -61,7 +62,7 @@ It never shows or does:
 - Live updates, actions, Send to, or adding repositories.
 - Any method but `GET` and `HEAD`.
 
-A request over `server.public_timeout_secs` (default 30) answers `503`. Slow
+A request over `server.public_timeout_secs` answers `503`. Slow
 pages finish in the background and answer from the cache next time.
 
 `[features]` can switch off more pages, such as `blame_enabled = false`: the
@@ -71,8 +72,7 @@ says.
 
 ## Run with Docker
 
-The root `Dockerfile` serves one repository, or a folder of repositories two
-levels deep:
+The root `Dockerfile` serves one repository, or a folder of repositories:
 
 ```sh
 docker build -t gitterrace .
@@ -83,8 +83,7 @@ docker run --rm -p 127.0.0.1:8080:8080 -v "$PWD":/repos:ro \
 Open `http://localhost:8080`. The image runs in public mode. Keep `127.0.0.1:`
 in `-p` unless the network may read every commit. The `/cache` volume keeps the
 index across restarts. Mount a config folder on `/config` for other settings.
-No prebuilt image is published. The build takes 5 to 10 minutes, on amd64 or
-arm64.
+No prebuilt image is published. The build runs on amd64 or arm64.
 
 On `docker stop` the server lets open responses finish and exits 0, well
 inside Docker's 10 seconds. The healthcheck runs the binary with `--version`. It

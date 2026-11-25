@@ -288,6 +288,24 @@ mod tests {
         assert!(p.contains("RunAtLoad") && p.contains("StandardErrorPath"));
     }
 
+    /// The commands and file names the service page shows are the ones the code uses.
+    #[test]
+    fn the_service_page_commands_parse_and_name_the_real_files() {
+        use clap::Parser as _;
+
+        let page = include_str!("../../../docs/service.md");
+        let mut n = 0;
+        for line in page.lines().filter_map(|l| l.strip_prefix("git terrace ")) {
+            let cmd = line.split('#').next().unwrap_or_default();
+            let args = std::iter::once("git-terrace").chain(cmd.split_whitespace());
+            assert!(crate::cli::Cli::try_parse_from(args).is_ok(), "does not parse: {line}");
+            n += 1;
+        }
+        assert!(n >= 3, "the service page lost its commands");
+        assert!(page.contains(UNIT_NAME), "service.md does not name {UNIT_NAME}");
+        assert!(page.contains(LABEL), "service.md does not name {LABEL}");
+    }
+
     #[test]
     fn addr_is_passed_only_when_given() {
         let mut s = spec(&["/r"]);

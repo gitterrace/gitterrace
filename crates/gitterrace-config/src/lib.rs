@@ -77,6 +77,9 @@ pub enum ConfigError {
 /// The Windows environment variable that holds the config folder's parent.
 pub const WINDOWS_CONFIG_ENV: &str = "APPDATA";
 
+/// The Windows environment variable that holds the repository list's parent.
+pub const WINDOWS_STATE_ENV: &str = "LOCALAPPDATA";
+
 /// Where the config directory is.
 ///
 /// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute,
@@ -233,6 +236,20 @@ mod tests {
         assert_eq!(e.to_string(), "/c/config.toml: oops");
         let e = parse("[repo.x.features]\nlive = true\n").expect_err("override");
         assert!(e.to_string().starts_with("repo.x.features."), "{e}");
+    }
+
+    /// Every toml example on the online page loads, so a renamed key breaks the build.
+    #[test]
+    fn the_online_page_examples_load() {
+        let page = include_str!("../../../docs/online.md");
+        let mut n = 0;
+        for block in page.split("```toml\n").skip(1) {
+            let body = block.split("```").next().unwrap_or_default();
+            let l = parse(body).expect("online.md toml loads");
+            assert!(l.warnings.is_empty(), "online.md toml warns: {:?}", l.warnings);
+            n += 1;
+        }
+        assert!(n > 0, "online.md lost its toml example");
     }
 
     /// The serving cache budget is the one the memory guard assumes (32 MB plus margin): a

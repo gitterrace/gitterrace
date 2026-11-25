@@ -29,10 +29,13 @@ install with Homebrew, which checks the digest in the formula.
 The Windows PowerShell installer does not check a digest. Download the zip and
 its `.sha256` file from the release page and compare them before unpacking:
 
+<!-- BEGIN GENERATED: verify -->
 ```powershell
 (Get-FileHash .\gitterrace-x86_64-pc-windows-msvc.zip).Hash
 Get-Content .\gitterrace-x86_64-pc-windows-msvc.zip.sha256
 ```
+
+<!-- END GENERATED: verify -->
 
 Every release archive also carries a build provenance attestation:
 `gh attestation verify <archive> --repo gitterrace/gitterrace`.
@@ -67,9 +70,14 @@ That is all most people need. Two options build on it:
 
 ## Windows
 
-Releases ship a zip. Config lives in `%APPDATA%\gitterrace`, the repository
-list in `%LOCALAPPDATA%\gitterrace`. `git terrace install-handler` only prints
-the `reg add` commands.
+Releases ship a zip. `git terrace install-handler` only prints the `reg add`
+commands.
+
+<!-- BEGIN GENERATED: windows-paths -->
+Config lives in `%APPDATA%\gitterrace`, the repository list in
+`%LOCALAPPDATA%\gitterrace`.
+
+<!-- END GENERATED: windows-paths -->
 
 ## Upgrade
 
@@ -94,10 +102,10 @@ again. A new cache format rebuilds the cache by itself.
 2. Remove the binary the way you installed it: `brew uninstall gitterrace`,
    `cargo uninstall gitterrace`, or delete the binary from the folder the
    shell installer reported (`~/.cargo/bin` by default).
-3. Delete what it wrote, if you want it gone too: the config folder
-   (`~/.config/gitterrace`, `%APPDATA%\gitterrace` on Windows), the repository
-   list (`~/.local/state/gitterrace`, `%LOCALAPPDATA%\gitterrace` on Windows)
-   and `.git/gitterrace/` in each repository you served.
+3. Delete what it wrote, if you want it gone too: the config folder, the
+   repository list (`~/.config/gitterrace` and `~/.local/state/gitterrace`, or
+   the Windows folders above) and `.git/gitterrace/` in each repository you
+   served.
 
 ## Troubleshooting
 
