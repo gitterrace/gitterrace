@@ -18,6 +18,9 @@ mod credit;
 mod docs_actions_md;
 mod docs_arch_md;
 mod docs_bench_md;
+// Unix only: the toml check stubs programs with mode bits, as the actions tests do.
+#[cfg(all(test, unix))]
+mod docs_guard;
 mod docs_index;
 mod docs_md;
 mod docs_using_md;
