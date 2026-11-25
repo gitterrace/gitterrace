@@ -29,6 +29,8 @@
   "ignores": [
     "target/**", "crates/*/tests/golden/**", "node_modules/**", "vendor/schwarzwald/kit/**",
     // vale downloads its packages here (gitignored)
-    "schwarzwald/styles/proselint/**"
+    "schwarzwald/styles/proselint/**",
+    // local tool state in dot directories (excluded from git), except the tracked workflow folder
+    ".[!g]*/**"
   ]
 }
