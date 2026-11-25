@@ -273,6 +273,15 @@ fc_judged=$(
         if guard_fallback_judge; then got=ALLOW; else got=BLOCK; fi
         printf '%s %s %s\n' "$want" "$got" "$cmd"
     done <<<"$FC_CORPUS"
+    # The data rows, judged degraded and healthy (healthy is how the script-content rule asks).
+    while IFS='@' read -r want cmd; do
+        [ -n "$want" ] && [ "${want#\#}" = "$want" ] || continue
+        for h in "" 1; do
+            GUARD_CWD="$REPO" GUARD_CMD="$cmd"
+            if GUARD_FALLBACK_HEALTHY=$h guard_fallback_judge; then got=ALLOW; else got=BLOCK; fi
+            printf '%s %s %s%s\n' "$want" "$got" "$cmd" "${h:+ (healthy)}"
+        done
+    done <"$GUARDS_SRC/tests/fallback-corpus.tsv"
     # shellcheck disable=SC2034 # read by the sourced judge
     GUARD_CWD=/tmp GUARD_CMD='git stash'
     if guard_fallback_judge; then got=ALLOW; else got=BLOCK; fi
@@ -294,6 +303,8 @@ while read -r want got cmd; do
 done <<<"$fc_judged"
 # A corpus that did not load or did not parse reads like a clean run.
 fc_want=$(printf '%s\n' "$FC_CORPUS" | grep -c '@')
+# Each data row is judged twice, degraded and healthy.
+fc_want=$((fc_want + 2 * $(grep -c '^[A-Z]*@' "$GUARDS_SRC/tests/fallback-corpus.tsv")))
 CASES=$((CASES + 1))
 if [ "$fc_n" -eq $((fc_want + 1)) ]; then
     printf '  ok   [COUNT ] fallback judge answered all %s corpus rows\n' "$fc_n"

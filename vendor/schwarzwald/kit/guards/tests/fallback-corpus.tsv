@@ -1,0 +1,9 @@
+# Fallback judge corpus, read by cases-fallback.sh after its inline rows. One row per line,
+# VERDICT@command, judged with the guards degraded and again healthy (the script-content rule's
+# mode). Data, not a script: a row may name the destructive class it must refuse.
+# Words after an `sh -c` body are its arguments, never a command: a script that only passes
+# "$1" after a python -c body names no git subcommand.
+BLOCK@bash -c 'echo a' x; git stash
+BLOCK@sh -c 'git stash' a b
+ALLOW@s=$(a); p -c 'v' "$s" "$1"
+ALLOW@python3 -c 'print(1)' "$1"

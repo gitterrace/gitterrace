@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-25T12:56:57Z",
+  "date": "2026-11-25T16:45:22Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -30,6 +30,7 @@
     "markdownlint",
     "ratchet",
     "rules",
+    "sonar-scan",
     "theme-tokens",
     "vale"
   ],
@@ -58,7 +59,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "0a2200da19679fbdcab1298f0f67fd64f7a620d227d05b4c31531255e6357f7a",
+    "README.md": "f56c4f382c8fb4ffd43ba1fa389ddeb2e216344112d542e58748ea7ffe4f4f07",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -105,12 +106,13 @@
     "guards/rules/70-silent-failure.sh": "73dbab45f0470476e2fad97ad13244b4d1d5250c13082a1a868c802c8890ff56",
     "guards/rules/80-destructive-class.sh": "62855350901ccec5ccb0c34ff9563c1251d006795732e03f6d0629777920a743",
     "guards/rules/82-script-content.sh": "dcde5c399881282c96c9b7c7d29ba373f03872debfe34af2e7c4af4be5bb8679",
-    "guards/rules/fallback/fail-closed.sh": "e751eda5192e28a5d3c055eafb2ae9d5c3c6f8269c5a924152152666edccb0a0",
+    "guards/rules/fallback/fail-closed.sh": "458f9f455e45f3f38c3c777de8d829d6cfff38807157807cf77daa9185367bec",
     "guards/tests/adapters.sh": "5d03e95fd100d562967443e317b782ac0b12c8bc26cd439296753fe1bcccac28",
     "guards/tests/cases-bypass.sh": "f286f545621a8cb93a15137a86cac22ff53178cfd9d312c8ea96aefc4d1bbf3a",
-    "guards/tests/cases-fallback.sh": "ae190592a9797fe5d9b74f9db17e492f862563789ce711994f8cead7d9dbc3b9",
+    "guards/tests/cases-fallback.sh": "66fc3b869e36e3175a1b01ae6896af9bd50b7ca194baac2d1fd5ec2279ff5174",
     "guards/tests/cases-rules.sh": "5935a18408293152074ed8459f9a3e13740af19f75c5f95638c90a85a1ca7373",
     "guards/tests/cases-state.sh": "295f0b06ff53956424a5c9d8b500af7782c25df5dc1e3165be36c50388af8a22",
+    "guards/tests/fallback-corpus.tsv": "291c38d7a849c071adce05c9b7350034c7fa09ecea43c5ba8bf41230b929d3a0",
     "guards/tests/lib.sh": "9413bf7b2a42725cb204923514e5e431a18b3c65b902de6d19e248e97777cb13",
     "guards/tests/prelude.sh": "0faabe9978e7a077bcfecc9e2856eb0e0f23b79f506dc4cc1a21feedc55c0cc1",
     "guards/tests/red-probes.tsv": "a3178acdfb83e33487400c77c0a9c326f793ef806cb5c7332626aa1044ffb3a9",
@@ -353,7 +355,9 @@
     "tools/golden.py": "660c09eb8d88ccc80e6c6c76e0747ba352377475e9e8a25e1abf4575089dd712",
     "tools/golden_test.py": "81b91e673ddc81a4d276cec02148e49845fa32263930f72fa2a597031f34cd9e",
     "tools/land.sh": "f4d75a1683799b421964bf88941bd80ececd31ac634b0ffd5918d5abb41ae462",
+    "tools/quiet.sh": "a794be9d97400331fed2961b12c3ef6a74c1a9d7af4dc4b9a804201c06396bd2",
     "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
+    "tools/sonar-scan.sh": "f1c7a2c6deb9f4cb1b9acdd749bc3272c68976f8aaf6b8fa976c7252ed202712",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
   },
   "exec": [
@@ -406,7 +410,9 @@
     "tools/golden.py",
     "tools/golden_test.py",
     "tools/land.sh",
+    "tools/quiet.sh",
     "tools/ratchet-check.py",
+    "tools/sonar-scan.sh",
     "tools/test-sandbox.sh"
   ]
 }

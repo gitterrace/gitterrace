@@ -1,0 +1,2 @@
+# Read by vendor/schwarzwald/kit/tools/sonar-scan.sh.
+exclusions = ["vendor/**", "target/**", "**/*.rs", "docs/screenshots/**"]

@@ -228,7 +228,13 @@ _gf_unquote() {
         fi
         tail="${near%"${near##*[! ]}"}"
         case "$tail" in
-            *-c | *eval)
+            *-c)
+                # `sh -c 'body' a b`: the body is code, the words after it are its arguments, so a
+                # placeholder command keeps them out of command position.
+                rest=" ; $body ; Q $rest"
+                continue
+                ;;
+            *eval)
                 rest=" ; $body ; $rest"
                 continue
                 ;;
