@@ -51,6 +51,7 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ARCH, "routes", arch::routes()),
         Out::block(ARCH, "languages", arch::languages()),
         Out::block(ARCH, "cache", arch::cache()),
+        Out::block(ARCH, "user-files", arch::user_files()),
         Out::block(BENCH, "corpus", bench::bench_report(root, "--corpus")?),
         Out::block(BENCH, "results", bench::bench_report(root, "--print")?),
         Out::block(USING, "log-filter", using::log_filter()),

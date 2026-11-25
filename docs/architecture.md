@@ -31,10 +31,8 @@ Each box is a crate the binary ships, and an arrow means "uses" (implied arrows
 left out). `testkit` is test-only. `schwarzwald` is the vendored shared kit:
 theme, lints, hooks and guards.
 
-The API crate's entry points: `gitterrace_api::router(ApiState)` (nest under
-`/api/v1`), `gitterrace_api::serve_mcp(path, config)` and
-`gitterrace_api::serve_mcp_repos(scope, repos, config)`. The naming rule for
-config keys lives in `gitterrace_config::naming`.
+The API crate's entry points are in its rustdoc. The naming rule for config
+keys lives in `gitterrace_config::naming`.
 
 ## Decisions
 
@@ -47,8 +45,8 @@ config keys lives in `gitterrace_config::naming`.
   landing mid-request cannot tear a page. Only the uncommitted view reads the
   worktree. The repository and the worktree are never written: the only writes
   are the files of the cache folder, all through `cache.rs`. Of those, the index
-  is disposable, while `checkpoints`, `viewed` and `findings` are the user's and
-  survive every reset (`USER_FILES` in `store.rs`).
+  is disposable, while the user's files (see [Cache](#cache)) survive every
+  reset (`USER_FILES` in `store.rs`).
 - **Browsing never waits on the cache.** Only insights pages show "Indexing
   history" while the index builds. The overview shows no progress.
 - **The index builds in a child process.** The server starts its own executable
@@ -67,7 +65,7 @@ config keys lives in `gitterrace_config::naming`.
   change, and a joining repository appears in open switchers. OS file events
   watch the git folder always and the working tree while a tab shows it. A burst
   of events is one cheap check. Dropped events (a loaded Mac) are caught by the
-  `watch.rescan_secs` rescan (30 by default). Without file events the server
+  `watch.rescan_secs` rescan. Without file events the server
   checks once a second.
 - **Features switch off at the route.** Each `[features]` switch owns its routes
   (`gitterrace-web/src/features.rs`). One gate answers an off route with 404,
@@ -125,8 +123,13 @@ The cache lives in `.git/gitterrace/` when that folder is writable, else in
 `$GITTERRACE_INDEX_FALLBACK/<hash of the git dir>` (the Docker image sets
 `/cache/index`), else nowhere.
 
+<!-- BEGIN GENERATED: user-files -->
 `checkpoints`, `viewed` and `findings` hold user state, so a wipe or an older
-build spares them. A checkpoint is a framed record with zstd copies of the
+build spares them.
+
+<!-- END GENERATED: user-files -->
+
+A checkpoint is a framed record with zstd copies of the
 changed text files. A torn tail is ignored, so a crash mid-write loses only
 that checkpoint.
 
@@ -232,8 +235,7 @@ public, headers on every method, path escapes in the tail and in `?path=`,
 Code, diffs, blame and fenced blocks in markdown are highlighted with the
 grammars of [bat](https://github.com/sharkdp/bat) (through `two-face` and
 `syntect`), compiled into the binary. A file is matched by name, then extension,
-then its `#!` line. Text over `limits.highlight_kb` (default 256 KiB) shows
-plain. These are the languages:
+then its `#!` line. Text over `limits.highlight_kb` shows plain. These are the languages:
 
 <!-- BEGIN GENERATED: languages -->
 182 languages: ActionScript, Ada, Apache Conf, AppleScript, ARM Assembly,

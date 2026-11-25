@@ -33,9 +33,9 @@ pub(crate) const OWNER_FILE: &str = "owner";
 /// The files that hold the user's own data, which no rebuild can recreate.
 ///
 /// A reset of any kind (a format change, an unreadable manifest, a hash collision, a rebuild)
-/// spares them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test checks
-/// both lists agree.
-pub(crate) const USER_FILES: [&str; 3] =
+/// spares them: only the index is disposable. Listed by name here and in `CACHE_FILES`; a test
+/// checks both lists agree.
+pub const USER_FILES: [&str; 3] =
     [crate::checkpoints::FILE, crate::viewed::FILE, crate::findings::FILE];
 
 /// Fails when `dir` exists but this process cannot write it: the lock file opens for append.

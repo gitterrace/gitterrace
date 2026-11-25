@@ -77,7 +77,7 @@ nothing about who is asking, and a secret in a page is a secret given away.
   for a ticket. A browser opens `/_launch?t=TICKET`, which spends the ticket and
   sets an HttpOnly, SameSite=Strict cookie holding a hash of the secret. The
   secret never sits in the browser. `git terrace launch --print` prints the
-  link, which works once, for a minute.
+  link, which works once.
 - Every write, and every read of the settings files, needs that cookie on top of
   the same-origin checks, which stop other sites but are forgeable by a local
   client (`a_forging_loopback_client_without_owner_proof_writes_nothing`).

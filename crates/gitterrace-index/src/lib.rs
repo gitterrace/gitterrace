@@ -40,7 +40,7 @@ pub use oracle::reference_time;
 pub use phases::PhaseTime;
 pub use select::Selected;
 pub use source::CommitSource;
-pub use store::FORMAT_VERSION;
+pub use store::{FORMAT_VERSION, USER_FILES};
 pub use viewed::Viewed;
 pub use warm_state::StateFile;
 
