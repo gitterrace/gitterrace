@@ -6,6 +6,10 @@
 {% if clean %}{{ empty }}{% else %}
 <details class="card files" open><summary>{{ files_summary }} <span class="counts">{% call deltas::delta(adds, dels) %}{% endcall %}</span></summary>
 <ul>{% for f in files %}<li><a href="#{{ f.stat.anchor }}">{{ f.stat.label }}</a>{% if !f.blob.is_empty() %} <a class="muted" href="{{ f.blob }}">View file</a>{% endif %}{% call deltas::file_counts(f.stat.additions, f.stat.deletions) %}{% endcall %}</li>{% endfor %}</ul></details>
+{% if omitted %}<p class="muted" data-files-omitted role="note">This list may be missing changed
+files: the scan
+stopped at <code>limits.worktree_files</code>. A checkpoint or review plan taken now covers only
+the files listed. Raise that limit in <code>config.toml</code> to see more.</p>{% endif %}
 {{ plan|safe }}
 {{ tools|safe }}
 {{ diff|safe }}

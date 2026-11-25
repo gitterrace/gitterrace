@@ -450,6 +450,7 @@ struct WorktreePage {
     head: crate::pagehead::PageHead,
     files_summary: String,
     tools: String,
+    omitted: bool,
     plan: String,
     files: Vec<WorktreeFileRow>,
     diff: String,
@@ -525,6 +526,7 @@ async fn worktree(
                 a,
                 &crate::review_panel::Source::Worktree { scope, since: review.since_id() },
             ),
+            omitted: review.files_omitted(),
             tools: review.since_note() + &crate::diff_find::toolbar(stats.len()),
             files: stats,
         })

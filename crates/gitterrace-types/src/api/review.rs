@@ -16,6 +16,9 @@ pub struct CheckpointItem {
     /// Seconds since the Unix epoch.
     pub created: i64,
     pub files: usize,
+    /// The scan of the working tree stopped at `limits.worktree_files`, so the checkpoint may
+    /// not hold every changed file. Raise the limit and take another checkpoint.
+    pub files_omitted: bool,
     /// The commit HEAD was at.
     pub head: String,
     /// `cp-` and 12 hex digits of the hash of the state: the same state is the same id.

@@ -77,8 +77,8 @@ pub use walk::{
 pub use watch::{Parts, Watcher};
 pub use worker_hook::{WorkerTime, set_worker_hook};
 pub use worktree::{
-    BIG_HASH, Scope, ScopeCounts, SinceDiff, SnapFile, WORKTREE_DIFF_BYTES, WORKTREE_FILES,
-    WorktreeView, WtFile, content_id, is_dirty, worktree_blob, worktree_bytes, worktree_counts,
-    worktree_diff, worktree_diff_scoped, worktree_diff_since, worktree_file_diff,
-    worktree_file_diff_scoped, worktree_signature, worktree_snapshot,
+    BIG_HASH, Listed, Scope, ScopeCounts, SinceDiff, SnapFile, Snapshot, WORKTREE_DIFF_BYTES,
+    WORKTREE_FILES, WorktreeView, WtFile, content_id, is_dirty, worktree_blob, worktree_bytes,
+    worktree_counts, worktree_diff, worktree_diff_scoped, worktree_diff_since, worktree_file_diff,
+    worktree_file_diff_scoped, worktree_listed, worktree_signature, worktree_snapshot,
 };

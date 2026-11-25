@@ -105,3 +105,22 @@ async fn the_writes_refuse_a_request_without_the_owner_proof() {
     let (_, list) = call(&app, "GET", "/r/r/api/v1/checkpoints", "", false).await;
     assert!(list.contains("\"checkpoints\":[]"), "nothing was written: {list}");
 }
+
+/// The page names the limit when the scan was cut, and keeps quiet when the list is whole.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_cut_scan_shows_the_omitted_files_notice_and_a_whole_one_does_not() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (app, repo) = server(tmp.path());
+    for i in 0..3 {
+        std::fs::write(repo.join(format!("n{i}.txt")), "x\n").expect("w");
+    }
+    let (_, whole) = call(&app, "GET", "/r/r/worktree", "", false).await;
+    assert!(!whole.contains("data-files-omitted"), "a list under the limit is whole");
+
+    let cfg = gitterrace_config::parse("[limits]\nworktree_files = 2\n").expect("parse").config;
+    let router = crate::build_server(vec![repo.clone()], None, None, &Env::new(cfg), None, None)
+        .expect("router")
+        .0;
+    let (_, cut) = call(&router, "GET", "/r/r/worktree", "", false).await;
+    assert!(cut.contains("data-files-omitted") && cut.contains("limits.worktree_files"), "{cut}");
+}

@@ -135,7 +135,7 @@ Exceptions, each on purpose:
 - `preview_mb` (integer, default `16`): Largest image whose pixel size a file
   page reads, in MiB. A larger one shows no pixel size.
 - `worktree_files` (integer, default `2000`): Most changed files the Uncommitted
-  view lists. Past it the rest are left out.
+  view lists. Past it the rest are left out, flagged.
 - `worktree_diff_kb` (integer, default `1024`): Largest working-tree file the
   Uncommitted view diffs, in KiB. A larger one is listed without hunks.
 - `unindexed_commits` (integer, default `2000`): Most commits a view of a
@@ -253,10 +253,8 @@ Exceptions, each on purpose:
   changed since. A checkpoint holds copies of changed text files from the
   working tree in `.git/gitterrace/`, never ignored or binary ones.
 - `checkpoint_mb` (integer, default `20`): Most copies a repository's
-  checkpoints keep, in MiB. The oldest copies go first. 0 switches checkpoints
-  off: none is taken and none is shown. Checkpoints already kept stay in
-  `.git/gitterrace/checkpoints` untouched, and come back when the value does;
-  delete that file to discard them.
+  checkpoints keep, in MiB, oldest first out. 0 takes and shows none but keeps
+  saved ones: delete `.git/gitterrace/checkpoints` to discard them.
 - `checkpoint_file_kb` (integer, default `256`): Largest changed text file a
   checkpoint copies, in KiB. A larger one is named without a copy, so a review
   since it diffs that file against HEAD and says so.

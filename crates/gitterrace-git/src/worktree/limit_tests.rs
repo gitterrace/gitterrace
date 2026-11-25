@@ -65,3 +65,50 @@ fn worktree_files_counts_a_rename_as_one_file() {
     assert_eq!(files.len(), 10, "{files:?}");
     assert!(files.iter().all(|f| f.kind == crate::ChangeKind::Renamed), "{files:?}");
 }
+
+/// Guard class: any scan that stops at `limits.worktree_files` must say so, whichever pass cut
+/// it (the status walk or the staged pass) and for every consumer of the list. At the limit the
+/// answer is "possibly incomplete", below it "complete".
+#[test]
+fn a_scan_at_the_limit_says_the_list_may_be_incomplete() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = dirty_repo(dir.path());
+    let omitted = |repo: &Repo| crate::worktree_listed(repo, crate::Scope::All).expect("list");
+    repo.set_worktree_limits(6, crate::WORKTREE_DIFF_BYTES);
+    assert!(!omitted(&repo).files_omitted, "five files under a limit of six are all of them");
+    repo.set_worktree_limits(5, crate::WORKTREE_DIFF_BYTES);
+    assert!(omitted(&repo).files_omitted, "at the limit more may exist");
+    repo.set_worktree_limits(2, crate::WORKTREE_DIFF_BYTES);
+    let l = omitted(&repo);
+    assert!(l.files_omitted && l.files.len() == 2);
+    let snap = crate::worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap");
+    assert!(snap.files_omitted && snap.files.len() == 2, "a checkpoint is cut like the list");
+}
+
+#[test]
+fn staged_files_cut_by_the_limit_say_so_too() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = dirty_repo(dir.path());
+    git(dir.path(), &["add", "."]);
+    repo.set_worktree_limits(3, crate::WORKTREE_DIFF_BYTES);
+    for scope in [crate::Scope::All, crate::Scope::Staged] {
+        let l = crate::worktree_listed(&repo, scope).expect("list");
+        assert!(l.files_omitted, "{scope:?}");
+    }
+    repo.set_worktree_limits(50, crate::WORKTREE_DIFF_BYTES);
+    assert!(!crate::worktree_listed(&repo, crate::Scope::All).expect("list").files_omitted);
+}
+
+#[test]
+fn a_since_comparison_carries_the_cut_of_the_checkpoint_and_of_the_scan_now() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = dirty_repo(dir.path());
+    let head = repo.resolve("HEAD").expect("head");
+    let since = |repo: &Repo, before_omitted| {
+        crate::worktree_diff_since(repo, &[], &head, before_omitted).expect("since").files_omitted
+    };
+    assert!(!since(&repo, false));
+    assert!(since(&repo, true), "the checkpoint's own cut shows");
+    repo.set_worktree_limits(2, crate::WORKTREE_DIFF_BYTES);
+    assert!(since(&repo, false), "the scan now is cut");
+}

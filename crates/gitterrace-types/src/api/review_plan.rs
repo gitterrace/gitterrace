@@ -113,6 +113,10 @@ pub struct ReviewPlan {
     pub base: String,
     /// Scored files, riskiest first.
     pub files: Vec<PlanFile>,
+    /// Working tree only: the scan stopped at `limits.worktree_files`, so the plan may not
+    /// cover every changed file and `total_files` may be low. Raise the limit to cover more.
+    /// Not the same as `truncated`, which is about scored rows cut at `limit`.
+    pub files_omitted: bool,
     /// Null for the working tree.
     pub head: Option<String>,
     pub since: Option<String>,

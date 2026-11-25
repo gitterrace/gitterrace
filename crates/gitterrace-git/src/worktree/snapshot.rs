@@ -8,7 +8,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::worktree::{
-    Read, Scope, classify, head_blob, is_plain, open, read_worktree, scoped_paths,
+    Read, Scope, classify, head_blob, is_plain, open, read_worktree, scoped_listing,
 };
 use crate::{FileDiff, Repo, Result};
 
@@ -27,6 +27,15 @@ pub struct SnapFile {
     pub text: Option<Vec<u8>>,
 }
 
+/// The working tree as a checkpoint takes it.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Snapshot {
+    pub files: Vec<SnapFile>,
+    /// The scan stopped at `limits.worktree_files`: more changed files may exist than the
+    /// snapshot names.
+    pub files_omitted: bool,
+}
+
 /// A checkpoint compared with the working tree now.
 #[derive(Debug, Default)]
 pub struct SinceDiff {
@@ -40,6 +49,9 @@ pub struct SinceDiff {
     /// different clone), so the files it did not list were compared with the current HEAD
     /// instead. The comparison may then miss changes the commits in between made.
     pub baseline_missing: bool,
+    /// The file list may be incomplete: the scan of the working tree stopped at
+    /// `limits.worktree_files`, or the checkpoint's did.
+    pub files_omitted: bool,
 }
 
 /// The git blob id of `bytes` as hex. Hashed as SHA-1 whatever the repository uses, so an id
@@ -52,18 +64,21 @@ pub fn content_id(bytes: &[u8]) -> String {
     )
 }
 
-/// Every changed file as it is now. `copy_bytes` is the largest file whose bytes are kept and
-/// `budget_bytes` the most bytes kept in all: past it a file keeps its hash and no copy, so a
-/// worktree of many large text files cannot fill memory before the caller packs and caps them.
-pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Result<Vec<SnapFile>> {
+/// Every changed file as it is now.
+///
+/// `copy_bytes` is the largest file whose bytes are kept and `budget_bytes` the most bytes kept
+/// in all: past it a file keeps its hash and no copy, so a worktree of many large text files
+/// cannot fill memory before the caller packs and caps them.
+pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Result<Snapshot> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
     let Some(root) = r.workdir().and_then(|w| w.canonicalize().ok()) else {
-        return Ok(Vec::new());
+        return Ok(Snapshot::default());
     };
     let mut out = Vec::new();
     let mut kept = 0u64;
-    for path in scoped_paths(&r, Scope::All, repo.worktree_files())? {
+    let (paths, files_omitted) = scoped_listing(&r, Scope::All, repo.worktree_files())?;
+    for path in paths {
         if !is_plain(&path) {
             continue;
         }
@@ -83,7 +98,7 @@ pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Res
             Read::Skip => continue,
         });
     }
-    Ok(out)
+    Ok(Snapshot { files: out, files_omitted })
 }
 
 /// The tree of commit `hex`: the empty tree for an empty id (the checkpoint was taken before
@@ -124,13 +139,20 @@ fn tree_paths(r: &gix::Repository, old: &gix::Tree<'_>, new: &gix::Tree<'_>) -> 
 /// A file the checkpoint did not list was equal to `base_head` then, so it is diffed against
 /// that commit, and the files the commits since changed are walked too: a file committed after
 /// the checkpoint still differs from what it was. A file whose copy is gone is diffed against
-/// the current HEAD and named in `gone`.
-pub fn worktree_diff_since(repo: &Repo, before: &[SnapFile], base_head: &str) -> Result<SinceDiff> {
+/// the current HEAD and named in `gone`. `before_omitted` is the checkpoint's own file-list
+/// completeness, carried into `files_omitted`.
+pub fn worktree_diff_since(
+    repo: &Repo,
+    before: &[SnapFile],
+    base_head: &str,
+    before_omitted: bool,
+) -> Result<SinceDiff> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    let mut paths: BTreeSet<String> = scoped_paths(&r, Scope::All, repo.worktree_files())?;
+    let (mut paths, now_omitted) = scoped_listing(&r, Scope::All, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
-    let mut out = SinceDiff::default();
+    let mut out =
+        SinceDiff { files_omitted: now_omitted || before_omitted, ..SinceDiff::default() };
     let base = baseline_tree(&r, base_head);
     out.baseline_missing = base.is_none();
     if let Some(base) = &base {
@@ -143,10 +165,8 @@ pub fn worktree_diff_since(repo: &Repo, before: &[SnapFile], base_head: &str) ->
         paths.iter().map(String::as_str).chain(known.keys().copied()).collect();
     let from_head =
         |path: &str| head.as_ref().map_or(Read::Missing, |t| head_blob(&r, t, path, big));
-    let from_base = |path: &str| match &base {
-        Some(t) => head_blob(&r, t, path, big),
-        None => from_head(path),
-    };
+    let from_base =
+        |path: &str| base.as_ref().map_or_else(|| from_head(path), |t| head_blob(&r, t, path, big));
     for path in all {
         if !is_plain(path) {
             continue;

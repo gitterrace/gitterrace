@@ -259,7 +259,7 @@ fn cache_folder_holds_the_documented_files() -> io::Result<()> {
     lines.save(idx.dir())?;
     crate::store::claim(idx.dir(), std::path::Path::new("/repos/a/.git"))?;
     idx.save_state(crate::StateFile::Chain, 1, b"x")?;
-    idx.checkpoint_add(&[], "abc", false, "", 1 << 20, 1)?;
+    idx.checkpoint_add(&gitterrace_git::Snapshot::default(), "abc", false, "", 1 << 20, 1)?;
     idx.viewed_set(&[("a".to_owned(), "h".to_owned())], true, 1)?;
     let one = crate::StoredFinding {
         id: String::new(),
@@ -546,7 +546,14 @@ fn every_user_data_write_stays_under_the_cache_dir() -> io::Result<()> {
         hash: gitterrace_git::content_id(b"one\n"),
         text: Some(b"one\n".to_vec()),
     };
-    idx.checkpoint_add(&[file], "abc", true, "x", 1 << 10, 5)?;
+    idx.checkpoint_add(
+        &gitterrace_git::Snapshot { files: vec![file], files_omitted: false },
+        "abc",
+        true,
+        "x",
+        1 << 10,
+        5,
+    )?;
     idx.viewed_set(&[("../../escape".to_owned(), "h".to_owned())], true, 5)?;
     let finding = crate::StoredFinding {
         id: String::new(),

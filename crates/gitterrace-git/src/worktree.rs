@@ -9,7 +9,7 @@ mod limit_tests;
 mod pair;
 mod snapshot;
 pub use snapshot::{
-    BIG_HASH, SinceDiff, SnapFile, content_id, worktree_diff_since, worktree_snapshot,
+    BIG_HASH, SinceDiff, SnapFile, Snapshot, content_id, worktree_diff_since, worktree_snapshot,
 };
 
 use std::collections::BTreeSet;
@@ -55,17 +55,29 @@ pub struct ScopeCounts {
 
 /// The paths of one scope, sorted, stopping at `limit`.
 fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BTreeSet<String>> {
+    scoped_listing(repo, scope, limit).map(|l| l.0)
+}
+
+/// [`scoped_paths`] and whether the list may be incomplete: the scan reached `limit`, so more
+/// changed files may exist than it names. Conservative on purpose: a list of exactly `limit`
+/// files reads as possibly incomplete, because proving otherwise would walk the whole tree.
+fn scoped_listing(
+    repo: &gix::Repository,
+    scope: Scope,
+    limit: usize,
+) -> Result<(BTreeSet<String>, bool)> {
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
 
     let mut out = BTreeSet::new();
     // A bare repository has no working tree to differ from HEAD, and diffing HEAD against its
     // empty index would walk the whole tree on every watcher tick.
     if repo.workdir().is_none() {
-        return Ok(out);
+        return Ok((out, false));
     }
     if scope == Scope::Staged {
         staged_paths(repo, &mut out, limit)?;
-        return Ok(out);
+        let cut = out.len() >= limit;
+        return Ok((out, cut));
     }
     let iter = repo
         .status(gix::progress::Discard)
@@ -91,13 +103,14 @@ fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BT
             }
         }
         if out.len() >= limit {
-            return Ok(out);
+            return Ok((out, true));
         }
     }
     if scope == Scope::All {
         staged_paths(repo, &mut out, limit)?;
     }
-    Ok(out)
+    let cut = out.len() >= limit;
+    Ok((out, cut))
 }
 
 /// The file count of every scope: the rows its table lists, so a tab never disagrees with the
@@ -222,9 +235,23 @@ pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
 /// would mislabel a half-staged move. Files are read and diffed one at a time, so the bytes
 /// held at once are one file's old and new side, not the whole change.
 pub fn worktree_diff_scoped(repo: &Repo, scope: Scope) -> Result<Vec<FileDiff>> {
+    worktree_listed(repo, scope).map(|l| l.files)
+}
+
+/// The files of one [`Scope`] and whether the scan stopped at `limits.worktree_files`.
+#[derive(Debug, Default)]
+pub struct Listed {
+    pub files: Vec<FileDiff>,
+    /// The list may be incomplete: the scan reached the limit. This says nothing about diff
+    /// lines, which are cut separately.
+    pub files_omitted: bool,
+}
+
+/// [`worktree_diff_scoped`] with the completeness of the file list.
+pub fn worktree_listed(repo: &Repo, scope: Scope) -> Result<Listed> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    let paths = scoped_paths(&r, scope, repo.worktree_files())?;
+    let (paths, files_omitted) = scoped_listing(&r, scope, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let index = r.index_or_empty().map_err(git)?;
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
@@ -249,7 +276,7 @@ pub fn worktree_diff_scoped(repo: &Repo, scope: Scope) -> Result<Vec<FileDiff>> 
         let (old, new) = sides(&r, scope, head.as_ref(), &index, root.as_deref(), path, big);
         out.extend(classify(path, &old, &new));
     }
-    Ok(out)
+    Ok(Listed { files: out, files_omitted })
 }
 
 /// The two sides of `path` that `scope` compares.

@@ -326,7 +326,7 @@ settings! {
         /// Largest image whose pixel size a file page reads, in MiB. A larger one shows no
         /// pixel size.
         preview_mb: u64 = 16 => Live + cost,
-        /// Most changed files the Uncommitted view lists. Past it the rest are left out.
+        /// Most changed files the Uncommitted view lists. Past it the rest are left out, flagged.
         worktree_files: usize = 2000 => Live,
         /// Largest working-tree file the Uncommitted view diffs, in KiB. A larger one is listed
         /// without hunks.
@@ -449,10 +449,8 @@ settings! {
         /// show only what changed since. A checkpoint holds copies of changed text files from the
         /// working tree in `.git/gitterrace/`, never ignored or binary ones.
         has_auto_checkpoint: bool = false => Live,
-        /// Most copies a repository's checkpoints keep, in MiB. The oldest copies go first. 0
-        /// switches checkpoints off: none is taken and none is shown. Checkpoints already kept
-        /// stay in `.git/gitterrace/checkpoints` untouched, and come back when the value does;
-        /// delete that file to discard them.
+        /// Most copies a repository's checkpoints keep, in MiB, oldest first out. 0 takes and
+        /// shows none but keeps saved ones: delete `.git/gitterrace/checkpoints` to discard them.
         checkpoint_mb: usize = 20 => Live,
         /// Largest changed text file a checkpoint copies, in KiB. A larger one is named without a
         /// copy, so a review since it diffs that file against HEAD and says so.

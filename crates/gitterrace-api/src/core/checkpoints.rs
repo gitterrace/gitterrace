@@ -60,6 +60,7 @@ impl ApiState {
                     bytes: c.bytes,
                     created: c.created,
                     files: c.files,
+                    files_omitted: c.files_omitted,
                     head: c.head,
                     id: c.id,
                     label: c.label,
@@ -81,14 +82,14 @@ impl ApiState {
             ));
         }
         let copy = (self.settings().review.checkpoint_file_kb as u64) << 10;
-        let files = gitterrace_git::worktree_snapshot(
+        let snap = gitterrace_git::worktree_snapshot(
             &self.repo,
             copy,
             self.cap_bytes().saturating_mul(UNPACKED_PER_PACKED),
         )?;
         let head = self.repo.resolve("HEAD").unwrap_or_default();
         let label: String = label.chars().take(MAX_LABEL).collect();
-        Ok(self.index.checkpoint_add(&files, &head, auto, &label, self.cap_bytes(), now())?)
+        Ok(self.index.checkpoint_add(&snap, &head, auto, &label, self.cap_bytes(), now())?)
     }
 
     /// Whether Mark all viewed takes a checkpoint first (`review.has_auto_checkpoint`).

@@ -11,6 +11,13 @@ use crate::wire;
 /// A checkpoint id and what differs from it.
 pub(super) type SinceRead = (String, gitterrace_git::SinceDiff);
 
+/// The files of the working tree, whether the list may be cut, and the checkpoint compared.
+pub(super) struct WorktreeList {
+    pub files: Vec<FileDiff>,
+    pub files_omitted: bool,
+    pub since: Option<SinceRead>,
+}
+
 /// Added and removed lines over a file list.
 fn totals(list: &[FileDiff]) -> (u64, u64) {
     list.iter().fold((0, 0), |(a, d), f| (a + u64::from(f.additions), d + u64::from(f.deletions)))
@@ -79,7 +86,8 @@ impl ApiState {
         max_lines: Option<usize>,
         since: Option<&str>,
     ) -> Result<WorktreeResponse, ApiError> {
-        let (list, since_part) = self.worktree_list(scope, since)?;
+        let WorktreeList { files: list, files_omitted, since: since_part } =
+            self.worktree_list(scope, since)?;
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
         let baseline_missing = since_part.as_ref().is_some_and(|(_, d)| d.baseline_missing);
@@ -93,6 +101,7 @@ impl ApiState {
             content_gone,
             deletions,
             files,
+            files_omitted,
             scope: scope.unwrap_or("all").to_owned(),
             since,
             truncated,
@@ -106,7 +115,7 @@ impl ApiState {
         &self,
         scope: Option<&str>,
         since: Option<&str>,
-    ) -> Result<(Vec<FileDiff>, Option<SinceRead>), ApiError> {
+    ) -> Result<WorktreeList, ApiError> {
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden("the working tree"));
         }
@@ -120,8 +129,11 @@ impl ApiState {
                 )));
             }
         };
-        let (list, since_part) = match since {
-            None => (gitterrace_git::worktree_diff_scoped(&self.repo, which)?, None),
+        let (list, files_omitted, since_part) = match since {
+            None => {
+                let l = gitterrace_git::worktree_listed(&self.repo, which)?;
+                (l.files, l.files_omitted, None)
+            }
             Some(id) => {
                 if which != gitterrace_git::Scope::All {
                     return Err(ApiError::BadRequest(
@@ -132,10 +144,15 @@ impl ApiState {
                     .index
                     .checkpoint(id)?
                     .ok_or_else(|| ApiError::CheckpointNotFound(id.to_owned()))?;
-                let d = gitterrace_git::worktree_diff_since(&self.repo, &cp.files, &cp.head)?;
-                (d.files.clone(), Some((id.to_owned(), d)))
+                let d = gitterrace_git::worktree_diff_since(
+                    &self.repo,
+                    &cp.files,
+                    &cp.head,
+                    cp.files_omitted,
+                )?;
+                (d.files.clone(), d.files_omitted, Some((id.to_owned(), d)))
             }
         };
-        Ok((list, since_part))
+        Ok(WorktreeList { files: list, files_omitted, since: since_part })
     }
 }

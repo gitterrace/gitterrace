@@ -35,6 +35,9 @@ pub(crate) struct Review {
     /// The newest checkpoint, which the Since checkpoint tab opens.
     latest: Option<String>,
     persisted: bool,
+    /// The scan stopped at `limits.worktree_files`: the list, and a checkpoint taken from it,
+    /// may be missing changed files.
+    files_omitted: bool,
 }
 
 /// The checkpoint a page is compared with.
@@ -58,7 +61,7 @@ fn missing(id: &str) -> Error {
 
 fn since_diff(a: &App, id: &str) -> Result<SinceDiff> {
     let cp = a.index.checkpoint(id)?.ok_or_else(|| missing(id))?;
-    Ok(gitterrace_git::worktree_diff_since(&a.repo, &cp.files, &cp.head)?)
+    Ok(gitterrace_git::worktree_diff_since(&a.repo, &cp.files, &cp.head, cp.files_omitted)?)
 }
 
 /// The files that differ from checkpoint `id`, for the folded files and find in the diff.
@@ -72,8 +75,14 @@ pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review>
     let persisted = list.as_ref().is_some_and(|l| l.persisted);
     let latest = list.as_ref().and_then(|l| l.checkpoints.first()).map(|c| c.id.clone());
     let Some(id) = since else {
-        let files = gitterrace_git::worktree_diff_scoped(&a.repo, scope)?;
-        return Ok(Review { files, since: None, latest, persisted });
+        let l = gitterrace_git::worktree_listed(&a.repo, scope)?;
+        return Ok(Review {
+            files: l.files,
+            since: None,
+            latest,
+            persisted,
+            files_omitted: l.files_omitted,
+        });
     };
     let info = list
         .and_then(|l| l.checkpoints.into_iter().find(|c| c.id == id))
@@ -93,10 +102,16 @@ pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review>
         gone: d.gone.len(),
         baseline_missing: d.baseline_missing,
     };
-    Ok(Review { files: d.files, since: Some(since), latest, persisted })
+    let files_omitted = d.files_omitted;
+    Ok(Review { files: d.files, since: Some(since), latest, persisted, files_omitted })
 }
 
 impl Review {
+    /// Whether the scan stopped at `limits.worktree_files`: the page then names the limit.
+    pub(crate) const fn files_omitted(&self) -> bool {
+        self.files_omitted
+    }
+
     /// The checkpoint id the page is compared with, if any.
     pub(crate) fn since_id(&self) -> Option<&str> {
         self.since.as_ref().map(|s| s.id.as_str())

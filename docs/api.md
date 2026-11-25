@@ -43,7 +43,7 @@ each cap.
 | `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
 | `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
 | `GET /compare` | `base`, `head`, `path`, `three_dot`, `max_lines` | additions, base, deletions, files, from, head, path, three_dot, truncated |
-| `GET /worktree` | `scope`, `max_lines`, `since` | additions, baseline_missing, content_gone, deletions, files, scope, since, truncated, unchanged_files |
+| `GET /worktree` | `scope`, `max_lines`, `since` | additions, baseline_missing, content_gone, deletions, files, files_omitted, scope, since, truncated, unchanged_files |
 | `GET /checkpoints` |  | bytes_used, cap_bytes, checkpoints, persisted |
 | `GET /viewed` |  | viewed |
 | `GET /findings` |  | cap_entries, count, findings, persisted |
@@ -52,7 +52,7 @@ each cap.
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
 | `GET /contributors` | `rev`, `q`, `period`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /file_insight` | `rev`, `q`, `period`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | age, authors_90d, bus_factor, churn, hot, kind, link, owners, partners, path, paths, permalink, rev |
-| `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, files, head, since, skipped, source, total_files, truncated |
+| `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, files, files_omitted, head, since, skipped, source, total_files, truncated |
 | `GET /insights` |  | insights |
 | `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `path`, `author`, `min_support`, `cross_dir`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 

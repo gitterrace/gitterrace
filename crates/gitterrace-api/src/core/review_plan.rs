@@ -71,6 +71,17 @@ struct Changed<'a> {
     has_sibling: bool,
 }
 
+/// The changed files a plan scores and what they are against.
+struct Source {
+    kind: PlanSource,
+    base: String,
+    head: Option<String>,
+    rev: String,
+    list: Vec<FileDiff>,
+    since: Option<String>,
+    files_omitted: bool,
+}
+
 impl ApiState {
     /// The changed files of a compare or of the working tree in the order to review them: most
     /// risk first, each with the numbers behind its `risk`. Counted as the `hotspots` and
@@ -85,35 +96,8 @@ impl ApiState {
         let settings = self.settings();
         let most = settings.review.plan_files;
         let limit = params.limit.map_or(most, |l| l.clamp(1, most));
-        let (source, base, head, rev, list, since) = match req.source.unwrap_or("worktree") {
-            "worktree" => {
-                if !settings.worktree_on {
-                    return Err(ApiError::Forbidden("the working tree"));
-                }
-                let (list, since) = self.worktree_list(req.scope, req.since)?;
-                let tip = self.repo.resolve("HEAD")?;
-                (PlanSource::Worktree, tip, None, "HEAD".to_owned(), list, since.map(|s| s.0))
-            }
-            "compare" => {
-                let base = req
-                    .base
-                    .filter(|b| !b.is_empty())
-                    .ok_or_else(|| ApiError::BadRequest("source compare needs base".to_owned()))?;
-                let head = checked(req.head.filter(|h| !h.is_empty()).unwrap_or("HEAD"))?;
-                let (from, list) = self.repo.compare_files(
-                    checked(base)?,
-                    head,
-                    req.three_dot.unwrap_or(false),
-                )?;
-                let tip = self.repo.resolve(head)?;
-                (PlanSource::Compare, from, Some(tip.clone()), tip, list, None)
-            }
-            other => {
-                return Err(ApiError::BadRequest(format!(
-                    "unknown source {other:?}: use `compare` or `worktree`"
-                )));
-            }
-        };
+        let Source { kind: source, base, head, rev, list, since, files_omitted } =
+            self.plan_source(req)?;
         let tip = self.repo.resolve(&rev)?;
         let heads = self.head_lines(&tip);
         let tree: BTreeSet<&str> = heads
@@ -176,7 +160,63 @@ impl ApiState {
         let total_files = files.len() + skipped.len();
         let truncated = files.len() > limit;
         files.truncate(limit);
-        Ok(ReviewPlan { base, files, head, since, skipped, source, total_files, truncated })
+        Ok(ReviewPlan {
+            base,
+            files,
+            files_omitted,
+            head,
+            since,
+            skipped,
+            source,
+            total_files,
+            truncated,
+        })
+    }
+
+    /// The changed files `req` names and where they are against.
+    fn plan_source(&self, req: &PlanRequest<'_>) -> Result<Source, ApiError> {
+        match req.source.unwrap_or("worktree") {
+            "worktree" => {
+                if !self.settings().worktree_on {
+                    return Err(ApiError::Forbidden("the working tree"));
+                }
+                let w = self.worktree_list(req.scope, req.since)?;
+                Ok(Source {
+                    kind: PlanSource::Worktree,
+                    base: self.repo.resolve("HEAD")?,
+                    head: None,
+                    rev: "HEAD".to_owned(),
+                    list: w.files,
+                    since: w.since.map(|s| s.0),
+                    files_omitted: w.files_omitted,
+                })
+            }
+            "compare" => {
+                let base = req
+                    .base
+                    .filter(|b| !b.is_empty())
+                    .ok_or_else(|| ApiError::BadRequest("source compare needs base".to_owned()))?;
+                let head = checked(req.head.filter(|h| !h.is_empty()).unwrap_or("HEAD"))?;
+                let (from, list) = self.repo.compare_files(
+                    checked(base)?,
+                    head,
+                    req.three_dot.unwrap_or(false),
+                )?;
+                let tip = self.repo.resolve(head)?;
+                Ok(Source {
+                    kind: PlanSource::Compare,
+                    base: from,
+                    head: Some(tip.clone()),
+                    rev: tip,
+                    list,
+                    since: None,
+                    files_omitted: false,
+                })
+            }
+            other => Err(ApiError::BadRequest(format!(
+                "unknown source {other:?}: use `compare` or `worktree`"
+            ))),
+        }
     }
 
     /// Why `diff` is not scored. Git reports a file it never read for size as binary, so a

@@ -107,3 +107,40 @@ fn diff_lines_cut_the_commit_diff() {
     let s = with(s, |c| c.api.diff_lines = 1);
     assert_eq!(lines(&s), 1);
 }
+
+/// Guard class: a file list the scan cut must say so on every transport that serves the working
+/// tree, with the diff-line flag left alone. The HTTP route and the MCP tool call the same
+/// core methods, so one body check covers the wire shape and the core answers cover both.
+#[tokio::test]
+async fn a_cut_file_list_is_flagged_on_the_worktree_the_plan_and_the_checkpoint() {
+    let (d, s) = crate::tests::fixture();
+    for i in 0..4 {
+        std::fs::write(d.path().join(format!("n{i}.txt")), "x\n").expect("write");
+    }
+    let omitted = |v: &serde_json::Value| v["files_omitted"].as_bool();
+    s.repo.set_worktree_limits(50, 1 << 20);
+    let (_, whole) = crate::tests::get(&s, "/worktree").await;
+    assert_eq!((omitted(&whole), whole["truncated"].as_bool()), (Some(false), Some(false)));
+    let (id, _) = s.checkpoint_create("", false).expect("checkpoint");
+    assert!(!s.checkpoints().expect("list").checkpoints[0].files_omitted);
+    let plan = s.review_plan(&crate::PlanRequest::default(), &crate::insights::Params::default());
+    assert!(!plan.expect("plan").files_omitted);
+
+    s.repo.set_worktree_limits(2, 1 << 20);
+    let (_, cut) = crate::tests::get(&s, "/worktree").await;
+    assert_eq!((omitted(&cut), cut["truncated"].as_bool()), (Some(true), Some(false)));
+    let core = s.worktree_diff(None, None).expect("core");
+    assert!(core.files_omitted && !core.truncated, "the MCP tool serves this answer");
+    let (_, since) = crate::tests::get(&s, &format!("/worktree?since={id}")).await;
+    assert_eq!(omitted(&since), Some(true));
+    assert!(
+        s.review_plan(&crate::PlanRequest::default(), &crate::insights::Params::default())
+            .expect("plan")
+            .files_omitted
+    );
+    let (cut_id, _) = s.checkpoint_create("cut", false).expect("checkpoint");
+    let items = s.checkpoints().expect("list").checkpoints;
+    let by = |id: &str| items.iter().find(|c| c.id == id).map(|c| c.files_omitted);
+    assert_eq!(by(&cut_id), Some(true), "a checkpoint of a cut scan says so");
+    assert_eq!(by(&id), Some(false));
+}

@@ -94,6 +94,10 @@ pub struct WorktreeResponse {
     pub content_gone: Vec<String>,
     pub deletions: u64,
     pub files: Vec<FileItem>,
+    /// The scan of the working tree stopped at `limits.worktree_files` (or, with `since`, so
+    /// did the checkpoint's): `files` may not list every changed file. Raise the limit to see
+    /// more. This is about files, `truncated` is about diff lines.
+    pub files_omitted: bool,
     /// `all`, `staged` or `unstaged`.
     pub scope: String,
     /// Only with `since`: the checkpoint the files are compared with.

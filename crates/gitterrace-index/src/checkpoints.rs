@@ -10,7 +10,7 @@
 
 use std::io::{self, Read, Seek, SeekFrom};
 
-use gitterrace_git::{SnapFile, content_id};
+use gitterrace_git::{SnapFile, Snapshot, content_id};
 use serde::{Deserialize, Serialize};
 
 use crate::{Index, cache};
@@ -59,6 +59,10 @@ struct Meta {
     auto: bool,
     label: String,
     files: Vec<FileMeta>,
+    /// The scan that listed `files` stopped at `limits.worktree_files`. Absent in a log from
+    /// before the field, which reads as complete.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    omitted: bool,
 }
 
 /// What a list shows of one checkpoint.
@@ -72,6 +76,9 @@ pub struct CheckpointInfo {
     pub bytes: u64,
     pub auto: bool,
     pub label: String,
+    /// The working tree had more changed files than the scan lists, so the checkpoint may not
+    /// hold them all.
+    pub files_omitted: bool,
 }
 
 /// The checkpoints, newest first, and what they hold in all.
@@ -85,6 +92,8 @@ pub struct CheckpointList {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Checkpoint {
     pub head: String,
+    /// See [`CheckpointInfo::files_omitted`].
+    pub files_omitted: bool,
     pub files: Vec<SnapFile>,
 }
 
@@ -235,13 +244,14 @@ fn held(meta: &Meta) -> u64 {
 /// `cap`: the frame could not be kept whole then, so peak memory is the cap and one file, not
 /// every file of the snapshot. The files after that keep their names and hashes.
 fn build(
-    files: &[SnapFile],
+    snap: &Snapshot,
     head: &str,
     auto: bool,
     label: &str,
     created: i64,
     cap: u64,
 ) -> io::Result<(Meta, Vec<u8>)> {
+    let files = &snap.files;
     let mut blobs = Vec::new();
     let mut metas = Vec::with_capacity(files.len());
     for f in files {
@@ -268,6 +278,7 @@ fn build(
         auto,
         label: label.chars().take(200).collect(),
         files: metas,
+        omitted: snap.files_omitted,
     };
     Ok((meta, blobs))
 }
@@ -323,13 +334,14 @@ fn fit(frame: (Meta, Vec<u8>), cap: u64) -> io::Result<Vec<u8>> {
 impl Index {
     /// Records `files` as a checkpoint at `now` and returns its id and whether it is new. The
     /// same state as the newest checkpoint returns its id; one that matches only an older
-    /// checkpoint is recorded again, and the id then names the newest of them. Copies past `cap_bytes` drop oldest first.
+    /// checkpoint is recorded again, and the id then names the newest of them. Copies past
+    /// `cap_bytes` drop oldest first.
     ///
     /// # Errors
     /// When the cache cannot be written: a newer build owns it, or the disk refuses.
     pub fn checkpoint_add(
         &self,
-        files: &[SnapFile],
+        snap: &Snapshot,
         head: &str,
         auto: bool,
         label: &str,
@@ -356,14 +368,14 @@ impl Index {
             }
             None => (None, 0),
         };
-        let id = id_of(files, head);
+        let id = id_of(&snap.files, head);
         // Only the newest frame stands for "nothing changed since the last checkpoint". A state
         // that matches an older frame (A, then B, then A again) is a new checkpoint, so the
         // newest one is always the state the user last saved, whatever the cap dropped.
         if frames.as_ref().and_then(|(_, fr)| fr.last()).is_some_and(|x| x.meta.id == id) {
             return Ok((id, false));
         }
-        let (meta, blobs) = build(files, head, auto, label, now, cap_bytes)?;
+        let (meta, blobs) = build(snap, head, auto, label, now, cap_bytes)?;
         let Some((f, fr)) = frames.as_mut() else {
             // The first frame meets the same cap as every later one.
             let bytes = fit((meta, blobs), cap_bytes)?;
@@ -405,6 +417,7 @@ impl Index {
                 bytes: held(&x.meta),
                 auto: x.meta.auto,
                 label: x.meta.label.clone(),
+                files_omitted: x.meta.omitted,
             })
             .collect();
         let bytes_used = items.iter().map(|i| i.bytes).sum();
@@ -448,7 +461,7 @@ impl Index {
             };
             files.push(SnapFile { path: m.path.clone(), hash: m.hash.clone(), text });
         }
-        Ok(Some(Checkpoint { head: fr.meta.head.clone(), files }))
+        Ok(Some(Checkpoint { head: fr.meta.head.clone(), files_omitted: fr.meta.omitted, files }))
     }
 }
 
