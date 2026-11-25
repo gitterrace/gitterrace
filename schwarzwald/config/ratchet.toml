@@ -46,7 +46,7 @@ web_format_html = 3
 web_page_bytes = 50657
 # The heaviest built page of each kind in raw bytes (xtask site guard 9). Lower it when a cut
 # lands, never raise it. The changelog page grows with every release, so it is not measured.
-site_bytes_landing = 21224
+site_bytes_landing = 20737
 site_bytes_docs = 50929
 site_bytes_other = 17978
 # The most files a page of each kind fetches on load: stylesheets, scripts and images not marked

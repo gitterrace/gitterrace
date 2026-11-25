@@ -20,7 +20,7 @@ const WHY: &str = "Why";
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
 
-/// The screenshots, in gallery order (the last two sit as one equal-height pair): file stem,
+/// The screenshots, in gallery order (the phone shot is kept for the checks, not shown): file stem,
 /// alt text ("Caption: what it shows"), caption. The site has a WebP pair per entry; the
 /// README shows the first, and `docs/screenshots/` keeps only the PNG files the README links.
 pub const SHOTS: [(&str, &str, &str); 8] = [
@@ -60,7 +60,7 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
 ];
 
 /// The gallery's stems, in order, and the hand-off's: the rest of `SHOTS` is the hero.
-const GALLERY: [&str; 5] = ["insights", "ownership", "blame", "commit", "narrow"];
+const GALLERY: [&str; 4] = ["insights", "ownership", "blame", "commit"];
 const HAND: [&str; 2] = ["send", "agent"];
 const HERO: &str = "overview";
 

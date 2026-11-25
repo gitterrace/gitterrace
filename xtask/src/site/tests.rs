@@ -12,7 +12,7 @@ fn landing() -> String {
 #[test]
 fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
     let page = landing();
-    let shown = ["insights", "ownership", "blame", "commit", "narrow", "send", "agent"];
+    let shown = ["insights", "ownership", "blame", "commit", "send", "agent"];
     assert_eq!(page.matches("<figure ").count(), shown.len());
     assert_eq!(page.matches("class=\"x\"").count(), shown.len());
     for name in shown {
@@ -21,12 +21,19 @@ fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
         assert_eq!(page.matches(&format!("screenshots/{name}-dark.thumb.webp")).count(), 1);
     }
     assert!(!page.contains("class=\"lightbox\""));
-    // The phone sits beside the commit page in one equal-height pair, and only those two.
-    let pair = page.split("<div class=\"pair\">").nth(1).expect("pair").split("</div>").next();
-    let pair = pair.expect("pair body");
-    assert!(pair.contains("id=\"shot-commit\"") && pair.contains("id=\"shot-narrow\""));
-    assert_eq!(pair.matches("<figure ").count(), 2);
-    assert_eq!(page.matches("class=\"pair\"").count(), 1);
+}
+
+/// Every gallery figure spans the full row: all four sit directly in the grid, with no wrapper
+/// that sets two of them side by side, and the stylesheet gives each the whole row.
+#[test]
+fn every_gallery_figure_spans_the_full_row() {
+    let page = landing();
+    let body = page.split("id=\"gallery\">").nth(1).expect("gallery").split("</div>").next();
+    let body = body.expect("gallery body");
+    assert_eq!(body.matches("<figure ").count(), 4);
+    assert!(!body.contains("<div"), "a wrapper narrows the figures");
+    let css = include_str!("../../templates/site.css");
+    assert!(css.contains("#gallery>figure{grid-column:1/-1}"));
 }
 
 /// Every code fence on the landing page carries `s-*` highlight classes. A fence that bypasses
