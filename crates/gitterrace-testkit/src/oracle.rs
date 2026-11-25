@@ -246,17 +246,23 @@ fn cut(body: &str, open: &str, close: &str) -> String {
     format!("{}{}", &body[..at], &body[end..])
 }
 
-/// Blanks the one value that is not output of the insights but of the watcher: `data-live-v`,
-/// a hash of worktree file stamps that differs per checkout. Nothing else is touched.
+/// Blanks the values that are not output of the insights.
+///
+/// `data-live-v` is a hash of worktree file stamps that differs per checkout, and the
+/// `gt-release` meta is the crate version, so a version bump does not rewrite every golden.
+/// Nothing else is touched.
 #[must_use]
 pub fn normalize(body: &str) -> String {
-    const KEY: &str = "data-live-v=\"";
-    let Some(at) = body.find(KEY) else {
-        return body.to_owned();
-    };
-    let start = at + KEY.len();
-    let end = body[start..].find('"').map_or(body.len(), |e| start + e);
-    format!("{}_{}", &body[..start], &body[end..])
+    let mut out = body.to_owned();
+    for key in ["data-live-v=\"", "<meta name=\"gt-release\" content=\""] {
+        let Some(at) = out.find(key) else {
+            continue;
+        };
+        let start = at + key.len();
+        let end = out[start..].find('"').map_or(out.len(), |e| start + e);
+        out = format!("{}_{}", &out[..start], &out[end..]);
+    }
+    out
 }
 
 /// The sort key of a list row: the `data-tip` of its `<time>`, which holds the date to the
