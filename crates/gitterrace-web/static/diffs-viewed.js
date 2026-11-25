@@ -61,11 +61,32 @@
         items.push({ path: p, patch: s.dataset.p });
       }
     });
-    try { localStorage.removeItem(KEY); } catch (e) { /* nothing to drop */ }
     if (!items.length) return null;
+    var sent = {};
+    items.forEach(function (i) { sent[i.path] = old[i.path]; });
+    touched = {};
     return post("/_viewed/all", { items: items }).then(function () {
-      items.forEach(function (i) { served[i.path] = i.patch; });
-    }).catch(function () { note("Earlier viewed marks could not be moved."); });
+      items.forEach(function (i) {
+        // A mark the reader changed while the save was in flight is newer: leave it be.
+        if (!touched[i.path] && !(i.path in served)) served[i.path] = i.patch;
+      });
+      forget(sent);
+    }).catch(function () {
+      note("Earlier viewed marks could not be moved. " +
+        "They are kept here and tried again on the next load.");
+    });
+  }
+  // Marks changed by a click since a migration began, by path.
+  var touched = {};
+  // Drops only the confirmed entries, and only while the stored value is still the one sent, so
+  // an entry another tab rewrote or added meanwhile stays.
+  function forget(sent) {
+    try {
+      var now = JSON.parse(localStorage.getItem(KEY)) || {};
+      Object.keys(sent).forEach(function (p) { if (now[p] === sent[p]) delete now[p]; });
+      if (Object.keys(now).length) localStorage.setItem(KEY, JSON.stringify(now));
+      else localStorage.removeItem(KEY);
+    } catch (e) { /* storage refused: the entries stay for the next load */ }
   }
   function files() {
     return Array.prototype.slice.call(document.querySelectorAll("section.file[data-path]"));
@@ -92,6 +113,7 @@
       // Shown at once and saved after: a refused save puts the old mark back.
       var on = t.checked, patch = s.dataset.p, path = s.dataset.path;
       served = served || {};
+      touched[path] = true;
       var before = served[path];
       if (on) served[path] = patch; else delete served[path];
       decorate();
