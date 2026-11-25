@@ -123,9 +123,11 @@ done
 
 api_cfg "$scratch/pw.cfg" "admin:admin" /api/users/change_password "login=admin" "previousPassword=admin" "password=$admin_pw"
 curl -sS -f -m 60 -X POST -K "$scratch/pw.cfg" >>"$log" 2>&1 || die "could not change the admin password" "re-run on a fresh container"
-api_cfg "$scratch/tok.cfg" "admin:$admin_pw" /api/user_tokens/generate "name=scan" "type=GLOBAL_ANALYSIS_TOKEN"
+# A USER_TOKEN, not GLOBAL_ANALYSIS_TOKEN: an analysis token uploads a scan but gets 403 on
+# /api/hotspots/search. The admin's user token does both, on a server that lives for this run.
+api_cfg "$scratch/tok.cfg" "admin:$admin_pw" /api/user_tokens/generate "name=scan" "type=USER_TOKEN"
 token=$(curl -sS -f -m 60 -X POST -K "$scratch/tok.cfg" 2>>"$log" \
-  | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["token"])') || die "could not create an analysis token" "re-run on a fresh container"
+  | "$PY" -c 'import json,sys;print(json.load(sys.stdin)["token"])') || die "could not create an API token" "re-run on a fresh container"
 
 snap=$scratch/snap
 mkdir -p "$snap"

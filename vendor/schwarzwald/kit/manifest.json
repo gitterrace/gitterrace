@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-25T16:45:22Z",
+  "date": "2026-11-25T17:13:44Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -59,7 +59,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "f56c4f382c8fb4ffd43ba1fa389ddeb2e216344112d542e58748ea7ffe4f4f07",
+    "README.md": "2d0123f1fd4a7391585d7dea8e778bdf917fec199d95f6ea973888df287cf702",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -357,7 +357,7 @@
     "tools/land.sh": "f4d75a1683799b421964bf88941bd80ececd31ac634b0ffd5918d5abb41ae462",
     "tools/quiet.sh": "a794be9d97400331fed2961b12c3ef6a74c1a9d7af4dc4b9a804201c06396bd2",
     "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
-    "tools/sonar-scan.sh": "f1c7a2c6deb9f4cb1b9acdd749bc3272c68976f8aaf6b8fa976c7252ed202712",
+    "tools/sonar-scan.sh": "bbdf7404efce6a25edf957db5b05d4f987d9a79fba1c5076e7d199ca340285ea",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
   },
   "exec": [
