@@ -28,9 +28,15 @@ history and find risky code. It needs the
 2. Read the order. The files come riskiest first. `risk` runs from 0 to 100
    and is the sum of `terms`, listed after
    the steps. Lockfiles, generated and binary files sit in `skipped`,
-   unscored. If `truncated` is true, narrow with `limit` or `query`.
-   `review.plan_files` caps the list and `review.test_siblings` says what a
-   test beside a file looks like.
+   unscored. If `truncated` is true, `files` holds only the riskiest rows and
+   `total_files` counts them all. `limit` only lowers the cap and `query`
+   only changes the history the scores count, so neither lists the rest. Call
+   `compare` (or `worktree_diff`) with `max_lines` 1: its `files` lists every
+   changed path and only the diff lines are capped. On the working tree, a
+   true `files_omitted` on the plan or on `worktree_diff` means the scan
+   stopped at `limits.worktree_files`: the list is incomplete, not
+   exhaustive. `review.plan_files` caps the list and `review.test_siblings`
+   says what a test beside a file looks like.
 3. For the top files call `compare` or `worktree_diff` and `read_file` to
    read the change, and `blame` on the touched lines to see who holds them.
 4. Report each risk with the evidence from the tools: hotspot rank, owners

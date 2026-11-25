@@ -29,9 +29,10 @@ pub(super) struct ReviewArgs {
 pub(super) fn review_text(a: &ReviewArgs) -> String {
     let head = a.head.as_deref().filter(|h| !h.is_empty()).unwrap_or("HEAD");
     let plan = match (a.worktree.unwrap_or(false), a.base.as_deref().filter(|b| !b.is_empty())) {
-        (true, _) => {
-            "Call `review_plan` (source `worktree`) to list the uncommitted files.".to_owned()
-        }
+        (true, _) => "Call `review_plan` (source `worktree`) to list the uncommitted files. If \
+             `files_omitted` is true the scan stopped at `limits.worktree_files` and the list \
+             is incomplete."
+            .to_owned(),
         (false, Some(base)) => format!(
             "Call `review_plan` with source `compare`, base `{base}`, head `{head}` and \
              three_dot true to list what `{head}` changed since the branches split."
@@ -39,6 +40,16 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
         (false, None) => "No base was given: ask which revision to compare with, then call \
              `review_plan` with source `compare`, base, head and three_dot true."
             .to_owned(),
+    };
+    let rest = if a.worktree.unwrap_or(false) {
+        "call `worktree_diff` with `max_lines` 1: its `files` lists every changed path, only the \
+         diff lines are capped. If its `files_omitted` is true the scan stopped at \
+         `limits.worktree_files`, so that list is cut too: say so and do not call the review \
+         complete."
+    } else {
+        "call `compare` with the same base, head and three_dot and `max_lines` 1: its `files` \
+         lists every changed path, only the diff lines are capped. Read the paths the plan left \
+         out too, or name them as unreviewed."
     };
     let repo = a
         .repo
@@ -48,7 +59,9 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
         "Review a change using only this server's read-only tools.{repo}\n\
          1. {plan} The files come riskiest first: `risk` is the sum of `terms` (churn, size, \
          ownership, untested), and `skipped` names the lockfiles, generated and binary files left \
-         out. If `truncated` is true, narrow it with `limit` or `query`.\n\
+         out. If `truncated` is true, `files` holds only the riskiest rows (at most `limit`, never \
+         more than `review.plan_files`) and `total_files` counts them all. `limit` and `query` \
+         cannot list the rest, so {rest}\n\
          2. For the top files read the change with `compare` or `worktree_diff` and \
          `read_file`, and call `blame` on the lines it touches to see who knows the code.\n\
          3. Report each risk with the evidence from the tools: hotspot rank, owners, a missing \

@@ -298,3 +298,149 @@ async fn the_basket_is_refused_over_mcp_when_the_worktree_switch_is_off() {
         assert_eq!(basket.is_err(), off, "{cfg}");
     }
 }
+
+/// A branch `side` of `n` source files off `main`, and a server whose plan holds `cap` rows.
+fn wide(n: usize, cap: usize) -> (tempfile::TempDir, McpServer, Vec<String>) {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    let _ = Fixture::init(p).write("a.txt", "one\n").commit("feat(core): first");
+    git(p, &["checkout", "-q", "-b", "side"]);
+    let names: Vec<String> = (0..n).map(|i| format!("src/f{i}.rs")).collect();
+    std::fs::create_dir(p.join("src")).expect("mkdir");
+    for f in &names {
+        std::fs::write(p.join(f), "fn f() {}\n").expect("write");
+    }
+    git(p, &["add", "."]);
+    git(p, &["commit", "-q", "-m", "feat: many"]);
+    let mut c = Config::default();
+    c.review.plan_files = cap;
+    c.validate().expect("valid");
+    let state = ApiState::open(p).expect("open").configured(&c);
+    (dir, McpServer::new(state), names)
+}
+
+fn call(res: Result<rmcp::model::CallToolResult, rmcp::ErrorData>) -> serde_json::Value {
+    let res = res.expect("result");
+    assert_ne!(res.is_error, Some(true), "{}", text(&res));
+    serde_json::from_str(&text(&res)).expect("json")
+}
+
+/// What the prompt tells the agent to do once `truncated` is true: the tool it names and its
+/// `max_lines`, read from the text so a rewritten recipe is the one under test.
+fn advice(prompt: &str) -> (String, usize) {
+    let tail = prompt.split("cannot list the rest, so call `").nth(1).unwrap_or("");
+    let tool = tail.split('`').next().unwrap_or("").to_owned();
+    let lines = tail
+        .split("`max_lines` ")
+        .nth(1)
+        .and_then(|t| t.split(|c: char| !c.is_ascii_digit()).next())
+        .and_then(|n| n.parse().ok())
+        .unwrap_or(0);
+    (tool, lines)
+}
+
+/// Guard class: advice for a cut answer must be walkable. The agent follows the prompt on a
+/// compare wider than the plan cap through the real tools and must end with every path, and a
+/// working tree cut by `limits.worktree_files` must say it is incomplete on both tools.
+#[tokio::test]
+async fn the_prompts_advice_for_a_truncated_plan_recovers_every_omitted_path() {
+    use rmcp::handler::server::wrapper::Parameters;
+
+    let (_d, s, names) = wide(7, 3);
+    let prompt = crate::mcp::prompts::review_text(&crate::mcp::prompts::ReviewArgs {
+        base: Some("main".into()),
+        head: Some("side".into()),
+        ..crate::mcp::prompts::ReviewArgs::default()
+    });
+    let plan_args = serde_json::json!({
+        "source": "compare", "base": "main", "head": "side", "three_dot": true
+    });
+    let plan =
+        call(s.review_plan(Parameters(serde_json::from_value(plan_args).expect("args"))).await);
+    assert_eq!(plan["truncated"], true);
+    assert_eq!(plan["files"].as_array().map(Vec::len), Some(3));
+    assert_eq!(plan["total_files"], 7);
+
+    let (tool, max_lines) = advice(&prompt);
+    assert_eq!(tool, "compare", "the prompt must name a tool that lists the omitted files");
+    assert!(max_lines > 0, "{prompt}");
+    let args = serde_json::json!({
+        "base": "main", "head": "side", "three_dot": true, "max_lines": max_lines
+    });
+    let all = call(s.compare(Parameters(serde_json::from_value(args).expect("args"))).await);
+    let mut got: Vec<String> = all["files"]
+        .as_array()
+        .expect("files")
+        .iter()
+        .filter_map(|f| f["path"].as_str().map(str::to_owned))
+        .collect();
+    got.sort();
+    assert_eq!(got, names, "every changed path, past the plan cap");
+
+    // A working tree cut by the scan limit says so on the plan and on the tool the prompt names.
+    let tree = crate::mcp::prompts::review_text(&crate::mcp::prompts::ReviewArgs {
+        worktree: Some(true),
+        ..crate::mcp::prompts::ReviewArgs::default()
+    });
+    assert_eq!(advice(&tree).0, "worktree_diff");
+    assert!(tree.contains("limits.worktree_files"), "{tree}");
+    let (d, _unused, _) = wide(1, 3);
+    git(d.path(), &["checkout", "-q", "main"]);
+    for i in 0..4 {
+        std::fs::write(d.path().join(format!("n{i}.txt")), "x\n").expect("write");
+    }
+    let state = ApiState::open(d.path()).expect("open");
+    state.repo.set_worktree_limits(2, 1 << 20);
+    let s = McpServer::new(state);
+    let cut_plan = call(
+        s.review_plan(Parameters(serde_json::from_value(serde_json::json!({})).expect("a"))).await,
+    );
+    assert_eq!(cut_plan["files_omitted"], true, "the plan must not claim to be exhaustive");
+    let args = serde_json::json!({ "max_lines": advice(&tree).1 });
+    let cut = call(s.worktree_diff(Parameters(serde_json::from_value(args).expect("args"))).await);
+    assert_eq!(cut["files_omitted"], true);
+    assert_eq!(cut["files"].as_array().map(Vec::len), Some(2));
+}
+
+/// Second defect it catches: advice that names a tool, argument, response field or setting the
+/// server does not have (a renamed `limit`, a dropped `files_omitted`). Every backticked word
+/// of every form of the prompt must exist in the registries it comes from.
+#[test]
+fn the_review_prompt_names_only_tools_arguments_fields_and_settings_that_exist() {
+    use std::collections::BTreeSet;
+
+    fn fields<T: schemars::JsonSchema>(into: &mut BTreeSet<String>) {
+        let v = serde_json::to_value(schemars::schema_for!(T)).expect("schema");
+        into.extend(v["properties"].as_object().into_iter().flat_map(|o| o.keys().cloned()));
+    }
+
+    let mut known: BTreeSet<String> = BTreeSet::new();
+    for t in McpServer::tool_docs() {
+        known.insert(t.name.clone());
+        known.extend(t.params.iter().map(|p| p.name.to_string()));
+    }
+    known.extend(gitterrace_config::keys().iter().map(|k| k.id.to_owned()));
+    fields::<gitterrace_types::api::ReviewPlan>(&mut known);
+    fields::<gitterrace_types::api::PlanFile>(&mut known);
+    fields::<gitterrace_types::api::CompareResponse>(&mut known);
+    fields::<gitterrace_types::api::WorktreeResponse>(&mut known);
+    // Values of arguments, not names: the source kinds and the revisions the test passes in.
+    known.extend(["worktree", "compare", "v1", "HEAD"].map(str::to_owned));
+
+    let args = |base: Option<&str>, worktree: bool| crate::mcp::prompts::ReviewArgs {
+        base: base.map(Into::into),
+        worktree: Some(worktree),
+        repo: Some("alpha".into()),
+        ..crate::mcp::prompts::ReviewArgs::default()
+    };
+    known.insert("alpha".to_owned());
+    for a in [args(Some("v1"), false), args(None, false), args(None, true)] {
+        let prompt = crate::mcp::prompts::review_text(&a);
+        for (i, word) in prompt.split('`').enumerate().filter(|(i, _)| i % 2 == 1) {
+            assert!(
+                known.contains(word),
+                "the prompt names `{word}` (part {i}), not in any registry"
+            );
+        }
+    }
+}
