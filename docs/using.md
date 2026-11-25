@@ -260,13 +260,20 @@ font size each have a key: [Configuration](configuration.md) lists them.
 
 Press `?` on any page for the full list. The common ones:
 
+<!-- BEGIN GENERATED: keys -->
 | Key | Does |
 | --- | --- |
-| `/` | Search code and commits |
 | `t` | Find a file by name |
-| `b` | Switch branch or tag |
+| `/` | Search code and commits |
 | `y` | Copy a permalink to this revision |
+| `g` then `c` | Go to the code |
+| `g` then `i` | Go to insights |
+| `g` then `b` | Go to branches and tags |
+| `g` then `l` | Go to the log |
+| `g` then `s` | Go to search |
+| `b` | Switch branch or tag |
+| `.` | The action menu for the selection |
 | `j`, `k` | Move through a list, `Enter` opens |
 | `]`, `[` | Jump to the next or previous changed file in a diff |
-| `g` then `c`, `l`, `b`, `i`, `s` | Code, log, branches, insights, search |
-| `.` | The action menu for the selection |
+
+<!-- END GENERATED: keys -->

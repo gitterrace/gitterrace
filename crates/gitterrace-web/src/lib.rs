@@ -72,6 +72,7 @@ mod seg;
 mod settings;
 mod settings_actions;
 mod settings_page;
+mod shortcuts;
 pub mod sitemap;
 mod worktree_scope;
 
@@ -118,6 +119,7 @@ pub use registry::{
 };
 pub use reload::{Load, Watched};
 pub use routes::{LAZY_ASSETS, MERMAID_JS, asset_url, asset_version, font_bytes};
+pub use shortcuts::{Shortcut, shortcuts};
 pub use views::stats_tab_labels;
 
 use crate::app::{App, Env};

@@ -33,6 +33,25 @@ pub(crate) fn prompt_args() -> String {
     s
 }
 
+/// The Keys table, from the list the `?` sheet in `nav.js` renders. Only the keys with a guide
+/// wording appear: the sheet has the rest.
+pub(crate) fn keys() -> String {
+    let mut s = String::from("| Key | Does |\n| --- | --- |\n");
+    for k in gitterrace_web::shortcuts() {
+        let Some(doc) = &k.doc else { continue };
+        let _ = writeln!(s, "| {} | {doc} |", key_cell(&k.keys));
+    }
+    s
+}
+
+/// `g c` as "`g` then `c`", `j / k` as "`j`, `k`", one key as itself.
+fn key_cell(keys: &str) -> String {
+    if keys.contains(" / ") {
+        return keys.split(" / ").map(|k| format!("`{k}`")).collect::<Vec<_>>().join(", ");
+    }
+    keys.split(' ').map(|k| format!("`{k}`")).collect::<Vec<_>>().join(" then ")
+}
+
 /// What the starter turns on by itself, as one sentence for the front page.
 pub(crate) fn send_defaults() -> String {
     let on: Vec<String> = gitterrace_actions::examples::enabled_by_default()

@@ -303,11 +303,15 @@
 
 
   // ---- shortcut sheet -----------------------------------------------------
-  var SHORTCUTS = [
-    ["t", "Go to file"], ["/", "Focus search"], ["y", "Permalink to this commit"],
-    ["g c", "Code"], ["g i", "Insights"], ["g b", "Branches and tags"], ["g l", "Commits"], ["g s", "Search"],
-    ["b", "Switch branch or tag"], [".", "Action menu"], ["j / k", "Next / previous commit or result"], ["] / [", "Next / previous changed file"], ["f", "Find in the diff"], ["n / N", "Next / previous match"], ["?", "This sheet"], ["Esc", "Close"]
-  ];
+  // The sheet reads keys.json, the one list the docs' Keys table is built from too. It loads
+  // when the sheet first opens, from beside this script.
+  var HERE = document.currentScript ? document.currentScript.src : location.href;
+  var keyList = null;
+  function loadKeyList() {
+    if (keyList) return Promise.resolve(keyList);
+    return fetch(new URL("keys.json" + new URL(HERE).search, HERE).href).then(function (r) { return r.json(); })
+      .then(function (l) { keyList = l; return l; });
+  }
   // Action chords: "a" then the key the user gave an action in actions.toml.
   function actionChords() {
     var m = document.querySelector('meta[name="gitterrace-actions"]'), list = [];
@@ -316,6 +320,7 @@
   }
   function openHelp() {
     var box = overlay("help", "Keyboard shortcuts"), dl = el("dl", "keys");
+    if (!box) return;
     var sw = el("label", "keys-switch"), cb = el("input");
     cb.type = "checkbox";
     cb.id = "keys-off";
@@ -324,14 +329,16 @@
     sw.append(cb, el("span", "", "Turn off single-key shortcuts (? still opens this sheet)"));
     box.append(el("h2", "", "Keyboard shortcuts"), sw, dl);
     // A chord is one unit: keys close together, joined by a muted "then" ("j / k" reads "or").
-    SHORTCUTS.filter(function (x) { return !(isOff("insights") && x[0] === "g i") && !(isOff("search") && (x[0] === "g s" || x[0] === "/")); }).concat(actionChords()).forEach(function (s) {
-      var alt = s[0].indexOf(" / ") > 0, dt = dl.appendChild(el("dt"));
-      s[0].split(alt ? " / " : " ").forEach(function (k, i) {
-        if (i > 0) dt.appendChild(el("span", "muted", alt ? "or" : "then"));
-        dt.appendChild(el("kbd", "", k));
+    loadKeyList().then(function (list) {
+      list.filter(function (x) { return !x.feature || !isOff(x.feature); }).map(function (x) { return [x.keys, x.help]; }).concat(actionChords()).forEach(function (s) {
+        var alt = s[0].indexOf(" / ") > 0, dt = dl.appendChild(el("dt"));
+        s[0].split(alt ? " / " : " ").forEach(function (k, i) {
+          if (i > 0) dt.appendChild(el("span", "muted", alt ? "or" : "then"));
+          dt.appendChild(el("kbd", "", k));
+        });
+        dl.appendChild(el("dd", "", s[1]));
       });
-      dl.appendChild(el("dd", "", s[1]));
-    });
+    }, function () { dl.appendChild(el("dd", "", "Could not load the shortcut list")); });
   }
 
   // ---- permalink ----------------------------------------------------------

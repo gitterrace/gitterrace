@@ -102,5 +102,5 @@ fn bracket_keys_focus_the_file_headers() {
     let nav = include_str!("../../static/nav.js");
     assert!(nav.contains("k === \"]\"") && nav.contains("k === \"[\""));
     assert!(nav.contains("section.file > header") && nav.contains("to.focus()"));
-    assert!(nav.contains("Next / previous changed file"));
+    assert!(include_str!("../../static/keys.json").contains("Next / previous changed file"));
 }

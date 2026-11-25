@@ -1,0 +1,18 @@
+[
+  {"keys": "t", "help": "Go to file", "doc": "Find a file by name"},
+  {"keys": "/", "help": "Focus search", "doc": "Search code and commits", "feature": "search"},
+  {"keys": "y", "help": "Permalink to this commit", "doc": "Copy a permalink to this revision"},
+  {"keys": "g c", "help": "Code", "doc": "Go to the code"},
+  {"keys": "g i", "help": "Insights", "doc": "Go to insights", "feature": "insights"},
+  {"keys": "g b", "help": "Branches and tags", "doc": "Go to branches and tags"},
+  {"keys": "g l", "help": "Commits", "doc": "Go to the log"},
+  {"keys": "g s", "help": "Search", "doc": "Go to search", "feature": "search"},
+  {"keys": "b", "help": "Switch branch or tag", "doc": "Switch branch or tag"},
+  {"keys": ".", "help": "Action menu", "doc": "The action menu for the selection"},
+  {"keys": "j / k", "help": "Next / previous commit or result", "doc": "Move through a list, `Enter` opens"},
+  {"keys": "] / [", "help": "Next / previous changed file", "doc": "Jump to the next or previous changed file in a diff"},
+  {"keys": "f", "help": "Find in the diff"},
+  {"keys": "n / N", "help": "Next / previous match"},
+  {"keys": "?", "help": "This sheet"},
+  {"keys": "Esc", "help": "Close"}
+]
