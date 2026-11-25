@@ -159,10 +159,22 @@ def untracked(d, rels):
     return sorted(rel for rel in rels if rel not in tracked)
 
 
+def host_paths(v):
+    """Every string in the manifest that is an absolute or home path: one names the machine that synced."""
+    if isinstance(v, dict):
+        return [p for k, x in v.items() for p in host_paths(k) + host_paths(x)]
+    if isinstance(v, list):
+        return [p for x in v for p in host_paths(x)]
+    return [v] if isinstance(v, str) and (v.startswith(('/', '~')) or re.match(r'[A-Za-z]:[\\/]', v)) else []
+
+
 def check(d):
     mf = d / 'manifest.json'
     if not mf.is_file():
         print(f'no manifest: {mf}')
+        return 1
+    for p in host_paths(json.loads(mf.read_text())):
+        print(f'host path in manifest.json: {p}; a manifest records the kit commit, never a path. Re-sync with a current sync.py')
         return 1
     for rel in links_of(d):
         print(f'symlink in the copy: {rel}; a copy holds only real files')

@@ -2,8 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-25T09:17:21Z",
-  "source": "/Users/timo/.jcode/scratch/kit-wt-9a5f296",
+  "date": "2026-11-25T12:56:57Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -59,8 +58,8 @@
     "tools"
   ],
   "files": {
-    "README.md": "5f9c91ba4eb1e5db50e12bcc3ac59af7799139b8383ad686d039a30a2348d30f",
-    "check.py": "42413a5f2df406126d7ebf142317beb462716825ab16e5804b0e1f28a05a3d95",
+    "README.md": "0a2200da19679fbdcab1298f0f67fd64f7a620d227d05b4c31531255e6357f7a",
+    "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
     "configs/deny-base.toml": "95071026e5d6f79cea219737b3ff12c10eb3c54844372b86d269ae3135407922",
@@ -353,7 +352,7 @@
     "tools/disk-sweep.py": "e8c65c19e39f2dcdda4a693336a289f16ab9b6a70db4b0d81aec2745d87a1873",
     "tools/golden.py": "660c09eb8d88ccc80e6c6c76e0747ba352377475e9e8a25e1abf4575089dd712",
     "tools/golden_test.py": "81b91e673ddc81a4d276cec02148e49845fa32263930f72fa2a597031f34cd9e",
-    "tools/land.sh": "e792b2e7fe854bc18030755581a541167eff1fa69c683fe6bff960a43a7de83b",
+    "tools/land.sh": "f4d75a1683799b421964bf88941bd80ececd31ac634b0ffd5918d5abb41ae462",
     "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
   },
