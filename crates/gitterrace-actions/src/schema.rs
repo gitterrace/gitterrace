@@ -164,8 +164,20 @@ pub const FILE_KEYS: [Item; 4] = [
 
 /// Keys of a `[[send]]` block.
 pub const SEND_KEYS: [Item; 6] = [
-    item("id", "string", true, "", "`[a-z0-9-]`, 1 to 32 characters, unique among sends."),
-    item("label", "string", true, "", "Text in the Send window, 1 to 80 characters."),
+    item(
+        "id",
+        "string",
+        true,
+        "",
+        concat!("`[a-z0-9-]`, 1 to ", numbers::id_chars!(), " characters, unique among sends."),
+    ),
+    item(
+        "label",
+        "string",
+        true,
+        "",
+        concat!("Text in the Send window, 1 to ", numbers::label_chars!(), " characters."),
+    ),
     item(
         "url",
         "string",
@@ -225,7 +237,11 @@ pub const SCRIPT_KEYS: [Item; 6] = [
         "string",
         true,
         "",
-        "`[a-z0-9-]`, 1 to 32 characters, unique. A script cannot name another script.",
+        concat!(
+            "`[a-z0-9-]`, 1 to ",
+            numbers::id_chars!(),
+            " characters, unique. A script cannot name another script."
+        ),
     ),
     item(
         "command",
@@ -270,8 +286,20 @@ pub const SCRIPT_KEYS: [Item; 6] = [
 
 /// Keys of an `[[action]]` block.
 pub const ACTION_KEYS: [Item; 14] = [
-    item("id", "string", true, "", "`[a-z0-9-]`, 1 to 32 characters, unique."),
-    item("label", "string", true, "", "Menu text, 1 to 80 characters."),
+    item(
+        "id",
+        "string",
+        true,
+        "",
+        concat!("`[a-z0-9-]`, 1 to ", numbers::id_chars!(), " characters, unique."),
+    ),
+    item(
+        "label",
+        "string",
+        true,
+        "",
+        concat!("Menu text, 1 to ", numbers::label_chars!(), " characters."),
+    ),
     item(
         "enabled",
         "boolean",

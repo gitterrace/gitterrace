@@ -27,6 +27,10 @@ pub const LOOKUP_FIELDS: [&str; 2] = ["sha", "short"];
 pub const DENIED_SCHEMES: [&str; 8] =
     ["javascript", "data", "file", "vbscript", "blob", "about", "chrome", "view-source"];
 
+/// The one scheme allowed only for a loopback host. Any other scheme not in
+/// [`DENIED_SCHEMES`] is allowed.
+pub const PLAINTEXT_SCHEME: &str = "http";
+
 /// One part of a template as the page receives it: `{"lit": "..."}` is copied as is,
 /// `{"ph": "title"}` is replaced by the encoded value.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -212,7 +216,7 @@ fn check_prefix(key: &str, prefix: &str, has_placeholder: bool) -> Result<(), Se
     if has_placeholder && host_end.is_none() {
         return Err(SendError::PlaceholderInHost { key: key.to_owned() });
     }
-    if lower == "http" {
+    if lower == PLAINTEXT_SCHEME {
         let authority = &after[..host_end.unwrap_or(after.len())];
         let host = authority.rsplit('@').next().unwrap_or_default();
         let host = host.strip_prefix('[').map_or_else(

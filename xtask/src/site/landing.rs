@@ -292,6 +292,12 @@ fn md(text: &str, links: &Links) -> String {
         }),
         ev => ev,
     });
+    // The markers of a generated block are for the editor, not for the reader.
+    let events = events.filter(|ev| {
+        !matches!(ev, pulldown_cmark::Event::Html(h)
+            if h.trim_start().starts_with("<!-- BEGIN GENERATED: ")
+                || h.trim_start().starts_with("<!-- END GENERATED: "))
+    });
     html::push_html(&mut out, events);
     out
 }

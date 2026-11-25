@@ -2,13 +2,18 @@
 
 use std::fmt::Write as _;
 
-use anyhow::{Context, Result};
-
+use anyhow::{Context as _, Result};
+use gitterrace_actions::SOURCE_FORMAT;
+use gitterrace_actions::config::{MAX_TIMEOUT, WINDOWS_EXTENSIONS};
+use gitterrace_actions::examples;
+use gitterrace_actions::runner::{
+    MAX_ARGV_BYTES, MAX_RUNNING, MAX_VALUE_BYTES, PER_MINUTE, WINDOWS_KILL_FORCE, WINDOWS_KILL_TREE,
+};
 use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
     SEND_KEYS, SEND_PLACEHOLDERS,
 };
-use gitterrace_actions::send::DENIED_SCHEMES;
+use gitterrace_actions::send::{DENIED_SCHEMES, PLAINTEXT_SCHEME};
 use gitterrace_actions::{Config, kind_name};
 
 use crate::action_scripts::Script;
@@ -174,7 +179,12 @@ pub(crate) fn send() -> String {
         let _ = writeln!(s, "| `{{{name}}}` | {doc} |");
     }
     let denied: Vec<String> = DENIED_SCHEMES.iter().map(|d| format!("`{d}:`")).collect();
-    let _ = writeln!(s, "\nRefused schemes: {}.\n", denied.join(", "));
+    let _ = writeln!(
+        s,
+        "\nA scheme is allowed unless it is refused. `{PLAINTEXT_SCHEME}:` is allowed only for a \
+         loopback host. Refused schemes: {}.\n",
+        denied.join(", ")
+    );
     s.push_str(&key_table("`[[send]]`", "One Send to target: a `url` template.", &SEND_KEYS));
     s
 }
@@ -183,8 +193,6 @@ pub(crate) fn send() -> String {
 /// limits from the runner and loader constants. One generated list, so the page never shows
 /// a hand list and a generated one as two lists.
 pub(crate) fn limits() -> String {
-    use gitterrace_actions::config::MAX_TIMEOUT;
-    use gitterrace_actions::runner::{MAX_RUNNING, PER_MINUTE};
     let output = gitterrace_config::keys()
         .iter()
         .find(|k| k.id == "limits.action_output_kb")
@@ -192,7 +200,8 @@ pub(crate) fn limits() -> String {
     let items = [
         "The file must be a regular file outside every served repository. On Unix it and its \
          folder must also be owned by you and not writable by group or others. Windows checks \
-         neither and relies on the profile folder's ACLs (see [Windows](#windows)). Actions are \
+         neither and relies on the profile folder's ACLs, as the \
+         [security model](security.md#accepted-risks) explains. Actions are \
          off on a public server, on a non-loopback bind and with `--no-actions`, and never \
          offered to MCP."
             .to_owned(),
@@ -240,22 +249,59 @@ pub(crate) fn script_table(scripts: &[Script]) -> String {
     s
 }
 
-/// A toml fence holding the starter chunks with these ids, verbatim and without their comment
-/// lines. An id the starter lacks fails generation, so a doc cannot name an entry that is gone.
-pub(crate) fn example(ids: &[&str]) -> Result<String> {
-    let mut parts = Vec::new();
-    for id in ids {
-        let want = format!("id=\"{id}\"");
-        let chunk = Config::STARTER
-            .split("\n\n")
-            .find(|c| {
-                let mut body = c.lines().filter(|l| !l.starts_with('#'));
-                body.next().is_some_and(|h| h.starts_with("[["))
-                    && body.any(|l| l.split_whitespace().collect::<String>() == want)
-            })
-            .with_context(|| format!("docs example: no starter entry with id `{id}`"))?;
-        let body: Vec<&str> = chunk.lines().filter(|l| !l.starts_with('#')).collect();
-        parts.push(body.join("\n"));
-    }
-    Ok(format!("```toml\n{}\n```\n", parts.join("\n\n")))
+/// The example block `id`, from the starter file or `defaults/examples.toml`.
+pub(crate) fn example(doc: &str, id: &str) -> Result<String> {
+    let spec = examples::SPECS
+        .iter()
+        .find(|s| s.doc == doc && s.block == id)
+        .with_context(|| format!("no example spec {doc} [{id}]"))?;
+    Ok(examples::render(spec)?)
+}
+
+/// The machine line every note ends with.
+pub(crate) fn source_line() -> String {
+    format!("```text\n{SOURCE_FORMAT}\n```\n")
+}
+
+/// The starter's coding agents as one sentence: the entry id and the menu text it shows.
+pub(crate) fn agents() -> String {
+    let rows: Vec<String> =
+        examples::agents().iter().map(|(id, label)| format!("`{id}` (**{label}**)")).collect();
+    format!("The entries are {}.\n", rows.join(", "))
+}
+
+/// What only Windows does, from the constants the code runs on.
+pub(crate) fn windows() -> String {
+    let dir = gitterrace_config::WINDOWS_CONFIG_ENV;
+    let exts: Vec<String> = WINDOWS_EXTENSIONS.iter().map(|e| format!("`.{e}`")).collect();
+    let list = match exts.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} or {last}", rest.join(", ")),
+        _ => exts.concat(),
+    };
+    let items = [
+        format!(
+            "`actions.toml` is read from `%{dir}%\\gitterrace`, with no owner or mode check. \
+             Background \
+             processes a script starts are not reaped when the action completes normally."
+        ),
+        format!("`command[0]` must be an {list}."),
+        format!(
+            "A timeout ends the process tree with `taskkill {WINDOWS_KILL_TREE}`, then \
+             `taskkill {WINDOWS_KILL_FORCE}`."
+        ),
+    ];
+    items.iter().fold(String::new(), |mut s, i| {
+        let _ = writeln!(s, "{}", crate::out::wrap_item(i));
+        s
+    })
+}
+
+/// The size bounds checked when a run starts, from the runner constants.
+pub(crate) fn load_limits() -> String {
+    format!(
+        "A value with a zero byte (NUL), a value over {} KiB, or arguments over {} KiB together \
+         refuse the run with a toast. Nothing is cut short. Send large text on stdin.",
+        MAX_VALUE_BYTES / 1024,
+        MAX_ARGV_BYTES / 1024
+    )
 }

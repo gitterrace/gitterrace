@@ -13,10 +13,11 @@ screen, where you confirm. gitterrace starts no process and makes no request.
 
 <!-- BEGIN GENERATED: example-send -->
 ```toml
+version = 1
+
 [[send]]
 id      = "github-issue"
 label   = "New issue"
-enabled = false
 url     = "https://github.com/{var.repo}/issues/new?title={title}&body={notes}"
 lookup  = "https://github.com/{var.repo}/search?q={sha}&type=commits"
 vars    = { repo = "owner/name" }
@@ -26,21 +27,24 @@ vars    = { repo = "owner/name" }
 
 Page values are always percent-encoded and can never reach the scheme or the
 host: the text before the first placeholder must hold the scheme and end the
-host. `https`, `mailto` and app schemes are allowed, `http` only for loopback.
-With no `[[send]]` entry, the window offers Copy as markdown.
+host. The schemes allowed and refused are listed under Reference. With no
+`[[send]]` entry, the window offers Copy as markdown.
 
 ### What a note carries
 
 A mark snaps to whole words and sends its source lines, also from rendered
-Markdown. A mark in a table quotes the whole table. A mark under about 20
-characters brings one line on each side. The title is the first line you type,
-else the file name and the first words of the mark.
+Markdown. A mark in a table quotes the whole table. A short mark brings one
+line on each side. The title is the first line you type, else the file name and
+the first words of the mark.
 
 The last line of every note, and of Copy as markdown, is for machines:
 
+<!-- BEGIN GENERATED: source-line -->
 ```text
 source: <repo>@<sha>:<path>#L<a>-L<b>
 ```
+
+<!-- END GENERATED: source-line -->
 
 `<sha>` is the full commit id. A commit has no `:<path>` part, a whole file no
 `#L` part, and a single line is still `#L<a>-L<a>`. In the path `%` is written
@@ -96,7 +100,8 @@ file `git terrace init` writes:
 | `{repo}` | The repository name. |
 | `{var.<name>}` | A value from `[send.vars]`, inserted verbatim, so it may hold the base URL. |
 
-Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`,
+A scheme is allowed unless it is refused. `http:` is allowed only for a loopback
+host. Refused schemes: `javascript:`, `data:`, `file:`, `vbscript:`, `blob:`,
 `about:`, `chrome:`, `view-source:`.
 
 ### `[[send]]`
@@ -125,7 +130,6 @@ alone. Use one for a write with no add screen, a script or a webhook.
 [[action]]
 id      = "webhook"
 label   = "Post to webhook"
-enabled = false
 kinds   = ["line", "commit"]
 command = [
   "curl", "-fsS", "-m", "8",
@@ -140,41 +144,69 @@ vars    = { url = "https://example.test/hook" }
 <!-- END GENERATED: example-webhook -->
 
 `:url` encodes a value for a URL, so a title with `&` or `#` stays one query
-value. The starter `search` entry uses it to search the web for the selection's
-title (`open` on macOS, `xdg-open` on Linux).
+value. This one searches the web for the selection's title (`open` on macOS,
+`xdg-open` on Linux):
+
+<!-- BEGIN GENERATED: example-search -->
+```toml
+[[action]]
+id      = "search"
+label   = "Search the web"
+kinds   = ["line", "commit"]
+command = ["open", "https://duckduckgo.com/?q={title:url}"]
+```
+
+<!-- END GENERATED: example-search -->
 
 ### Hand a finding to an agent
 
-The starter file has one entry per coding agent: `claude` (Claude Code),
-`codex` (Codex CLI), `kiro` (Kiro CLI) and `gemini` (Gemini CLI). Each runs
+The starter file has one entry per coding agent, listed below. Each runs
 [`agent.sh`](actions/agent.sh), which opens a new terminal in the repository
 and starts the agent with the note as its first prompt, source line included.
 The agent starts interactive, so you see what it does before it does it.
 
+<!-- BEGIN GENERATED: agents -->
+The entries are `claude` (**Ask Claude Code**), `codex` (**Ask Codex**), `kiro`
+(**Ask Kiro**), `gemini` (**Ask Gemini**).
+
+<!-- END GENERATED: agents -->
+
 1. Copy `agent.sh` to `~/.config/gitterrace/` and make it executable.
 2. In `actions.toml`, set `enabled = true` on the agent you use.
-3. Mark lines, press `.` and pick **Ask Claude Code** (or your agent).
+3. Mark lines, press `.` and pick the agent's entry from the list above.
 
-For any other agent, pass its command instead of the name:
-`command = ["~/.config/gitterrace/agent.sh", "aider --message"]`. It gets the
+For any other agent, pass its command instead of the name. It gets the
 note as its last argument.
+
+<!-- BEGIN GENERATED: example-agent-other -->
+```toml
+[[action]]
+id      = "aider"
+label   = "Ask aider"
+kinds   = ["line"]
+command = ["~/.config/gitterrace/agent.sh", "aider --message"]
+```
+
+<!-- END GENERATED: example-agent-other -->
 
 ### Windows
 
-`actions.toml` is read from `%APPDATA%\gitterrace` with no owner or mode check.
-`command[0]` must be an `.exe`, `.cmd`, `.bat` or `.com`, and a timeout ends the
-process tree with `taskkill /T` (then `/F`). The sample `.sh` scripts need a
-POSIX shell, so call a Windows tool directly, such as `command = ["clip.exe"]`
-with `stdin = "markdown"`.
+The sample `.sh` scripts need a POSIX shell. Call a Windows tool directly, as
+in `command = ["clip.exe"]` with `stdin = "markdown"`.
 
-Windows relies on the ACLs of your profile folder, as the
-[security model](security.md#accepted-risks) explains. Background processes a script starts are not reaped
-when the action completes normally. Only a timeout triggers `taskkill /T` (then `/F`) cleanup.
+<!-- BEGIN GENERATED: windows -->
+- `actions.toml` is read from `%APPDATA%\gitterrace`, with no owner or mode
+  check. Background processes a script starts are not reaped when the action
+  completes normally.
+- `command[0]` must be an `.exe`, `.cmd`, `.bat` or `.com`.
+- A timeout ends the process tree with `taskkill /T`, then `taskkill /F`.
+
+<!-- END GENERATED: windows -->
 
 ### Scripts shared by actions
 
 Declare a command once as a `[[script]]` and point actions at it, each with its
-own settings. The starter `obsidian-daily` entry points at the `obsidian` script below.
+own settings. Any of the [sample scripts](#scripts) can be one.
 
 <!-- BEGIN GENERATED: example-script -->
 ```toml
@@ -185,7 +217,6 @@ command = ["~/.config/gitterrace/obsidian.sh"]
 [[action]]
 id      = "obsidian-daily"
 label   = "Obsidian daily note"
-enabled = false
 kinds   = ["line", "commit"]
 script  = "obsidian"
 vars    = { folder = "Daily" }
@@ -231,9 +262,13 @@ Checked when the file loads:
   is the argument of (`"--notes", "{markdown}"`), or behind a literal prefix
   (`"--notes={markdown}"`). In the option case, a value that does start with `-`
   refuses the run.
-- A value with a zero byte (NUL), a value over 64 KiB, or arguments over 256 KiB
-  together refuse the run with a toast. Nothing is cut short. Send large text on
-  stdin.
+
+<!-- BEGIN GENERATED: load-limits -->
+A value with a zero byte (NUL), a value over 64 KiB, or arguments over 256 KiB
+together refuse the run with a toast. Nothing is cut short. Send large text on
+stdin.
+
+<!-- END GENERATED: load-limits -->
 
 <!-- BEGIN GENERATED: action-keys -->
 ### `[[script]]`
@@ -325,9 +360,10 @@ Environment (same values, plus `GITTERRACE_VAR_<NAME>`):
 <!-- BEGIN GENERATED: limits -->
 - The file must be a regular file outside every served repository. On Unix it
   and its folder must also be owned by you and not writable by group or others.
-  Windows checks neither and relies on the profile folder's ACLs (see
-  [Windows](#windows)). Actions are off on a public server, on a non-loopback
-  bind and with `--no-actions`, and never offered to MCP.
+  Windows checks neither and relies on the profile folder's ACLs, as the
+  [security model](security.md#accepted-risks) explains. Actions are off on a
+  public server, on a non-loopback bind and with `--no-actions`, and never
+  offered to MCP.
 - Every field is untrusted repository text. In a script, quote it and never
   `eval` it.
 - No shell between gitterrace and the program: a placeholder is one argument,

@@ -6,6 +6,10 @@ use std::path::{MAIN_SEPARATOR, Path};
 
 use gitterrace_types::home::expand_tilde;
 
+/// The extensions Windows runs as a program, matched without regard to case. Only Windows reads
+/// the list to decide, the docs print it on every OS.
+pub const WINDOWS_EXTENSIONS: [&str; 4] = ["exe", "cmd", "bat", "com"];
+
 /// argv[0] as an absolute executable: tilde-expanded, or looked up in `PATH` when it has no
 /// slash. A relative path with a slash is refused: it would resolve against the cwd.
 pub(super) fn resolve_program(prog: &str, home: &Path) -> Option<String> {
@@ -32,7 +36,7 @@ fn is_executable(p: &Path) -> bool {
     let ext_ok = |p: &Path| {
         p.extension()
             .and_then(|e| e.to_str())
-            .is_some_and(|e| ["exe", "cmd", "bat", "com"].iter().any(|x| e.eq_ignore_ascii_case(x)))
+            .is_some_and(|e| WINDOWS_EXTENSIONS.iter().any(|x| e.eq_ignore_ascii_case(x)))
     };
     std::fs::metadata(p).is_ok_and(|m| m.is_file()) && ext_ok(p)
 }

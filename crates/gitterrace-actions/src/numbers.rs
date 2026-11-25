@@ -14,6 +14,18 @@ macro_rules! max_vars {
         32
     };
 }
+/// An action or send `id`: most characters.
+macro_rules! id_chars {
+    () => {
+        32
+    };
+}
+/// An action or send `label`: most characters.
+macro_rules! label_chars {
+    () => {
+        80
+    };
+}
 /// Payload `text`: most KiB.
 macro_rules! text_kib {
     () => {
@@ -33,4 +45,4 @@ macro_rules! timeout_secs {
     };
 }
 
-pub(crate) use {max_vars, text_kib, text_lines, timeout_secs, var_kib};
+pub(crate) use {id_chars, label_chars, max_vars, text_kib, text_lines, timeout_secs, var_kib};

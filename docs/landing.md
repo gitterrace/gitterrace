@@ -21,13 +21,16 @@ agents wrote, then pass each finding on with its context.
 A finding is plain text with a source line, so it goes to the agent, editor,
 tracker or script you already use. One entry in `actions.toml` adds a target.
 
+<!-- BEGIN GENERATED: example-claude -->
 ```toml
 [[action]]
-id      = "claude"
-label   = "Ask Claude Code"
+id      = "ask"
+label   = "Ask Claude"
+kinds   = ["line"]
 command = ["~/.config/gitterrace/agent.sh", "claude"]
-stdin   = "markdown"
 ```
+
+<!-- END GENERATED: example-claude -->
 
 Agents can also read the repository themselves, over a read-only MCP server.
 Register it once.

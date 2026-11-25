@@ -329,21 +329,26 @@ fn placeholders_load_and_every_refusal_names_its_key() {
     assert!(Config::parse(&awk, Path::new("/")).is_ok());
 }
 
-/// Every `toml` block in docs/actions.md loads, so the docs never show a config the
-/// server refuses. Programs are stubbed: `~/...` under a temp home, bare names as
-/// absolute stubs, so only the PATH lookup itself is not exercised here.
+/// Every `toml` block in docs/actions.md and docs/landing.md loads, so the docs never show a
+/// config the server refuses. `deny_unknown_fields` makes a key the parser renamed a failure
+/// here, and `examples::tests` holds each block to its starter or examples entry. Programs
+/// are stubbed: `~/...` under a temp home, bare names as absolute
+/// stubs, so only the PATH lookup itself is not exercised here.
 #[test]
 fn every_documented_example_loads() {
     use std::os::unix::fs::PermissionsExt;
-    let doc = include_str!("../../../../docs/actions.md");
+    let docs =
+        [include_str!("../../../../docs/actions.md"), include_str!("../../../../docs/landing.md")];
     let home = tempfile::tempdir().expect("tmp");
     let stub = |p: &Path| {
         std::fs::create_dir_all(p.parent().expect("parent")).expect("dir");
         std::fs::write(p, "#!/bin/sh\n").expect("write");
         std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o700)).expect("chmod");
     };
-    let blocks: Vec<&str> =
-        doc.split("```toml\n").skip(1).filter_map(|b| b.split("```").next()).collect();
+    let blocks: Vec<&str> = docs
+        .iter()
+        .flat_map(|d| d.split("```toml\n").skip(1).filter_map(|b| b.split("```").next()))
+        .collect();
     assert!(blocks.len() >= 3, "found {} toml blocks", blocks.len());
     for (i, block) in blocks.iter().enumerate() {
         let mut text = if block.contains("version") {
@@ -371,7 +376,7 @@ fn every_documented_example_loads() {
             }
         }
         if let Err(e) = Config::parse(&text, home.path()) {
-            panic!("docs/actions.md toml block {i} does not load: {e}\n{text}");
+            panic!("docs toml block {i} does not load: {e}\n{text}");
         }
     }
 }

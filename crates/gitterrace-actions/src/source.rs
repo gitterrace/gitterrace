@@ -9,6 +9,10 @@ use crate::payload::{Lines, flat};
 /// The prefix that starts the line.
 pub const SOURCE_PREFIX: &str = "source: ";
 
+/// The shape of the line for the docs, written with the placeholders a reader fills in. A test
+/// holds it to what [`source_line`] writes.
+pub const SOURCE_FORMAT: &str = "source: <repo>@<sha>:<path>#L<a>-L<b>";
+
 /// A parsed source line.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Source {

@@ -18,6 +18,7 @@ use serde::Deserialize;
 
 pub use crate::config::command::{PieceError, pieces};
 use crate::config::command::{StdinError, check_command};
+pub use crate::config::program::WINDOWS_EXTENSIONS;
 use crate::config::program::resolve_program;
 pub use crate::config::reload::Reloader;
 use crate::config::trust::check_file;
@@ -346,16 +347,16 @@ fn send_err(id: &str, why: impl Into<String>) -> ConfigError {
     ConfigError::Send { id, why }
 }
 
-const ID_RULE: &str = "id must match [a-z0-9-]{1,32}";
+const ID_RULE: &str = concat!("id must match [a-z0-9-]{1,", crate::numbers::id_chars!(), "}");
 
 /// A menu or Send label: 1 to 80 characters, not blank.
 pub(crate) fn valid_label(label: &str) -> bool {
-    !label.trim().is_empty() && label.chars().count() <= 80
+    !label.trim().is_empty() && label.chars().count() <= crate::numbers::label_chars!()
 }
 
 fn valid_id(id: &str) -> bool {
     !id.is_empty()
-        && id.len() <= 32
+        && id.len() <= crate::numbers::id_chars!()
         && id.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
 }
 

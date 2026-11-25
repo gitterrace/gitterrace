@@ -74,6 +74,9 @@ pub enum ConfigError {
     File { path: std::path::PathBuf, source: Box<Self> },
 }
 
+/// The Windows environment variable that holds the config folder's parent.
+pub const WINDOWS_CONFIG_ENV: &str = "APPDATA";
+
 /// Where the config directory is.
 ///
 /// On Windows `%APPDATA%\gitterrace`. Else `$XDG_CONFIG_HOME/gitterrace` when that is absolute,
@@ -86,7 +89,7 @@ pub fn config_dir(override_dir: Option<&Path>) -> Option<PathBuf> {
     #[cfg(windows)]
     {
         // The roaming profile folder (`%APPDATA%`), private to the user by default.
-        if let Some(a) = std::env::var_os("APPDATA").map(PathBuf::from) {
+        if let Some(a) = std::env::var_os(WINDOWS_CONFIG_ENV).map(PathBuf::from) {
             return Some(a.join("gitterrace"));
         }
     }

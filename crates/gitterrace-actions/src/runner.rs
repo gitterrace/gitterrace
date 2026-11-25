@@ -60,6 +60,12 @@ pub struct Limits {
     pub output_bytes: usize,
 }
 
+/// The `taskkill` flag that ends a whole process tree. Only Windows runs it, the docs print it
+/// on every OS.
+pub const WINDOWS_KILL_TREE: &str = "/T";
+/// The `taskkill` flag for the forceful kill after the grace period.
+pub const WINDOWS_KILL_FORCE: &str = "/F";
+
 /// Runs at once, process-wide (one per action id). Not configurable: docs/actions.md states it.
 pub const MAX_RUNNING: usize = 4;
 /// Starts a minute, process-wide. Not configurable: docs/actions.md states it.
@@ -395,9 +401,9 @@ fn signal_group(pgid: Group, sig: Sig) {
 #[cfg(windows)]
 fn signal_group(pid: Group, sig: Sig) {
     let mut cmd = Command::new("taskkill");
-    cmd.arg("/T");
+    cmd.arg(WINDOWS_KILL_TREE);
     if matches!(sig, Sig::Kill) {
-        cmd.arg("/F");
+        cmd.arg(WINDOWS_KILL_FORCE);
     }
     cmd.arg("/PID")
         .arg(pid.to_string())

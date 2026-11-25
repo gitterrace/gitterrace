@@ -16,6 +16,7 @@ use crate::out::Out;
 use crate::readme_agents_md::crate_diagram;
 
 const ACTIONS: &str = "docs/actions.md";
+const LANDING: &str = "docs/landing.md";
 const ARCH: &str = "docs/architecture.md";
 const BENCH: &str = "docs/benchmarks.md";
 const USING: &str = "docs/using.md";
@@ -29,11 +30,22 @@ pub fn render(root: &Path, ws: &Workspace, scripts: &[Script]) -> Result<Vec<Out
         Out::block(ACTIONS, "placeholders", actions::placeholders()),
         Out::block(ACTIONS, "starter", actions::starter()),
         Out::block(ACTIONS, "send", actions::send()),
-        Out::block(ACTIONS, "example-send", actions::example(&["github-issue"])?),
-        Out::block(ACTIONS, "example-webhook", actions::example(&["webhook"])?),
-        Out::block(ACTIONS, "example-script", actions::example(&["obsidian", "obsidian-daily"])?),
         Out::block(ACTIONS, "scripts", actions::script_table(scripts)),
         Out::block(ACTIONS, "limits", actions::limits()),
+        Out::block(ACTIONS, "source-line", actions::source_line()),
+        Out::block(ACTIONS, "agents", actions::agents()),
+        Out::block(ACTIONS, "windows", actions::windows()),
+        Out::block(ACTIONS, "load-limits", actions::load_limits()),
+        Out::block(ACTIONS, "example-send", actions::example(ACTIONS, "example-send")?),
+        Out::block(ACTIONS, "example-webhook", actions::example(ACTIONS, "example-webhook")?),
+        Out::block(ACTIONS, "example-search", actions::example(ACTIONS, "example-search")?),
+        Out::block(
+            ACTIONS,
+            "example-agent-other",
+            actions::example(ACTIONS, "example-agent-other")?,
+        ),
+        Out::block(ACTIONS, "example-script", actions::example(ACTIONS, "example-script")?),
+        Out::block(LANDING, "example-claude", actions::example(LANDING, "example-claude")?),
         Out::block(ARCH, "crates", crate_diagram(ws)?),
         Out::block(ARCH, "routes", arch::routes()),
         Out::block(ARCH, "languages", arch::languages()),

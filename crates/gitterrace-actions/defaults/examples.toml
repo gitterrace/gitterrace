@@ -1,0 +1,19 @@
+# Examples the docs show that the starter file does not hold. Every block here loads by the
+# same rules as an actions file, and `src/examples.rs` holds each one to the key tables. The
+# docs print them through `examples::SPECS`, so nothing is typed twice.
+
+version = 1
+
+# The shortest entry that loads, for the landing page.
+[[action]]
+id      = "ask"
+label   = "Ask Claude"
+kinds   = ["line"]
+command = ["~/.config/gitterrace/agent.sh", "claude"]
+
+# Any other agent: pass its command to `agent.sh` instead of a name.
+[[action]]
+id      = "aider"
+label   = "Ask aider"
+kinds   = ["line"]
+command = ["~/.config/gitterrace/agent.sh", "aider --message"]

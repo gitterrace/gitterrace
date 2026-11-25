@@ -156,6 +156,13 @@ pub(super) fn body(
                     id,
                 })
             }
+            // The markers of a generated block are for the editor, not for the reader.
+            Event::Html(h)
+                if h.trim_start().starts_with("<!-- BEGIN GENERATED: ")
+                    || h.trim_start().starts_with("<!-- END GENERATED: ") =>
+            {
+                continue;
+            }
             Event::Html(h) => Event::Html(CowStr::from(links.rewrite_html(from, &h))),
             ev => ev,
         };
