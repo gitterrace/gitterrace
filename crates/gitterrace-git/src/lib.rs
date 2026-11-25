@@ -30,8 +30,8 @@ mod worktree;
 
 pub use anchor::{Anchor, AnchorQuery, anchors_now};
 pub use atomic::{
-    create_new_no_follow, open_append_no_follow, open_read_no_follow, read_no_follow_bounded,
-    refused, synced_files, write_atomic, write_atomic_unsynced,
+    create_new_no_follow, make_private_no_follow, open_append_no_follow, open_read_no_follow,
+    read_no_follow_bounded, refused, synced_files, write_atomic, write_atomic_unsynced,
 };
 pub use budget::Budget;
 pub use error::{Error, Result};

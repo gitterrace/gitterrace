@@ -123,6 +123,13 @@ The cache lives in `.git/gitterrace/` when that folder is writable, else in
 `$GITTERRACE_INDEX_FALLBACK/<hash of the git dir>` (the Docker image sets
 `/cache/index`), else nowhere.
 
+Cache folders are mode 0700 and files 0600, set at creation, so the copies of
+uncommitted text in checkpoints and the notes in findings never depend on the
+umask. A cache made by an older build is tightened when opened, through
+no-follow handles, so a planted link is never chmod'ed. A shared repository
+serves each user from their own cache: another user cannot write
+`.git/gitterrace`, so they use the user-cache folder.
+
 <!-- BEGIN GENERATED: user-files -->
 `checkpoints`, `viewed` and `findings` hold user state, so a wipe or an older
 build spares them.

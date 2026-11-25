@@ -161,6 +161,43 @@ pub fn create_new_no_follow(path: &Path, mode: u32) -> io::Result<fs::File> {
     no_follow(&mut o).open(path)
 }
 
+/// Removes group and other access from an existing file or folder.
+///
+/// The handle is opened `O_NOFOLLOW`, so a planted link is never chmod'ed (`fchmod` on the
+/// opened inode, not `chmod` on the path). A link, a special file or a file with other hard
+/// links is left alone: its inode may belong to somebody else. Does nothing off unix.
+///
+/// # Errors
+/// When the open or the mode change fails. A missing path is not an error.
+#[cfg(unix)]
+pub fn make_private_no_follow(path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::{MetadataExt, PermissionsExt};
+    let mut o = OpenOptions::new();
+    o.read(true);
+    let f = match read_flags(&mut o).open(path) {
+        Ok(f) => f,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(()),
+        // O_NOFOLLOW on a link: not ours to change.
+        Err(e) if e.raw_os_error() == Some(libc::ELOOP) => return Ok(()),
+        Err(e) => return Err(e),
+    };
+    let m = f.metadata()?;
+    let shared = m.is_file() && m.nlink() > 1;
+    if (!m.is_file() && !m.is_dir()) || shared || m.mode().trailing_zeros() >= 6 {
+        return Ok(());
+    }
+    f.set_permissions(fs::Permissions::from_mode(m.mode() & 0o700))
+}
+
+/// Other platforms have no mode bits to tighten.
+///
+/// # Errors
+/// Never.
+#[cfg(not(unix))]
+pub const fn make_private_no_follow(_path: &Path) -> io::Result<()> {
+    Ok(())
+}
+
 /// The creation mode where the platform has one.
 #[cfg(unix)]
 fn set_mode(o: &mut OpenOptions, mode: u32) {

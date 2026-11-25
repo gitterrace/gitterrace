@@ -55,7 +55,7 @@ pub(crate) fn create_no_follow(dir: &Path, name: &str) -> io::Result<File> {
         Err(e) if e.kind() == io::ErrorKind::NotFound => {}
         Err(e) => return Err(e),
     }
-    gitterrace_git::create_new_no_follow(&path, 0o644)
+    gitterrace_git::create_new_no_follow(&path, crate::cache::FILE_MODE)
 }
 
 /// Writes `bytes` to `<name>.tmp`, fsyncs and renames it to `name`, then syncs `dir`.
