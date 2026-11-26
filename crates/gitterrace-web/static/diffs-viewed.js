@@ -40,7 +40,7 @@
   function load() {
     // Only the newest read counts: an older one that lands late holds marks from before a save.
     var mine = ++reads;
-    return fetch(B + "/api/v1/viewed", { cache: "no-store" })
+    return fetch(B + "/_viewed", { cache: "no-store" })
       .then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); })
       .then(function (j) {
         if (mine !== reads) return null;

@@ -9,6 +9,10 @@ use gitterrace_testkit::Fixture;
 use crate::app::Env;
 
 fn server(root: &Path) -> (axum::Router, std::path::PathBuf) {
+    server_with(root, gitterrace_config::Config::default())
+}
+
+fn server_with(root: &Path, config: gitterrace_config::Config) -> (axum::Router, std::path::PathBuf) {
     let p = root.join("r");
     let f = Fixture::init(&p).write("a.txt", "a\n").write("b.txt", "b\n").commit("feat: one");
     let repo = f.path().to_path_buf();
@@ -16,7 +20,7 @@ fn server(root: &Path) -> (axum::Router, std::path::PathBuf) {
         vec![repo.clone()],
         None,
         None,
-        &Env::new(gitterrace_config::Config::default()),
+        &Env::new(config),
         None,
         None,
     )
@@ -88,6 +92,27 @@ async fn a_viewed_mark_is_kept_by_the_server_per_patch() {
     assert_eq!(call(&app, "POST", "/r/r/_viewed", &off, true).await.0, 200);
     let (_, list) = call(&app, "GET", "/r/r/api/v1/viewed", "", false).await;
     assert!(!list.contains("a.txt"), "{list}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn viewed_marks_are_read_and_saved_with_the_public_api_off() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let config = gitterrace_config::parse("[features]\napi_enabled = false\n").expect("parse").config;
+    let (app, _) = server_with(tmp.path(), config);
+    assert_eq!(call(&app, "GET", "/r/r/api/v1/viewed", "", false).await.0, 404, "API stays off");
+    let mark = r#"{"path":"a.txt","patch":"p1","viewed":true}"#;
+    assert_eq!(call(&app, "POST", "/r/r/_viewed", mark, true).await.0, 200);
+    let (s, list) = call(&app, "GET", "/r/r/_viewed", "", false).await;
+    assert_eq!(s, 200, "{list}");
+    assert!(list.contains("a.txt") && list.contains("p1"), "{list}");
+}
+
+/// Class guard for the page script: it reads and writes only its own `/_viewed` routes, since
+/// the public API may be off. Any later script line that fetches `/api/v1` fails here.
+#[test]
+fn the_viewed_script_uses_web_routes_only() {
+    let js = include_str!("../static/diffs-viewed.js");
+    assert!(!js.contains("/api/v1"), "reads must not need the public API");
 }
 
 #[tokio::test(flavor = "multi_thread")]

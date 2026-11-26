@@ -256,6 +256,15 @@ struct One {
     viewed: bool,
 }
 
+/// `GET /_viewed` answers the marks as `GET /api/v1/viewed` does, but on the page's own route:
+/// the page reads its marks here, so they work with `features.api_enabled` off.
+pub(crate) async fn viewed_list(axum::extract::State(app): Shared) -> Response {
+    match with_api(&app, gitterrace_api::ApiState::viewed).await {
+        Ok(v) => reply(&serde_json::to_value(&v).unwrap_or_default()),
+        Err(res) => *res,
+    }
+}
+
 /// `POST /_viewed` `{"path","patch","viewed"}`: marks one file viewed at `patch`, or clears it.
 pub(crate) async fn viewed(axum::extract::State(app): Shared, req: Request) -> Response {
     if let Some(no) = refused(&app, &req) {

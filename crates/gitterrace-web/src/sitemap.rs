@@ -131,9 +131,10 @@ pub const PAGES: &[Page] = &[
         &["/_repos"],
     ),
     page(
-        "`POST /_checkpoint`, `POST /_viewed`, `POST /_viewed/all`",
+        "`POST /_checkpoint`, `GET`/`POST /_viewed`, `POST /_viewed/all`",
         concat!(
-            "The working tree page's writes: take a checkpoint, mark files viewed. Same-origin ",
+            "The working tree page's writes: take a checkpoint, mark files viewed, ",
+            "read the marks without the API. Same-origin ",
             "with the owner cookie, local servers only, and they write only `.git/gitterrace`"
         ),
         &["/_checkpoint", "/_viewed", "/_viewed/all"],
