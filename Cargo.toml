@@ -108,7 +108,7 @@ cargo-dist-version = "0.34.0"
 ci = ["github"]
 installers = ["shell", "powershell", "homebrew"]
 tap = "gitterrace/homebrew-tap"
-publish-jobs = ["homebrew"]
+publish-jobs = ["homebrew", "./publish-mcp-registry"]
 targets = [
   "x86_64-unknown-linux-gnu",
   "aarch64-unknown-linux-gnu",
@@ -121,6 +121,9 @@ windows-archive = ".zip"
 # Tests and a runtime smoke of every built binary, before host and the tap. See release-check.yml.
 allow-dirty = ["ci"]
 local-artifacts-jobs = ["./release-check"]
+# One MCP bundle per target, built from the archives and shipped in the same release as they are,
+# then listed in the MCP registry after host. See release-mcpb.yml and publish-mcp-registry.yml.
+global-artifacts-jobs = ["./release-mcpb"]
 checksum = "sha256"
 # Build provenance for every artifact, checked with `gh attestation verify`.
 github-attestations = true
@@ -134,5 +137,9 @@ pr-run-mode = "plan"
 
 # dist builds aarch64-apple-darwin on macos-14, which GitHub retired on 2026-11-02: the job
 # is cancelled before it starts. macos-15 is the oldest Apple silicon image still served.
+[workspace.metadata.dist.github-custom-job-permissions]
+release-mcpb = { attestations = "write", contents = "read", id-token = "write" }
+publish-mcp-registry = { contents = "read", id-token = "write" }
+
 [workspace.metadata.dist.github-custom-runners]
 aarch64-apple-darwin = "macos-15"

@@ -169,6 +169,8 @@ steps = [
   "ci-inject-test|python3|install python3|python3 scripts/lint/inject-check.py --self-test",
   "deps|python3|install python 3.11|$PY scripts/lint/deps-check.py",
   "deps-test|python3|install python 3.11|$PY scripts/lint/deps-check.py --self-test",
+  "release-mcpb|python3|install python 3.11|$PY scripts/lint/release-mcpb-check.py",
+  "release-mcpb-test|python3|install python 3.11|$PY scripts/lint/release-mcpb-check.py --self-test",
   "release-gate-test|bash|install bash|bash scripts/release/gate-run.sh --self-test",
   "pre-push-test|python3|install python3|python3 scripts/release/push-check.py --self-test",
   "landed-clones|bash|install bash|bash scripts/dev/sweep-run.sh --ratchet",

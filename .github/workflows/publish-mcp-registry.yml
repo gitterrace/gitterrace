@@ -1,0 +1,69 @@
+# Lists the release in the official MCP registry. Called by release.yml (the `publish-jobs` hook
+# in Cargo.toml), after host created the release, so the registry never names a bundle that does
+# not exist. The registry refuses a version twice: this is the last job that can fail, and
+# everything that can be checked is checked before `publish`. No secret: the login is the
+# job's own OIDC token, which the registry maps to the io.github.gitterrace namespace.
+# Hand-written; release.yml itself is generated.
+name: Publish to the MCP registry
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: dist's plan, passed through by the generated caller
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+env:
+  # Bump on purpose. The digests below are of that release's linux_amd64 archive and its
+  # Sigstore bundle, and cosign checks the archive against the bundle.
+  MCP_PUBLISHER_VERSION: v1.8.16
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      GT_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install cosign
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
+      - name: Install mcp-publisher
+        run: |
+          set -euo pipefail
+          base="https://github.com/modelcontextprotocol/registry/releases/download/${MCP_PUBLISHER_VERSION}"
+          archive=mcp-publisher_linux_amd64.tar.gz
+          curl --fail --location --silent --show-error --output "$archive" "$base/$archive"
+          curl --fail --location --silent --show-error --output "$archive.sigstore.json" "$base/$archive.sigstore.json"
+          printf '%s\n' \
+            '6e2f799550cf843c6fd3350498d56cc49be3dc0af1e6237eb0e6435c7a9d5c05  mcp-publisher_linux_amd64.tar.gz' \
+            '346e33f9b5622a8060bf7400389cc28130cb37599423f8ff0363b1eb0428db33  mcp-publisher_linux_amd64.tar.gz.sigstore.json' |
+            sha256sum -c -
+          cosign verify-blob \
+            --bundle "$archive.sigstore.json" \
+            --certificate-identity "https://github.com/modelcontextprotocol/registry/.github/workflows/release.yml@refs/tags/${MCP_PUBLISHER_VERSION}" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            "$archive"
+          tar xzf "$archive" mcp-publisher
+          rm -f "$archive" "$archive.sigstore.json"
+      # The files users get, not the ones the bundle job meant to upload.
+      - name: Download the release's bundles and server.json
+        run: gh release download "$GT_TAG" --dir dl --pattern server.json --pattern 'gitterrace-mcp-*.mcpb'
+      - name: Check the release against server.json
+        run: python3 scripts/lint/release-mcpb-check.py --assets dl --tag "$GT_TAG"
+      - name: Validate with the publisher
+        run: ./mcp-publisher validate dl/server.json
+      - name: Log in with the job's OIDC token
+        run: ./mcp-publisher login github-oidc
+      - name: Publish
+        run: ./mcp-publisher publish dl/server.json
+      - name: Check the registry lists what the release holds
+        run: python3 scripts/lint/release-mcpb-check.py --assets dl --tag "$GT_TAG" --registry

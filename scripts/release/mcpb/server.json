@@ -1,0 +1,44 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.gitterrace/gitterrace",
+  "title": "gitterrace",
+  "description": "Read-only git browser with insights: history, hotspots and ownership for agents.",
+  "repository": {
+    "url": "https://github.com/gitterrace/gitterrace",
+    "source": "github"
+  },
+  "version": "@VERSION@",
+  "websiteUrl": "https://gitterrace.dev",
+  "packages": [
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/gitterrace/gitterrace/releases/download/v@VERSION@/gitterrace-mcp-x86_64-unknown-linux-gnu.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/gitterrace/gitterrace/releases/download/v@VERSION@/gitterrace-mcp-aarch64-unknown-linux-gnu.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/gitterrace/gitterrace/releases/download/v@VERSION@/gitterrace-mcp-x86_64-apple-darwin.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/gitterrace/gitterrace/releases/download/v@VERSION@/gitterrace-mcp-aarch64-apple-darwin.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    },
+    {
+      "registryType": "mcpb",
+      "identifier": "https://github.com/gitterrace/gitterrace/releases/download/v@VERSION@/gitterrace-mcp-x86_64-pc-windows-msvc.mcpb",
+      "fileSha256": "0000000000000000000000000000000000000000000000000000000000000000",
+      "transport": { "type": "stdio" }
+    }
+  ]
+}

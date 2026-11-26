@@ -79,7 +79,9 @@ SRC_DIRS = ("crates/*/src", "xtask/src")
 TEMPLATES = "crates/gitterrace-web/templates"
 STEM = re.compile(r"^_?[a-z][a-z0-9_]*$")
 # R5: `-lib` marks a library imported by other scripts, not a command.
-SCRIPT = re.compile(r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|lib)\.(py|sh|mjs)$")
+SCRIPT = re.compile(
+    r"^[a-z]+(-[a-z]+)*-(check|gen|run|export|report|render|pack|lib)\.(py|sh|mjs)$"
+)
 HEADER = ("//", "#", '"""')
 MAKE_TARGET = re.compile(r"^[a-z]+(-[a-z]+)?$")
 
@@ -157,9 +159,9 @@ def check_templates() -> list[str]:
 
 def script_files() -> list[Path]:
     """Every script under scripts/, its group dirs too. Hooks, guard adapters, ast-grep rules
-    the screenshot config and the red cases of a lint are data or entry points other tools
+    the screenshot config, the MCP bundle templates and the red cases of a lint are data or entry points other tools
     name, not scripts."""
-    data = ("guards", "hooks", "ast-grep", "site-shots", "red-cases")
+    data = ("guards", "hooks", "ast-grep", "site-shots", "red-cases", "mcpb")
     return sorted(
         f
         for f in (ROOT / "scripts").rglob("*")
@@ -175,7 +177,8 @@ def check_headers() -> list[str]:
     for f in script_files():
         if not SCRIPT.match(f.name):
             bad.append(
-                f"{f.relative_to(ROOT)}: not <area>-<verb> with a verb of check|gen|run|export|report|render|lib (R5)"
+                f"{f.relative_to(ROOT)}: not <area>-<verb>, the verb one of "
+                "check|gen|run|export|report|render|pack|lib (R5)"
             )
     files = script_files()
     files += sorted((ROOT / "crates/gitterrace-web/static").glob("*.js"))

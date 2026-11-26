@@ -1,0 +1,56 @@
+# One MCP bundle (.mcpb) per dist target and the registry's server.json, built from the archives
+# dist just made. Called by release.yml (the `global-artifacts-jobs` hook in Cargo.toml), after
+# every build-local-artifacts job, so host puts the bundles in the same `gh release create` as
+# the archives. publish-mcp-registry.yml lists the result in the MCP registry after host.
+# Hand-written; release.yml itself is generated.
+name: Release MCP bundles
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        description: dist's plan, passed through by the generated caller
+        required: true
+        type: string
+
+# The caller grants these through github-custom-job-permissions in Cargo.toml.
+permissions:
+  attestations: write
+  contents: read
+  id-token: write
+
+jobs:
+  bundle:
+    name: Bundle
+    runs-on: ubuntu-24.04
+    env:
+      GT_TAG: ${{ fromJson(inputs.plan).announcement_tag }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Fetch the dist archives
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: artifacts-build-local-*
+          path: target/distrib/
+          merge-multiple: true
+      - name: Pack one bundle per target and render server.json
+        run: python3 scripts/release/mcpb-pack.py --tag "$GT_TAG" --dist target/distrib
+      # Before anything is uploaded: the digests, targets, URLs and version agree with the bytes.
+      - name: Check the bundles against server.json
+        run: python3 scripts/lint/release-mcpb-check.py --assets target/distrib --tag "$GT_TAG"
+      - name: Attest the bundles and server.json
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            target/distrib/gitterrace-mcp-*.mcpb
+            target/distrib/server.json
+      - name: Upload artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: artifacts-mcpb
+          path: |
+            target/distrib/gitterrace-mcp-*.mcpb
+            target/distrib/server.json
+          if-no-files-found: error

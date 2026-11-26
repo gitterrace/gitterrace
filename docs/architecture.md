@@ -103,6 +103,19 @@ keys lives in `gitterrace_config::naming`.
   and under `links.roots`, and rechecks its id. A link is input from outside:
   one strict parser in `gitterrace-actions/src/link.rs`, nothing from a link is
   stored, and an unknown id never clones or fetches.
+- **The MCP registry lists one bundle per target.** The registry takes a local
+  stdio binary only as an `mcpb` package, a URL with "mcp" in it and the file's
+  sha256. A bundle names operating systems, not architectures, so each dist
+  target gets its own `.mcpb` with that one binary and `THIRD-PARTY-NOTICES`.
+  A hand-written workflow in dist's global-artifacts slot packs them from the
+  archives (`scripts/release/mcpb-pack.py`, byte for byte repeatable) and renders
+  `scripts/release/mcpb/server.json`, so host ships them in the same `gh release create` as the
+  archives and a release never exists without them. A publish job lists the
+  version after host, with `mcp-publisher` at a pinned, verified version and the
+  job's OIDC login, no secret. The registry refuses a version twice, so it is
+  the last job and every check runs before it. `release-mcpb-check.py` holds the
+  templates, the dist targets, the tag and the bytes in step. The registry name
+  in the registry manifest is permanent.
 
 ## Cache
 

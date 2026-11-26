@@ -44,6 +44,15 @@ The binaries are built auditable, so `cargo audit bin` on the installed binary l
 dependencies they were built from, and each release carries a CycloneDX SBOM
 for the workspace crates.
 
+### Install in an MCP client
+
+gitterrace is listed in the official MCP registry under its own
+namespace. A client that reads the registry installs
+the bundle for your platform from the release page. Each release carries one
+`gitterrace-mcp-<target>.mcpb` per platform, which holds only the program and
+runs its `mcp` command. To wire it up by hand, add `git terrace mcp` as a stdio
+server instead.
+
 ## Quickstart
 
 <!-- BEGIN GENERATED: quickstart -->
