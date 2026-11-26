@@ -1,0 +1,8 @@
+# Release trust for cargo-dist: paste these four keys into the product's dist config, under
+# [workspace.metadata.dist] in Cargo.toml, or under [dist] in dist-workspace.toml when
+# cargo-dist keeps its config there. cargo-dist cannot include a file, so this is copy-in text
+# and lint/dist-trust.py is the guard: it fails when a key is missing or weaker.
+cargo-auditable = true
+cargo-cyclonedx = true
+github-attestations = true
+checksum = "sha256"

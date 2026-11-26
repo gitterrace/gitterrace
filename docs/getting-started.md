@@ -40,6 +40,10 @@ Get-Content .\gitterrace-x86_64-pc-windows-msvc.zip.sha256
 Every release archive also carries a build provenance attestation:
 `gh attestation verify <archive> --repo gitterrace/gitterrace`.
 
+The binaries are built auditable, so `cargo audit bin` on the installed binary lists the
+dependencies they were built from, and each release carries a CycloneDX SBOM
+for the workspace crates.
+
 ## Quickstart
 
 <!-- BEGIN GENERATED: quickstart -->

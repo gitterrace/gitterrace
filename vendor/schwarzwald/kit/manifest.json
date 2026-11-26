@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-26T08:32:01Z",
+  "date": "2026-11-26T08:32:45Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -12,6 +12,7 @@
     "design-tokens",
     "disk-floor",
     "disk-sweep",
+    "dist-trust",
     "fonts",
     "golden",
     "guards-claude",
@@ -60,11 +61,12 @@
     "tools"
   ],
   "files": {
-    "README.md": "a3ac28e8d2c47c2822748d273743809b9c6772e2c9a7e00b130e55dec01709e0",
+    "README.md": "c91b4d0ff43fcb736e1d3320010acccad784c2d27518f07f88d83cf5fa100a9e",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
     "configs/deny-base.toml": "95071026e5d6f79cea219737b3ff12c10eb3c54844372b86d269ae3135407922",
+    "configs/dist/trust.toml": "f08821b87d9e7c173682775aa16c2c074e120406f9a381b7176c8ae3275cfdea",
     "configs/drift.py": "495d11ea892427d11501f5cacba135ae2ca21c20ab30d463c61a0148b2f9c3ec",
     "configs/help.mk": "b7ea4d2801e29344a3be1eca52e08be64153e26cddcf5bd9ab038b5ce2fc0226",
     "configs/markdownlint/prose-length.cjs": "51ee7f6effb196f3f59b79ae4183ec54d65ced58a81c94161abe9a33382d5519",
