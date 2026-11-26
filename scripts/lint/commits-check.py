@@ -17,6 +17,8 @@ and runs the commit-message step of land-check over the range. It does not repla
 from __future__ import annotations
 
 import argparse
+import re
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -24,8 +26,21 @@ from pathlib import Path, PurePosixPath
 
 ROOT = Path(__file__).resolve().parents[2]
 PY = sys.executable
+Gate = tuple[str, list[str], tuple[str, ...]]
+
+
+def lint_step(name: str) -> list[str]:
+    """The shell command of a `[run] steps` entry of lint.toml, so the gate here is the one
+    `make lint` runs and cannot drift from it."""
+    text = (ROOT / "schwarzwald/config/lint.toml").read_text(encoding="utf-8")
+    m = re.search(rf'"{re.escape(name)}\|[^|]*\|[^|]*\|([^"\\]*)"', text)
+    return ["bash", "-c", m.group(1) if m else "echo no lint.toml step " + name + "; exit 1"]
+
+
+# The binary a gate needs when its command is `bash -c ...`, for the skip note.
+TOOLS = {"pyright": "npx", "tsc": "npm", "vale-rs": "vale", "vale-md": "vale"}
 # (gate, command, the suffixes or path prefixes that select it; empty selects on any change)
-GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
+GATES: list[Gate] = [
     ("lines", [PY, "scripts/lint/lines-check.py", "--repo", "."], ()),
     ("names", [PY, "scripts/lint/names-check.py"], ()),
     ("text", [PY, "scripts/lint/text-check.py"], ()),
@@ -55,7 +70,34 @@ GATES: list[tuple[str, list[str], tuple[str, ...]]] = [
         [PY, "vendor/schwarzwald/kit/lint/actions-pin.py", "--repo", "."],
         (".github/",),
     ),
+    ("docs-install", [PY, "scripts/lint/docs-install-check.py"], (".md",)),
+    ("ruff-check", ["ruff", "check", "."], (".py",)),
+    ("ruff-format", ["ruff", "format", "--check", "."], (".py",)),
+    ("pyright", lint_step("pyright"), (".py", "pyrightconfig.json")),
+    ("tsc", lint_step("tsc"), (".mjs", ".js", "jsconfig.json")),
+    (
+        "browser-sleeps",
+        [PY, "scripts/lint/sleeps-check.py"],
+        ("scripts/verify/browser/", "scripts/guards/browser-sleeps.json"),
+    ),
+    ("vale-rs", lint_step("vale-rs"), (".rs",)),
+    (
+        "vale-md",
+        ["bash", "-c", "git ls-files -z -- '*.md' | xargs -0 vale --minAlertLevel=error"],
+        (".md", ".vale.ini", "styles/"),
+    ),
+    ("changelog", [PY, "scripts/lint/changelog-check.py"], ("CHANGELOG.md", "Cargo.toml")),
+    ("ast-grep", ["ast-grep", "scan", "--error"], (".rs", ".js", ".py")),
 ]
+# Checks that need a build, so a range that touches .rs still has them to run afterwards.
+CARGO_ONLY = ("clippy", "conventions test", "cargo test")
+# Makefile lint scripts that are not a per-file-type gate here: run by their own target
+# (the stubbed-PATH example actions, the tracked-files check, this script's own self-test).
+CARGO_ONLY_LINTS = (
+    "scripts/lint/actions-check.sh",
+    "scripts/lint/tracked-check.py",
+    "scripts/lint/commits-check.py",
+)
 
 
 def run(cmd: list[str]) -> tuple[int, str]:
@@ -73,6 +115,17 @@ def selected(files: list[str]) -> list[tuple[str, list[str]]]:
         return not keys or any(f.endswith(k) or f.startswith(k) for f in files for k in keys)
 
     return [(name, cmd) for name, cmd, keys in GATES if hits(keys)]
+
+
+def makefile_lint_scripts(makefile: str) -> set[str]:
+    """Every scripts/lint script any Makefile recipe runs."""
+    return set(re.findall(r"scripts/lint/[\w-]+\.(?:py|sh)", makefile))
+
+
+def ungated(makefile: str, gates: list[Gate] | None = None) -> list[str]:
+    """Makefile lint scripts that are in neither GATES nor CARGO_ONLY_LINTS."""
+    cmds = {a for _, cmd, _ in (gates or GATES) for a in cmd}
+    return sorted(makefile_lint_scripts(makefile) - cmds - set(CARGO_ONLY_LINTS))
 
 
 def is_test_path(path: str) -> bool:
@@ -134,8 +187,20 @@ def self_test() -> int:
     ok = ok and not prod_removals("scripts/x.py", [1], "x\n")
     diff = "--- a/crates/x/src/a.rs\n+++ b/crates/x/src/a.rs\n@@ -2,2 +1,0 @@\n-x\n-y\n"
     ok = ok and removed_lines(diff) == {"crates/x/src/a.rs": [2, 3]}
+    ok = ok and {"ruff-check", "ruff-format"} <= {n for n, _ in selected(["a.py"])}
     ok = ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-button") == 1
     ok = ok and "css-button" not in [n for n, _ in selected(["crates/a/src/x.rs"])]
+    mk = (ROOT / "Makefile").read_text(encoding="utf-8")
+    ok = ok and not ungated(mk)
+    ok = ok and ungated(mk, [g for g in GATES if g[0] != "docs-install"]) == [
+        "scripts/lint/docs-install-check.py"
+    ]
+    names = {g[0] for g in GATES}
+    ok = ok and {"pyright", "tsc", "browser-sleeps", "vale-rs", "vale-md"} <= names
+    ok = ok and all("no lint.toml step" not in c[-1] for _, c, _ in GATES)
+    ok = ok and "tsc" in [n for n, _ in selected(["scripts/verify/browser/x-lib.mjs"])]
+    ok = ok and "pyright" in [n for n, _ in selected(["scripts/lint/x.py"])]
+    ok = ok and "tsc" not in [n for n, _ in selected(["a.py"])]
     print("commits-check self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
@@ -154,6 +219,10 @@ def main() -> int:
     print("files:\n  " + "\n  ".join(files))
     print("diffstat:\n" + run(["git", "diff", "--stat", a.range or "HEAD"])[1])
     gates = selected(files)
+    skipped = [n for n, c in gates if not shutil.which(TOOLS.get(n, c[0]))]
+    gates = [g for g in gates if g[0] not in skipped]
+    for n in skipped:
+        print(f"SKIP {n}: {TOOLS.get(n, dict((g[0], g[1][0]) for g in GATES)[n])} is not on PATH")
     print("gates: " + ", ".join(n for n, _ in gates))
     with ThreadPoolExecutor() as pool:
         results = list(pool.map(lambda g: (g[0], *run(g[1])), gates))
@@ -179,6 +248,8 @@ def main() -> int:
             fails += bool(code)
         else:
             print(f"SKIP messages: check out {tip} to run them")
+    if any(f.endswith(".rs") for f in files):
+        print("still needs a build: " + ", ".join(CARGO_ONLY) + " (scripts/land-check.sh)")
     print("Judgement is not checked here: read the diff for comments that earn their place.")
     return 1 if fails else 0
 
