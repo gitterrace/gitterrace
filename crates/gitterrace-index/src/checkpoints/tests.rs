@@ -372,3 +372,68 @@ fn the_label_limit_is_defined_once() {
     assert_eq!(own.matches("take(MAX_LABEL)").count(), 1);
     assert_eq!(own.matches("take(200)").count(), 0);
 }
+
+/// Bytes zstd cannot shrink.
+fn incompressible(seed: u64, n: usize) -> Vec<u8> {
+    let mut x = seed | 1;
+    (0..n)
+        .map(|_| {
+            x ^= x << 13;
+            x ^= x >> 7;
+            x ^= x << 17;
+            (x >> 24) as u8
+        })
+        .collect()
+}
+
+#[test]
+fn an_incompressible_copy_at_the_size_limit_reads_back() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let bytes = incompressible(7, super::MAX_COPY as usize);
+    let file = SnapFile {
+        path: "blob.txt".to_owned(),
+        hash: gitterrace_git::content_id(&bytes),
+        text: Some(bytes),
+    };
+    let (id, _) = add(&idx, std::slice::from_ref(&file), "h", false, "", 1 << 30, 1)?;
+    assert!(idx.checkpoint_list()?.items[0].bytes > super::MAX_COPY);
+    assert_eq!(idx.checkpoint_files(&id)?.expect("known"), [file]);
+    Ok(())
+}
+
+#[test]
+fn the_cumulative_header_bound_is_met_exactly_at_the_limit() {
+    let half = super::MAX_HEADERS / 2;
+    assert_eq!(super::oldest_to_drop(&[half, half]), 0);
+    assert_eq!(super::oldest_to_drop(&[half, half + 1]), 1);
+    assert_eq!(super::oldest_to_drop(&[1, half, half]), 1);
+    assert_eq!(super::oldest_to_drop(&[super::MAX_HEADERS + 1]), 0, "the newest stays");
+}
+
+/// A meta whose header is exactly `n` bytes: one path pads it.
+fn meta_with_header(n: usize) -> super::Meta {
+    let mut m = super::Meta {
+        id: "cp-000000000000".to_owned(),
+        created: 1,
+        head: "h".to_owned(),
+        auto: false,
+        label: String::new(),
+        files: vec![super::FileMeta { path: String::new(), hash: String::new(), copy: None }],
+        omitted: false,
+    };
+    let base = serde_json::to_vec(&m).map_or(0, |v| v.len());
+    m.files[0].path = "p".repeat(n - base);
+    m
+}
+
+#[test]
+fn a_header_is_written_at_the_reader_limit_and_refused_one_byte_over() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let limit = super::MAX_HEADER as usize;
+    let at = planted(&idx, &super::encode(&meta_with_header(limit), &[])?)?;
+    let found = super::scan(&mut std::fs::File::open(at)?)?;
+    assert!(!found.damaged && found.frames.len() == 1);
+    let err = super::encode(&meta_with_header(limit + 1), &[]).expect_err("one over");
+    assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    Ok(())
+}

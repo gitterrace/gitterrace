@@ -30,7 +30,13 @@ const MAX_LABEL: usize = 200;
 /// Largest copy, packed or unpacked: `review.checkpoint_file_kb` tops out at 4 MiB, so a larger
 /// claim is a planted size.
 const MAX_COPY: u64 = 4 << 20;
-/// Most bytes of copies one read unpacks, so many small claims cannot add up to gigabytes.
+/// Largest packed copy: what zstd can make of an incompressible `MAX_COPY` (its worst-case bound
+/// is the input plus 1/256th plus a few bytes of framing). The writer and the reader share it, so
+/// a copy the writer packs is never refused as too long.
+const MAX_PACKED: u64 = MAX_COPY + (MAX_COPY >> 8) + 128;
+/// Most bytes of copies one read unpacks, so many small claims cannot add up to gigabytes. The
+/// writer keeps no more than this unpacked per checkpoint, so a restore never drops a copy the
+/// log holds.
 const MAX_RESTORE: u64 = 256 << 20;
 /// Largest blob of one frame: `review.checkpoint_mb` tops out at 1 GiB.
 const MAX_BLOB: u64 = 1 << 30;
@@ -104,6 +110,8 @@ pub struct Checkpoint {
 struct Frame {
     meta: Meta,
     blob_at: u64,
+    /// Bytes of the header as written, which the reader counts against `MAX_HEADERS`.
+    hdr_len: u32,
 }
 
 /// The id of a state: `cp-` and 12 hex of the git blob id of its HEAD and manifest (paths and
@@ -141,7 +149,7 @@ fn sound(meta: &mut Meta, blob_len: u64) {
     let mut used = 0u64;
     for f in &mut meta.files {
         let Some(c) = &f.copy else { continue };
-        let fits = c.len <= MAX_COPY
+        let fits = c.len <= MAX_PACKED
             && c.size <= MAX_COPY
             && c.off.checked_add(c.len).is_some_and(|e| e <= blob_len)
             && used.checked_add(c.len).is_some_and(|u| u <= blob_len);
@@ -193,7 +201,7 @@ fn scan(f: &mut std::fs::File) -> io::Result<Scan> {
             break;
         };
         sound(&mut meta, blob_len);
-        out.frames.push(Frame { meta, blob_at: at + FIXED + u64::from(hdr_len) });
+        out.frames.push(Frame { meta, blob_at: at + FIXED + u64::from(hdr_len), hdr_len });
         at = end;
     }
     out.valid = at;
@@ -229,6 +237,15 @@ fn repack(f: &mut std::fs::File, frame: &Frame) -> io::Result<(Meta, Vec<u8>)> {
 
 fn encode(meta: &Meta, blobs: &[u8]) -> io::Result<Vec<u8>> {
     let hdr = serde_json::to_vec(meta).map_err(io::Error::other)?;
+    // The reader calls a longer header damage and then refuses every later write, so a header it
+    // would refuse is refused here, before anything reaches the log.
+    if u32::try_from(hdr.len()).map_or(true, |n| n > MAX_HEADER) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "the checkpoint lists too many or too long paths to store; \
+             lower review.worktree_files",
+        ));
+    }
     let mut out = Vec::with_capacity(FIXED as usize + hdr.len() + blobs.len());
     out.extend_from_slice(MAGIC);
     out.extend_from_slice(&u32::try_from(hdr.len()).map_err(io::Error::other)?.to_le_bytes());
@@ -241,6 +258,23 @@ fn encode(meta: &Meta, blobs: &[u8]) -> io::Result<Vec<u8>> {
 
 fn held(meta: &Meta) -> u64 {
     meta.files.iter().filter_map(|f| f.copy.as_ref()).fold(0, |n, c| n.saturating_add(c.len))
+}
+
+/// How many of the oldest frames, with headers of `sizes` bytes, go so the rest are within
+/// `MAX_HEADERS`. The newest never goes.
+fn oldest_to_drop(sizes: &[u64]) -> usize {
+    let mut headers: u64 = sizes.iter().sum();
+    let mut drop = 0;
+    while headers > MAX_HEADERS && drop + 1 < sizes.len() {
+        headers -= sizes[drop];
+        drop += 1;
+    }
+    drop
+}
+
+/// The header length of an encoded frame.
+fn hdr_of(frame: &[u8]) -> u64 {
+    u64::from(u32_at(frame, 4))
 }
 
 /// A checkpoint of `files` as one frame. Compression stops once the copies packed so far pass
@@ -256,11 +290,17 @@ fn build(
 ) -> io::Result<(Meta, Vec<u8>)> {
     let files = &snap.files;
     let mut blobs = Vec::new();
+    let mut unpacked = 0u64;
     let mut metas = Vec::with_capacity(files.len());
     for f in files {
         let copy = match &f.text {
-            Some(t) if (blobs.len() as u64) <= cap => {
+            Some(t)
+                if (blobs.len() as u64) <= cap
+                    && t.len() as u64 <= MAX_COPY
+                    && unpacked + t.len() as u64 <= MAX_RESTORE =>
+            {
                 let z = zstd::bulk::compress(t, ZSTD_LEVEL)?;
+                unpacked += t.len() as u64;
                 let c = Copy {
                     off: blobs.len() as u64,
                     len: z.len() as u64,
@@ -306,20 +346,24 @@ fn trimmed(
         total -= held(&fr.meta);
         stripped[i] = true;
     }
-    let mut out = Vec::new();
+    let mut encoded = Vec::with_capacity(frames.len() + 1);
     for (fr, strip) in frames.iter().zip(&stripped) {
         if *strip {
             let mut m = fr.meta.clone();
             m.files.iter_mut().for_each(|x| x.copy = None);
-            out.extend(encode(&m, &[])?);
+            encoded.push(encode(&m, &[])?);
         } else {
             let (m, blobs) = repack(f, fr)?;
-            out.extend(encode(&m, &blobs)?);
+            encoded.push(encode(&m, &blobs)?);
         }
     }
     let fitted = if total > cap { bare(newest.0) } else { newest };
-    out.extend(encode(&fitted.0, &fitted.1)?);
-    Ok(out)
+    encoded.push(encode(&fitted.0, &fitted.1)?);
+    // The reader bounds the headers of the whole log, so the oldest checkpoints go whole until
+    // what is kept can be read back. The newest always stays.
+    let sizes: Vec<u64> = encoded.iter().map(|b| hdr_of(b)).collect();
+    let drop = oldest_to_drop(&sizes);
+    Ok(encoded.drain(drop..).flatten().collect())
 }
 
 /// `frame` without its copies: every path and hash stays.
@@ -352,6 +396,7 @@ impl Index {
         now: i64,
     ) -> io::Result<(String, bool)> {
         self.writable()?;
+        let cap_bytes = cap_bytes.min(MAX_BLOB);
         // The cache's writer lock: a rewrite replaces the file, so it must not run between
         // another writer's scan and append, in this process or another.
         let _lock = crate::store::WriteLock::take(self.dir())?;
@@ -387,10 +432,16 @@ impl Index {
         };
         let size = f.metadata()?.len();
         let total = held(&meta) + fr.iter().map(|x| held(&x.meta)).sum::<u64>();
-        if valid == size && total <= cap_bytes && fr.len() < MAX_CHECKPOINTS {
+        let bytes = encode(&meta, &blobs)?;
+        let headers = hdr_of(&bytes) + fr.iter().map(|x| u64::from(x.hdr_len)).sum::<u64>();
+        if valid == size
+            && total <= cap_bytes
+            && headers <= MAX_HEADERS
+            && fr.len() < MAX_CHECKPOINTS
+        {
             use std::io::Write;
             let mut out = cache::open_append(self.dir(), FILE)?;
-            out.write_all(&encode(&meta, &blobs)?)?;
+            out.write_all(&bytes)?;
             out.sync_data()?;
         } else {
             let all = std::mem::take(fr);
