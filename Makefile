@@ -253,7 +253,7 @@ bench-report:
 	python3 scripts/bench/bench-report.py
 
 ##@ Site and release
-.PHONY: docs-gen domains changelog release-gate site deploy demo demo-deploy site-preview \
+.PHONY: docs-gen domains changelog reach release-gate site deploy demo demo-deploy site-preview \
 	app-icon site-render site-shots shipped
 
 ## docs-gen: Regenerate every generated file (docs, README blocks) and build the site
@@ -281,6 +281,12 @@ changelog:
 	python3 scripts/release/changelog-run.py
 	bash vendor/schwarzwald/kit/tools/changelog-gen.sh \
 		$(or $(VERSION),$(error VERSION=x.y.z is required))
+
+# On demand only, never in the gate: downloads, tap clones and traffic through gh, read only.
+# Each run adds a snapshot under ~/.local/share/schwarzwald/reach, outside the repository.
+## reach: Report adoption (release downloads, tap clones, visitors) with the change since last week
+reach:
+	bash vendor/schwarzwald/kit/tools/reach-stats.sh .
 
 # site: Refuse to publish install lines before the repository, tap and release tag answer
 site: docs-check

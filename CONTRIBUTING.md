@@ -182,6 +182,13 @@ on http://127.0.0.1:4343.
    that fails a site guard), then `make domains`.
 6. Refresh the live demo: `make demo demo-deploy` exports the pinned jq and
    ripgrep and ships them to demo.gitterrace.dev.
+7. `make reach` prints adoption: release downloads per os and arch, tap clones
+   and visitors, each with the change against a week earlier. It reads the
+   code host through `gh`, writes a snapshot under
+   `~/.local/share/schwarzwald/reach` and is never part of the gate.
+   `schwarzwald/config/reach.toml` holds the repository, the tap, the
+   downloads our own CI causes per release (`ci_baseline`) and the asset
+   globs.
 
 ## Security
 

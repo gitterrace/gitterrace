@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-26T08:32:45Z",
+  "date": "2026-11-26T08:33:06Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -30,6 +30,7 @@
     "lint-run",
     "markdownlint",
     "ratchet",
+    "reach-stats",
     "release-date",
     "rules",
     "sonar-scan",
@@ -61,7 +62,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "c91b4d0ff43fcb736e1d3320010acccad784c2d27518f07f88d83cf5fa100a9e",
+    "README.md": "961f3a516da44f9a46d8d8677e639f2562276cce2afaf3762d7e4b42e236a6e0",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -373,6 +374,7 @@
     "tools/land.sh": "f4d75a1683799b421964bf88941bd80ececd31ac634b0ffd5918d5abb41ae462",
     "tools/quiet.sh": "a794be9d97400331fed2961b12c3ef6a74c1a9d7af4dc4b9a804201c06396bd2",
     "tools/ratchet-check.py": "cb8526f43aaba95ca85cec9063229dc20dda2e26976311466020bcafd383e9ad",
+    "tools/reach-stats.sh": "82015a930dd56957aa07b06b3681d1bde68d375e35cd518f6c0e43ff65c5f77c",
     "tools/release-date.sh": "1f13812abdd93bfdbcf181c96bc692b53a719263f6c82884edd0193b2e67e7b6",
     "tools/sonar-scan.sh": "bbdf7404efce6a25edf957db5b05d4f987d9a79fba1c5076e7d199ca340285ea",
     "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
@@ -429,6 +431,7 @@
     "tools/land.sh",
     "tools/quiet.sh",
     "tools/ratchet-check.py",
+    "tools/reach-stats.sh",
     "tools/release-date.sh",
     "tools/sonar-scan.sh",
     "tools/test-sandbox.sh"
