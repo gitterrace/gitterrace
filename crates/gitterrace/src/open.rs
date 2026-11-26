@@ -206,7 +206,12 @@ pub(crate) fn launch_cmd(addr: SocketAddr, print: bool) -> anyhow::Result<()> {
         println!("{url}");
         return Ok(());
     }
-    browse(&opener_arg(state.as_deref(), addr.port(), Some(url.clone()), url))
+    browse(&launch_opener_arg(state.as_deref(), addr, url))
+}
+
+/// The handoff page, or the ticket-free front page when it cannot be written.
+fn launch_opener_arg(state: Option<&Path>, addr: SocketAddr, link: String) -> String {
+    opener_arg(state, addr.port(), Some(link), format!("http://{addr}/"))
 }
 
 /// The one-time link that hands the browser the owner cookie before it lands on `path`.

@@ -104,6 +104,8 @@ nothing about who is asking, and a secret in a page is a secret given away.
   SameSite=Strict cookie holding a hash of the secret. The secret never sits in
   the browser. `git terrace launch --print` prints the link, which works once
   and is on the terminal, so it is the user's to guard.
+  When that page cannot be written, the opener gets the plain front page, never
+  the link (`a_failed_launch_handoff_opens_a_ticket_free_page`).
 - Every write, and every read of the settings files, needs that cookie on top of
   the same-origin checks, which stop other sites but are forgeable by a local
   client (`a_forging_loopback_client_without_owner_proof_writes_nothing`).

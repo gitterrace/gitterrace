@@ -455,3 +455,22 @@ fn a_file_url_names_the_same_path_on_every_os() {
     assert_eq!(unc, "file://host/share/a%20b.html");
     assert_eq!(file_path(&unc, true).as_deref(), Some("\\\\host\\share\\a b.html"));
 }
+
+/// Guard class: a failed handoff never opens the live link instead. Also catches a page
+/// built from the link's own parts (its host and query), which would carry the ticket too.
+#[test]
+fn a_failed_launch_handoff_opens_a_ticket_free_page() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let state = tmp.path().join("state");
+    std::fs::create_dir_all(&state).expect("dir");
+    let addr: std::net::SocketAddr = "127.0.0.1:7878".parse().expect("addr");
+    let link = "http://127.0.0.1:7878/_launch?t=TICKET-abc_123&to=/".to_owned();
+    // A directory at the page's name: the atomic write fails.
+    std::fs::create_dir(state.join("launch-7878.html")).expect("hostile dir");
+    let got = super::launch_opener_arg(Some(&state), addr, link.clone());
+    assert_eq!(got, "http://127.0.0.1:7878/");
+    // A missing state folder fails the write too.
+    let gone = tmp.path().join("gone");
+    let got = super::launch_opener_arg(Some(&gone), addr, link);
+    assert!(!got.contains("TICKET") && !got.contains("_launch"), "{got}");
+}
