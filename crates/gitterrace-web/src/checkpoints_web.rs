@@ -3,8 +3,6 @@
 //! the buttons call. The API and MCP stay read-only: these routes are the only writers, and they
 //! write only the cache folder (`.git/gitterrace`).
 
-use std::collections::HashSet;
-
 use askama::Template;
 use axum::{
     extract::Request,
@@ -61,6 +59,7 @@ fn missing(id: &str) -> Error {
     ))
 }
 
+/// The comparison with checkpoint `id`.
 fn since_diff(a: &App, id: &str) -> Result<SinceDiff> {
     let cp = a.index.checkpoint(id)?.ok_or_else(|| missing(id))?;
     Ok(gitterrace_git::worktree_diff_since(&a.repo, &cp.files, &cp.head, cp.files_omitted)?)
@@ -89,13 +88,8 @@ pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review>
     let info = list
         .and_then(|l| l.checkpoints.into_iter().find(|c| c.id == id))
         .ok_or_else(|| missing(id))?;
-    let d = since_diff(a, id)?;
-    let moved: HashSet<&str> = d.files.iter().map(|f| f.path.as_str()).collect();
-    let unchanged = gitterrace_git::worktree_diff_scoped(&a.repo, Scope::All)?
-        .into_iter()
-        .map(|f| f.path)
-        .filter(|p| !moved.contains(p.as_str()))
-        .collect();
+    let mut d = since_diff(a, id)?;
+    let unchanged = std::mem::take(&mut d.unchanged_paths);
     let since = Since {
         id: info.id,
         created: info.created,
@@ -325,5 +319,72 @@ pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) 
     match done {
         Ok((n, id)) => reply(&serde_json::json!({ "marked": n, "checkpoint": id })),
         Err(res) => *res,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use gitterrace_git::{Repo, Scope, worktree_diff_scoped, worktree_diff_since, worktree_snapshot};
+    use gitterrace_testkit::{Fixture, git};
+
+    /// Guard class: the unchanged list of the page is the one it always had (changed files
+    /// against HEAD that the checkpoint already holds as they are), now read off the single
+    /// comparison. Held, not-held, changed, gone and saved-then-committed files all agree with
+    /// the old second scan, so a drift in either side fails here.
+    #[test]
+    fn unchanged_list_equals_the_old_scan_for_every_kind_of_file() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = dir.path();
+        let _ = Fixture::init(p)
+            .write("held.txt", "1\n")
+            .write("moved.txt", "1\n")
+            .write("clean.txt", "1\n")
+            .write("later.txt", "1\n")
+            .write("saved.txt", "1\n")
+            .write("x.dat", "1\n")
+            .commit("init");
+        let base = git(p, &["rev-parse", "HEAD"]).trim().to_owned();
+        std::fs::write(p.join("held.txt"), "held\n").expect("w");
+        std::fs::write(p.join("moved.txt"), "a\n").expect("w");
+        std::fs::write(p.join("saved.txt"), "saved\n").expect("w");
+        std::fs::write(p.join("x.dat"), b"\0\x01").expect("w");
+        let repo = Repo::discover(p).expect("repo");
+        let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap");
+        // The checkpoint keeps no copy of x.dat: it is "gone" once the file moves on.
+        let held: Vec<_> = snap
+            .files
+            .into_iter()
+            .map(|mut f| {
+                if f.path == "x.dat" {
+                    f.text = None;
+                }
+                f
+            })
+            .collect();
+        // later.txt: committed after the checkpoint, then put back to the old text.
+        std::fs::write(p.join("later.txt"), "2\n").expect("w");
+        git(p, &["commit", "-qm", "later", "--", "later.txt"]);
+        std::fs::write(p.join("later.txt"), "1\n").expect("w");
+        // saved.txt: committed exactly as the checkpoint saved it.
+        git(p, &["commit", "-qm", "saved", "--", "saved.txt"]);
+        std::fs::write(p.join("moved.txt"), "b\n").expect("w");
+        std::fs::write(p.join("x.dat"), b"\0\x02").expect("w");
+        let d = worktree_diff_since(&repo, &held, &base, false).expect("since");
+        let moved: HashSet<String> = d.files.iter().map(|f| f.path.clone()).collect();
+        let old: Vec<String> = worktree_diff_scoped(&repo, Scope::All)
+            .expect("scan")
+            .into_iter()
+            .map(|f| f.path)
+            .filter(|p| !moved.contains(p))
+            .collect();
+        let mut old_sorted = old;
+        old_sorted.sort();
+        assert_eq!(d.unchanged_paths, old_sorted);
+        assert!(d.unchanged_paths.contains(&"held.txt".to_owned()), "{:?}", d.unchanged_paths);
+        assert!(d.unchanged_paths.contains(&"later.txt".to_owned()), "not held, equal to base");
+        assert!(!d.unchanged_paths.contains(&"saved.txt".to_owned()));
+        assert!(moved.contains("moved.txt") && d.gone == ["x.dat"]);
     }
 }

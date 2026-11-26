@@ -43,6 +43,9 @@ pub struct SinceDiff {
     pub files: Vec<FileDiff>,
     /// Files that were in the checkpoint or are changed now and read the same.
     pub unchanged: usize,
+    /// The paths of `unchanged` that still differ from the current HEAD, sorted: files equal to
+    /// the checkpoint that the working tree page lists as already held.
+    pub unchanged_paths: Vec<String>,
     /// Files whose checkpoint copy is gone (binary, too large, dropped): diffed against HEAD.
     pub gone: Vec<String>,
     /// The commit the checkpoint was taken at is not in this repository (a reset, a gc, a
@@ -189,6 +192,7 @@ pub fn worktree_diff_since(
         paths.iter().map(String::as_str).chain(known.keys().copied()).collect();
     let from_head =
         |path: &str| head.as_ref().map_or(Read::Missing, |t| head_blob(&r, t, path, big));
+    let differs_head = |path: &str, new: &Read| classify(path, &from_head(path), new).is_some();
     let from_base =
         |path: &str| base.as_ref().map_or_else(|| from_head(path), |t| head_blob(&r, t, path, big));
     for path in all {
@@ -203,6 +207,9 @@ pub fn worktree_diff_since(
                 (None, hash) => {
                     if matches!(&new, Read::Data(d) if content_id(d) == hash) {
                         out.unchanged += 1;
+                        if differs_head(path, &new) {
+                            out.unchanged_paths.push(path.to_owned());
+                        }
                         continue;
                     }
                     (from_head(path), true)
@@ -216,7 +223,12 @@ pub fn worktree_diff_since(
         match classify(path, &old, &new) {
             Some(d) => out.files.push(d),
             None if gone || matches!(new, Read::Skip) => {}
-            None => out.unchanged += 1,
+            None => {
+                out.unchanged += 1;
+                if differs_head(path, &new) {
+                    out.unchanged_paths.push(path.to_owned());
+                }
+            }
         }
     }
     Ok(out)
