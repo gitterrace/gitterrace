@@ -21,6 +21,9 @@
   // Most findings one review payload carries (gitterrace-actions MAX_REVIEW_FINDINGS, held equal
   // by a test). A larger basket is sent in chosen parts, never trimmed.
   var SEND_MAX = 500;
+  // Longest note, in UTF-8 bytes (gitterrace-index MAX_NOTE, held equal by a test). The server
+  // refuses a longer one, so the box counts bytes the way it does and never lets one through.
+  var NOTE_MAX = 2000;
   var badge = null;
   var cur = null;
 
@@ -47,6 +50,12 @@
     badge.textContent = n > 99 ? "99+" : String(n);
     badge.hidden = n === 0;
     btn.setAttribute("aria-label", n ? "Review basket, " + n + " entries" : "Review basket");
+  }
+  // Bytes the server would store for `text`: control characters other than a line break or tab
+  // are dropped there, and the rest is counted as UTF-8.
+  function noteBytes(text) {
+    var kept = text.replace(/[\u0000-\u0008\u000b-\u001f\u007f-\u009f]/g, "");
+    return new TextEncoder().encode(kept).length;
   }
   function refresh() {
     return json("GET", B + "/_findings?count=1").then(function (j) { count(j.count || 0); },
@@ -99,13 +108,20 @@
     lab.htmlFor = "basket-note";
     var note = el("textarea", "basket-note");
     note.id = "basket-note";
-    note.maxLength = 2000;
     note.spellcheck = false;
     var msg = el("span", "basket-msg muted");
     msg.setAttribute("role", "status");
     var foot = el("div", "basket-foot");
     var go = el("button", "primary sm", "Add");
     go.type = "submit";
+    function size() {
+      var n = noteBytes(note.value);
+      var over = n > NOTE_MAX;
+      go.disabled = over;
+      msg.textContent = over || n > NOTE_MAX * 0.8 ? n + " of " + NOTE_MAX + " bytes"
+        + (over ? ": too long, shorten the note" : "") : "";
+    }
+    note.addEventListener("input", size);
     foot.appendChild(msg);
     foot.appendChild(button("Cancel", "sm", function () { ov.close(); }));
     foot.appendChild(go);
@@ -114,6 +130,7 @@
     s.box.appendChild(form);
     form.addEventListener("submit", function (e) {
       e.preventDefault();
+      if (noteBytes(note.value) > NOTE_MAX) { size(); return; }
       go.disabled = true;
       var body = { kind: c.kind, rev: c.rev, note: note.value };
       ["path", "lines", "query", "sha"].forEach(function (k) { if (c[k]) body[k] = c[k]; });

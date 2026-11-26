@@ -134,3 +134,11 @@ fn the_panel_send_limit_is_the_payload_limit() {
     let want = format!("var SEND_MAX = {};", gitterrace_actions::MAX_REVIEW_FINDINGS);
     assert!(js.contains(&want), "basket.js must carry `{want}`");
 }
+
+#[test]
+fn the_note_box_limit_is_the_stored_note_limit() {
+    let js = include_str!("../static/basket.js");
+    let want = format!("var NOTE_MAX = {};", gitterrace_index::MAX_NOTE);
+    assert!(js.contains(&want), "basket.js must carry `{want}`");
+    assert!(!js.contains("maxLength"), "a UTF-16 maxlength disagrees with the byte limit");
+}
