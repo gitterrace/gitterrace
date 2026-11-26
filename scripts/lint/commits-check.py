@@ -81,6 +81,11 @@ GATES: list[Gate] = [
         [PY, "scripts/lint/sleeps-check.py"],
         ("scripts/verify/browser/", "scripts/guards/browser-sleeps.json"),
     ),
+    (
+        "browser-all",
+        [PY, "scripts/lint/browser-all-check.py"],
+        ("scripts/verify/", "scripts/lint/browser-all-check.py"),
+    ),
     ("vale-rs", lint_step("vale-rs"), (".rs",)),
     (
         "vale-md",
