@@ -142,7 +142,14 @@ build spares them.
 
 A checkpoint is a framed record with zstd copies of the
 changed text files. A torn tail is ignored, so a crash mid-write loses only
-that checkpoint.
+that checkpoint. The writer and the reader share one set of header bounds: the
+writer drops the oldest whole checkpoints, or refuses a header the reader would
+refuse, so nothing written is unreadable.
+
+The review basket is rewritten by atomic rename, except when a frame is
+damaged: reads skip that frame, adds append, and removes are refused, so no
+byte of it is lost. A note is at most 2000 UTF-8 bytes, and a longer one is
+refused, never cut.
 
 The index is a set of immutable files named by one manifest, swapped by rename,
 so a crash leaves the previous complete set. Pages read bounded, checksummed
