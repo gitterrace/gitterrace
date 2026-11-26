@@ -43,7 +43,7 @@ each cap.
 | `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
 | `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
 | `GET /compare` | `base`, `head`, `path`, `three_dot`, `max_lines` | additions, base, deletions, files, from, head, path, three_dot, truncated |
-| `GET /worktree` | `scope`, `max_lines`, `since` | additions, baseline_missing, content_gone, deletions, files, files_omitted, scope, since, truncated, unchanged_files |
+| `GET /worktree` | `scope`, `max_lines`, `since` | additions, baseline_missing, content_gone, deletions, files, files_omitted, history_unreadable, scope, since, truncated, unchanged_files |
 | `GET /checkpoints` |  | bytes_used, cap_bytes, checkpoints, persisted |
 | `GET /viewed` |  | viewed |
 | `GET /findings` |  | cap_entries, count, findings, persisted |

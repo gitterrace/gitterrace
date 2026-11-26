@@ -16,10 +16,24 @@ pub(crate) fn tree_changes(
     cache: &mut gix::diff::blob::Platform,
     rewrites: gix::diff::Rewrites,
 ) -> Result<Vec<ChangeDetached>> {
+    Ok(tree_changes_capped(repo, old, new_tree, cache, rewrites, usize::MAX)?.0)
+}
+
+/// [`tree_changes`] that stops collecting after `limit` changes. The flag says it stopped, so
+/// more changes may exist than the vector holds.
+pub(crate) fn tree_changes_capped(
+    repo: &gix::Repository,
+    old: Option<&gix::Tree<'_>>,
+    new_tree: &gix::Tree<'_>,
+    cache: &mut gix::diff::blob::Platform,
+    rewrites: gix::diff::Rewrites,
+    limit: usize,
+) -> Result<(Vec<ChangeDetached>, bool)> {
     let empty = repo.empty_tree();
     let old = old.unwrap_or(&empty);
     let opts = gix::diff::Options::default().with_rewrites(Some(rewrites));
     let mut raw = Vec::new();
+    let mut cut = false;
     let diffed = gix::diff::tree_with_rewrites(
         gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),
         gix::objs::TreeRefIter::from_bytes(&new_tree.data, new_tree.id.kind()),
@@ -27,6 +41,10 @@ pub(crate) fn tree_changes(
         &mut gix::diff::tree::State::default(),
         &repo.objects,
         |change| {
+            if raw.len() >= limit {
+                cut = true;
+                return Ok(std::ops::ControlFlow::Break(()));
+            }
             raw.push(change.into_owned());
             Ok(std::ops::ControlFlow::Continue(()))
         },
@@ -38,6 +56,9 @@ pub(crate) fn tree_changes(
     if cache.clear_resource_cache_keep_allocation() > KEEP_BLOB_BUFFERS {
         cache.clear_resource_cache();
     }
-    diffed.map_err(git)?;
-    Ok(raw)
+    // A stop we asked for may surface as an error from the walk: the changes so far stand.
+    if !cut {
+        diffed.map_err(git)?;
+    }
+    Ok((raw, cut))
 }

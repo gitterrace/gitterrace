@@ -91,6 +91,7 @@ impl ApiState {
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
         let baseline_missing = since_part.as_ref().is_some_and(|(_, d)| d.baseline_missing);
+        let history_unreadable = since_part.as_ref().is_some_and(|(_, d)| d.history_unreadable);
         let (since, unchanged_files, content_gone) = since_part
             .map_or((None, None, Vec::new()), |(id, d)| {
                 (Some(id), Some(d.unchanged as u64), d.gone)
@@ -102,6 +103,7 @@ impl ApiState {
             deletions,
             files,
             files_omitted,
+            history_unreadable,
             scope: scope.unwrap_or("all").to_owned(),
             since,
             truncated,

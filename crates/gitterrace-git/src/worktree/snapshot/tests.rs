@@ -175,3 +175,49 @@ fn a_checkpoint_head_missing_from_the_repository_says_so() {
     let d = since_at(&repo, &snap, &"ab".repeat(20));
     assert!(d.baseline_missing);
 }
+
+/// Guard class: any walk of the commits since a checkpoint that does not cover them all (a cap
+/// or a tree it cannot read) says the list may be incomplete, instead of returning less.
+#[test]
+fn a_large_commit_since_the_checkpoint_is_bounded_and_reported() {
+    let (d, repo) = repo();
+    let p = d.path();
+    let at = repo.resolve("HEAD").expect("head");
+    let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    for i in 0..10 {
+        std::fs::write(p.join(format!("f{i}.txt")), "n\n").expect("write");
+    }
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "many"]);
+    repo.set_worktree_limits(3, crate::WORKTREE_DIFF_BYTES);
+    let d = since_at(&repo, &snap, &at);
+    assert!(d.files.len() <= 3, "{} files", d.files.len());
+    assert!(d.files_omitted);
+    repo.set_worktree_limits(crate::WORKTREE_FILES, crate::WORKTREE_DIFF_BYTES);
+    let d = since_at(&repo, &snap, &at);
+    assert_eq!(d.files.len(), 10);
+    assert!(!d.files_omitted);
+}
+
+#[test]
+fn a_missing_tree_object_since_the_checkpoint_is_reported_not_empty() {
+    let (d, repo) = repo();
+    let p = d.path();
+    std::fs::create_dir(p.join("sub")).expect("mkdir");
+    std::fs::write(p.join("sub/x.txt"), "x\n").expect("write");
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "sub"]);
+    let at = repo.resolve("HEAD").expect("head");
+    let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    let sub = git(p, &["rev-parse", "HEAD:sub"]);
+    let sub = sub.trim();
+    // Only the checkpoint's commit holds the tree, so the current tree still lists and only the
+    // walk from the checkpoint to HEAD has to read it.
+    git(p, &["rm", "-rq", "sub"]);
+    git(p, &["commit", "-qm", "drop sub"]);
+    let obj = p.join(".git/objects").join(&sub[..2]).join(&sub[2..]);
+    std::fs::remove_file(&obj).expect("loose object");
+    let d = since_at(&Repo::discover(p).expect("repo"), &snap, &at);
+    assert!(d.history_unreadable);
+    assert!(!d.files_omitted, "unreadable is not the same fact as capped");
+}

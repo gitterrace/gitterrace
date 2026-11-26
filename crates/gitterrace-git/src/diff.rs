@@ -11,7 +11,7 @@ use crate::{ChangeKind, CodeCounts, FileDiff, Hunk, Result};
 
 pub(crate) use hunks::build_hunks;
 pub(crate) use stream::{Window, stream};
-pub(crate) use tree::tree_changes;
+pub(crate) use tree::{tree_changes, tree_changes_capped};
 
 #[cfg(test)]
 thread_local! {

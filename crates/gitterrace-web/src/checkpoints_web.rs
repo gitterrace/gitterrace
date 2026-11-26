@@ -51,6 +51,8 @@ struct Since {
     gone: usize,
     /// The checkpoint's HEAD is not in the repository: the comparison may miss commits.
     baseline_missing: bool,
+    /// The commits since the checkpoint could not be read.
+    history_unreadable: bool,
 }
 
 fn missing(id: &str) -> Error {
@@ -101,6 +103,7 @@ pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review>
         unchanged,
         gone: d.gone.len(),
         baseline_missing: d.baseline_missing,
+        history_unreadable: d.history_unreadable,
     };
     let files_omitted = d.files_omitted;
     Ok(Review { files: d.files, since: Some(since), latest, persisted, files_omitted })
@@ -155,6 +158,7 @@ impl Review {
             unchanged_count: fmt::count(s.unchanged.len(), "file", "files"),
             unchanged: s.unchanged.clone(),
             baseline_missing: s.baseline_missing,
+            history_unreadable: s.history_unreadable,
         }
         .render()
         .unwrap_or_default()
@@ -177,6 +181,7 @@ struct SinceNote {
     unchanged_count: String,
     unchanged: Vec<String>,
     baseline_missing: bool,
+    history_unreadable: bool,
 }
 
 /// Why a write is refused before its body is read: the owner proof and same-origin rules every

@@ -50,8 +50,12 @@ pub struct SinceDiff {
     /// instead. The comparison may then miss changes the commits in between made.
     pub baseline_missing: bool,
     /// The file list may be incomplete: the scan of the working tree stopped at
-    /// `limits.worktree_files`, or the checkpoint's did.
+    /// `limits.worktree_files`, or the checkpoint's did, or the walk of the commits since the
+    /// checkpoint did.
     pub files_omitted: bool,
+    /// The commits between the checkpoint and HEAD could not be compared (a missing or
+    /// unreadable tree object), so files only they changed may be missing.
+    pub history_unreadable: bool,
 }
 
 /// The git blob id of `bytes` as hex. Hashed as SHA-1 whatever the repository uses, so an id
@@ -111,26 +115,43 @@ fn baseline_tree<'r>(r: &'r gix::Repository, hex: &str) -> Option<gix::Tree<'r>>
     r.find_commit(id).ok()?.tree().ok()
 }
 
-/// The paths that differ between two trees, both sides of a rename.
-fn tree_paths(r: &gix::Repository, old: &gix::Tree<'_>, new: &gix::Tree<'_>) -> Vec<String> {
+/// What the commits between two trees changed.
+struct TreePaths {
+    paths: Vec<String>,
+    /// The walk stopped at the limit, so more paths may have changed.
+    cut: bool,
+    /// The trees could not be compared: a missing or unreadable object.
+    failed: bool,
+}
+
+/// The paths that differ between two trees, both sides of a rename, at most `limit` changes.
+fn tree_paths(
+    r: &gix::Repository,
+    old: &gix::Tree<'_>,
+    new: &gix::Tree<'_>,
+    limit: usize,
+) -> TreePaths {
     use gix::bstr::ByteSlice;
     use gix::object::tree::diff::ChangeDetached as C;
 
+    let failed = TreePaths { paths: Vec::new(), cut: false, failed: true };
     let Ok(mut cache) = crate::diff::resource_cache(r) else {
-        return Vec::new();
+        return failed;
     };
     let exact = gix::diff::Rewrites { percentage: None, limit: 0, ..Default::default() };
-    let Ok(changes) = crate::diff::tree_changes(r, Some(old), new, &mut cache, exact) else {
-        return Vec::new();
+    let Ok((changes, cut)) =
+        crate::diff::tree_changes_capped(r, Some(old), new, &mut cache, exact, limit)
+    else {
+        return failed;
     };
-    let mut out = Vec::new();
+    let mut paths = Vec::new();
     for c in &changes {
         if let C::Rewrite { source_location, .. } = c {
-            out.push(source_location.to_str_lossy().into_owned());
+            paths.push(source_location.to_str_lossy().into_owned());
         }
-        out.push(c.location().to_str_lossy().into_owned());
+        paths.push(c.location().to_str_lossy().into_owned());
     }
-    out
+    TreePaths { paths, cut, failed: false }
 }
 
 /// The working tree against a checkpoint taken at `base_head`: only files whose content differs
@@ -157,7 +178,10 @@ pub fn worktree_diff_since(
     out.baseline_missing = base.is_none();
     if let Some(base) = &base {
         let now = head.clone().unwrap_or_else(|| r.empty_tree());
-        paths.extend(tree_paths(&r, base, &now));
+        let walked = tree_paths(&r, base, &now, repo.worktree_files());
+        out.files_omitted |= walked.cut;
+        out.history_unreadable = walked.failed;
+        paths.extend(walked.paths);
     }
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
     let known: BTreeMap<&str, &SnapFile> = before.iter().map(|f| (f.path.as_str(), f)).collect();

@@ -81,6 +81,10 @@ pub struct CompareResponse {
 }
 
 /// `GET /worktree`: uncommitted changes against HEAD.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the contract lists each fact as its own JSON field"
+)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct WorktreeResponse {
     pub additions: u64,
@@ -89,6 +93,10 @@ pub struct WorktreeResponse {
     /// between may be missed.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub baseline_missing: bool,
+    /// Only with `since`: the commits between the checkpoint and HEAD could not be read (a
+    /// missing or unreadable tree), so files only they changed may be missing.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub history_unreadable: bool,
     /// Only with `since`: files whose checkpoint copy is gone, diffed against HEAD instead.
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub content_gone: Vec<String>,
