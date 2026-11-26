@@ -109,8 +109,23 @@ fi
 
 tmp=$(mktemp -d "${TMPDIR:-/tmp}/repro-check.XXXXXX") || die "mktemp failed" "free space in ${TMPDIR:-/tmp}"
 tmp=$(cd "${tmp}" && pwd -P)
-cleanup() { "${PY}" -c 'import shutil, sys; shutil.rmtree(sys.argv[1], ignore_errors=True)' "${tmp}"; }
+# Removes a tree git made partly read-only (.git/objects/pack/*.pack is 0444, and a dir without
+# u+w cannot lose its entries): every dir gets u+w first, so nothing is left behind.
+rmtree() {
+  "${PY}" - "$1" <<'PY'
+import os, shutil, stat, sys
+p = sys.argv[1]
+if os.path.lexists(p):
+    for d, dirs, _ in os.walk(p):
+        for x in [d] + [os.path.join(d, n) for n in dirs]:
+            if not os.path.islink(x):
+                os.chmod(x, os.stat(x).st_mode | stat.S_IWUSR | stat.S_IXUSR)
+    shutil.rmtree(p)
+PY
+}
+cleanup() { rmtree "${tmp}" 2>/dev/null || :; }
 trap cleanup EXIT
+# The same two paths for every target: what differs between them is all a path leak can be.
 copies=("${tmp}/one/tree-a" "${tmp}/second-longer-name/checkout-b")
 
 expand() { # expand <dir> <glob>: the files the glob names below dir, sorted
@@ -126,7 +141,7 @@ copy_tree() { # copy_tree <dest>: the product tree, .git included, without targe
   "${PY}" - "${root}" "$1" <<'PY'
 import os, shutil, sys
 src, dst = sys.argv[1:3]
-shutil.copytree(src, dst, symlinks=True, dirs_exist_ok=True,
+shutil.copytree(src, dst, symlinks=True,
                 ignore=lambda d, names: ["target"] if os.path.samefile(d, src) and "target" in names else [])
 PY
 }
@@ -146,6 +161,8 @@ for target in "${targets[@]}"; do
   line=${build//\{target\}/${target}}
   for c in "${copies[@]}"; do
     mkdir -p "$(dirname "${c}")" || die "cannot make ${c}" "free space in ${TMPDIR:-/tmp}"
+    # A fresh copy per target: the last target's build and git's read-only pack files are gone.
+    rmtree "${c}" || die "cannot clear ${c}" "check that ${tmp} is writable"
     copy_tree "${c}" || die "cannot copy the tree to ${c}" "check disk space and that ${root} is readable"
     echo "repro-check: building ${label} in ${c}" >&2
     build_in "${c}" "${line}" ||
