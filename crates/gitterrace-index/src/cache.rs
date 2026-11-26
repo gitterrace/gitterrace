@@ -241,4 +241,23 @@ mod tests {
         assert_eq!(fs::read_to_string(&victim)?, "keep");
         Ok(())
     }
+
+    /// Red when an append lands in an inode that another name also reaches. Also catches the
+    /// same for the lock file or any later cache file, as the check is in the shared open.
+    #[test]
+    fn a_hard_linked_findings_or_checkpoints_file_is_refused_and_the_other_link_kept()
+    -> io::Result<()> {
+        let (t, dir) = repo()?;
+        for name in ["findings", "checkpoints", "lock"] {
+            let other = t.path().join(format!("other-{name}"));
+            fs::write(&other, "keep")?;
+            fs::set_permissions(&other, fs::Permissions::from_mode(0o644))?;
+            fs::hard_link(&other, dir.join(name))?;
+            let err = open_append(&dir, name).expect_err("refused");
+            assert!(err.to_string().contains("hard links"), "{err}");
+            assert_eq!(fs::read_to_string(&other)?, "keep");
+            assert_eq!(mode(&other), 0o644);
+        }
+        Ok(())
+    }
 }

@@ -136,17 +136,40 @@ fn write_replacing(dir: &Path, name: &str, bytes: &[u8], mode: u32, sync: bool) 
     written
 }
 
-/// Opens `dir/name` for appending and reading, creating it (`O_NOFOLLOW|O_APPEND`, `mode` on
-/// unix). A link at the name is refused rather than written through.
+/// Opens `dir/name` for appending and reading, creating it, and refuses a link or a shared inode.
+///
+/// The open is `O_NOFOLLOW|O_APPEND` with `mode` on unix. A link at the name is refused rather
+/// than written through, and so is a file with other hard links: an append would reach the same
+/// inode through the other name, outside the private folder. The check is on the opened handle,
+/// so a swap after the path check is caught.
 ///
 /// # Errors
-/// When `dir` is not a real folder, an entry at `name` is not a regular file, or the open fails.
+/// When `dir` is not a real folder, an entry at `name` is not a regular file, it has other hard
+/// links, or the open fails.
 pub fn open_append_no_follow(dir: &Path, name: &str, mode: u32) -> io::Result<fs::File> {
     let path = regular_entry(dir, name)?;
     let mut o = OpenOptions::new();
     o.create(true).append(true).read(true);
     set_mode(&mut o, mode);
-    no_follow(&mut o).open(&path)
+    let f = no_follow(&mut o).open(&path)?;
+    #[cfg(unix)]
+    refuse_shared(&f, &path)?;
+    Ok(f)
+}
+
+/// Refuses a handle whose inode is shared under another name. Nothing was written yet. Unix
+/// only, where the link count is read from the handle.
+#[cfg(unix)]
+fn refuse_shared(f: &fs::File, path: &Path) -> io::Result<()> {
+    use std::os::unix::fs::MetadataExt;
+    let m = f.metadata()?;
+    if !m.is_file() || m.nlink() > 1 {
+        return Err(io::Error::other(format!(
+            "refusing to append to {}: it is not a regular file or has other hard links",
+            path.display()
+        )));
+    }
+    Ok(())
 }
 
 /// Creates `path` new for writing, `O_NOFOLLOW` and `mode` on unix, so a link or an existing
