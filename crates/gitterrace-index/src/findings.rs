@@ -3,7 +3,10 @@
 //! The file holds frames, one finding each: a fixed header (magic, payload length, payload
 //! crc) and a payload of varint-framed fields read through the bounded [`Cursor`], so a length
 //! that lies cannot size a buffer. A frame cut short by a crash is a torn tail: it is ignored
-//! and the next write replaces the file without it. A frame whose checksum holds but whose
+//! and the next write replaces the file without it. A damaged span (bad checksum, lying length,
+//! unknown magic) is skipped to the next whole frame and reported, and no write rewrites a file
+//! holding one: an add appends, a remove or a cap trim is refused, so unreadable bytes are kept.
+//! A frame whose checksum holds but whose
 //! payload does not decode comes from a build this one does not know: reading it is an error,
 //! never a guess and never a deletion.
 //!
@@ -168,35 +171,80 @@ fn decode(payload: &[u8]) -> io::Result<StoredFinding> {
     Ok(StoredFinding { id, kind, rev, sha, path, lines, query, note, added })
 }
 
-/// The whole frames of `bytes` and where the last one ends. Anything after is a torn tail.
-fn scan(bytes: &[u8]) -> io::Result<(Vec<StoredFinding>, usize)> {
-    let mut out = Vec::new();
-    let mut at = 0;
-    while at + FIXED <= bytes.len() {
-        let head = &bytes[at..at + FIXED];
-        let len = u32::from_le_bytes([head[4], head[5], head[6], head[7]]) as usize;
-        let crc = u32::from_le_bytes([head[8], head[9], head[10], head[11]]);
-        if &head[..4] != MAGIC || len > MAX_FRAME {
-            break;
-        }
-        let Some(payload) = bytes.get(at + FIXED..at + FIXED + len) else {
-            break;
-        };
-        if crc32fast::hash(payload) != crc {
-            break;
-        }
-        out.push(decode(payload)?);
-        at += FIXED + len;
-    }
-    Ok((out, at))
+/// What a pass over the file found. `valid` is where reading stopped cleanly: the file's length
+/// unless an incomplete last frame (a torn tail) follows. `damaged` counts spans that are no
+/// frame and no torn tail: a flipped byte, a lying length, a magic this build does not know.
+#[derive(Default)]
+struct Scan {
+    items: Vec<StoredFinding>,
+    valid: usize,
+    damaged: usize,
 }
 
-fn read(idx: &Index) -> io::Result<Option<(Vec<StoredFinding>, usize, usize)>> {
+/// The payload of the whole, checksummed frame at `at`, and where it ends.
+fn frame_at(bytes: &[u8], at: usize) -> Option<(usize, &[u8])> {
+    let head = bytes.get(at..at + FIXED)?;
+    let len = u32::from_le_bytes([head[4], head[5], head[6], head[7]]) as usize;
+    let crc = u32::from_le_bytes([head[8], head[9], head[10], head[11]]);
+    if &head[..4] != MAGIC || len > MAX_FRAME {
+        return None;
+    }
+    let end = at + FIXED + len;
+    let payload = bytes.get(at + FIXED..end)?;
+    (crc32fast::hash(payload) == crc).then_some((end, payload))
+}
+
+/// Whether the bytes from `at` are the start of a frame the file ends before finishing.
+fn is_torn(bytes: &[u8], at: usize) -> bool {
+    let rest = &bytes[at..];
+    if rest.len() < FIXED {
+        return MAGIC.starts_with(&rest[..rest.len().min(4)]);
+    }
+    let len = u32::from_le_bytes([rest[4], rest[5], rest[6], rest[7]]) as usize;
+    &rest[..4] == MAGIC && len <= MAX_FRAME && FIXED + len > rest.len()
+}
+
+/// The whole frames of `bytes`. A damaged span is skipped to the next whole frame and counted,
+/// so one bad frame never hides the entries after it. Only a trailing incomplete frame is a
+/// torn tail.
+fn scan(bytes: &[u8]) -> io::Result<Scan> {
+    let mut out = Scan::default();
+    let mut at = 0;
+    while at < bytes.len() {
+        if let Some((end, payload)) = frame_at(bytes, at) {
+            out.items.push(decode(payload)?);
+            at = end;
+            continue;
+        }
+        match (at + 1..bytes.len()).find(|&i| frame_at(bytes, i).is_some()) {
+            Some(next) => {
+                out.damaged += 1;
+                at = next;
+            }
+            None if is_torn(bytes, at) => break,
+            None => {
+                out.damaged += 1;
+                at = bytes.len();
+            }
+        }
+    }
+    out.valid = at;
+    Ok(out)
+}
+
+fn read(idx: &Index) -> io::Result<Option<(Scan, usize)>> {
     let Some(bytes) = cache::read(idx.dir(), FILE)? else {
         return Ok(None);
     };
-    let (items, valid) = scan(&bytes)?;
-    Ok(Some((items, valid, bytes.len())))
+    Ok(Some((scan(&bytes)?, bytes.len())))
+}
+
+/// The error of a write that would rewrite the file and so destroy bytes it cannot read.
+fn refuse_rewrite(damaged: usize) -> io::Error {
+    bad(format_args!(
+        "the review basket holds {damaged} damaged span(s) this build cannot read: not rewriting \
+         it, so nothing is lost. Keep a copy of .git/gitterrace/{FILE} and remove it to start over"
+    ))
 }
 
 fn encode_all(items: &[StoredFinding]) -> Vec<u8> {
@@ -209,7 +257,16 @@ impl Index {
     /// # Errors
     /// When the file cannot be read, or holds a frame this build cannot decode.
     pub fn findings_list(&self) -> io::Result<Vec<StoredFinding>> {
-        Ok(read(self)?.map_or_else(Vec::new, |(items, ..)| items))
+        let Some((scan, _)) = read(self)? else {
+            return Ok(Vec::new());
+        };
+        if scan.damaged > 0 {
+            crate::warn(format_args!(
+                "{FILE} holds {} damaged span(s): skipped, the readable entries are listed",
+                scan.damaged
+            ));
+        }
+        Ok(scan.items)
     }
 
     /// Adds `f`, dropping the oldest entries past `cap_entries`. Returns false when a finding
@@ -222,7 +279,8 @@ impl Index {
         // The cache's writer lock: a rewrite replaces the file, so it must not run between
         // another writer's scan and append.
         let _lock = crate::store::WriteLock::take(self.dir())?;
-        let (mut items, valid, size) = read(self)?.unwrap_or_default();
+        let (scan, size) = read(self)?.unwrap_or_default();
+        let Scan { mut items, valid, damaged } = scan;
         if items.iter().any(|x| x.id == f.id) {
             return Ok(false);
         }
@@ -232,6 +290,9 @@ impl Index {
             out.write_all(&encode(f))?;
             out.sync_data()?;
             return Ok(true);
+        }
+        if damaged > 0 {
+            return Err(refuse_rewrite(damaged));
         }
         items.push(f.clone());
         let over = items.len().saturating_sub(cap);
@@ -248,9 +309,13 @@ impl Index {
     pub fn findings_remove(&self, ids: &[String]) -> io::Result<usize> {
         self.writable()?;
         let _lock = crate::store::WriteLock::take(self.dir())?;
-        let Some((mut items, ..)) = read(self)? else {
+        let Some((scan, _)) = read(self)? else {
             return Ok(0);
         };
+        if scan.damaged > 0 {
+            return Err(refuse_rewrite(scan.damaged));
+        }
+        let mut items = scan.items;
         let before = items.len();
         if ids.is_empty() {
             items.clear();

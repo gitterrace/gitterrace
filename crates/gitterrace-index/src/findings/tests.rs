@@ -133,7 +133,8 @@ fn a_huge_length_with_a_valid_checksum_is_an_error_not_an_abort() -> io::Result<
     let mut head = MAGIC.to_vec();
     head.extend(u32::MAX.to_le_bytes());
     head.extend(0u32.to_le_bytes());
-    assert_eq!(scan(&head)?.1, 0);
+    let found = scan(&head)?;
+    assert!(found.items.is_empty() && found.damaged == 1);
     assert_eq!(head.len(), FIXED);
     Ok(())
 }
@@ -147,4 +148,53 @@ fn an_op_from_a_newer_build_is_an_error_and_the_file_is_left_alone() -> io::Resu
     assert!(idx.findings_add(&finding("a", 1), 500).is_err());
     assert_eq!(std::fs::read(idx.dir().join(FILE))?, bytes);
     Ok(())
+}
+
+/// Three findings with the middle frame's checksum byte flipped, as the bytes of the file.
+fn with_damaged_middle(idx: &Index) -> io::Result<(Vec<StoredFinding>, Vec<u8>)> {
+    let all: Vec<_> = (0..3).map(|i| finding(&format!("n{i}"), i)).collect();
+    for f in &all {
+        idx.findings_add(f, 500)?;
+    }
+    let path = idx.dir().join(FILE);
+    let mut bytes = std::fs::read(&path)?;
+    let second = super::encode(&all[0]).len() + FIXED;
+    bytes[second] ^= 0xff;
+    std::fs::write(&path, &bytes)?;
+    Ok((all, bytes))
+}
+
+#[test]
+fn a_damaged_middle_frame_is_skipped_and_the_later_entries_are_listed() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (all, _) = with_damaged_middle(&idx)?;
+    assert_eq!(idx.findings_list()?, [all[0].clone(), all[2].clone()]);
+    Ok(())
+}
+
+/// Class guard: no write may rewrite a file from a partial read. It would also catch a frame of
+/// an unknown magic or a lying length in the middle, which scan reports the same way.
+#[test]
+fn a_damaged_frame_keeps_every_byte_through_add_remove_and_a_cap_trim() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (all, bytes) = with_damaged_middle(&idx)?;
+    let path = idx.dir().join(FILE);
+    assert!(idx.findings_remove(&[all[0].id.clone()]).is_err());
+    assert!(idx.findings_remove(&[]).is_err());
+    assert!(idx.findings_add(&finding("x", 9), 2).is_err(), "a cap trim would rewrite");
+    assert_eq!(std::fs::read(&path)?, bytes);
+    let extra = finding("four", 4);
+    assert!(idx.findings_add(&extra, 500)?, "an append keeps the old bytes");
+    let after = std::fs::read(&path)?;
+    assert!(after.starts_with(&bytes));
+    assert_eq!(idx.findings_list()?, [all[0].clone(), all[2].clone(), extra]);
+    Ok(())
+}
+
+#[test]
+fn garbage_between_frames_is_skipped_to_the_next_whole_frame() {
+    let (a, b) = (super::encode(&finding("a", 1)), super::encode(&finding("b", 2)));
+    let bytes = [a, b"junk-junk-junk-junk".to_vec(), b].concat();
+    let found = scan(&bytes).expect("scan");
+    assert_eq!((found.items.len(), found.damaged, found.valid), (2, 1, bytes.len()));
 }
