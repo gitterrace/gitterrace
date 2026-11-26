@@ -293,6 +293,11 @@ t ALLOW live_desktop_input "$REPO" macos_computer_use '{"action":"run_applescrip
 t BLOCK git_commit_backticks "$REPO" bash '{"command":"git commit -m \"x `id` y\""}' "backticks in -m"
 t ALLOW git_commit_backticks "$REPO" bash '{"command":"git commit -m \"plain\""}' "plain message"
 t ALLOW git_commit_backticks "$REPO" bash '{"command":"git commit -F - <<MSG"}' "-F heredoc form"
+# The engine appends every script the call runs to the command: a backtick in a script's
+# docstring, on another line, is no part of the commit message.
+t ALLOW git_commit_backticks "$REPO" bash '{"command":"git commit -q -m \"x\"\n\"\"\"Read `tools/a.sh`.\"\"\""}' "a backtick on another line"
+t ALLOW git_commit_backticks "$REPO" bash '{"command":"git commit -m \"x\"; echo `date`"}' "a backtick after the commit"
+t BLOCK git_commit_backticks "$REPO" bash '{"command":"echo hi\ngit commit -m \"x `id` y\""}' "backticks in -m on a later line"
 
 # git commit -a ADVISES rather than blocks: same hazard class as `git add .`, but
 # the false-positive cost differs and a guard that fires on ordinary intent gets

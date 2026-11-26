@@ -5,7 +5,9 @@ A hand-edited released line fails. Only released sections are compared. The Unre
 and a section for a version not tagged yet are left out, because `tools/changelog-gen.sh`
 writes them just before the tag. Settings come from lint.toml `[changelog]`: `git_cliff` pins
 the version ("" turns the check off), `file` and `tag_prefix` name the file and the tags.
-A pinned check fails when the file is missing, repeats a section, or git-cliff is absent or of
+A tagged section's date must be the committer date, in UTC, of the commit that set that version
+(`tools/release-date.sh`), so a hand-edited date fails and a bump committed late in the evening
+keeps its day. A pinned check fails when the file is missing, repeats a section, or git-cliff is absent or of
 another version, because each of those reads like a pass otherwise.
 
   changelog.py [--repo DIR]
@@ -41,13 +43,49 @@ def sections(text: str, tags: set[str], prefix: str) -> dict[str, str]:
     return out
 
 
+DATE = re.compile(r"^(## \[\d[^\]]*\]) - \d{4}-\d{2}-\d{2}", flags=re.M)
+
+
+def heading_date(section: str) -> str:
+    m = re.match(r"## \[\d[^\]]*\] - (\d{4}-\d{2}-\d{2})", section)
+    return m.group(1) if m else ""
+
+
 def diff(file_text: str, generated: str, known: set[str], prefix: str, name: str) -> list[str]:
+    """The bodies and headings compared with the date left out: the date has its own check."""
     have, want = sections(file_text, known, prefix), sections(generated, known, prefix)
+    have = {k: DATE.sub(r"\1", v, count=1) for k, v in have.items()}
+    want = {k: DATE.sub(r"\1", v, count=1) for k, v in want.items()}
     return [
         f"{name} [{v}] differs from `git cliff` output; regenerate it, never edit it by hand"
         for v in sorted(set(have) | set(want))
         if have.get(v) != want.get(v)
     ]
+
+
+def vkey(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in re.findall(r"\d+", v))
+
+
+def dates(root: Path, text: str, known: set[str], prefix: str, name: str, since: str = "") -> list[str]:
+    """One message per tagged section whose date is not its bump commit's committer date (UTC).
+    Sections older than `since` shipped with the date they have and are not checked."""
+    helper = Path(__file__).resolve().parent.parent / "tools/release-date.sh"
+    out = []
+    for v, body in sorted(sections(text, known, prefix).items()):
+        if since and vkey(v) < vkey(since):
+            continue
+        r = subprocess.run(["bash", str(helper), "--repo", str(root), "--date", f"{prefix}{v}"],
+                           capture_output=True, text=True)
+        if r.returncode != 0:
+            out.append(f"{name} [{v}]: cannot read the release date of {prefix}{v}: {r.stderr.strip()}")
+            continue
+        want, have = r.stdout.strip(), heading_date(body)
+        if have != want:
+            out.append(f"{name} [{v}] is dated {have or 'nothing'} but its bump commit's committer date (UTC) is "
+                       f"{want}; set the heading to `## [{v}] - {want}` (tools/release-date.sh {prefix}{v} prints it), "
+                       "never pick the date by hand")
+    return out
 
 
 def self_test() -> bool:
@@ -57,7 +95,10 @@ def self_test() -> bool:
         not diff(gen, gen, t, "v", "C")
         and bool(diff(gen.replace("A: b", "A: c"), gen, t, "v", "C"))
         and not diff(gen + "\n## [Unreleased]\n- x\n", gen, t, "v", "C")
+        and not diff(gen, gen.replace("2026-01-01", "2026-01-02"), t, "v", "C")
+        and heading_date(gen.split("\n\n", 1)[1]) == "2026-01-01"
         and heading_versions(gen + gen) == ["0.1.0", "0.1.0"]
+        and vkey("0.10.0") > vkey("0.9.1") and vkey("0.2.2") < vkey("0.2.10")
     )
     if not ok:
         print(f"FAIL [{RULE}] self-test", file=sys.stderr)
@@ -104,7 +145,7 @@ def main(argv: list[str]) -> int:
         print(f"FAIL [{RULE}] git-cliff {' '.join(have)} found, {want} pinned in lint.toml", file=sys.stderr)
         return 1
     gen = subprocess.run(["git-cliff"], cwd=root, capture_output=True, check=True, text=True).stdout
-    bad = diff(text, gen, known, prefix, name)
+    bad = diff(text, gen, known, prefix, name) + dates(root, text, known, prefix, name, s.get("dates_since", ""))
     for b in bad:
         print(f"FAIL [{RULE}] {b}", file=sys.stderr)
     return 1 if bad else 0

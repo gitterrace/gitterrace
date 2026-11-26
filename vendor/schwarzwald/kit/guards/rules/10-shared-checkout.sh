@@ -119,7 +119,9 @@ guard_rule_git_commit_backticks() {
     # Scoped to `git commit -m` only: a general rule would block wanted $(...).
     guard_cmd_is 'git( +-C +[^ ]+)? +commit[^;]*-m' || return 0
     guard_cmd_has 'commit[^;]*-F' && return 0
-    guard_cmd_has '`' &&
+    # The backtick must sit in the commit command itself, not anywhere in GUARD_CMD: the engine
+    # appends every script the call runs, so a backtick in some python docstring is not a message.
+    guard_cmd_has $'commit[^;&|\n]*-m[^;&|\n]*`' &&
         guard_block \
             "backticks inside a 'git commit -m' message are command-substituted -- message fragments silently vanish." \
             "Use a quoted heredoc: git commit -F - <<'MSG' ... MSG"

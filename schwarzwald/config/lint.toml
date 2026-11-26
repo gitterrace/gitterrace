@@ -119,6 +119,8 @@ targets = ["x86_64-pc-windows-gnu", "x86_64-unknown-linux-gnu"]
 git_cliff = "2.14.2"
 file = "CHANGELOG.md"
 tag_prefix = "v"
+# Sections up to 0.2.2 keep the dates they were published with; the bump-date check starts here.
+dates_since = "0.2.3"
 
 [scripts]
 dirs = ["scripts"]

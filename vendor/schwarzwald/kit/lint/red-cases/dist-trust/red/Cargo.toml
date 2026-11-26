@@ -1,0 +1,7 @@
+[workspace]
+members = ["a"]
+
+[workspace.metadata.dist]
+cargo-cyclonedx = true
+github-attestations = true
+checksum = "sha256"

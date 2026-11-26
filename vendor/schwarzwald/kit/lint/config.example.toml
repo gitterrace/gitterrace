@@ -139,6 +139,9 @@ history_ids = ""
 git_cliff = ""
 file = "CHANGELOG.md"
 tag_prefix = "v"
+# The bump-date check (tools/release-date.sh) starts at this version: a release before it shipped
+# with whatever date it has, and a published section is not rewritten. "" checks every tag.
+dates_since = ""
 
 [make]
 # make-help: the targets every Makefile in [scope] make must define and document with a `##`

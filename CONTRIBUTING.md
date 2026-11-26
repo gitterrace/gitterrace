@@ -168,6 +168,15 @@ on http://127.0.0.1:4343.
    run, a tag apart from a main at the same commit, and a main that edits a
    released section apart from its tag. To re-tag an unpublished release,
    `make release-gate VERSION=x.y.z RETAG=1`.
+
+   The release date comes from one place: the committer date, in UTC, of the
+   commit that set the version (`vendor/schwarzwald/kit/tools/release-date.sh`).
+   `make changelog` writes it, the tagged-section check fails when the
+   changelog says otherwise, and the release gate exports `SOURCE_DATE_EPOCH`
+   from it, so a gate that crosses midnight changes nothing. Commit the version
+   bump before running the gate. From 0.2.3 on, a release is dated by its bump
+   commit's UTC date. Earlier sections keep the dates they were published with
+   (`dates_since` in `schwarzwald/config/lint.toml`).
 4. The release workflow builds the binaries, the installer and the formula.
 5. `make deploy` (it refuses until the tag, repository and tap answer, and a site
    that fails a site guard), then `make domains`.

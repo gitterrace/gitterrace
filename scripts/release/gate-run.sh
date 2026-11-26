@@ -4,8 +4,10 @@
 # Refuses a dirty tree or a HEAD that is not main. The steps, with no early exit after the
 # changelog, so one run lists every failure:
 # 1. The changelog section is regenerated, never taken as written: an old section of x.y.z is
-#    removed, make changelog writes it from the commits with today's date, and a change is
-#    committed. A hand edit or a stale date of an unpublished re-tag cannot survive.
+#    removed, make changelog writes it from the commits dated by the bump commit (the kit's
+#    release-date.sh: its committer date in UTC, never today), and a change is committed. A
+#    hand edit cannot survive, and a gate that runs across midnight changes nothing. The same
+#    script gives SOURCE_DATE_EPOCH, exported for every step that builds.
 # 2. Both changelog checks against the candidate, never a stale tag: the untagged-section check
 #    with no v<x.y.z> left, then the shared tagged-section lint with the tag on the candidate.
 # 3. The release check's gate on macOS with the memory budget, and the macOS smoke test.
@@ -109,6 +111,9 @@ gate() {
   git tag -d "$tag" >/dev/null 2>&1 || true
   changelog "$version"
   sha=$(git rev-parse HEAD)
+  SOURCE_DATE_EPOCH=$(bash "$root/vendor/schwarzwald/kit/tools/release-date.sh" --repo "$repo" \
+    --epoch "$version") || die "no release date for $version"
+  export SOURCE_DATE_EPOCH
   while IFS= read -r line; do
     case $line in
     @tag)

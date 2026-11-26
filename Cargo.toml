@@ -124,6 +124,10 @@ local-artifacts-jobs = ["./release-check"]
 checksum = "sha256"
 # Build provenance for every artifact, checked with `gh attestation verify`.
 github-attestations = true
+# Auditable binaries (`cargo audit bin` reads the dependency list from the executable) and a
+# CycloneDX SBOM per package. lint/dist-trust.py in the shared kit fails when either goes missing.
+cargo-auditable = true
+cargo-cyclonedx = true
 # The licence texts of the embedded fonts and script travel in every archive.
 extra-files = ["THIRD-PARTY-NOTICES"]
 pr-run-mode = "plan"

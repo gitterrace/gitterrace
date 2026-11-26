@@ -1,0 +1,8 @@
+[workspace]
+members = ["a"]
+
+[workspace.metadata.dist]
+cargo-auditable = true
+cargo-cyclonedx = true
+github-attestations = true
+checksum = "sha1"

@@ -8,6 +8,11 @@
 # it writes the section to stdout and touches nothing. The pinned git-cliff version, the file and
 # the tag prefix come from schwarzwald/config/lint.toml [changelog]; a different git-cliff may
 # render differently and the changelog lint would then fail on a file nobody edited.
+#
+# The date in the heading is the release date from tools/release-date.sh (the committer date, in
+# UTC, of the commit that set the version), never today's. Bump the version first and commit it,
+# then run this: with no such commit yet the date is HEAD's committer date and the lint fails
+# after the bump if that day differs.
 set -euo pipefail
 
 repo=""
@@ -65,8 +70,12 @@ if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
   echo "tag ${tag} already exists" >&2
   exit 1
 fi
+day=$(bash "$(dirname "${BASH_SOURCE[0]}")/release-date.sh" --repo "${repo}" --date "${version}")
+# git-cliff stamps an unreleased --tag section with the clock: put the release date in its place.
+fix_date() { awk -v v="## [${version}] - " -v d="${day}" \
+  '!done && index($0, v) == 1 { print v d; done = 1; next } { print }'; }
 if [[ ${mode} == --print ]]; then
-  git-cliff --unreleased --tag "${tag}" --strip header
+  git-cliff --unreleased --tag "${tag}" --strip header | fix_date
   exit 0
 fi
 if grep -q "^## \[${version}\]" "${file}"; then
@@ -74,3 +83,7 @@ if grep -q "^## \[${version}\]" "${file}"; then
   exit 1
 fi
 git-cliff --unreleased --tag "${tag}" --prepend "${file}"
+fixed=$(mktemp)
+fix_date <"${file}" >"${fixed}"
+cat "${fixed}" >"${file}"
+rm -f "${fixed}"

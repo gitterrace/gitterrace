@@ -1,0 +1,7 @@
+[workspace]
+members = ["cargo:."]
+
+[dist]
+cargo-auditable = true
+cargo-cyclonedx = true
+checksum = "sha256"

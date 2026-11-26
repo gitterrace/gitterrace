@@ -103,7 +103,7 @@ DEFAULTS: dict[str, dict] = {
         "readers": ["Makefile", "*.md", "*.yml", "*.yaml", "*.toml", "scripts/*"],
         "exempt": [],
     },
-    "changelog": {"git_cliff": "", "file": "CHANGELOG.md", "tag_prefix": "v"},
+    "changelog": {"git_cliff": "", "file": "CHANGELOG.md", "tag_prefix": "v", "dates_since": ""},
     "run": {
         "steps": [],
         "shell_exclude": [],

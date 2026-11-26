@@ -274,7 +274,8 @@ release-gate:
 	bash scripts/release/gate-run.sh $(or $(VERSION),$(error VERSION=x.y.z is required))
 
 # Writes the section from the commits since the last tag, in place of the generated Unreleased
-# section. Needs git-cliff 2.14.2.
+# section. The date is the version-bump commit's committer date in UTC (the kit's release-date.sh,
+# which changelog-gen.sh calls), never today's. Needs git-cliff 2.14.2.
 ## changelog: Prepend the release's section to CHANGELOG.md (VERSION=x.y.z)
 changelog:
 	python3 scripts/release/changelog-run.py
