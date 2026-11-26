@@ -16,8 +16,13 @@ links [DIR]: every link of a docs page takes the one shared link color (the `a` 
   GitHub link and the version last, and the legal nav on the right, stacked on a narrow
   screen. Without DIR it reads target/site.
 agents [DIR]: what search and agent fetchers read on the built site (DIR, default target/site):
-  robots.txt disallows none of the search and user-fetch bots and names the sitemap.
-  `domains` runs the same robots check on the live file.
+  robots.txt disallows none of the search and user-fetch bots and names the sitemap. llms.txt
+  names the workspace version and links every sitemap page (a document by its index.md, which
+  exists). Each page's index.md is the source file byte for byte, announced by a
+  rel=alternate link in the page and a Link header in _headers. The landing page carries one
+  JSON-LD SoftwareApplication at the workspace version with no rating, FAQ or how-to. Each
+  sitemap entry has the lastmod of its source's last commit and no changefreq or priority.
+  `domains` runs the robots check on the live file.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
@@ -38,6 +43,7 @@ from __future__ import annotations
 import base64
 import email.message
 import hashlib
+import importlib.util
 import re
 import subprocess
 import sys
@@ -45,8 +51,19 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[3]
-CANONICAL = "gitterrace.dev"
+_spec = importlib.util.spec_from_file_location(
+    "agents_check", Path(__file__).with_name("agents-check.py")
+)
+_agents = importlib.util.module_from_spec(_spec)  # type: ignore[arg-type]
+sys.modules["agents_check"] = _agents
+_spec.loader.exec_module(_agents)  # type: ignore[union-attr]
+CANONICAL = _agents.CANONICAL
+ROOT = _agents.ROOT
+agent_files_self_test = _agents.agent_files_self_test
+agents = _agents.agents
+agents_self_test = _agents.agents_self_test
+robots_problems = _agents.robots_problems
+
 REDIRECTS = ("www.gitterrace.dev", "gitterrace.com", "www.gitterrace.com")
 TIMEOUT = 15
 
@@ -298,7 +315,7 @@ def domains() -> list[str]:
         bad.append(f"https://{CANONICAL}/ answered {status or 'nothing'}")
     bad += wrong
     status, _, robots = fetch(f"https://{CANONICAL}/robots.txt", body=True)
-    wrong = robots_problems(robots) if status == 200 else [f"robots.txt answered {status or 'nothing'}"]
+    wrong = robots_problems(robots) if status == 200 else ["robots.txt does not answer 200"]
     print(f"  [{'x' if wrong else '+'}] robots.txt is open to search bots and names the sitemap")
     bad += wrong
     status, _, _ = fetch(f"https://{CANONICAL}/no-such-page")
@@ -318,60 +335,6 @@ def domains() -> list[str]:
                     f"{scheme}://{host}/ should redirect permanently to https://{CANONICAL}/"
                 )
     return bad
-
-
-# The bots that fetch a page to answer a person (search indexes and user-triggered fetches). A
-# robots.txt that shuts one out makes the site vanish from that answer without any error.
-OPEN_BOTS = ("OAI-SearchBot", "Claude-SearchBot", "Claude-User", "Googlebot")
-
-
-def robots_problems(text: str) -> list[str]:
-    """Each of OPEN_BOTS must be allowed the whole site by the group that applies to it (its own,
-    else `*`), and the file must name the sitemap."""
-    groups: list[tuple[list[str], list[str]]] = []
-    agents: list[str] = []
-    rules: list[str] = []
-    for raw in text.splitlines():
-        line = raw.split("#", 1)[0].strip()
-        key, _, val = line.partition(":")
-        key, val = key.strip().lower(), val.strip()
-        if key == "user-agent":
-            if rules:
-                groups.append((agents, rules))
-                agents, rules = [], []
-            agents.append(val.lower())
-        elif key in ("allow", "disallow") and agents:
-            rules.append(f"{key}:{val}")
-    if agents:
-        groups.append((agents, rules))
-    bad = []
-    for bot in OPEN_BOTS:
-        mine = [r for a, r in groups if bot.lower() in a] or [r for a, r in groups if "*" in a]
-        if any(x in ("disallow:/", "disallow:/*") for r in mine for x in r):
-            bad.append(f"robots.txt disallows {bot}")
-    sitemap = f"https://{CANONICAL}/sitemap.xml"
-    if not re.search(r"^sitemap:\s*" + re.escape(sitemap) + r"\s*$", text, re.I | re.M):
-        bad.append(f"robots.txt has no `Sitemap: {sitemap}` line")
-    return bad
-
-
-def agents(directory: str | None = None) -> list[str]:
-    d = Path(directory) if directory else ROOT / "target" / "site"
-    bad = robots_problems((d / "robots.txt").read_text())
-    print(f"  [{'x' if bad else '+'}] robots.txt in {d} is open to search bots and names the sitemap")
-    return bad
-
-
-def agents_self_test() -> bool:
-    """A planted Disallow for a named bot or for `*`, and a missing Sitemap line, are red."""
-    ok_txt = f"User-agent: *\nAllow: /\nSitemap: https://{CANONICAL}/sitemap.xml\n"
-    return bool(
-        not robots_problems(ok_txt)
-        and robots_problems(ok_txt.replace("Allow: /", "Disallow: /"))
-        and robots_problems(ok_txt + "User-agent: Claude-User\nDisallow: /\n")
-        and not robots_problems(ok_txt + "User-agent: GPTBot\nDisallow: /\n")
-        and robots_problems(ok_txt.split("Sitemap")[0])
-    ) or print("self-test: the robots check misjudged a planted fault") or False
 
 
 def links_self_test() -> bool:
@@ -442,6 +405,7 @@ def self_test() -> int:
             good = False
     good = links_self_test() and good
     good = agents_self_test() and good
+    good = agent_files_self_test() and good
     print("self-test", "ok" if good else "FAILED")
     return 0 if good else 1
 
@@ -450,7 +414,8 @@ def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    run = {"release": release, "domains": domains, "csp": csp, "links": links, "agents": agents}.get(cmd)
+    runs = {"release": release, "domains": domains, "csp": csp, "links": links, "agents": agents}
+    run = runs.get(cmd)
     if not run:
         print(__doc__)
         return 2

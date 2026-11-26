@@ -4021,6 +4021,7 @@ dependencies = [
  "gitterrace-actions",
  "gitterrace-api",
  "gitterrace-config",
+ "gitterrace-git",
  "gitterrace-index",
  "gitterrace-testkit",
  "gitterrace-web",

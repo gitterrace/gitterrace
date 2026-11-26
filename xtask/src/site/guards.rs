@@ -288,6 +288,11 @@ fn thin_pages(pages: &BTreeMap<String, String>) -> Vec<String> {
     bad
 }
 
+/// What a page weighs against its budget: every byte sent, head markup included.
+const fn weight(html: &str) -> usize {
+    html.len()
+}
+
 /// Guard 9: a page heavier than its kind's budget.
 fn over_budget(pages: &BTreeMap<String, String>, budgets: &Budgets) -> Vec<String> {
     let mut bad = Vec::new();
@@ -302,7 +307,7 @@ fn over_budget(pages: &BTreeMap<String, String>, budgets: &Budgets) -> Vec<Strin
         } else {
             ("other", budgets.other)
         };
-        let size = html.len();
+        let size = weight(html);
         if size > max {
             bad.push(format!("{path}: {size} bytes, over the {kind} budget of {max}"));
         }

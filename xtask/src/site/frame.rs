@@ -38,6 +38,10 @@ pub(crate) struct Body<'a> {
     pub scripts: Vec<String>,
     /// Keep the page out of search results (the 404).
     pub noindex: bool,
+    /// The site path of the page's markdown twin, empty for none.
+    pub md: &'a str,
+    /// Extra markup for the head, built by the site (a JSON-LD block), empty for none.
+    pub head: &'a str,
 }
 
 /// The site-wide facts the frame needs.
@@ -61,6 +65,8 @@ struct Page<'a> {
     path: &'a str,
     name: &'a str,
     noindex: bool,
+    md: &'a str,
+    head: &'a str,
     theme_init: &'a str,
     bar: &'a str,
     docnav: &'a str,
@@ -125,6 +131,8 @@ pub(crate) fn page(site: &Site, body: &Body) -> String {
         path: body.path,
         name: site.name,
         noindex: body.noindex,
+        md: body.md,
+        head: body.head,
         theme_init: THEME_INIT_JS,
         bar: &bar::bar(
             site.name,

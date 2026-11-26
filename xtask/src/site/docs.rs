@@ -16,6 +16,7 @@ use crate::docs_index::{LEGAL, normalize, on_site};
 use crate::out::Out;
 use crate::site::frame::{Body, Site, page};
 use crate::site::outline_script;
+use crate::site::twins::{Twin, md_path};
 use crate::site::{at, attrs, changelog, diagram, docnav};
 
 pub(super) const CHANGELOG: &str = "CHANGELOG.md";
@@ -397,7 +398,7 @@ fn title_of(rel: &str, text: &str) -> Result<String> {
 
 /// The document without a leading `---` front matter block. A skill file carries one for the
 /// agents that load it; on the site it would render as a rule and a heading of raw keys.
-fn without_front_matter(text: &str) -> &str {
+pub(super) fn without_front_matter(text: &str) -> &str {
     let Some(rest) = text.strip_prefix("---\n") else {
         return text;
     };
@@ -405,8 +406,9 @@ fn without_front_matter(text: &str) -> &str {
 }
 
 /// One page per published document, the docs index, the legal pages and the changelog.
-/// Returns the files and every page path, for the sitemap and the link check.
-pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)> {
+/// Returns the files, every page path (for the sitemap and the link check) and the pages that
+/// have a markdown twin.
+pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>, Vec<Twin>)> {
     let links = Links::new(site.repo);
     let read = |rel: &str| {
         std::fs::read_to_string(root.join(rel)).with_context(|| format!("reading {rel}"))
@@ -426,7 +428,8 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
     let order: Vec<(String, String, String)> =
         docs.iter().map(|(_, p, t, .., g)| (p.clone(), t.clone(), (*g).to_owned())).collect();
     let mut titles = Vec::new();
-    for (rel, path, title, what, text, _) in docs {
+    let mut twins = Vec::new();
+    for (rel, path, title, what, text, group) in docs {
         let mut h2s = Vec::new();
         let inner = body(without_front_matter(&text), rel, &links, &mut |level, h| {
             let id = slug(h);
@@ -452,12 +455,21 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
                 pager: &nav.pager,
                 rail: &rail,
                 edit: Some((rel, text.starts_with(GENERATED))),
+                md: &md_path(&path),
                 scripts,
                 ..Body::default()
             },
         );
         check_unique_ids(&path, &html)?;
         outs.push(Out::file(at(&format!("{path}index.html")), html));
+        twins.push(Twin {
+            path: path.clone(),
+            source: rel.to_owned(),
+            title: title.clone(),
+            what: sentence(what),
+            group: group.to_owned(),
+            text,
+        });
         paths.push(path);
         titles.push((rel.to_owned(), title));
     }
@@ -476,18 +488,28 @@ pub(super) fn pages(root: &Path, site: &Site) -> Result<(Vec<Out>, Vec<String>)>
             },
         ),
     ));
-    let log = changelog::page(site, &links, &read(CHANGELOG)?)?;
+    let log_text = read(CHANGELOG)?;
+    let log = changelog::page(site, &links, &log_text)?;
     if let Out::File { body, .. } = &log {
         check_unique_ids(changelog::PATH, body)?;
     }
     outs.push(log);
     paths.push(changelog::PATH.to_owned());
+    twins.push(Twin {
+        path: changelog::PATH.to_owned(),
+        source: CHANGELOG.to_owned(),
+        title: "Changelog".to_owned(),
+        what: changelog::WHAT.to_owned(),
+        group: "Project".to_owned(),
+        text: log_text,
+    });
     paths.sort();
-    Ok((outs, paths))
+    Ok((outs, paths, twins))
 }
 
 /// The legal pages. A legal page's `<title>` and kicker are the word the footer links it by; its
-/// h1 may be friendlier.
+/// h1 may be friendlier. They get no markdown twin: agents read the docs, and the legal text is
+/// not documentation.
 fn legal_pages(
     site: &Site,
     links: &Links,

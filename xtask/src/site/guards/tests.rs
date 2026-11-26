@@ -272,6 +272,30 @@ fn a_page_over_its_byte_budget_is_reported() {
     assert!(!plant(|_| {}).contains("budget"));
 }
 
+/// The class: any markup left out of the weight. The JSON-LD block and the alternate link are
+/// sent on every load, so a page is measured with them, and one they push over is reported.
+#[test]
+fn the_weight_of_a_page_counts_its_json_ld_and_alternate_link() {
+    let head = "<link rel=\"alternate\" type=\"text/markdown\" href=\"/docs/a/index.md\">\n\
+                <script type=\"application/ld+json\">{}</script>\n";
+    let (pages, _) = site();
+    let html = pages["docs/a/index.html"].replacen("<title>", &format!("{head}<title>"), 1);
+    assert_eq!(weight(&html), html.len());
+    let twice = format!("{head}{html}");
+    assert_eq!(weight(&twice), twice.len());
+    let room = 10_000 - pages["docs/a/index.html"].len();
+    let fill = format!("<i>{}</i></main>", "9".repeat(room - head.len() / 2));
+    let got = plant(|p| {
+        edit_page(p, "docs/a/index.html", "</main>", &fill);
+    });
+    assert!(!got.contains("budget"), "{got}");
+    let got = plant(|p| {
+        edit_page(p, "docs/a/index.html", "</main>", &fill);
+        edit_page(p, "docs/a/index.html", "<title>", &format!("{head}<title>"));
+    });
+    assert!(got.contains("docs budget"), "{got}");
+}
+
 #[test]
 fn budgets_are_read_from_the_registry_counts() {
     let b = Budgets::parse(concat!(

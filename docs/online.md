@@ -40,6 +40,18 @@ action, Send to target, settings page or host path reaches it.
 An export is a snapshot with no search, live updates or actions. For those, or
 any revision on demand, use public mode.
 
+## Read by agents and search
+
+The project's own site, gitterrace.dev, is built for machines as well as people.
+Every documentation page has its markdown source beside it at `<page>index.md`,
+announced by a `rel="alternate"` link in the page and a `Link` header. `/llms.txt`
+summarizes the project with the version and links each page's markdown file, and
+`/llms-full.txt` holds every document as one text. The landing page carries one
+`SoftwareApplication` JSON-LD block, the sitemap dates each page by the last
+commit to its source, and `robots.txt` keeps search and user-fetch bots out of
+no page. All of it is generated from the docs registry and the workspace
+version, and `site-check.py agents` fails when one drifts.
+
 ## Serve in public mode
 
 `--public` (or `server.is_public = true`) makes the server a read-only viewer of

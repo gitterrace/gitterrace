@@ -9,6 +9,9 @@ use crate::site::frame::{Body, Site, page as frame_page};
 
 /// The site path of the page.
 pub const PATH: &str = "changelog/";
+/// The changelog's meta description, and its line in `llms.txt`.
+pub(super) const WHAT: &str =
+    "What changed in each release of gitterrace, written from the commits.";
 
 /// The id of a release heading such as `[0.3.0] - 2026-01-02` or `[Unreleased]`.
 fn release_id(heading: &str) -> String {
@@ -50,8 +53,9 @@ pub(super) fn page(site: &Site, links: &Links, text: &str) -> anyhow::Result<Out
             site,
             &Body {
                 title: "Changelog",
-                desc: "What changed in each release of gitterrace, written from the commits.",
+                desc: WHAT,
                 path: PATH,
+                md: &crate::site::twins::md_path(PATH),
                 inner: &inner,
                 ..Body::default()
             },

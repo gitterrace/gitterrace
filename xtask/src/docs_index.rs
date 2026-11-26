@@ -14,7 +14,7 @@ mod docker;
 mod keys;
 use keys::Keys;
 
-const INDEX: &str = "docs/README.md";
+pub(crate) const INDEX: &str = "docs/README.md";
 
 /// What a document is for, in the order the index lists them.
 #[derive(Clone, Copy, PartialEq, Eq)]

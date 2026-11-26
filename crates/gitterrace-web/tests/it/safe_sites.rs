@@ -167,6 +167,7 @@ const SITE_SITES: &[(&str, &str, &str)] = &[
     ("page.html", "bar", "xtask site/bar.rs bar"),
     ("page.html", "docnav", "xtask site/docnav.rs"),
     ("page.html", "footer", "xtask site/footer.rs"),
+    ("page.html", "head", "xtask site/agents.rs json_ld: serde_json with every < escaped"),
     ("page.html", "inner", "xtask site/docs.rs body: pulldown-cmark of repository docs"),
     ("page.html", "menus", "xtask site/frame.rs: built by the site's templates"),
     ("page.html", "pager", "xtask site/frame.rs: built by the site's templates"),

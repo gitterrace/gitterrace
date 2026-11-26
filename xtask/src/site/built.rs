@@ -141,6 +141,10 @@ fn csp_problems(headers: &str, pages: &[(String, String)]) -> Vec<String> {
     for (path, html) in pages {
         for chunk in html.split("<script").skip(1) {
             let (tag, rest) = chunk.split_once('>').unwrap_or((chunk, ""));
+            // A data block (the JSON-LD) is never run, so the policy need not list it.
+            if tag.contains("application/ld+json") {
+                continue;
+            }
             if tag.contains("src=") {
                 bad.push(format!("{path}: a script is loaded, not inline"));
                 continue;
@@ -401,7 +405,10 @@ fn site_links_to_files(pages: &[(String, String)]) -> Vec<String> {
     for (path, html) in pages {
         for dest in attrs(html, "href") {
             let file = dest.split('#').next().unwrap_or("");
-            let on_site = !file.contains("://") && !file.starts_with("mailto:");
+            // A page's markdown twin is published: `<page>index.md` is the one file allowed.
+            let on_site = !file.contains("://")
+                && !file.starts_with("mailto:")
+                && !file.ends_with("/index.md");
             let source = [".md", ".rs", ".toml", ".sh", ".py", ".json", ".yml"]
                 .iter()
                 .any(|e| file.ends_with(e));

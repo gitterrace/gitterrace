@@ -13,6 +13,9 @@ renderer; every plain value is escaped here. -#}
 <title>{{ title }}</title>
 <meta name="description" content="{{ desc }}">
 <link rel="canonical" href="{{ home }}/{{ path }}">
+{%- if !md.is_empty() %}
+<link rel="alternate" type="text/markdown" href="/{{ md }}">
+{%- endif %}
 <meta property="og:title" content="{{ title }}">
 <meta property="og:description" content="{{ desc }}">
 <meta property="og:url" content="{{ home }}/{{ path }}">
@@ -25,7 +28,7 @@ renderer; every plain value is escaped here. -#}
 <link rel="icon" type="image/svg+xml" href="/assets/mark.svg">
 <link rel="apple-touch-icon" href="/assets/icons/apple-touch-icon.png">
 <link rel="stylesheet" href="/assets/site.css">
-<script>{{ theme_init|safe }}</script>
+{{ head|safe }}<script>{{ theme_init|safe }}</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>

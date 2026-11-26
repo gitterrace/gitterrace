@@ -77,6 +77,8 @@ Next: [getting started](https://gitterrace.dev/docs/getting-started/) and
 [using it](https://gitterrace.dev/docs/using/). Docker serves read-only at
 `http://localhost:8080`
 ([run with Docker](https://gitterrace.dev/docs/online/#run-with-docker)).
+Agents can read the docs as markdown: [llms.txt](https://gitterrace.dev/llms.txt) lists
+each page and `llms-full.txt` holds them all.
 
 ## Send a finding with its context
 
