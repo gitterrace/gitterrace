@@ -225,7 +225,11 @@
     var first = button("Select first " + SEND_MAX, "sm basket-first", function () {
       picked.clear();
       ids.slice(0, SEND_MAX).forEach(function (id) { picked.add(id); });
-      load();
+      // Only the ticks change: no server data did, so no GET and no anchors to recompute.
+      Array.prototype.forEach.call(list.querySelectorAll(".basket-tick"), function (t) {
+        t.checked = picked.has(t.closest("li").dataset.id);
+      });
+      sync();
     });
     first.hidden = true;
     var picked = new Set();

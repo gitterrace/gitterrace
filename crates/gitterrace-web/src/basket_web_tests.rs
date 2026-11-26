@@ -142,3 +142,16 @@ fn the_note_box_limit_is_the_stored_note_limit() {
     assert!(js.contains(&want), "basket.js must carry `{want}`");
     assert!(!js.contains("maxLength"), "a UTF-16 maxlength disagrees with the byte limit");
 }
+
+/// Class guard: choosing rows is local state. A handler that only changes the ticked set must not
+/// fetch the basket again, since that endpoint recomputes every anchor. It also catches any
+/// later handler that calls `load()` straight after editing `picked`.
+#[test]
+fn selecting_a_batch_does_not_reload_the_basket() {
+    let js = include_str!("../static/basket.js");
+    let at = js.find("picked.clear();").expect("the select-first handler");
+    // The handler's own close, at the button call's indent: inner callbacks close deeper.
+    let handler = &js[at..js[at..].find("\n    });").map_or(js.len(), |e| at + e)];
+    assert!(!handler.contains("load("), "select first must not call load(): {handler}");
+    assert!(handler.contains("sync();"));
+}
