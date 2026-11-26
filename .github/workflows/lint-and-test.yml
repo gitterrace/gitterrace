@@ -64,6 +64,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: EmbarkStudios/cargo-deny-action@17aeb3c839e42274e2b8adf721c8c65edfdc74dd # v2.1.3
 
+  # A release build is reproducible: repro-check.sh builds the dist profile twice, in two copies
+  # of the tree at different paths, and fails naming the file, the offset and any host path that
+  # differs. Linux only (ld64 and codesign stamp their own data). schwarzwald/config/repro.toml
+  # holds the build, the outputs and the targets.
+  repro:
+    name: Reproducible build
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: ./.github/actions/rust
+        with:
+          targets: x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu
+      # The aarch64 build links with the cross gcc.
+      - run: sudo apt-get update -q && sudo apt-get install -y --no-install-recommends gcc-aarch64-linux-gnu
+      - run: bash vendor/schwarzwald/kit/tools/repro-check.sh .
+        env:
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+
   # rust-version in Cargo.toml is a promise; this proves it. Keep the two in step. Fast tier;
   # release-check.yml runs it again on the release commit.
   msrv:

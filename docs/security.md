@@ -38,6 +38,23 @@ folder like the repository.
 - A hostile repository: file names, commit text, markdown, SVG, `.mailmap`, huge
   blobs, symlinks, a committed `actions.toml`.
 
+## Verifying a release
+
+Every archive has a `.sha256` file and a build provenance attestation:
+`gh attestation verify <archive> --repo gitterrace/gitterrace`. The Linux
+archives also rebuild byte for byte. Check out the release tag with its tags
+(`git clone --branch vX.Y.Z`), install the toolchain `rust-toolchain.toml`
+names, then run
+`bash vendor/schwarzwald/kit/tools/repro-check.sh --version X.Y.Z .`. It builds
+the release binary and the archive twice, in two trees at different
+paths, and fails naming the file, the offset and any host path that differs.
+To compare with a download, run `bash scripts/release/repro-run.sh
+x86_64-unknown-linux-gnu` inside `eval "$(bash
+vendor/schwarzwald/kit/tools/repro-env.sh X.Y.Z)"` and compare
+`sha256sum target/repro/gitterrace-x86_64-unknown-linux-gnu.tar.gz` with the
+release's `.sha256`. macOS and Windows builds are not reproducible: ld64 and
+codesign stamp their own data. CI runs the check on every push.
+
 ## Doors and what holds them
 
 | Door | Exposure | Holds it |

@@ -1,0 +1,9 @@
+# What tools/repro-check.sh builds twice, in two trees at different paths, and compares by sha256
+# (vendor/schwarzwald/kit). Linux only: ld64 stamps an LC_UUID and codesign a signature on macOS.
+# repro-run.sh builds the dist profile and packs the archive with repro-archive.sh.
+build = "bash scripts/release/repro-run.sh {target}"
+outputs = [
+  "target/{target}/dist/git-terrace",
+  "target/repro/gitterrace-{target}.tar.gz",
+]
+targets = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]
