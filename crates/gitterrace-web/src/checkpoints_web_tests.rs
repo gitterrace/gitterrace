@@ -12,20 +12,16 @@ fn server(root: &Path) -> (axum::Router, std::path::PathBuf) {
     server_with(root, gitterrace_config::Config::default())
 }
 
-fn server_with(root: &Path, config: gitterrace_config::Config) -> (axum::Router, std::path::PathBuf) {
+fn server_with(
+    root: &Path,
+    config: gitterrace_config::Config,
+) -> (axum::Router, std::path::PathBuf) {
     let p = root.join("r");
     let f = Fixture::init(&p).write("a.txt", "a\n").write("b.txt", "b\n").commit("feat: one");
     let repo = f.path().to_path_buf();
-    let router = crate::build_server(
-        vec![repo.clone()],
-        None,
-        None,
-        &Env::new(config),
-        None,
-        None,
-    )
-    .expect("router")
-    .0;
+    let router = crate::build_server(vec![repo.clone()], None, None, &Env::new(config), None, None)
+        .expect("router")
+        .0;
     (router, repo)
 }
 
@@ -97,7 +93,8 @@ async fn a_viewed_mark_is_kept_by_the_server_per_patch() {
 #[tokio::test(flavor = "multi_thread")]
 async fn viewed_marks_are_read_and_saved_with_the_public_api_off() {
     let tmp = tempfile::tempdir().expect("tmp");
-    let config = gitterrace_config::parse("[features]\napi_enabled = false\n").expect("parse").config;
+    let config =
+        gitterrace_config::parse("[features]\napi_enabled = false\n").expect("parse").config;
     let (app, _) = server_with(tmp.path(), config);
     assert_eq!(call(&app, "GET", "/r/r/api/v1/viewed", "", false).await.0, 404, "API stays off");
     let mark = r#"{"path":"a.txt","patch":"p1","viewed":true}"#;
@@ -105,6 +102,32 @@ async fn viewed_marks_are_read_and_saved_with_the_public_api_off() {
     let (s, list) = call(&app, "GET", "/r/r/_viewed", "", false).await;
     assert_eq!(s, 200, "{list}");
     assert!(list.contains("a.txt") && list.contains("p1"), "{list}");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_migration_never_overwrites_a_mark_that_already_exists() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (app, _) = server(tmp.path());
+    let mark = r#"{"path":"a.txt","patch":"new","viewed":true}"#;
+    assert_eq!(call(&app, "POST", "/r/r/_viewed", mark, true).await.0, 200);
+    let old = r#"{"items":[{"path":"a.txt","patch":"old"},{"path":"b.txt","patch":"b1"}],
+        "missing_only":true}"#;
+    let (s, body) = call(&app, "POST", "/r/r/_viewed/all", old, true).await;
+    assert_eq!(s, 200, "{body}");
+    assert!(body.contains("\"marked\":1"), "{body}");
+    let (_, list) = call(&app, "GET", "/r/r/_viewed", "", false).await;
+    assert!(list.contains("new") && !list.contains("old") && list.contains("b1"), "{list}");
+}
+
+/// Class guard: every write the script sends waits in one queue, so the server sees them in the
+/// order the reader made them. A later write posted outside the queue (a stale save landing
+/// after a newer click, or a second migration racing the first) fails here.
+#[test]
+fn every_viewed_write_in_the_script_goes_through_the_queue() {
+    let js = include_str!("../static/diffs-viewed.js");
+    let posts = js.matches("post(\"").count();
+    let queued = js.matches("enqueue(function").count();
+    assert!(posts >= 2 && queued >= posts, "{posts} posts, {queued} queued");
 }
 
 /// Class guard for the page script: it reads and writes only its own `/_viewed` routes, since

@@ -30,6 +30,14 @@
       body: JSON.stringify(body)
     }).then(function (r) { if (!r.ok) throw new Error(String(r.status)); return r.json(); });
   }
+  // Every write goes through one queue, so the server applies them in the order the reader made
+  // them: a migration that is still in flight can never land after a later click.
+  var chain = Promise.resolve();
+  function enqueue(fn) {
+    var p = chain.then(fn);
+    chain = p.catch(function () { /* the caller sees it, the queue goes on */ });
+    return p;
+  }
   function note(text) {
     var n = document.querySelector("[data-cpbar] .cpnote");
     if (n) n.textContent = text;
@@ -54,23 +62,26 @@
     var old = null;
     try { old = JSON.parse(localStorage.getItem(KEY)); } catch (e) { old = null; }
     if (!old) return null;
-    var items = [];
-    files().forEach(function (s) {
-      var p = s.dataset.path;
-      if (old[p] && old[p] === s.dataset.h && s.dataset.p && !(p in served)) {
-        items.push({ path: p, patch: s.dataset.p });
-      }
-    });
-    if (!items.length) return null;
     var sent = {};
-    items.forEach(function (i) { sent[i.path] = old[i.path]; });
-    touched = {};
-    return post("/_viewed/all", { items: items }).then(function () {
-      items.forEach(function (i) {
-        // A mark the reader changed while the save was in flight is newer: leave it be.
-        if (!touched[i.path] && !(i.path in served)) served[i.path] = i.patch;
+    // Built when its turn in the queue comes, so a path clicked before then is left out, and
+    // asked missing_only so a mark another tab saved meanwhile is not overwritten either.
+    return enqueue(function () {
+      var items = [];
+      files().forEach(function (s) {
+        var p = s.dataset.path;
+        if (old[p] && old[p] === s.dataset.h && s.dataset.p && !(p in served) && !touched[p]) {
+          items.push({ path: p, patch: s.dataset.p });
+          sent[p] = old[p];
+        }
       });
-      forget(sent);
+      if (!items.length) return null;
+      return post("/_viewed/all", { items: items, missing_only: true }).then(function () {
+        items.forEach(function (i) {
+          // A mark the reader changed while the save was in flight is newer: leave it be.
+          if (!touched[i.path] && !(i.path in served)) served[i.path] = i.patch;
+        });
+        forget(sent);
+      });
     }).catch(function () {
       note("Earlier viewed marks could not be moved. " +
         "They are kept here and tried again on the next load.");
@@ -117,7 +128,9 @@
       var before = served[path];
       if (on) served[path] = patch; else delete served[path];
       decorate();
-      post("/_viewed", { path: path, patch: patch, viewed: on }).catch(function () {
+      enqueue(function () {
+        return post("/_viewed", { path: path, patch: patch, viewed: on });
+      }).catch(function () {
         if (before === undefined) delete served[path]; else served[path] = before;
         note("The viewed mark was not saved.");
         decorate();

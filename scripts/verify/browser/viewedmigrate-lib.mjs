@@ -6,6 +6,8 @@
 // - a saved POST drops the confirmed entries and the marks show after a reload
 // - an entry for a file not on the page stays, and one whose content changed stays unmarked
 // - two tabs migrating at once end with the marks on the server and nothing lost
+// - a click made while the migration request is held (then released) is still there after a
+//   reload: tick and untick a file, and the server must not end up holding the older mark
 // A second defect the same checks catch: a retry that drops the entries of a different page.
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -158,5 +160,49 @@ export function checks(env) {
     });
   }
 
-  return { viewedMigrateRejected, viewedMigrateSaved, viewedMigrateKept, viewedMigrateTwoTabs };
+  async function viewedMigrateLaterClickWins() {
+    await each('click-while-held', async (p, srv, w) => {
+      await seed(p);
+      /** @type {(v?: unknown) => void} */
+      let release = () => {};
+      const gate = new Promise((res) => { release = res; });
+      /** @type {(v?: unknown) => void} */
+      let held = () => {};
+      const arrived = new Promise((res) => { held = res; });
+      await p.route('**/_viewed/all', async (route) => {
+        held(true);
+        await gate;
+        await route.continue();
+      });
+      let saved = 0;
+      /** @type {(v?: unknown) => void} */
+      let allSaved = () => {};
+      const settled = new Promise((res) => { allSaved = res; });
+      p.on('response', (x) => {
+        const save = x.request().method() === 'POST' && /\/_viewed(\/all)?$/.test(x.url());
+        if (save && ++saved === 3) allSaved(true);
+      });
+      await p.reload({ waitUntil: 'load' });
+      await arrived;
+      // The reader ticks a.txt and unticks it again while the migration is still in flight.
+      const box = 'section.file[data-path="a.txt"] input.viewed';
+      await p.click(box);
+      await p.click(box);
+      release();
+      // The migration and both clicks have been answered: three saves, in whatever order.
+      await settled;
+      say(saved === 3, `${w}: the migration and both clicks were saved`, `${w}: ${saved} saves`);
+      await p.unroute('**/_viewed/all');
+      await reload(p);
+      await count(p, 1);
+      say((await ticked(p)).join() === 'b.txt',
+        `${w}: the later untick survives a reload, the migrated b.txt stays`,
+        `${w}: ticked after reload ${await ticked(p)}`);
+    });
+  }
+
+  return {
+    viewedMigrateLaterClickWins, viewedMigrateRejected, viewedMigrateSaved, viewedMigrateKept,
+    viewedMigrateTwoTabs,
+  };
 }

@@ -297,6 +297,10 @@ struct Many {
     /// `review.has_auto_checkpoint` is on, so the page need not know the setting.
     #[serde(default)]
     checkpoint: bool,
+    /// Marks only the paths that have no mark yet: the browser's move of its old marks must
+    /// not undo one another tab or a later click saved.
+    #[serde(default)]
+    missing_only: bool,
 }
 
 /// `POST /_viewed/all` `{"items":[{"path","patch"}],"checkpoint":false}`: marks every item
@@ -313,9 +317,16 @@ pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) 
     if many.items.iter().any(|i| i.path.is_empty()) {
         return bad();
     }
-    let items: Vec<(String, String)> = many.items.into_iter().map(|i| (i.path, i.patch)).collect();
+    let mut items: Vec<(String, String)> =
+        many.items.into_iter().map(|i| (i.path, i.patch)).collect();
     let want = many.checkpoint;
+    let missing_only = many.missing_only;
     let done = with_api(&app, move |api| {
+        if missing_only {
+            let held: std::collections::HashSet<String> =
+                api.viewed()?.viewed.into_iter().map(|v| v.path).collect();
+            items.retain(|(p, _)| !held.contains(p));
+        }
         let id = if want && api.has_auto_checkpoint() {
             Some(api.checkpoint_create("", true)?.0)
         } else {
@@ -335,7 +346,9 @@ pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) 
 mod tests {
     use std::collections::HashSet;
 
-    use gitterrace_git::{Repo, Scope, worktree_diff_scoped, worktree_diff_since, worktree_snapshot};
+    use gitterrace_git::{
+        Repo, Scope, worktree_diff_scoped, worktree_diff_since, worktree_snapshot,
+    };
     use gitterrace_testkit::{Fixture, git};
 
     /// Guard class: the unchanged list of the page is the one it always had (changed files

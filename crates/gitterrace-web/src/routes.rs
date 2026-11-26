@@ -75,7 +75,10 @@ pub(crate) fn router(app: Arc<App>) -> Router {
                 .delete(crate::basket_web::remove),
         )
         .route("/_checkpoint", post(crate::checkpoints_web::checkpoint))
-        .route("/_viewed", get(crate::checkpoints_web::viewed_list).post(crate::checkpoints_web::viewed))
+        .route(
+            "/_viewed",
+            get(crate::checkpoints_web::viewed_list).post(crate::checkpoints_web::viewed),
+        )
         .route("/_viewed/all", post(crate::checkpoints_web::viewed_all))
         .route("/worktree/diff/{*path}", get(views::worktree_fragment))
         .route("/worktree/raw/{*path}", get(raw::worktree_raw))
