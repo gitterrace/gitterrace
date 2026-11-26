@@ -349,3 +349,26 @@ fn a_header_without_the_omitted_field_reads_as_complete() {
     .expect("parse");
     assert!(!m.omitted);
 }
+
+#[test]
+fn a_long_unicode_label_is_cut_to_200_characters_at_the_index() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let long = "\u{e9}\u{1f600}".repeat(150);
+    add(&idx, &[snap("a.txt", "one\n")], "abc", false, &long, 1 << 20, 100)?;
+    let label = &idx.checkpoint_list()?.items[0].label;
+    assert_eq!(label.chars().count(), 200);
+    assert!(long.starts_with(label.as_str()));
+    Ok(())
+}
+
+#[test]
+fn the_label_limit_is_defined_once() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+    let api = std::fs::read_to_string(root.join("gitterrace-api/src/core/checkpoints.rs"))
+        .unwrap_or_default();
+    assert!(!api.contains("take("), "the api must pass labels through to the index limit");
+    let own = std::fs::read_to_string(root.join("gitterrace-index/src/checkpoints.rs"))
+        .unwrap_or_default();
+    assert_eq!(own.matches("take(MAX_LABEL)").count(), 1);
+    assert_eq!(own.matches("take(200)").count(), 0);
+}

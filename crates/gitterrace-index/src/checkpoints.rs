@@ -24,6 +24,9 @@ const FIXED: u64 = 20;
 const MAX_HEADER: u32 = 16 << 20;
 /// Checkpoints kept whatever the byte cap says: each holds a header of path names.
 const MAX_CHECKPOINTS: usize = 200;
+/// Longest label a checkpoint keeps, in characters. The one limit: callers pass labels as typed.
+/// Not configurable: a label is a short note, not content.
+const MAX_LABEL: usize = 200;
 /// Largest copy, packed or unpacked: `review.checkpoint_file_kb` tops out at 4 MiB, so a larger
 /// claim is a planted size.
 const MAX_COPY: u64 = 4 << 20;
@@ -276,7 +279,7 @@ fn build(
         created,
         head: head.to_owned(),
         auto,
-        label: label.chars().take(200).collect(),
+        label: label.chars().take(MAX_LABEL).collect(),
         files: metas,
         omitted: snap.files_omitted,
     };
