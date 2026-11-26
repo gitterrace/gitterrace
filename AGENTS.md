@@ -43,7 +43,8 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 - Docs: `api.md`, `configuration.md` and every `GENERATED` block come from code
   registries (`ENDPOINTS`, `INSIGHTS`, config keys, `actions::schema`,
   `web::sitemap`, `CACHE_FILES`, clap `Cli`, Cargo.toml, script headers). Change
-  the registry, `make docs-gen`, never edit a block. Prose holds decisions, not
+  the registry, `make docs-gen`, never edit a block (`commits-check.py --range` fails a commit that
+  changes one without `make docs-gen` in its message). Prose holds decisions, not
   inventories.
 
 ## Code conventions

@@ -21,6 +21,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path, PurePosixPath
 
@@ -179,6 +180,55 @@ def test_commits_removing_product(rng: str) -> list[str]:
     return hits
 
 
+GEN_BEGIN = re.compile(r"^<!-- BEGIN GENERATED: ([\w-]+) -->$")
+GEN_NOTE = "make docs-gen"
+
+
+def gen_blocks(text: str) -> dict[str, str]:
+    """The body of every `<!-- BEGIN GENERATED: id -->` block, by id."""
+    out: dict[str, str] = {}
+    cur, body = None, []
+    for line in text.splitlines():
+        m = GEN_BEGIN.match(line)
+        if m and cur is None:
+            cur, body = m.group(1), []
+        elif cur and line == f"<!-- END GENERATED: {cur} -->":
+            out[cur] = "\n".join(body)
+            cur = None
+        elif cur:
+            body.append(line)
+    return out
+
+
+def hand_edited(old: str, new: str) -> list[str]:
+    """Ids of generated blocks present in both texts whose body differs."""
+    a, b = gen_blocks(old), gen_blocks(new)
+    return sorted(i for i in a.keys() & b.keys() if a[i] != b[i])
+
+
+def commits_editing_generated(rng: str) -> list[str]:
+    """Commits that change a GENERATED block without `make docs-gen` in the message.
+
+    The blocks come from several generators, so a block is not mapped to one registry: the
+    commit says it regenerated them, or it is a hand edit the docs-gen gate would undo.
+    """
+    _, shas = run(["git", "rev-list", "--no-merges", rng])
+    hits = []
+    for sha in shas.split():
+        _, msg = run(["git", "log", "-1", "--format=%B", sha])
+        if GEN_NOTE in msg:
+            continue
+        _, names = run(["git", "diff", "--name-only", f"{sha}~", sha])
+        for path in names.splitlines():
+            c1, old = run(["git", "show", f"{sha}~:{path}"])
+            c2, new = run(["git", "show", f"{sha}:{path}"])
+            if c1 or c2 or "BEGIN GENERATED" not in new:
+                continue
+            for i in hand_edited(old, new):
+                hits.append(f"{sha[:9]} {path}: block '{i}' changed without '{GEN_NOTE}'")
+    return hits
+
+
 def self_test() -> int:
     ok = run([PY, "-c", "raise SystemExit(3)"])[0] == 3
     rust = "fn a() {}\nfn b() {}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n"
@@ -190,6 +240,31 @@ def self_test() -> int:
     ok = ok and {"ruff-check", "ruff-format"} <= {n for n, _ in selected(["a.py"])}
     ok = ok and [n for n, _ in selected(["crates/a/src/x.css"])].count("css-button") == 1
     ok = ok and "css-button" not in [n for n, _ in selected(["crates/a/src/x.rs"])]
+    blk = "x\n<!-- BEGIN GENERATED: k -->\n{}\n<!-- END GENERATED: k -->\ny\n"
+    ok = ok and hand_edited(blk.format("a"), blk.format("b")) == ["k"]  # red: hand edit
+    ok = ok and not hand_edited(blk.format("a"), blk.format("a").replace("x\n", "z\n"))
+    ok = ok and not hand_edited("p\n", blk.format("b"))
+    ok = ok and gen_blocks(blk.format("a\nb")) == {"k": "a\nb"}
+    with tempfile.TemporaryDirectory() as d:
+        g = ["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t"]
+        f = Path(d, "a.md")
+        subprocess.run([*g, "init", "-q"], check=True)
+        for body, msg in (
+            ("a", "docs: add"),
+            ("b", "docs: edit"),
+            ("c", "docs: regen\n\nmake docs-gen"),
+        ):
+            f.write_text(blk.format(body), encoding="utf-8")
+            subprocess.run([*g, "add", "a.md"], check=True)
+            subprocess.run([*g, "commit", "-qm", msg], check=True)
+        _, shas = run(["git", "-C", d, "rev-list", "--reverse", "HEAD"])
+        global ROOT
+        keep, ROOT = ROOT, Path(d)
+        try:
+            hits = commits_editing_generated(f"{shas.split()[0]}..HEAD")
+        finally:
+            ROOT = keep
+        ok = ok and len(hits) == 1 and "'k'" in hits[0]
     mk = (ROOT / "Makefile").read_text(encoding="utf-8")
     ok = ok and not ungated(mk)
     ok = ok and ungated(mk, [g for g in GATES if g[0] != "docs-install"]) == [
@@ -237,6 +312,11 @@ def main() -> int:
         for h in hits:
             print(h)
         print(f"{'FAIL' if hits else 'PASS'} test-commits-keep-product")
+        fails += bool(hits)
+        hits = commits_editing_generated(a.range)
+        for h in hits:
+            print(h)
+        print(f"{'FAIL' if hits else 'PASS'} generated-blocks-regenerated")
         fails += bool(hits)
         base, _, tip = a.range.partition("..")
         # land-check reads messages over BASE..HEAD, so it speaks for the range only at HEAD.
