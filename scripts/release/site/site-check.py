@@ -15,6 +15,9 @@ links [DIR]: every link of a docs page takes the one shared link color (the `a` 
   footer of a docs page holds the project nav on the left, its Edit link right after the
   GitHub link and the version last, and the legal nav on the right, stacked on a narrow
   screen. Without DIR it reads target/site.
+agents [DIR]: what search and agent fetchers read on the built site (DIR, default target/site):
+  robots.txt disallows none of the search and user-fetch bots and names the sitemap.
+  `domains` runs the same robots check on the live file.
 domains: gitterrace.dev serves the page over HTTPS with the generated headers, and every other
   host (www, gitterrace.com, www.gitterrace.com) redirects to it permanently. A www host that
   resolves to nothing looks like DNS propagation and goes unnoticed for weeks; this measures it.
@@ -25,6 +28,7 @@ steps, and scripting them needs a Zone:Edit token, too large a credential for th
   python3 scripts/release/site/site-check.py release
   python3 scripts/release/site/site-check.py csp [DIR]
   python3 scripts/release/site/site-check.py links [DIR]
+  python3 scripts/release/site/site-check.py agents [DIR]
   python3 scripts/release/site/site-check.py domains
   python3 scripts/release/site/site-check.py --self-test
 """
@@ -293,6 +297,10 @@ def domains() -> list[str]:
     if status != 200:
         bad.append(f"https://{CANONICAL}/ answered {status or 'nothing'}")
     bad += wrong
+    status, _, robots = fetch(f"https://{CANONICAL}/robots.txt", body=True)
+    wrong = robots_problems(robots) if status == 200 else [f"robots.txt answered {status or 'nothing'}"]
+    print(f"  [{'x' if wrong else '+'}] robots.txt is open to search bots and names the sitemap")
+    bad += wrong
     status, _, _ = fetch(f"https://{CANONICAL}/no-such-page")
     print(f"  [{'+' if status == 404 else 'x'}] unknown paths answer 404 ({status or 'no answer'})")
     if status != 404:
@@ -310,6 +318,60 @@ def domains() -> list[str]:
                     f"{scheme}://{host}/ should redirect permanently to https://{CANONICAL}/"
                 )
     return bad
+
+
+# The bots that fetch a page to answer a person (search indexes and user-triggered fetches). A
+# robots.txt that shuts one out makes the site vanish from that answer without any error.
+OPEN_BOTS = ("OAI-SearchBot", "Claude-SearchBot", "Claude-User", "Googlebot")
+
+
+def robots_problems(text: str) -> list[str]:
+    """Each of OPEN_BOTS must be allowed the whole site by the group that applies to it (its own,
+    else `*`), and the file must name the sitemap."""
+    groups: list[tuple[list[str], list[str]]] = []
+    agents: list[str] = []
+    rules: list[str] = []
+    for raw in text.splitlines():
+        line = raw.split("#", 1)[0].strip()
+        key, _, val = line.partition(":")
+        key, val = key.strip().lower(), val.strip()
+        if key == "user-agent":
+            if rules:
+                groups.append((agents, rules))
+                agents, rules = [], []
+            agents.append(val.lower())
+        elif key in ("allow", "disallow") and agents:
+            rules.append(f"{key}:{val}")
+    if agents:
+        groups.append((agents, rules))
+    bad = []
+    for bot in OPEN_BOTS:
+        mine = [r for a, r in groups if bot.lower() in a] or [r for a, r in groups if "*" in a]
+        if any(x in ("disallow:/", "disallow:/*") for r in mine for x in r):
+            bad.append(f"robots.txt disallows {bot}")
+    sitemap = f"https://{CANONICAL}/sitemap.xml"
+    if not re.search(r"^sitemap:\s*" + re.escape(sitemap) + r"\s*$", text, re.I | re.M):
+        bad.append(f"robots.txt has no `Sitemap: {sitemap}` line")
+    return bad
+
+
+def agents(directory: str | None = None) -> list[str]:
+    d = Path(directory) if directory else ROOT / "target" / "site"
+    bad = robots_problems((d / "robots.txt").read_text())
+    print(f"  [{'x' if bad else '+'}] robots.txt in {d} is open to search bots and names the sitemap")
+    return bad
+
+
+def agents_self_test() -> bool:
+    """A planted Disallow for a named bot or for `*`, and a missing Sitemap line, are red."""
+    ok_txt = f"User-agent: *\nAllow: /\nSitemap: https://{CANONICAL}/sitemap.xml\n"
+    return bool(
+        not robots_problems(ok_txt)
+        and robots_problems(ok_txt.replace("Allow: /", "Disallow: /"))
+        and robots_problems(ok_txt + "User-agent: Claude-User\nDisallow: /\n")
+        and not robots_problems(ok_txt + "User-agent: GPTBot\nDisallow: /\n")
+        and robots_problems(ok_txt.split("Sitemap")[0])
+    ) or print("self-test: the robots check misjudged a planted fault") or False
 
 
 def links_self_test() -> bool:
@@ -379,6 +441,7 @@ def self_test() -> int:
             print(f"self-test: {policy!r} on {page!r} should be {'red' if red else 'green'}")
             good = False
     good = links_self_test() and good
+    good = agents_self_test() and good
     print("self-test", "ok" if good else "FAILED")
     return 0 if good else 1
 
@@ -387,7 +450,7 @@ def main() -> int:
     if "--self-test" in sys.argv:
         return self_test()
     cmd = sys.argv[1] if len(sys.argv) > 1 else ""
-    run = {"release": release, "domains": domains, "csp": csp, "links": links}.get(cmd)
+    run = {"release": release, "domains": domains, "csp": csp, "links": links, "agents": agents}.get(cmd)
     if not run:
         print(__doc__)
         return 2
