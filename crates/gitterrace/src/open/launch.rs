@@ -26,7 +26,55 @@ pub(super) fn opener_arg(
     if gitterrace_git::write_atomic(dir, &name, page.as_bytes(), 0o600).is_err() {
         return plain;
     }
-    format!("file://{}", path_query(&dir.join(name).to_string_lossy()))
+    file_url(&dir.join(name).to_string_lossy(), cfg!(windows))
+}
+
+/// `path` as a `file:` URL the opener can load. A drive path `C:\a b` is `file:///C:/a%20b`, a
+/// UNC path `\\host\share\x` is `file://host/share/x`, a Unix path `/a` is `file:///a`. Each
+/// segment is percent-encoded, so `#`, `?` and `%` in a name stay in the path. `windows` is a
+/// parameter so the rules run under test on every OS.
+pub(super) fn file_url(path: &str, windows: bool) -> String {
+    if !windows {
+        return format!("file://{}", path_query(path));
+    }
+    let flat = path.replace('\\', "/");
+    let flat = flat.strip_prefix("//?/").unwrap_or(&flat);
+    if let Some(unc) = flat.strip_prefix("UNC/") {
+        return format!("file://{}", path_query(unc));
+    }
+    if let Some(unc) = flat.strip_prefix("//") {
+        return format!("file://{}", path_query(unc));
+    }
+    // The drive colon stays literal: `C%3A` is not a drive to a browser.
+    match flat.split_once(':') {
+        Some((drive, rest)) if drive.len() == 1 => {
+            format!("file:///{drive}:{}", path_query(rest))
+        }
+        _ => format!("file:///{}", path_query(flat.trim_start_matches('/'))),
+    }
+}
+
+/// The inverse of [`file_url`]: the path a `file:` URL names, for tests and callers that must
+/// read what the opener is given.
+#[cfg(test)]
+pub(super) fn file_path(url: &str, windows: bool) -> Option<String> {
+    let rest = url.strip_prefix("file://")?;
+    let mut raw = Vec::new();
+    let mut bytes = rest.bytes();
+    while let Some(b) = bytes.next() {
+        if b == b'%' {
+            let hex = [bytes.next()?, bytes.next()?];
+            raw.push(u8::from_str_radix(std::str::from_utf8(&hex).ok()?, 16).ok()?);
+        } else {
+            raw.push(b);
+        }
+    }
+    let text = String::from_utf8(raw).ok()?;
+    if !windows {
+        return Some(text);
+    }
+    let back = text.replace('/', "\\");
+    Some(back.strip_prefix('\\').map_or_else(|| format!("\\\\{back}"), str::to_owned))
 }
 
 /// `path` as a query value: every byte outside the unreserved set is escaped, so a `?` or `&`

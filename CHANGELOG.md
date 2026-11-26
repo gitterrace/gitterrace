@@ -7,7 +7,7 @@ All notable changes are listed here. The format follows
 <!-- BEGIN GENERATED: unreleased -->
 <!-- END GENERATED: unreleased -->
 
-## [0.2.2] - 2026-11-25
+## [0.2.2] - 2026-11-26
 
 ### Added
 
@@ -37,6 +37,7 @@ All notable changes are listed here. The format follows
 - mcp: point a truncated review plan at the full changed-file list
 - actions: start every child through one process-wide lock
 - site: drop the phone shot from the landing gallery
+- open: build the launch page URL as a real file URL
 
 ### Performance
 

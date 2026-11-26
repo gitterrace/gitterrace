@@ -400,7 +400,8 @@ fn the_opener_argument_never_holds_the_ticket() {
     let arg =
         crate::open::launch::opener_arg(Some(&state), 7878, Some(link.to_owned()), plain.clone());
     assert!(!arg.contains("TICKET") && !arg.contains("_launch"), "the argument leaks: {arg}");
-    let file = arg.strip_prefix("file://").expect("a file page");
+    let file = crate::open::launch::file_path(&arg, cfg!(windows)).expect("a file page");
+    let file = file.as_str();
     let page = std::fs::read_to_string(file).expect("page");
     assert!(page.contains("TICKET-abc_123"), "the page carries the link: {page}");
     assert!(page.contains("t=TICKET-abc_123&amp;to=/r/x/"), "attribute-escaped: {page}");
@@ -432,4 +433,25 @@ fn the_opener_argument_never_holds_the_ticket() {
         assert_eq!(got, plain, "refused, so the plain page opens");
         assert_eq!(std::fs::read_to_string(&victim).expect("r"), "keep");
     }
+}
+
+/// Guard class: a path handed to the opener becomes a URL that names the same path on every OS.
+/// The old `file://` plus an escaped path turned `C:\x` into `file://C%3A%5Cx`, a host and no
+/// file. A second defect it catches: a `#`, `?` or `%` in a folder name read as a fragment, a
+/// query or an escape, which opens the wrong page.
+#[test]
+fn a_file_url_names_the_same_path_on_every_os() {
+    use crate::open::launch::{file_path, file_url};
+    let unix = "/home/a b/#x?%y/\u{e9}.html";
+    let url = file_url(unix, false);
+    assert_eq!(url, "file:///home/a%20b/%23x%3F%25y/%C3%A9.html");
+    assert_eq!(file_path(&url, false).as_deref(), Some(unix));
+    let drive = "C:\\Users\\a b\\#x\\launch-7878.html";
+    let url = file_url(drive, true);
+    assert_eq!(url, "file:///C:/Users/a%20b/%23x/launch-7878.html");
+    assert_eq!(file_path(&url, true).as_deref(), Some("C:\\Users\\a b\\#x\\launch-7878.html"));
+    assert_eq!(file_url("\\\\?\\C:\\t\\p.html", true), "file:///C:/t/p.html");
+    let unc = file_url("\\\\host\\share\\a b.html", true);
+    assert_eq!(unc, "file://host/share/a%20b.html");
+    assert_eq!(file_path(&unc, true).as_deref(), Some("\\\\host\\share\\a b.html"));
 }

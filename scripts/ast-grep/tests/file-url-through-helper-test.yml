@@ -1,0 +1,6 @@
+id: file-url-through-helper
+valid:
+  - 'fn f() { let u = file_url(&p, true); }'
+  - 'mod tests { fn f() { let u = format!("file://{}", p); } }'
+invalid:
+  - 'fn f() { let u = format!("file://{}", p.display()); }'
