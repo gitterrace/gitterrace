@@ -7,12 +7,16 @@ step then fails on a machine that has a newer python too. Red when a `[run] step
 schwarzwald/config/lint.toml runs such a script with anything but `$PY`. A script that imports
 tomllib only inside a function, for a mode the step does not use, is not counted.
 
+Also red when pyrightconfig.json's pythonVersion is below 3.11 while a script imports tomllib:
+pyright then reports tomllib missing, whichever python3 is first on PATH.
+
   python3 scripts/lint/py-check.py              check the steps
   python3 scripts/lint/py-check.py --self-test  red and green on fixtures
 """
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 import tempfile
@@ -25,7 +29,34 @@ STEP = re.compile(r'^\s*"([^"|]+)\|[^|]*\|[^|]*\|(.*)",?\s*$', re.M)
 SCRIPT = re.compile(r"(\S+)\s+((?:scripts|vendor)/\S+\.py)\b")
 
 
+MIN_PY = (3, 11)
+
+
+def pyright_problems(repo: Path) -> list[str]:
+    cfg = repo / "pyrightconfig.json"
+    if not cfg.is_file():
+        return []
+    want = json.loads(cfg.read_text(encoding="utf-8")).get("pythonVersion", "")
+    try:
+        have = tuple(int(x) for x in want.split("."))
+    except ValueError:
+        return [f"pyrightconfig.json: pythonVersion {want!r} is not a version"]
+    uses = any(
+        TOP_IMPORT.search(p.read_text(encoding="utf-8")) for p in (repo / "scripts").rglob("*.py")
+    )
+    if uses and have < MIN_PY:
+        return [
+            f"pyrightconfig.json: pythonVersion {want} is below 3.11 but scripts import "
+            "tomllib, so pyright fails on it under an older python3"
+        ]
+    return []
+
+
 def problems(repo: Path) -> list[str]:
+    return step_problems(repo) + pyright_problems(repo)
+
+
+def step_problems(repo: Path) -> list[str]:
     text = (repo / "schwarzwald/config/lint.toml").read_text(encoding="utf-8")
     bad = []
     for name, cmd in STEP.findall(text):
@@ -66,6 +97,15 @@ def self_test() -> int:
         if bool(got) != red:
             print(f"py-check self-test: case {i} {'passed' if red else 'failed'}: {got}")
             return 1
+    for ver, red in (("3.9", True), ("3.11", False), ("3.12", False)):
+        with tempfile.TemporaryDirectory() as t:
+            d = Path(t)
+            (d / "scripts").mkdir()
+            (d / "scripts" / "fixture.py").write_text("import tomllib\n")
+            (d / "pyrightconfig.json").write_text(json.dumps({"pythonVersion": ver}))
+            if bool(pyright_problems(d)) != red:
+                print(f"py-check self-test: pythonVersion {ver} should be red={red}")
+                return 1
     print("py-check self-test: ok")
     return 0
 

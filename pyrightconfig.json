@@ -1,6 +1,6 @@
 {
   "include": ["scripts"],
-  "pythonVersion": "3.9",
+  "pythonVersion": "3.11",
   "typeCheckingMode": "standard",
   "reportMissingParameterType": "error",
   "reportMissingTypeArgument": "error",
