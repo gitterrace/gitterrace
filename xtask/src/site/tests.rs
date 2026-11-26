@@ -7,33 +7,17 @@ fn landing() -> String {
     pages.into_iter().find(|p| p.0 == "index.html").map(|p| p.1).expect("landing page")
 }
 
-/// One figure per gallery and hand-off shot, each one picture whose dark source follows the
-/// system, with its own close link: no second copy of the image for the overlay.
+/// The landing page shows the hero thumbnail and one full-size showcase, each one picture whose
+/// dark source follows the system, with a link to the live demo and no overlay.
 #[test]
-fn gallery_has_one_figure_per_shot_and_a_close_link_each() {
+fn landing_shows_one_full_size_screenshot_beside_the_hero() {
     let page = landing();
-    let shown = ["insights", "ownership", "blame", "commit", "send", "agent"];
-    assert_eq!(page.matches("<figure ").count(), shown.len());
-    assert_eq!(page.matches("class=\"x\"").count(), shown.len());
-    for name in shown {
-        assert!(page.contains(&format!("id=\"shot-{name}\"")), "{name}");
-        assert_eq!(page.matches(&format!("screenshots/{name}-light.thumb.webp")).count(), 1);
-        assert_eq!(page.matches(&format!("screenshots/{name}-dark.thumb.webp")).count(), 1);
-    }
-    assert!(!page.contains("class=\"lightbox\""));
-}
-
-/// Every gallery figure spans the full row: all four sit directly in the grid, with no wrapper
-/// that sets two of them side by side, and the stylesheet gives each the whole row.
-#[test]
-fn every_gallery_figure_spans_the_full_row() {
-    let page = landing();
-    let body = page.split("id=\"gallery\">").nth(1).expect("gallery").split("</div>").next();
-    let body = body.expect("gallery body");
-    assert_eq!(body.matches("<figure ").count(), 4);
-    assert!(!body.contains("<div"), "a wrapper narrows the figures");
-    let css = include_str!("../../templates/site.css");
-    assert!(css.contains("#gallery>figure{grid-column:1/-1}"));
+    assert_eq!(page.matches("<figure ").count(), 1);
+    assert_eq!(page.matches("screenshots/insights-light.webp").count(), 1);
+    assert_eq!(page.matches("screenshots/insights-dark.webp").count(), 1);
+    assert_eq!(page.matches("screenshots/overview-light.thumb.webp").count(), 1);
+    assert_eq!(page.matches("<picture").count(), 2);
+    assert!(!page.contains("class=\"x\"") && !page.contains("id=\"shot-"));
 }
 
 /// Every code fence on the landing page carries `s-*` highlight classes. A fence that bypasses

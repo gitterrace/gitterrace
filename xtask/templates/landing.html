@@ -3,7 +3,7 @@ what the insights show, the hand-off, then install and quickstart. Its prose com
 docs/landing.md, each sentence once, the rest from the code. The h1 is text, because the bar
 already draws the wordmark, so the page loads one image: the overview, eager. The install tabs
 are radio inputs and CSS, so they need no script, and with CSS off every command still shows.
-A screenshot opens as a :target overlay on its own figure, also without script. Every image is
+Every image is
 one picture whose dark source follows the system, and the theme button points that source's
 media at its choice. -#}
 <div class="hero">
@@ -21,11 +21,13 @@ height="800" loading="eager" fetchpriority="high" decoding="async"></picture>
 <div class="trust" id="your-code">{{ promises|safe }}</div>
 <section id="features">
 <h2>Find what a diff never shows</h2>
-<div class="shots" id="gallery">
-{%- for s in shots %}
-{% include "landing-figure.html" %}
-{%- endfor %}
-</div>
+<figure class="showcase"><picture><source media="(prefers-color-scheme: dark)"
+srcset="/assets/screenshots/{{ showcase.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ showcase.0 }}-light.webp" alt="{{ showcase.1 }}" width="2560"
+height="1600" loading="lazy" decoding="async"></picture>
+<figcaption><b>{{ showcase.2 }}.</b> {{ showcase.3 }}
+{%- if !demo.is_empty() %} <a href="{{ demo }}">Try the live demo</a>.{% endif %}
+</figcaption></figure>
 <ul class="lines" data-from="docs">
 {%- for l in lines %}
 <li><b><a href="/{{ l.1 }}">{{ l.0 }}</a>.</b> {{ l.2 }}</li>
@@ -34,11 +36,6 @@ height="800" loading="eager" fetchpriority="high" decoding="async"></picture>
 </section>
 <section class="handoff">
 <h2 id="hand-off">Mark lines. Send the finding.</h2>
-<div class="shots" id="sends">
-{%- for s in hand %}
-{% include "landing-figure.html" %}
-{%- endfor %}
-</div>
 <div class="snip">{{ handoff|safe }}</div>
 <ul class="destinations" aria-label="Where a finding goes">
 {%- for d in destinations %}

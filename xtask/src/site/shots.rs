@@ -6,6 +6,7 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 
 use crate::out::Out;
+use crate::site::landing::{HERO, SHOWCASE};
 use crate::site::{SHOTS, at, sizes};
 
 pub(super) const SHOT_DIR: &str = "docs/screenshots";
@@ -46,14 +47,14 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The site's copy of every thumbnail in `SHOTS`, under `assets/screenshots/`: a screenshot
-/// opens as its own thumbnail, so the full-size files stay in the repository for the README.
+/// The site's copy of the files the landing page shows, under `assets/screenshots/`: the hero's
+/// thumbnails and the showcase at full size. The rest stay in the repository for the README.
 /// Run after `check_shots`, so each one is there at its size.
 pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
-    for (n, ..) in SHOTS {
+    for (n, ext) in [(HERO, "thumb.webp"), (SHOWCASE, "webp")] {
         for c in ["light", "dark"] {
-            let f = format!("{n}-{c}.thumb.webp");
+            let f = format!("{n}-{c}.{ext}");
             let path = format!("{SHOT_DIR}/{f}");
             let body =
                 std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;

@@ -1,5 +1,5 @@
 //! The landing page from `templates/landing.html`: the pitch, the why beside the overview,
-//! install, the quickstart, the screenshots with two lines for what they cannot show, and the
+//! install, the quickstart, one large screenshot with two lines for what it cannot show, and the
 //! promises. Its prose lives in `docs/landing.md`, each sentence once, and no landing sentence
 //! repeats on the page or in another doc.
 
@@ -20,7 +20,7 @@ const WHY: &str = "Why";
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
 
-/// The screenshots, in gallery order (the phone shot is kept for the checks, not shown): file stem,
+/// The screenshots (the landing page shows the hero and `SHOWCASE`): file stem,
 /// alt text ("Caption: what it shows"), caption. The site has a WebP pair per entry; the
 /// README shows the first, and `docs/screenshots/` keeps only the PNG files the README links.
 pub const SHOTS: [(&str, &str, &str); 8] = [
@@ -59,10 +59,9 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
     ),
 ];
 
-/// The gallery's stems, in order, and the hand-off's: the rest of `SHOTS` is the hero.
-const GALLERY: [&str; 4] = ["insights", "ownership", "blame", "commit"];
-const HAND: [&str; 2] = ["send", "agent"];
-const HERO: &str = "overview";
+/// The one large screenshot on the landing page, shown full size.
+pub(super) const SHOWCASE: &str = "insights";
+pub(super) const HERO: &str = "overview";
 
 /// The pixel size of a shot's thumbnail and of its full-size file. The phone crop is a 390 px
 /// wide screen at 2x, the rest a 1280x800 window at 2x.
@@ -92,10 +91,6 @@ const DESTINATIONS: [(&str, &str); 6] = [
     ("API and MCP", "docs/api/"),
 ];
 
-/// A gallery tile: stem, alt, caption, description, thumbnail width and height, and the
-/// anchor its close link returns to.
-type Shot<'a> = (&'a str, &'a str, &'a str, &'a str, u32, u32, &'a str);
-
 #[derive(Template)]
 #[template(path = "landing.html")]
 struct Landing<'a> {
@@ -104,8 +99,7 @@ struct Landing<'a> {
     bin: &'a str,
     requires: Vec<String>,
     quickstart: String,
-    shots: Vec<Shot<'a>>,
-    hand: Vec<Shot<'a>>,
+    showcase: (&'a str, &'a str, &'a str, &'a str),
     hero: (&'a str, &'a str),
     hero_cmds: String,
     handoff: String,
@@ -143,18 +137,12 @@ pub(crate) fn body(
         let path = crate::site::docs::page_path(crate::site::docs::stem(doc));
         rows.push((title, format!("{path}#{}", crate::site::docs::slug(head)), plain(para)));
     }
-    let tile = |stem: &str, back: &'static str| -> anyhow::Result<Shot<'static>> {
-        let (file, alt, cap) = SHOTS
-            .iter()
-            .find(|s| s.0 == stem)
-            .copied()
-            .ok_or_else(|| anyhow::anyhow!("no shot {stem}"))?;
-        let what = alt.split_once(": ").map_or(alt, |(_, rest)| rest);
-        let (w, h) = sizes(file).0;
-        Ok((file, alt, cap, what, w, h, back))
-    };
-    let shots = GALLERY.iter().map(|s| tile(s, "gallery")).collect::<anyhow::Result<Vec<_>>>()?;
-    let hand = HAND.iter().map(|s| tile(s, "sends")).collect::<anyhow::Result<Vec<_>>>()?;
+    let (file, alt, cap) = SHOTS
+        .iter()
+        .find(|s| s.0 == SHOWCASE)
+        .copied()
+        .ok_or_else(|| anyhow::anyhow!("no shot {SHOWCASE}"))?;
+    let what = alt.split_once(": ").map_or(alt, |(_, rest)| rest);
     let handoff = section(&copy, "Hand-off")
         .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## Hand-off' section"))?;
     let install = readme_agents_md::install_lines(ws);
@@ -167,14 +155,13 @@ pub(crate) fn body(
         bin: pkg.bins.first().map_or("", String::as_str),
         requires: requirements(ws),
         quickstart: code_block(&readme_agents_md::quickstart(), "bash"),
-        shots,
+        showcase: (file, alt, cap, what),
         hero: (HERO, HERO_ALT),
         hero_cmds: code_block(
             &format!("{}\ngit terrace\n", install.first().map_or("", |(_, l)| l.as_str())),
             "bash",
         ),
         handoff: md(handoff, links)?,
-        hand,
         demo: &ws.demo,
         repo: &pkg.repository,
         lines: rows,
