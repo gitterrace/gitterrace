@@ -19,8 +19,10 @@ from __future__ import annotations
 import argparse
 import importlib
 import os
+import shutil
 import statistics
 import sys
+import tempfile
 import time
 from pathlib import Path
 
@@ -85,8 +87,15 @@ def verdict(repo: str, samples: dict[str, list[float]]) -> list[tuple[str, float
 
 
 def measure(binary: str, repo: Path, names: list[str], runs: int, max_load: float):
-    logdir = Path(os.environ.get("TMPDIR", "/tmp")) / "gitterrace-speed-check"
-    logdir.mkdir(parents=True, exist_ok=True)
+    # A private directory: a fixed shared name is guessable and guessable.
+    logdir = Path(tempfile.mkdtemp(prefix="gitterrace-speed-check-"))
+    try:
+        return sample(binary, repo, names, runs, max_load, logdir)
+    finally:
+        shutil.rmtree(logdir, ignore_errors=True)
+
+
+def sample(binary: str, repo: Path, names: list[str], runs: int, max_load: float, logdir: Path):
     samples: dict[str, list[float]] = {n: [] for n in names}
     for run in range(runs):
         for name in names:
@@ -119,6 +128,9 @@ def self_test() -> int:
     for repo, gates in GATES.items():
         assert set(gates) <= set(PAGES), (repo, set(gates) - set(PAGES))
     assert set(GATES["rust"]) == set(PAGES), set(PAGES) - set(GATES["rust"])
+    # No shared, guessable temp path: logs go to a mkdtemp directory.
+    src = Path(__file__).read_text(encoding="utf-8")
+    assert "mkdtemp(" in src and "/" + "tmp" not in src, "use a private temp dir"
     print("speed-check self-test ok")
     return 0
 

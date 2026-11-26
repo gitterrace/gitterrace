@@ -66,6 +66,5 @@
  "javascript:S9383|crates/gitterrace-web/static/live.js|557c1489259b5786bcd42b6390c10ca303f33e41",
  "javascript:S9383|crates/gitterrace-web/static/live.js|6fd0431741c03b7605f7265cc55e018764a91f4b",
  "javascript:S9383|crates/gitterrace-web/static/live.js|82c7d8781ad0db162b36e0e8ca69205299ecc782",
- "javascript:S9383|scripts/verify/browser/reap-check.mjs|4dcc1688a89b49c5d0b770be6af484320672d972",
- "python:S5443|scripts/bench/speed-check.py|877b6174a49f943c98d0773589b0cf7be122a468"
+ "javascript:S9383|scripts/verify/browser/reap-check.mjs|4dcc1688a89b49c5d0b770be6af484320672d972"
 ]
