@@ -189,3 +189,96 @@ fn a_compare_plan_needs_a_base_and_scores_the_branch() {
     assert!(plan.head.is_some());
     assert!(plan.files[0].permalink.is_some());
 }
+
+/// A plan since a checkpoint is against the commit the checkpoint was taken at, not the HEAD
+/// of now, and an ordinary plan carries no checkpoint state.
+#[test]
+fn a_since_plan_is_based_on_the_checkpoint_head() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    let first = git(d.path(), &["rev-parse", "HEAD"]).trim().to_owned();
+    std::fs::write(d.path().join("src/b.rs"), "fn b() {}\nfn x() {}\n").expect("w");
+    let (id, _) = s.checkpoint_create("", false).expect("checkpoint");
+    std::fs::write(d.path().join("src/a.rs"), "fn a() { 1 }\n").expect("w");
+    git(d.path(), &["commit", "-qam", "chore: move head"]);
+    let moved = git(d.path(), &["rev-parse", "HEAD"]).trim().to_owned();
+    assert_ne!(first, moved);
+    let req = PlanRequest { since: Some(&id), ..PlanRequest::default() };
+    let plan = s.review_plan(&req, &Params::default()).expect("plan");
+    assert_eq!(plan.base, first, "the checkpoint's commit, not the current HEAD");
+    assert_eq!(plan.since.as_deref(), Some(id.as_str()));
+    assert!(!plan.baseline_missing);
+    assert_eq!(plan.content_gone, Vec::<String>::new());
+    let unpinned = s.review_plan(&PlanRequest::default(), &Params::default()).expect("plain");
+    assert_eq!(unpinned.base, moved);
+    assert!(
+        !unpinned.baseline_missing && unpinned.content_gone.is_empty() && unpinned.since.is_none()
+    );
+}
+
+/// A checkpoint over `files`, taken at `head`, written straight to the store so a test can
+/// name a commit the repository does not hold and a copy the store dropped.
+fn stored(s: &ApiState, files: Vec<gitterrace_git::SnapFile>, head: &str) -> String {
+    let snap = gitterrace_git::Snapshot { files, files_omitted: false };
+    s.index.checkpoint_add(&snap, head, false, "", 1 << 20, 1).expect("add").0
+}
+
+/// The plan of `s` since `id`.
+fn since_plan(s: &ApiState, id: &str) -> gitterrace_types::api::ReviewPlan {
+    let req = PlanRequest { since: Some(id), ..PlanRequest::default() };
+    s.review_plan(&req, &Params::default()).expect("plan")
+}
+
+#[test]
+fn a_since_plan_after_a_head_move_is_based_on_the_checkpoint_head_() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    let first = git(d.path(), &["rev-parse", "HEAD"]).trim().to_owned();
+    let id = stored(&s, Vec::new(), &first);
+    std::fs::write(d.path().join("src/a.rs"), "fn a() { 1 }\n").expect("w");
+    git(d.path(), &["commit", "-qam", "chore: move head"]);
+    let typed = since_plan(&s, &id);
+    assert_eq!(typed.base, first);
+    assert!(!typed.baseline_missing && typed.content_gone.is_empty());
+}
+
+#[test]
+fn a_since_plan_with_a_missing_baseline_is_flagged_and_falls_back_to_head() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    let head = git(d.path(), &["rev-parse", "HEAD"]).trim().to_owned();
+    let id = stored(&s, Vec::new(), &"ab".repeat(20));
+    let typed = since_plan(&s, &id);
+    assert!(typed.baseline_missing);
+    assert_eq!(typed.base, head);
+}
+
+#[test]
+fn a_since_plan_names_a_file_whose_checkpoint_copy_is_gone() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    let head = git(d.path(), &["rev-parse", "HEAD"]).trim().to_owned();
+    std::fs::write(d.path().join("src/b.rs"), "fn b() { 9 }\n").expect("w");
+    let gone = gitterrace_git::SnapFile {
+        path: "src/b.rs".to_owned(),
+        hash: gitterrace_git::content_id(b"fn b() { 8 }\n"),
+        text: None,
+    };
+    let id = stored(&s, vec![gone], &head);
+    let typed = since_plan(&s, &id);
+    assert_eq!(typed.content_gone, ["src/b.rs"]);
+}
+
+/// An ordinary plan keeps its shape: the checkpoint fields are false and empty, and the bytes
+/// are those of a second read.
+#[test]
+fn an_ordinary_plan_has_no_checkpoint_state_and_is_byte_stable() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    std::fs::write(d.path().join("src/b.rs"), "fn b() {}\nfn z() {}\n").expect("w");
+    let a = s.review_plan(&PlanRequest::default(), &Params::default()).expect("a");
+    let b = s.review_plan(&PlanRequest::default(), &Params::default()).expect("b");
+    assert_eq!(serde_json::to_string(&a).expect("a"), serde_json::to_string(&b).expect("b"));
+    assert!(a.since.is_none() && !a.baseline_missing && a.content_gone.is_empty());
+    assert_eq!(a.base, git(d.path(), &["rev-parse", "HEAD"]).trim());
+}

@@ -79,6 +79,8 @@ struct Source {
     rev: String,
     list: Vec<FileDiff>,
     since: Option<String>,
+    baseline_missing: bool,
+    content_gone: Vec<String>,
     files_omitted: bool,
 }
 
@@ -96,8 +98,17 @@ impl ApiState {
         let settings = self.settings();
         let most = settings.review.plan_files;
         let limit = params.limit.map_or(most, |l| l.clamp(1, most));
-        let Source { kind: source, base, head, rev, list, since, files_omitted } =
-            self.plan_source(req)?;
+        let Source {
+            kind: source,
+            base,
+            head,
+            rev,
+            list,
+            since,
+            baseline_missing,
+            content_gone,
+            files_omitted,
+        } = self.plan_source(req)?;
         let tip = self.repo.resolve(&rev)?;
         let heads = self.head_lines(&tip);
         let tree: BTreeSet<&str> = heads
@@ -162,6 +173,8 @@ impl ApiState {
         files.truncate(limit);
         Ok(ReviewPlan {
             base,
+            baseline_missing,
+            content_gone,
             files,
             files_omitted,
             head,
@@ -181,13 +194,27 @@ impl ApiState {
                     return Err(ApiError::Forbidden("the working tree"));
                 }
                 let w = self.worktree_list(req.scope, req.since)?;
+                let mut base = self.repo.resolve("HEAD")?;
+                let mut baseline_missing = false;
+                let mut content_gone = Vec::new();
+                if let Some((_, cp_head, d)) = &w.since {
+                    baseline_missing = d.baseline_missing;
+                    content_gone.clone_from(&d.gone);
+                    // The comparison is against the checkpoint's commit; with it missing, the
+                    // base stays the current HEAD, which `base` already is.
+                    if !baseline_missing {
+                        base = self.repo.resolve(cp_head).unwrap_or(base);
+                    }
+                }
                 Ok(Source {
                     kind: PlanSource::Worktree,
-                    base: self.repo.resolve("HEAD")?,
+                    base,
                     head: None,
                     rev: "HEAD".to_owned(),
                     list: w.files,
                     since: w.since.map(|s| s.0),
+                    baseline_missing,
+                    content_gone,
                     files_omitted: w.files_omitted,
                 })
             }
@@ -210,6 +237,8 @@ impl ApiState {
                     rev: tip,
                     list,
                     since: None,
+                    baseline_missing: false,
+                    content_gone: Vec::new(),
                     files_omitted: false,
                 })
             }

@@ -109,8 +109,16 @@ pub struct PlanSkipped {
 /// `GET /review_plan`.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ReviewPlan {
-    /// The commit the changes are against.
+    /// The commit the changes are against. With `since`, the commit the checkpoint was taken
+    /// at, or the current HEAD when `baseline_missing`.
     pub base: String,
+    /// With `since`: the checkpoint's commit is not in this repository, so files it did not
+    /// list were compared with the current HEAD and the plan may miss changes in between.
+    /// False otherwise.
+    pub baseline_missing: bool,
+    /// With `since`: files whose checkpoint copy was dropped (binary, too large), listed
+    /// against HEAD instead. Empty otherwise.
+    pub content_gone: Vec<String>,
     /// Scored files, riskiest first.
     pub files: Vec<PlanFile>,
     /// Working tree only: the scan stopped at `limits.worktree_files`, so the plan may not

@@ -8,8 +8,8 @@ use crate::core::{ApiState, under};
 use crate::error::ApiError;
 use crate::wire;
 
-/// A checkpoint id and what differs from it.
-pub(super) type SinceRead = (String, gitterrace_git::SinceDiff);
+/// A checkpoint id, the commit it was taken at, and what differs from it.
+pub(super) type SinceRead = (String, String, gitterrace_git::SinceDiff);
 
 /// The files of the working tree, whether the list may be cut, and the checkpoint compared.
 pub(super) struct WorktreeList {
@@ -90,10 +90,10 @@ impl ApiState {
             self.worktree_list(scope, since)?;
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
-        let baseline_missing = since_part.as_ref().is_some_and(|(_, d)| d.baseline_missing);
-        let history_unreadable = since_part.as_ref().is_some_and(|(_, d)| d.history_unreadable);
+        let baseline_missing = since_part.as_ref().is_some_and(|(_, _, d)| d.baseline_missing);
+        let history_unreadable = since_part.as_ref().is_some_and(|(_, _, d)| d.history_unreadable);
         let (since, unchanged_files, content_gone) = since_part
-            .map_or((None, None, Vec::new()), |(id, d)| {
+            .map_or((None, None, Vec::new()), |(id, _, d)| {
                 (Some(id), Some(d.unchanged as u64), d.gone)
             });
         Ok(WorktreeResponse {
@@ -152,7 +152,7 @@ impl ApiState {
                     &cp.head,
                     cp.files_omitted,
                 )?;
-                (d.files.clone(), d.files_omitted, Some((id.to_owned(), d)))
+                (d.files.clone(), d.files_omitted, Some((id.to_owned(), cp.head, d)))
             }
         };
         Ok(WorktreeList { files: list, files_omitted, since: since_part })

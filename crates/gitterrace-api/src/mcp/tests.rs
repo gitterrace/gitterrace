@@ -444,3 +444,57 @@ fn the_review_prompt_names_only_tools_arguments_fields_and_settings_that_exist()
         }
     }
 }
+
+/// The MCP `review_plan` carries what the typed plan does since a checkpoint: the checkpoint's
+/// commit as `base`, `baseline_missing` and `content_gone`, and an ordinary call carries none.
+#[tokio::test]
+async fn review_plan_since_a_checkpoint_reports_base_missing_baseline_and_gone_copies() {
+    use rmcp::handler::server::wrapper::Parameters;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    let _ = Fixture::init(p)
+        .write("src/a.rs", "fn a() {}\n")
+        .write("src/b.rs", "fn b() {}\n")
+        .commit("feat: first");
+    let first = git(p, &["rev-parse", "HEAD"]).trim().to_owned();
+    let state = ApiState::open(p).expect("open");
+    state.refresh_index().expect("index");
+    let s = McpServer::new(state.clone());
+    let add = |files: Vec<gitterrace_git::SnapFile>, head: &str| {
+        let snap = gitterrace_git::Snapshot { files, files_omitted: false };
+        state.index.checkpoint_add(&snap, head, false, "", 1 << 20, 1).expect("add").0
+    };
+    let plan = |args: serde_json::Value| {
+        let a = Parameters(serde_json::from_value(args).expect("args"));
+        s.review_plan(a)
+    };
+
+    let ordinary = call(plan(serde_json::json!({})).await);
+    assert_eq!(ordinary["baseline_missing"], false);
+    assert_eq!(ordinary["content_gone"], serde_json::json!([]));
+    assert_eq!(ordinary["since"], serde_json::Value::Null);
+
+    let id = add(Vec::new(), &first);
+    std::fs::write(p.join("src/a.rs"), "fn a() { 1 }\n").expect("w");
+    git(p, &["commit", "-qam", "chore: move head"]);
+    let moved = call(plan(serde_json::json!({ "since": id })).await);
+    assert_eq!(moved["base"], first.as_str());
+    assert_eq!(moved["baseline_missing"], false);
+
+    let head = git(p, &["rev-parse", "HEAD"]).trim().to_owned();
+    let lost = add(Vec::new(), &"ab".repeat(20));
+    let missing = call(plan(serde_json::json!({ "since": lost })).await);
+    assert_eq!(missing["baseline_missing"], true);
+    assert_eq!(missing["base"], head.as_str());
+
+    std::fs::write(p.join("src/b.rs"), "fn b() { 9 }\n").expect("w");
+    let copy = gitterrace_git::SnapFile {
+        path: "src/b.rs".to_owned(),
+        hash: gitterrace_git::content_id(b"fn b() { 8 }\n"),
+        text: None,
+    };
+    let gone_id = add(vec![copy], &head);
+    let gone = call(plan(serde_json::json!({ "since": gone_id })).await);
+    assert_eq!(gone["content_gone"], serde_json::json!(["src/b.rs"]));
+}
