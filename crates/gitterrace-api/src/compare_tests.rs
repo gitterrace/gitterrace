@@ -235,7 +235,7 @@ fn findings_round_trip_with_anchors_computed_on_read() {
     let first = new_finding(Some("a.txt"), Some((1, 1)), "look \u{1b}here");
     let id = s.finding_add(&first).expect("add");
     assert!(id.starts_with("f-"));
-    let long = "x".repeat(5000);
+    let long = "x".repeat(2000);
     let big = s.finding_add(&new_finding(Some("a.txt"), None, &long)).expect("add");
     let r = s.findings().expect("list");
     assert_eq!((r.count, r.persisted, r.cap_entries), (2, true, 500));
@@ -252,6 +252,22 @@ fn findings_round_trip_with_anchors_computed_on_read() {
     assert_eq!(s.findings_remove(&[id]).expect("remove"), 1);
     assert_eq!(s.findings_remove(&[]).expect("clear"), 1);
     assert_eq!(s.findings().expect("list").count, 0);
+}
+
+/// A note over the byte limit is refused with the limit named, never stored cut: 1500 two-byte
+/// characters fit a 2000 UTF-16 unit box but not 2000 bytes. A note at the limit is stored whole.
+#[test]
+fn a_note_over_the_byte_limit_is_refused_and_one_at_it_is_stored_whole() {
+    let (_d, s) = fixture();
+    let over = "\u{e9}".repeat(1500);
+    match s.finding_add(&new_finding(Some("a.txt"), None, &over)) {
+        Err(crate::ApiError::BadRequest(m)) => assert!(m.contains("2000"), "{m}"),
+        other => panic!("expected a refusal, got {other:?}"),
+    }
+    assert_eq!(s.findings().expect("list").count, 0);
+    let at = "\u{e9}".repeat(1000);
+    s.finding_add(&new_finding(Some("a.txt"), None, &at)).expect("add");
+    assert_eq!(s.findings().expect("list").findings[0].note, at);
 }
 
 #[test]

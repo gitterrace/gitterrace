@@ -1,7 +1,8 @@
 //! The review basket. The reads are served on both transports. The writes are the web's alone:
 //! this module offers them as plain methods and the API router and the MCP server never call
 //! them. The text of a note is whatever the user typed in the page and is stored as plain text,
-//! cut at [`gitterrace_index::MAX_NOTE`]: it is escaped wherever it is shown.
+//! limited to [`gitterrace_index::MAX_NOTE`] bytes, a longer one is refused: it is escaped
+//! wherever it is shown.
 
 use gitterrace_actions::{kind_name, schema::KINDS};
 use gitterrace_git::{Anchor, AnchorQuery};
@@ -99,8 +100,8 @@ impl ApiState {
     }
 
     /// Adds `new` to the basket and returns its id. Web only: the API and MCP never call it.
-    /// The revision and the file are checked against the repository, the note is cut and
-    /// stripped of control characters.
+    /// The revision and the file are checked against the repository, a note over
+    /// the byte limit is refused, never cut, and control characters are stripped.
     pub fn finding_add(&self, new: &NewFinding) -> Result<String, ApiError> {
         self.only_here("findings")?;
         if !self.basket_persists() {
@@ -126,6 +127,14 @@ impl ApiState {
             Some(l) => Some((l.start, l.end)),
             None => None,
         };
+        let cleaned = gitterrace_index::clean_note(&new.note);
+        if cleaned.len() > gitterrace_index::MAX_NOTE {
+            return Err(ApiError::BadRequest(format!(
+                "the note is {} bytes (UTF-8): the limit is {} bytes, shorten it",
+                cleaned.len(),
+                gitterrace_index::MAX_NOTE
+            )));
+        }
         let query = new.query.as_deref().map(|q| q.chars().take(1024).collect::<String>());
         let rev: String = new.rev.chars().filter(|c| !c.is_control()).take(256).collect();
         let f = StoredFinding {

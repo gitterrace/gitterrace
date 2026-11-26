@@ -29,7 +29,8 @@ const OP_ADD: u8 = 1;
 /// A payload bigger than this is no frame of ours. Not configurable: a bound on a file the
 /// repository may have planted.
 const MAX_FRAME: usize = 256 << 10;
-/// Longest note kept, in bytes. The note is cut, not refused. Not configurable: part of the
+/// Longest note kept, in UTF-8 bytes. The web write refuses a longer note and names this limit.
+/// Not configurable: part of the
 /// finding shape the API documents.
 pub const MAX_NOTE: usize = 2000;
 
@@ -69,15 +70,21 @@ impl StoredFinding {
     }
 }
 
-/// `note` cut to [`MAX_NOTE`] bytes on a character boundary, control characters other than a
-/// line break or tab dropped. The text is plain: nothing here is markup.
+/// `note` without control characters other than a line break or tab. The text is plain:
+/// nothing here is markup.
+#[must_use]
+pub fn clean_note(note: &str) -> String {
+    note.chars().filter(|c| !c.is_control() || *c == '\n' || *c == '\t').collect()
+}
+
+/// `note` cleaned by [`clean_note`] and cut to [`MAX_NOTE`] bytes on a character boundary.
+///
+/// The web write refuses a note that is over the limit once cleaned, so this cut only guards the
+/// store against any other caller: a user is never told "added" for a cut note.
 #[must_use]
 pub fn cut_note(note: &str) -> String {
     let mut out = String::new();
-    for c in note.chars() {
-        if c.is_control() && c != '\n' && c != '\t' {
-            continue;
-        }
+    for c in clean_note(note).chars() {
         if out.len() + c.len_utf8() > MAX_NOTE {
             break;
         }

@@ -2,7 +2,7 @@
 
 use std::io;
 
-use super::{FILE, FIXED, MAGIC, MAX_NOTE, OP_ADD, StoredFinding, cut_note, scan};
+use super::{FILE, FIXED, MAGIC, MAX_NOTE, OP_ADD, StoredFinding, clean_note, cut_note, scan};
 use crate::Index;
 
 fn open() -> io::Result<(tempfile::TempDir, Index)> {
@@ -197,4 +197,21 @@ fn garbage_between_frames_is_skipped_to_the_next_whole_frame() {
     let bytes = [a, b"junk-junk-junk-junk".to_vec(), b].concat();
     let found = scan(&bytes).expect("scan");
     assert_eq!((found.items.len(), found.damaged, found.valid), (2, 1, bytes.len()));
+}
+
+/// Class guard: the stored note is the cleaned input or a char-boundary prefix of it, at and
+/// across the limit, for one-, two-, three- and four-byte characters. It would also catch a cut
+/// that splits a character or a limit counted in anything but bytes.
+#[test]
+fn a_note_at_and_across_the_byte_limit_is_stored_whole_or_cut_on_a_boundary() {
+    for unit in ["a", "\u{e9}", "\u{20ac}", "\u{1f600}"] {
+        let fit = MAX_NOTE / unit.len();
+        let whole = unit.repeat(fit);
+        assert_eq!(cut_note(&whole), whole, "{unit:?} at the limit");
+        let over = unit.repeat(fit + 1);
+        let cut = cut_note(&over);
+        assert!(cut.len() <= MAX_NOTE && over.starts_with(&cut), "{unit:?} across it");
+        assert_eq!(clean_note(&over).len(), over.len(), "the refusal sees the true size");
+    }
+    assert_eq!(clean_note("a\u{1b}b\n"), "ab\n");
 }
