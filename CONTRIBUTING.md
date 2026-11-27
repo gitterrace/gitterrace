@@ -110,7 +110,13 @@ a plain `git commit`, so commit in a clone and land from it.
 
 The local gate is the one that counts. Hosted CI runs the Linux `make check`,
 cargo deny, the MSRV check and, when a Docker path changed, the image. macOS
-and Windows run weekly, on demand and for every tag.
+and Windows run weekly, on demand and for every tag. The macOS gate is two
+parallel jobs (static analysis and docs, then tests and lint), so each stays
+well inside its timeout. `scripts/verify/ci-budget-check.py` is a step of
+`make release-gate` (its self-test is in `make lint`), skipped with a note
+without `gh`. It fails when a job's median over
+recent successful main runs passes 75% of its `timeout-minutes`: split the
+job, never raise the timeout.
 
 - `make check` always
 - `make browser-check BIN=target/debug/git-terrace` if you changed templates,

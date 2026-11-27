@@ -10,7 +10,8 @@ gated or skipped on purpose. Also red: a skip entry for a step `make check` no l
 empty reason, and a step both gated and skipped.
 
 `make check-built` is the rest of `check`, in order, so check-static plus check-built run every
-step once: the macOS runner runs only check-built, as the static steps do not depend on the OS.
+step once: the macOS runners run only check-built (two jobs), as the static steps do not
+depend on the OS.
 
 `make check-static` is the `check` steps whose recipe builds nothing, in the same order, so one
 target runs every gate step that needs no build. A step whose recipe calls cargo (other
@@ -97,7 +98,11 @@ def static_problems(makefile: str, steps: list[str]) -> list[str]:
 def built_problems(makefile: str, steps: list[str]) -> list[str]:
     static = prerequisites(makefile, "check-static")
     want = [s for s in steps if s not in static]
-    got = prerequisites(makefile, "check-built")
+    got = [
+        t
+        for p in prerequisites(makefile, "check-built")
+        for t in (prerequisites(makefile, p) if p.startswith("built-") else [p])
+    ]
     if got == want:
         return []
     return [
@@ -138,6 +143,7 @@ def landing_problems(repo: Path) -> list[str]:
 # Full-tier job -> (release-check job, the OS its matrix must hold).
 COVERS = {
     "check-macos": ("check", "macos-latest"),
+    "check-macos-test": ("check", "macos-latest"),
     "windows": ("check", "windows-latest"),
     # The memory budget runs on the full tier only: the release check runs it on Linux.
     "memory": ("memory", "ubuntu-latest"),
@@ -164,6 +170,35 @@ def jobs(text: str) -> dict[str, str]:
         elif cur:
             out[cur] += line + "\n"
     return out
+
+
+MAKE_RUN = re.compile(r"\bmake\s+(?:-k\s+)?((?:[a-z][a-z0-9-]*\s*)+)")
+
+
+def mac_problems(makefile: str, tiers: dict[str, str]) -> list[str]:
+    """The macOS jobs together run every check-built step and lint, so a step added to
+    check-built reaches macOS through the Makefile, not a list copied into the workflow."""
+    ran: set[str] = set()
+    for j, body in tiers.items():
+        if j.startswith("check-macos"):
+            for m in MAKE_RUN.finditer(body):
+                for t in m.group(1).split():
+                    ran |= (
+                        set(prerequisites(makefile, t) or [t])
+                        if (t.startswith("built-") or t == "check-built")
+                        else {t}
+                    )
+    want = {
+        t
+        for p in prerequisites(makefile, "check-built")
+        for t in (prerequisites(makefile, p) if p.startswith("built-") else [p])
+    } | {"lint"}
+    if ran == want:
+        return []
+    return [
+        f"lint-and-test.yml: the check-macos jobs run {sorted(ran)}, check-built plus lint is "
+        f"{sorted(want)}. Run check-built through built-gates, built-test and doc"
+    ]
 
 
 def tier_problems(repo: Path) -> list[str]:
@@ -216,6 +251,8 @@ def tier_problems(repo: Path) -> list[str]:
                 f"add fetch-depth: 0 to its checkout"
             )
     bad += gate_problems(tiers, release)
+    if (repo / "Makefile").exists():
+        bad += mac_problems((repo / "Makefile").read_text(), tiers)
     bad += cliff_problems(repo)
     bad += action_shell_problems(repo)
     return bad
@@ -344,7 +381,10 @@ LINUX = (
     "  check-linux:\n    runs-on: ubuntu-latest\n    steps:\n"
     "      - run: make -k check CROSS=x MEMORY=0\n"
 )
-MAC = "  check-macos:\n    if: inputs.full\n    runs-on: macos-latest\n"
+MAC = (
+    "  check-macos:\n    if: inputs.full\n    runs-on: macos-latest\n"
+    "  check-macos-test:\n    if: inputs.full\n    runs-on: macos-latest\n"
+)
 WIN = (
     "  windows:\n    if: inputs.full\n    runs-on: windows-latest\n"
     "  memory:\n    if: inputs.full\n    runs-on: ubuntu-latest\n"
@@ -498,6 +538,18 @@ def self_test() -> int:
         (CALL, FAST + MAC + WIN, REL, False, TOOLS.format(v="2.14.2")),
     ]
     results: list[tuple[list[str], bool]] = []
+    mk = "check-built: built-gates built-test doc\nbuilt-gates: theme\nbuilt-test: test\n"
+    job = "  check-macos:\n    steps:\n      - run: make -k {a} X=1\n"
+    job += "  check-macos-test:\n    steps:\n      - run: make -k {b}\n"
+    for a, b, red in (
+        ("built-gates doc", "built-test lint", False),
+        ("built-gates doc", "lint", True),
+        ("theme test doc", "lint", False),
+        ("built-gates", "built-test lint", True),
+        ("built-gates doc", "built-test", True),
+    ):
+        got = mac_problems(mk, jobs("jobs:\n" + job.format(a=a, b=b)))
+        results.append((got, red))
     for c in landing_cases:
         with tempfile.TemporaryDirectory() as t:
             got = landing_problems(landing_fixture(Path(t), *c.fixture))

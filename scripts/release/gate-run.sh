@@ -32,6 +32,7 @@ python3 scripts/lint/changelog-check.py
 python3 vendor/schwarzwald/kit/lint/changelog.py --repo .
 make -k check CROSS=x86_64-pc-windows-gnu
 bash scripts/dev/macos-run.sh
+python3 scripts/verify/ci-budget-check.py
 @ci
 EOF2
   [ "${ACT:-0}" = 1 ] && act_steps

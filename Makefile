@@ -42,8 +42,9 @@ preview:
 	@bash scripts/dev/preview-run.sh
 
 ##@ Check gates
-.PHONY: check check-static check-built fmt clippy clippy-features clippy-cross lint harness-links \
-	test doc theme actions send-vectors names lines docs-check gc-guard bench-guard deny
+.PHONY: check check-static check-built built-gates built-test fmt clippy clippy-features \
+	clippy-cross lint harness-links test doc theme actions send-vectors names lines docs-check \
+	gc-guard bench-guard deny
 
 ## check: Every gate, in the order CI runs them
 check: gc-guard theme actions send-vectors names lines bench-guard docs-check \
@@ -53,7 +54,13 @@ check: gc-guard theme actions send-vectors names lines bench-guard docs-check \
 check-static: gc-guard actions send-vectors names lines fmt lint
 
 ## check-built: The check steps check-static leaves out, in order, for a runner that skips them
-check-built: theme bench-guard docs-check clippy clippy-features clippy-cross deny test doc
+check-built: built-gates built-test doc
+
+## built-gates: The check-built steps before the tests, so a CI runner can run them apart
+built-gates: theme bench-guard docs-check clippy clippy-features clippy-cross deny
+
+## built-test: The tests, the middle of check-built, so a CI runner can run them apart
+built-test: test
 
 # fmt: Check formatting
 fmt:
@@ -85,6 +92,7 @@ clippy-cross:
 ## lint: External linters (typos, vale, shellcheck, ruff, pyright, ast-grep, ...)
 lint: harness-links
 	bash vendor/schwarzwald/kit/lint/run.sh
+	python3 scripts/verify/ci-budget-check.py --self-test
 
 ## deny: cargo deny, as CI's job runs it: a new advisory against a locked crate is red here
 ## first, not on a tag. Skipped with a note where cargo-deny is not installed.

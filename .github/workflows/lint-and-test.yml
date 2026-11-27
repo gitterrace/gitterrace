@@ -159,7 +159,10 @@ jobs:
           cache: cargo-memory
       - run: make test-memory
 
-  # Full tier from here on.
+  # Full tier from here on. The macOS gate is two parallel jobs, as one job took 34 to 47 minutes
+  # against a 60 minute limit: this one runs the make targets built-gates and doc,
+  # check-macos-test the tests and lint.
+  # scripts/lint/gate-check.py fails when together they stop covering check-built and lint.
   check-macos:
     if: inputs.full
     name: Check (macos-latest)
@@ -178,9 +181,27 @@ jobs:
       - uses: ./.github/actions/lint-tools
       # The Ubuntu job cross-checks Windows; this runner has neither that target nor Docker.
       # The static steps (theme, names, fmt) read files and do not depend on the OS: the Ubuntu
-      # job runs them. lint runs here too, as its shell and Python tools can differ by OS.
-      # check-built is the rest of `make check`, so every step still runs.
-      - run: make -k check-built lint CROSS=none MEMORY=0
+      # job runs them.
+      - run: make -k built-gates doc CROSS=none MEMORY=0
+
+  check-macos-test:
+    if: inputs.full
+    name: Check tests and lint (macos-latest)
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+      - uses: ./.github/actions/rust
+        with:
+          components: clippy, rustfmt
+          cache: cargo-test
+      - uses: ./.github/actions/lint-tools
+      # lint runs on macOS too, as its shell and Python tools can differ by OS.
+      - run: make -k built-test lint CROSS=none MEMORY=0
 
   # The Windows binary builds, its tests pass and it serves a repository. The runtime smoke test is
   # the same script the release check and scripts/dev/wine-run.sh use.
