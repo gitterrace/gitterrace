@@ -235,7 +235,7 @@ impl Payload {
             &permalink,
             text.as_deref(),
             commit.as_ref(),
-            &crate::source::source_line(&repo.name(), &sha, path.as_deref(), lines),
+            &crate::source::source_line(&loc.repo, &sha, path.as_deref(), lines),
         );
 
         Ok(Self {
@@ -264,10 +264,13 @@ impl Payload {
     }
 
     /// The `review` payload of `findings`, the server's own basket entries with their anchors.
+    /// `key` is the name the repo is served under, the one Copy as markdown writes into its
+    /// source line, so a renamed repo is named the same in both.
     /// Each entry's text is read from git at its commit, capped at the markdown line cap, so
     /// nothing a page sends reaches a script.
     pub fn build_review(
         repo: &Repo,
+        key: &str,
         action: &str,
         findings: &[Finding],
         origin: &str,
@@ -303,7 +306,7 @@ impl Payload {
         let short = gitterrace_git::short_id(&first.sha);
         let count = entries.len();
         let title = format!("Review: {count} finding{}", if count == 1 { "" } else { "s" });
-        let markdown = review_markdown(&name, short, &entries);
+        let markdown = review_markdown(key, short, &entries);
         Ok(Self {
             v: PAYLOAD_VERSION,
             action: action.to_string(),

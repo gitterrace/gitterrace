@@ -233,7 +233,8 @@ fn a_review_payload_reads_its_text_from_git_and_sets_the_env() {
         finding(Some("src/a.rs"), Some((2, 3)), &sha, "check $(touch pwned)\nnow"),
         finding(Some("src/a.rs"), None, &sha, ""),
     ];
-    let p = Payload::build_review(&repo, "x", &basket, "o", LinkStyle::Gitterrace).expect("review");
+    let p = Payload::build_review(&repo, "r", "x", &basket, "o", LinkStyle::Gitterrace)
+        .expect("review");
     assert_eq!(p.kind, Kind::Review);
     assert_eq!((p.path.as_deref(), p.lines, p.text.as_deref()), (None, None, None));
     assert_eq!(p.title, "Review: 2 findings");
@@ -252,7 +253,7 @@ fn a_review_payload_reads_its_text_from_git_and_sets_the_env() {
     assert_eq!(env["GITTERRACE_PATH"], "src/a.rs");
     assert_eq!(env["GITTERRACE_LINE_START"], "2");
     assert_eq!(env["GITTERRACE_KIND"], "review");
-    assert!(Payload::build_review(&repo, "x", &[], "o", LinkStyle::Go).is_err());
+    assert!(Payload::build_review(&repo, "r", "x", &[], "o", LinkStyle::Go).is_err());
 }
 
 /// Class guard: v1 stays byte for byte. No single-kind payload carries a `findings` key, and a
@@ -298,4 +299,23 @@ fn a_locator_with_findings_reads_and_an_unknown_field_still_fails() {
     let ok = r#"{"repo":"r","rev":"main","findings":["f-1"]}"#;
     assert!(serde_json::from_str::<Locator>(ok).is_ok());
     assert!(serde_json::from_str::<Locator>(r#"{"repo":"r","rev":"main","note":"x"}"#).is_err());
+}
+
+/// Class guard: the source line names the repo by its served key, as the page does, never by the
+/// directory name, so a renamed repo reads the same in a copied note and an action payload.
+#[test]
+fn source_line_names_the_served_key_not_the_directory() {
+    let (t, sha) = hostile_repo();
+    let repo = Repo::discover(t.path()).expect("open");
+    assert_ne!(repo.name(), "alias");
+    let mut l = loc(Some("src/a.rs"), Some((2, 3)));
+    l.repo = "alias".into();
+    let p = Payload::build(&repo, "x", Kind::Line, &l, "o", LinkStyle::Go).expect("build");
+    let want = crate::source::source_line("alias", &sha, Some("src/a.rs"), l.lines);
+    assert!(p.markdown.contains(&want));
+    let basket = [finding(Some("src/a.rs"), None, &sha, "")];
+    let r =
+        Payload::build_review(&repo, "alias", "x", &basket, "o", LinkStyle::Go).expect("review");
+    let want = crate::source::source_line("alias", &sha, Some("src/a.rs"), None);
+    assert!(r.markdown.contains(&want));
 }

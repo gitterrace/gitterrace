@@ -473,7 +473,7 @@ fn review_payload(
     let app = site.env.apps().into_iter().find(|a| a.key == t.key);
     let api = app.as_ref().and_then(|a| a.api()).ok_or_else(|| bad("no basket here"))?;
     let found = api.findings_by_id(ids).map_err(|e| bad(&e.to_string()))?;
-    Ok(Payload::build_review(&t.repo, &action.id, &found, origin, site.link_style()))
+    Ok(Payload::build_review(&t.repo, &t.key, &action.id, &found, origin, site.link_style()))
 }
 
 /// Fixtures shared with the read-only crawl in `lib.rs`.

@@ -1,5 +1,13 @@
 [
   {
+    "name": "a renamed repo is named by its served key",
+    "repo": "alias",
+    "sha": "abcdef1234",
+    "path": "a.rs",
+    "lines": { "start": 1, "end": 2 },
+    "expected": "source: alias@abcdef1234:a.rs#L1-L2"
+  },
+  {
     "name": "lines",
     "repo": "gitterrace",
     "sha": "a9b0c7c0123456789abcdef0123456789abcdef0",
