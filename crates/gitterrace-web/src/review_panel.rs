@@ -16,6 +16,11 @@ pub(crate) enum Source<'a> {
     Compare { base: &'a str, head: &'a str, three_dot: bool },
 }
 
+/// The most rows the page's panel shows. The panel is read top down and every row carries its
+/// Why list, about a dozen elements, so a page of 2,000 changed files stays inside its DOM
+/// budget. Not configurable: `review.plan_files` is the API's own cut and still applies below.
+const PANEL_ROWS: usize = 50;
+
 struct Row {
     path: String,
     href: String,
@@ -64,7 +69,8 @@ pub(crate) fn render(a: &App, source: &Source<'_>) -> String {
             ..PlanRequest::default()
         },
     };
-    let plan = match api.review_plan(&req, &Params::default()) {
+    let plan = match api.review_plan(&req, &Params { limit: Some(PANEL_ROWS), ..Params::default() })
+    {
         Ok(p) => p,
         Err(e) => {
             tracing::debug!("review panel: {e}");
@@ -196,5 +202,25 @@ mod tests {
             .collect();
         assert!(at[0] < at[1], "{order:?} {page}");
         assert!(page.contains("Churn "), "terms are inspectable");
+    }
+
+    /// A change wider than the panel lists its riskiest rows and counts the rest, so a page of
+    /// thousands of changed files keeps a small panel. Catches the panel taking the API's cut.
+    #[tokio::test]
+    async fn a_wide_change_lists_the_panel_rows_and_counts_the_rest() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let n = super::PANEL_ROWS + 5;
+        let mut f = Fixture::init(dir.path());
+        for i in 0..n {
+            f = f.write(&format!("f{i:03}.txt"), "a\n");
+        }
+        let p = f.commit("feat: many").path().to_owned();
+        for i in 0..n {
+            std::fs::write(p.join(format!("f{i:03}.txt")), "a\nb\n").expect("write");
+        }
+        let (st, page) = gitterrace_testkit::get(&linked(&p), "/worktree").await;
+        assert_eq!(st, 200);
+        assert_eq!(page.matches("data-rplan-path=").count(), super::PANEL_ROWS, "{page}");
+        assert!(page.contains("and 5 more files."), "the rest is counted");
     }
 }
