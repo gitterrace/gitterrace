@@ -261,3 +261,30 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(all(test, windows))]
+mod windows_tests {
+    use std::fs;
+    use std::io;
+
+    use super::*;
+
+    /// Red when an append lands in a file another name also reaches. The lock and every later
+    /// cache file share the open, so they are covered with findings and checkpoints.
+    #[test]
+    fn a_hard_linked_findings_checkpoints_or_lock_file_is_refused_and_the_other_link_kept()
+    -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let dir = tmp.path().join(".git").join("gitterrace");
+        fs::create_dir_all(&dir)?;
+        for name in ["findings", "checkpoints", "lock"] {
+            let other = tmp.path().join(format!("other-{name}"));
+            fs::write(&other, "keep")?;
+            fs::hard_link(&other, dir.join(name))?;
+            let err = open_append(&dir, name).expect_err("refused");
+            assert!(err.to_string().contains("hard links"), "{err}");
+            assert_eq!(fs::read_to_string(&other)?, "keep");
+        }
+        Ok(())
+    }
+}

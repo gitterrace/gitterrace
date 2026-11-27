@@ -34,6 +34,8 @@ libc = "0.2"
 rustix = { version = "1.1", default-features = false, features = ["std", "fs"] }
 # OS file events (FSEvents, inotify, ReadDirectoryChangesW): its unsafe stays inside it.
 notify = { version = "8.2", default-features = false, features = ["macos_fsevent"] }
+# Safe link-count read from an opened handle on Windows. Already in the tree through walkdir.
+winapi-util = "0.1"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 tracing = "0.1"

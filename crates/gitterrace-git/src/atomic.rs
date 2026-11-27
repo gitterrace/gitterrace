@@ -152,18 +152,32 @@ pub fn open_append_no_follow(dir: &Path, name: &str, mode: u32) -> io::Result<fs
     o.create(true).append(true).read(true);
     set_mode(&mut o, mode);
     let f = no_follow(&mut o).open(&path)?;
-    #[cfg(unix)]
+    #[cfg(any(unix, windows))]
     refuse_shared(&f, &path)?;
     Ok(f)
 }
 
-/// Refuses a handle whose inode is shared under another name. Nothing was written yet. Unix
-/// only, where the link count is read from the handle.
+/// Refuses a handle whose file is shared under another name. Nothing was written yet. The link
+/// count is read from the opened handle, so no swap between check and open is possible.
 #[cfg(unix)]
 fn refuse_shared(f: &fs::File, path: &Path) -> io::Result<()> {
     use std::os::unix::fs::MetadataExt;
     let m = f.metadata()?;
     if !m.is_file() || m.nlink() > 1 {
+        return Err(io::Error::other(format!(
+            "refusing to append to {}: it is not a regular file or has other hard links",
+            path.display()
+        )));
+    }
+    Ok(())
+}
+
+/// Windows hard links are plain file names, so `FILE_FLAG_OPEN_REPARSE_POINT` does not see them.
+/// `GetFileInformationByHandle` on the opened handle reports `nNumberOfLinks`.
+#[cfg(windows)]
+fn refuse_shared(f: &fs::File, path: &Path) -> io::Result<()> {
+    let info = winapi_util::file::information(f)?;
+    if !f.metadata()?.is_file() || info.number_of_links() > 1 {
         return Err(io::Error::other(format!(
             "refusing to append to {}: it is not a regular file or has other hard links",
             path.display()
@@ -334,6 +348,34 @@ mod tests {
         use std::path::Path;
 
         use crate::atomic::{open_append_no_follow, write_atomic};
+
+        /// Red when an append reaches a file through a second name. Covers every name the cache
+        /// appends to (findings, checkpoints, lock), as they share this open.
+        #[test]
+        fn open_append_refuses_a_hard_linked_file_and_keeps_the_other_link() {
+            let t = tempfile::tempdir().expect("tmp");
+            let dir = t.path().join("cache");
+            std::fs::create_dir(&dir).expect("mkdir");
+            for name in ["findings", "checkpoints", "lock"] {
+                let other = t.path().join(format!("other-{name}"));
+                std::fs::write(&other, "keep").expect("seed");
+                std::fs::hard_link(&other, dir.join(name)).expect("link");
+                let err = open_append_no_follow(&dir, name, 0o600).expect_err("refused");
+                assert!(err.to_string().contains("hard links"), "{err}");
+                assert_eq!(std::fs::read_to_string(&other).expect("read"), "keep");
+            }
+        }
+
+        #[test]
+        fn open_append_accepts_an_ordinary_file_and_appends() {
+            use std::io::Write;
+            let t = tempfile::tempdir().expect("tmp");
+            std::fs::write(t.path().join("f"), "a").expect("seed");
+            let mut f = open_append_no_follow(t.path(), "f", 0o600).expect("open");
+            f.write_all(b"b").expect("append");
+            drop(f);
+            assert_eq!(std::fs::read_to_string(t.path().join("f")).expect("read"), "ab");
+        }
 
         /// Plants a directory junction at `at` pointing to `to`: junctions need no privilege.
         fn junction(at: &Path, to: &Path) -> std::io::Result<()> {

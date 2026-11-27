@@ -107,7 +107,8 @@ nothing about who is asking, and a secret in a page is a secret given away.
   When that page cannot be written, the opener gets the plain front page, never
   the link (`a_failed_launch_handoff_opens_a_ticket_free_page`).
 - Cache files that are appended to (findings, checkpoints, the lock) are opened
-  `O_NOFOLLOW` and refused when the opened inode has other hard links, so
+  `O_NOFOLLOW` and refused when the opened inode has other hard links (on
+  Windows the opened handle's link count, `GetFileInformationByHandle`), so
   private review data never lands in a file another name can read
   (`a_hard_linked_findings_or_checkpoints_file_is_refused_and_the_other_link_kept`).
 - Every write, and every read of the settings files, needs that cookie on top of

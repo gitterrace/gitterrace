@@ -1105,6 +1105,7 @@ dependencies = [
  "rustix",
  "tempfile",
  "thiserror",
+ "winapi-util",
 ]
 
 [[package]]
