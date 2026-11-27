@@ -86,6 +86,16 @@ GATES: list[Gate] = [
         [PY, "scripts/lint/browser-all-check.py"],
         ("scripts/verify/", "scripts/lint/browser-all-check.py"),
     ),
+    (
+        "browser-gate",
+        [PY, "scripts/lint/browser-gate-check.py"],
+        (
+            ".github/workflows/",
+            "Makefile",
+            "scripts/verify/browser/browser-check.mjs",
+            "scripts/lint/browser-gate-check.py",
+        ),
+    ),
     ("vale-rs", lint_step("vale-rs"), (".rs",)),
     (
         "vale-md",

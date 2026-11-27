@@ -1,8 +1,8 @@
 name: Lint and test
 
 # The jobs behind ci.yml, in two tiers. The fast tier runs on every pull request and push: the
-# Linux gate, cargo deny, the MSRV check, and the Docker image when a Docker path changed. The
-# full tier (input `full`) adds macOS, Windows and the memory budget; it runs nightly when main
+# Linux gate, the browser checks, cargo deny, the MSRV check, and the Docker image when a Docker
+# path changed. The full tier (input `full`) adds macOS, Windows and the memory budget; it runs nightly when main
 # moved, and by hand. A tag never ships on the fast tier alone: release-check.yml runs macOS,
 # Windows and the memory budget again before dist publishes. scripts/lint/gate-check.py holds both
 # rules.
@@ -137,6 +137,37 @@ jobs:
           echo "run=$run" >> "$GITHUB_OUTPUT"
       - if: steps.paths.outputs.run == 'true'
         run: bash scripts/verify/docker-check.sh
+
+  # The real-browser checks (scripts/verify/browser/browser-check.mjs) against a release build, in
+  # chromium, webkit and firefox. Nothing else runs them: a red case reached main unseen until this
+  # job. Fast tier, so a push cannot go green past a red case. The whole ALL list runs: no
+  # --checks filter, and scripts/lint/gate-check.py fails when this job or the Makefile adds one.
+  # Expected: about 12 minutes of cold release build, 3 for the browsers, 15 to 25 for the checks
+  # (an estimate until the first hosted run; ci-budget-check.py holds it to 75% of the limit).
+  browser:
+    name: Browser checks (ubuntu-latest)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/rust
+        with:
+          cache: cargo-browser
+      - run: cargo build --release --locked -p gitterrace
+      # The runner image ships node.
+      - run: make browser-deps
+      # The system libraries webkit and firefox need; act's runner image ships without them.
+      - run: sudo env "PATH=$PATH" node node_modules/playwright-core/cli.js install-deps chromium webkit firefox
+      - name: Run the browser checks
+        run: make -k browser-check BIN=target/release/git-terrace 2>&1 | tee browser-check.log; exit "${PIPESTATUS[0]}"
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: browser-check-log
+          path: browser-check.log
+          if-no-files-found: ignore
 
   # The release memory budget, beside the gates: alone it takes about 35 minutes on a 4-core
   # runner, which the gate jobs could not also hold. Full tier only (nightly, manual, and the

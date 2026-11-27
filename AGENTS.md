@@ -65,7 +65,9 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 
 - Gate: `make check` runs every gate in CI's order (the `check:` line of the
   Makefile). `make lint` runs the linters in
-  [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance checks below.
+  [CONTRIBUTING](CONTRIBUTING.md#lint) and the provenance checks below. The real-browser
+  checks (`make browser-check`) are no part of it: the hosted `browser` job and
+  the release gate run them.
   Without `HARNESS_KIT` its link check is skipped with a note.
   `cargo test -p <crate>` while working on one crate.
 - Landing: `bash scripts/dev/land-run.sh <repo> <clone> <sha>` wraps `land.sh` and then

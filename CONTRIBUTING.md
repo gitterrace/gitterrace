@@ -109,7 +109,12 @@ a plain `git commit`, so commit in a clone and land from it.
 ## Before a pull request
 
 The local gate is the one that counts. Hosted CI runs the Linux `make check`,
-cargo deny, the MSRV check and, when a Docker path changed, the image. macOS
+the browser checks (`make browser-check` on a release build, every case in
+chromium, webkit and firefox, uploading `browser-check.log` when red), cargo
+deny, the MSRV check and, when a Docker path changed, the image. The release
+gate runs the browser checks locally too, skipped with a loud note only when
+`make browser-deps` has not run. `scripts/lint/browser-gate-check.py` fails when the
+`browser` job is missing or narrows the run. macOS
 and Windows run weekly, on demand and for every tag. The macOS gate is two
 parallel jobs (static analysis and docs, then tests and lint), so each stays
 well inside its timeout. `scripts/verify/ci-budget-check.py` is a step of

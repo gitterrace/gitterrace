@@ -167,6 +167,8 @@ lines:
 	python3 scripts/lint/docs-install-check.py
 	python3 vendor/schwarzwald/kit/tools/verify-docs.py --check docs/getting-started.md
 	python3 scripts/lint/browser-all-check.py --self-test && python3 scripts/lint/browser-all-check.py
+	python3 scripts/lint/browser-gate-check.py --self-test
+	python3 scripts/lint/browser-gate-check.py
 
 # docs-check: Generated files are up to date, and the dev scripts pass their self-tests
 docs-check:

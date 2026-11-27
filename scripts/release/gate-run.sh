@@ -31,6 +31,7 @@ python3 scripts/lint/changelog-check.py
 @tag
 python3 vendor/schwarzwald/kit/lint/changelog.py --repo .
 make -k check CROSS=x86_64-pc-windows-gnu
+bash scripts/release/browser-run.sh
 bash scripts/dev/macos-run.sh
 python3 scripts/verify/ci-budget-check.py
 @ci
@@ -225,7 +226,7 @@ self_test() {
   local list jobs job
   list=$(steps)
   for want in scripts/lint/changelog-check.py kit/lint/changelog.py "CROSS=x86_64-pc-windows-gnu" \
-    scripts/dev/macos-run.sh @ci @tag; do
+    scripts/dev/macos-run.sh scripts/release/browser-run.sh @ci @tag; do
     grep -qF -- "$want" <<<"$list" || fail "no step runs $want"
   done
   [ "$(sed -n 1p <<<"$list")" = python3\ scripts/lint/changelog-check.py ] &&
