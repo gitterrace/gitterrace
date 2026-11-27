@@ -156,6 +156,12 @@ build spares them.
 A `viewed` file that does not decode lists as no marks, but a write
 refuses with an error and leaves the bytes untouched, as `findings` does
 for a damaged span.
+A `findings` tail that is cut short is a torn write and the next rewrite drops
+it, but only when nothing in it is a whole frame. A last frame whose length
+field was raised past the end of the file looks the same, so a tail whose bytes
+match the header's checksum counts as a damaged span: kept, listed as
+incomplete, appended after and never rewritten. Every rewrite goes through
+one function that refuses on a damaged span, so no path drops unread bytes.
 
 A checkpoint is a framed record with zstd copies of the
 changed text files. A torn tail is ignored, so a crash mid-write loses only

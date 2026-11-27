@@ -266,3 +266,67 @@ fn a_note_at_and_across_the_byte_limit_is_stored_whole_or_cut_on_a_boundary() {
     }
     assert_eq!(clean_note("a\u{1b}b\n"), "ab\n");
 }
+
+/// Three findings written, the last frame's length field raised by 1000 so it claims more than
+/// the file holds: the file looks cut short, and the bytes of the third are whole.
+fn with_bumped_last_length(idx: &Index) -> io::Result<(Vec<StoredFinding>, Vec<u8>, Vec<u8>)> {
+    let all: Vec<_> = (0..3).map(|i| finding(&format!("n{i}"), i)).collect();
+    for f in &all {
+        idx.findings_add(f, 500)?;
+    }
+    let path = idx.dir().join(FILE);
+    let mut bytes = std::fs::read(&path)?;
+    let third = super::encode(&all[2]);
+    let at = bytes.len() - third.len();
+    let len = u32::from_le_bytes([bytes[at + 4], bytes[at + 5], bytes[at + 6], bytes[at + 7]]);
+    bytes[at + 4..at + 8].copy_from_slice(&(len + 1000).to_le_bytes());
+    std::fs::write(&path, &bytes)?;
+    Ok((all, bytes[at..].to_vec(), bytes))
+}
+
+/// Class guard: a tail that holds a whole frame is not a torn write, whatever its length field
+/// says. Every rewrite goes through one function, so it would also catch a tail that looks like
+/// a cut frame in any other shape.
+#[test]
+fn a_last_frame_with_a_bumped_length_is_never_lost_to_add_or_remove() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let (all, third, bytes) = with_bumped_last_length(&idx)?;
+    let path = idx.dir().join(FILE);
+    assert_eq!(idx.findings_list()?, [all[0].clone(), all[1].clone()]);
+    assert!(idx.findings_remove(&[]).is_err());
+    assert!(idx.findings_remove(&[all[0].id.clone()]).is_err());
+    assert!(idx.findings_add(&finding("x", 9), 2).is_err(), "a cap trim would rewrite");
+    assert_eq!(std::fs::read(&path)?, bytes);
+    let four = finding("four", 4);
+    assert!(idx.findings_add(&four, 500)?);
+    let after = std::fs::read(&path)?;
+    assert!(after.starts_with(&bytes), "the original bytes stay, in place");
+    assert!(after.windows(third.len()).any(|w| w == third.as_slice()));
+    assert_eq!(idx.findings_list()?, [all[0].clone(), all[1].clone(), four]);
+    assert!(idx.findings_remove(&[all[0].id.clone()]).is_err());
+    assert!(std::fs::read(&path)?.starts_with(&bytes));
+    Ok(())
+}
+
+/// A trailing write cut at any point inside its frame is still a torn tail: ignored, and the
+/// next write replaces the file without it.
+#[test]
+fn a_write_cut_at_any_point_is_a_torn_tail_the_next_write_replaces() -> io::Result<()> {
+    let (a, b, c) = (finding("a", 1), finding("b", 2), finding("c", 3));
+    let whole = super::encode(&c);
+    for cut in [1, 4, FIXED - 1, FIXED, FIXED + 1, whole.len() - 1] {
+        let (_t, idx) = open()?;
+        idx.findings_add(&a, 500)?;
+        idx.findings_add(&b, 500)?;
+        let path = idx.dir().join(FILE);
+        let mut bytes = std::fs::read(&path)?;
+        bytes.extend_from_slice(&whole[..cut]);
+        std::fs::write(&path, &bytes)?;
+        let found = scan(&bytes).expect("scan");
+        assert_eq!((found.items.len(), found.damaged), (2, 0), "cut {cut}");
+        assert_eq!(idx.findings_remove(std::slice::from_ref(&a.id))?, 1, "cut {cut}");
+        assert_eq!(idx.findings_list()?, std::slice::from_ref(&b), "cut {cut}");
+        assert_eq!(std::fs::read(&path)?, super::encode(&b), "cut {cut}");
+    }
+    Ok(())
+}

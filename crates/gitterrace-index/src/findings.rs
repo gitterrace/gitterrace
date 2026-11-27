@@ -3,7 +3,9 @@
 //! The file holds frames, one finding each: a fixed header (magic, payload length, payload
 //! crc) and a payload of varint-framed fields read through the bounded [`Cursor`], so a length
 //! that lies cannot size a buffer. A frame cut short by a crash is a torn tail: it is ignored
-//! and the next write replaces the file without it. A damaged span (bad checksum, lying length,
+//! and the next write replaces the file without it, unless the tail already holds a whole
+//! frame (a length field bumped past the file looks exactly like a cut write): then it is a
+//! damaged span, kept. A damaged span (bad checksum, lying length,
 //! unknown magic) is skipped to the next whole frame and reported, and no write rewrites a file
 //! holding one: an add appends, a remove or a cap trim is refused, so unreadable bytes are kept.
 //! A frame whose checksum holds but whose
@@ -224,6 +226,22 @@ fn frame_at<'a>(
     Ok((crc32fast::hash(payload) == crc).then_some((end, payload)))
 }
 
+/// Whether the bytes after the header at `at` hold a whole frame: some prefix of them has the
+/// header's checksum. A cut write never does, but a length field bumped past the file's end looks
+/// like one, so such a tail is never discarded. Only called for a header whose length is within
+/// [`MAX_FRAME`], so it hashes less than that, once per pass.
+fn holds_whole_frame(bytes: &[u8], at: usize) -> bool {
+    let Some(head) = bytes.get(at..at + FIXED) else {
+        return false;
+    };
+    let crc = u32::from_le_bytes([head[8], head[9], head[10], head[11]]);
+    let mut hasher = crc32fast::Hasher::new();
+    bytes[at + FIXED..].iter().any(|b| {
+        hasher.update(&[*b]);
+        hasher.clone().finalize() == crc
+    })
+}
+
 /// Whether the bytes from `at` are the start of a frame the file ends before finishing.
 fn is_torn(bytes: &[u8], at: usize) -> bool {
     let rest = &bytes[at..];
@@ -271,7 +289,7 @@ fn scan(bytes: &[u8]) -> io::Result<Scan> {
                 out.damaged += 1;
                 at = next;
             }
-            Ok(None) if is_torn(bytes, at) => break,
+            Ok(None) if is_torn(bytes, at) && !holds_whole_frame(bytes, at) => break,
             Ok(None) => {
                 out.damaged += 1;
                 at = bytes.len();
@@ -305,8 +323,15 @@ fn refuse_rewrite(damaged: usize) -> io::Error {
     ))
 }
 
-fn encode_all(items: &[StoredFinding]) -> Vec<u8> {
-    items.iter().flat_map(encode).collect()
+/// The one way the file is rewritten, so the tail rule holds for every caller: a pass that found
+/// damaged or unread bytes (`damaged`, which an incomplete scan always counts) is refused, so a
+/// rewrite drops nothing but a plain torn tail.
+fn rewrite(idx: &Index, damaged: usize, items: &[StoredFinding]) -> io::Result<()> {
+    if damaged > 0 {
+        return Err(refuse_rewrite(damaged));
+    }
+    let bytes: Vec<u8> = items.iter().flat_map(encode).collect();
+    cache::write_atomic(idx.dir(), FILE, &bytes)
 }
 
 impl Index {
@@ -353,13 +378,10 @@ impl Index {
             out.sync_data()?;
             return Ok(true);
         }
-        if damaged > 0 {
-            return Err(refuse_rewrite(damaged));
-        }
         items.push(f.clone());
         let over = items.len().saturating_sub(cap);
         items.drain(..over);
-        cache::write_atomic(self.dir(), FILE, &encode_all(&items))?;
+        rewrite(self, damaged, &items)?;
         Ok(true)
     }
 
@@ -374,9 +396,7 @@ impl Index {
         let Some((scan, _)) = read(self)? else {
             return Ok(0);
         };
-        if scan.damaged > 0 {
-            return Err(refuse_rewrite(scan.damaged));
-        }
+        let damaged = scan.damaged;
         let mut items = scan.items;
         let before = items.len();
         if ids.is_empty() {
@@ -385,8 +405,8 @@ impl Index {
             items.retain(|x| !ids.contains(&x.id));
         }
         let gone = before - items.len();
-        if gone > 0 {
-            cache::write_atomic(self.dir(), FILE, &encode_all(&items))?;
+        if gone > 0 || damaged > 0 {
+            rewrite(self, damaged, &items)?;
         }
         Ok(gone)
     }

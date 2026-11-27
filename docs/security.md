@@ -113,6 +113,10 @@ nothing about who is asking, and a secret in a page is a secret given away.
   Windows the opened handle's link count, `GetFileInformationByHandle`), so
   private review data never lands in a file another name can read
   (`a_hard_linked_findings_or_checkpoints_file_is_refused_and_the_other_link_kept`).
+- The review basket is never rewritten over bytes it could not read. A last
+  frame with a corrupted length looks like an interrupted write, so a tail
+  that holds a whole frame is kept as a damaged span and only appended after
+  (`a_last_frame_with_a_bumped_length_is_never_lost_to_add_or_remove`).
 - Every write, and every read of the settings files, needs that cookie on top of
   the same-origin checks, which stop other sites but are forgeable by a local
   client (`a_forging_loopback_client_without_owner_proof_writes_nothing`).
