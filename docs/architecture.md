@@ -153,6 +153,10 @@ build spares them.
 
 <!-- END GENERATED: user-files -->
 
+A `viewed` file that does not decode lists as no marks, but a write
+refuses with an error and leaves the bytes untouched, as `findings` does
+for a damaged span.
+
 A checkpoint is a framed record with zstd copies of the
 changed text files. A torn tail is ignored, so a crash mid-write loses only
 that checkpoint. The writer and the reader share one set of header bounds: the

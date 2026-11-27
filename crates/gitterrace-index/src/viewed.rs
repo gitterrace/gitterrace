@@ -31,7 +31,8 @@ impl Index {
     /// Every mark, oldest first.
     ///
     /// # Errors
-    /// When the file cannot be read. A file that does not decode reads as no marks.
+    /// When the file cannot be read. A file that does not decode reads as no marks,
+    /// with a warning, and every write refuses until it is removed.
     pub fn viewed_list(&self) -> io::Result<Vec<Viewed>> {
         Ok(self.viewed_records()?.into_iter().filter(|v| !v.off).collect())
     }
@@ -40,7 +41,27 @@ impl Index {
         let Some(bytes) = cache::read(self.dir(), FILE)? else {
             return Ok(Vec::new());
         };
-        Ok(serde_json::from_slice(&bytes).unwrap_or_default())
+        Ok(serde_json::from_slice(&bytes).unwrap_or_else(|e| {
+            crate::warn(format_args!("{FILE} does not decode ({e}): listed as no marks"));
+            Vec::new()
+        }))
+    }
+
+    /// The records a write starts from. A file that does not decode is an error, never an empty
+    /// start, because the write would replace the user's marks with it.
+    fn viewed_records_for_write(&self) -> io::Result<Vec<Viewed>> {
+        let Some(bytes) = cache::read(self.dir(), FILE)? else {
+            return Ok(Vec::new());
+        };
+        serde_json::from_slice(&bytes).map_err(|e| {
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "the viewed marks do not decode ({e}): not rewriting them, so nothing is \
+                     lost. Keep a copy of .git/gitterrace/{FILE} and remove it to start over"
+                ),
+            )
+        })
     }
 
     fn viewed_save(&self, mut all: Vec<Viewed>) -> io::Result<()> {
@@ -58,7 +79,7 @@ impl Index {
     pub fn viewed_set(&self, items: &[(String, String)], on: bool, now: i64) -> io::Result<()> {
         self.writable()?;
         let _lock = crate::store::WriteLock::take(self.dir())?;
-        let mut all = self.viewed_records()?;
+        let mut all = self.viewed_records_for_write()?;
         for (path, patch) in items {
             if path.len() > MAX_FIELD || patch.len() > MAX_FIELD {
                 continue;
@@ -78,7 +99,7 @@ impl Index {
     pub fn viewed_add_missing(&self, items: &[(String, String)], now: i64) -> io::Result<usize> {
         self.writable()?;
         let _lock = crate::store::WriteLock::take(self.dir())?;
-        let mut all = self.viewed_records()?;
+        let mut all = self.viewed_records_for_write()?;
         let mut held: std::collections::HashSet<String> =
             all.iter().map(|v| v.path.clone()).collect();
         let mut n = 0;
@@ -124,6 +145,23 @@ mod tests {
         let idx = Index::open_dir(tmp.path().join("gitterrace"))?;
         std::fs::write(idx.dir().join(FILE), "not json")?;
         assert_eq!(idx.viewed_list()?.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn a_file_that_does_not_decode_survives_a_mark_and_an_unmark_and_the_error_says_so()
+    -> io::Result<()> {
+        let tmp = tempfile::tempdir()?;
+        let idx = Index::open_dir(tmp.path().join("gitterrace"))?;
+        let path = idx.dir().join(FILE);
+        std::fs::write(&path, b"[{\"path\":\"a\",")?;
+        let item = vec![("a".to_owned(), "h".to_owned())];
+        let marked = idx.viewed_set(&item, true, 1).expect_err("mark must refuse");
+        assert_eq!(marked.kind(), io::ErrorKind::InvalidData);
+        assert!(marked.to_string().contains("not rewriting"));
+        assert!(idx.viewed_set(&item, false, 2).is_err());
+        assert!(idx.viewed_add_missing(&item, 3).is_err());
+        assert_eq!(std::fs::read(&path)?, b"[{\"path\":\"a\",");
         Ok(())
     }
 

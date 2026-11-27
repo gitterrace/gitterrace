@@ -11,7 +11,8 @@ config or working file changes. It keeps one folder of its own,
 marks and review notes. Delete the folder at any time: the index rebuilds, and
 the marks and notes are forgotten. A checkpoint holds copies of changed text
 files from your working tree (never ignored or binary files), so treat that
-folder like the repository.
+folder like the repository. A damaged marks file is never overwritten:
+writes refuse until you remove it.
 
 ## Assets
 
