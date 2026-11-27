@@ -119,6 +119,52 @@ async fn a_migration_never_overwrites_a_mark_that_already_exists() {
     assert!(list.contains("new") && !list.contains("old") && list.contains("b1"), "{list}");
 }
 
+/// Two tabs: tab A's old-marks move is held, tab B marks then unmarks the file, then the move
+/// lands. The unmark must survive: the server state after the move, read as a reload does.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_late_migration_does_not_bring_back_a_newer_unmark() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (app, _) = server(tmp.path());
+    for on in ["true", "false"] {
+        let b = format!(r#"{{"path":"a.txt","patch":"p1","viewed":{on}}}"#);
+        assert_eq!(call(&app, "POST", "/r/r/_viewed", &b, true).await.0, 200);
+    }
+    let old = r#"{"items":[{"path":"a.txt","patch":"p1"},{"path":"b.txt","patch":"b1"}],
+        "missing_only":true}"#;
+    let (s, body) = call(&app, "POST", "/r/r/_viewed/all", old, true).await;
+    assert_eq!(s, 200, "{body}");
+    assert!(body.contains("\"marked\":1"), "{body}");
+    let (_, list) = call(&app, "GET", "/r/r/_viewed", "", false).await;
+    assert!(!list.contains("a.txt") && list.contains("b1"), "{list}");
+}
+
+/// The newer mark case: tab B marked with a newer hash before the old move lands.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_late_migration_keeps_a_newer_mark_after_an_unmark() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let (app, _) = server(tmp.path());
+    for (on, h) in [("true", "p1"), ("false", "p1"), ("true", "p2")] {
+        let b = format!(r#"{{"path":"a.txt","patch":"{h}","viewed":{on}}}"#);
+        assert_eq!(call(&app, "POST", "/r/r/_viewed", &b, true).await.0, 200);
+    }
+    let old = r#"{"items":[{"path":"a.txt","patch":"p1"}],"missing_only":true}"#;
+    let (s, body) = call(&app, "POST", "/r/r/_viewed/all", old, true).await;
+    assert_eq!(s, 200, "{body}");
+    assert!(body.contains("\"marked\":0"), "{body}");
+    let (_, list) = call(&app, "GET", "/r/r/_viewed", "", false).await;
+    assert!(list.contains("p2") && !list.contains("p1"), "{list}");
+}
+
+/// Class guard: a `missing_only` request checks and writes in one index call, so no tab can
+/// land a mark between a separate read and write. A read of `viewed()` in the handler fails here.
+#[test]
+fn the_missing_only_check_and_write_share_one_lock() {
+    let src = include_str!("checkpoints_web.rs");
+    let at = src.find("if missing_only").expect("branch");
+    let branch = &src[at..src[at..].find("let id").map_or(src.len(), |i| at + i)];
+    assert!(branch.contains("viewed_add_missing") && !branch.contains(".viewed()"), "{branch}");
+}
+
 /// Class guard: every write the script sends waits in one queue, so the server sees them in the
 /// order the reader made them. A later write posted outside the queue (a stale save landing
 /// after a newer click, or a second migration racing the first) fails here.

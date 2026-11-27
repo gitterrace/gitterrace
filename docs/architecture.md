@@ -129,7 +129,7 @@ keys lives in `gitterrace_config::naming`.
 | `lines.json` | Line counts per blob id for the language chart. A blob never changes, so the counts never go stale. |
 | `chain.state` | Languages chain totals, checkpointed every 64 commits; a newer tip walks only new commits. Read only whole, under its rules key. |
 | `checkpoints` | Snapshots of uncommitted work, append-only and checksummed. Capped by `review.checkpoint_mb`, oldest dropped. Not rebuildable. |
-| `viewed` | Viewed marks per file and patch hash, so a mark holds while the patch is the same. Small, rewritten by atomic rename. Not rebuildable. |
+| `viewed` | Viewed marks per file and patch hash; an unmark is kept as a tombstone so a late migration cannot revive it. Atomic rename. Not rebuildable. |
 | `findings` | The review basket: findings with notes, capped by `review.findings_entries`. Rewritten by atomic rename. Not rebuildable. |
 
 The format version is `3`, stored as `v3`.

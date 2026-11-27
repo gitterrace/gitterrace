@@ -84,8 +84,8 @@ pub const CACHE_FILES: [(&str, &str); 9] = [
     ),
     (
         viewed::FILE,
-        "Viewed marks per file and patch hash, so a mark holds while the patch is the same. \
-        Small, rewritten by atomic rename. Not rebuildable.",
+        "Viewed marks per file and patch hash; an unmark is kept as a tombstone so a late \
+        migration cannot revive it. Atomic rename. Not rebuildable.",
     ),
     (
         findings::FILE,

@@ -8,6 +8,8 @@
 // - two tabs migrating at once end with the marks on the server and nothing lost
 // - a click made while the migration request is held (then released) is still there after a
 //   reload: tick and untick a file, and the server must not end up holding the older mark
+// - a migration held in one tab while a second tab ticks and unticks the same file ends with the
+//   file unmarked on the server after a reload (an unmark is kept, not forgotten)
 // A second defect the same checks catch: a retry that drops the entries of a different page.
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
@@ -201,8 +203,61 @@ export function checks(env) {
     });
   }
 
+  async function viewedMigrateOtherTabUnmark() {
+    await each('other-tab-unmark', async (p, srv, w, ctx) => {
+      await seed(p);
+      /** @type {(v?: unknown) => void} */
+      let release = () => {};
+      const gate = new Promise((res) => { release = res; });
+      /** @type {(v?: unknown) => void} */
+      let held = () => {};
+      const arrived = new Promise((res) => { held = res; });
+      let moved = false;
+      /** @type {(v?: unknown) => void} */
+      let movedDone = () => {};
+      const answered = new Promise((res) => { movedDone = res; });
+      await p.route('**/_viewed/all', async (route) => {
+        held(true);
+        await gate;
+        await route.continue();
+        moved = true;
+        movedDone(true);
+      });
+      await p.reload({ waitUntil: 'load' });
+      await arrived;
+      // Tab q ticks and unticks a.txt, both saved, while tab p's move is still held. q shares
+      // p's storage, so it moves the same old marks first (its own route is not held): wait for
+      // that, then click until a.txt ends unmarked by a click, which is the newer choice.
+      const q = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+      const qMoved = q.waitForResponse(
+        (x) => x.request().method() === 'POST' && /\/_viewed\/all$/.test(x.url()), WAIT);
+      await q.goto(`${srv.base}${KEY}`, { waitUntil: 'load' });
+      await q.waitForSelector('section.file input.viewed', WAIT);
+      await qMoved;
+      const box = 'section.file[data-path="a.txt"] input.viewed';
+      const clicks = (await q.isChecked(box)) ? 1 : 2;
+      for (let i = 0; i < clicks; i++) {
+        const saved = q.waitForResponse(
+          (x) => x.request().method() === 'POST' && /\/_viewed$/.test(x.url()), WAIT);
+        await q.click(box);
+        await saved;
+      }
+      say(!(await q.isChecked(box)), `${w}: tab q unmarked a.txt`, `${w}: tab q left a.txt ticked`);
+      release();
+      await answered;
+      say(moved, `${w}: the held move was answered last`, `${w}: the move never answered`);
+      await p.unroute('**/_viewed/all');
+      await reload(q);
+      say(!(await ticked(q)).includes('a.txt'),
+        `${w}: the unmark of the other tab survives the late move`,
+        `${w}: ticked after reload ${await ticked(q)}`);
+      await q.close();
+    });
+  }
+
   return {
-    viewedMigrateLaterClickWins, viewedMigrateRejected, viewedMigrateSaved, viewedMigrateKept,
+    viewedMigrateOtherTabUnmark, viewedMigrateLaterClickWins, viewedMigrateRejected,
+    viewedMigrateSaved, viewedMigrateKept,
     viewedMigrateTwoTabs,
   };
 }

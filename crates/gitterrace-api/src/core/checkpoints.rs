@@ -114,4 +114,14 @@ impl ApiState {
         }
         Ok(self.index.viewed_set(items, on, now())?)
     }
+
+    /// Marks the items whose path has no record yet, an unmark counting as a record. One
+    /// critical section for the check and the write. Answers how many were marked. Web only.
+    pub fn viewed_add_missing(&self, items: &[(String, String)]) -> Result<usize, ApiError> {
+        self.only_here("viewed marks")?;
+        if self.index.newer_owner().is_some() {
+            return Err(ApiError::BadRequest("the cache belongs to a newer gitterrace".to_owned()));
+        }
+        Ok(self.index.viewed_add_missing(items, now())?)
+    }
 }
