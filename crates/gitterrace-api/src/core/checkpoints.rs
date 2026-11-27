@@ -69,7 +69,9 @@ impl ApiState {
     }
 
     /// Takes a checkpoint of the working tree now and returns its id and whether it is new
-    /// (the same state again returns the old id). Web only: the API and MCP never call it.
+    /// (the same state again returns the old id). Tests only: a caller that shows the result to
+    /// a user takes [`Self::checkpoint_create_report`], so a drop or an omission is never lost.
+    #[cfg(test)]
     pub fn checkpoint_create(&self, label: &str, auto: bool) -> Result<(String, bool), ApiError> {
         let r = self.checkpoint_create_report(label, auto)?;
         Ok((r.id, r.is_new))

@@ -311,7 +311,8 @@ struct Many {
 
 /// `POST /_viewed/all` `{"items":[{"path","patch"}],"checkpoint":false}`: marks every item
 /// viewed, after a checkpoint when asked and `review.has_auto_checkpoint` is on. Answers
-/// `{"marked", "checkpoint"}`, the id of the checkpoint taken or null.
+/// `{"marked", "checkpoint", "dropped", "copies_omitted"}`: the id of the checkpoint taken
+/// or null, and what that write gave up.
 pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) -> Response {
     if let Some(no) = refused(&app, &req) {
         return no;
@@ -330,17 +331,22 @@ pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) 
         if missing_only {
             return Ok((api.viewed_add_missing(&items)?, None));
         }
-        let id = if want && api.has_auto_checkpoint() {
-            Some(api.checkpoint_create("", true)?.0)
+        let report = if want && api.has_auto_checkpoint() {
+            Some(api.checkpoint_create_report("", true)?)
         } else {
             None
         };
         api.viewed_set(&items, true)?;
-        Ok((items.len(), id))
+        Ok((items.len(), report))
     })
     .await;
     match done {
-        Ok((n, id)) => reply(&serde_json::json!({ "marked": n, "checkpoint": id })),
+        Ok((n, r)) => reply(&serde_json::json!({
+            "marked": n,
+            "checkpoint": r.as_ref().map(|r| &r.id),
+            "dropped": r.as_ref().map_or(0, |r| r.dropped),
+            "copies_omitted": r.as_ref().map_or(0, |r| r.copies_omitted),
+        })),
         Err(res) => *res,
     }
 }

@@ -221,3 +221,21 @@ async fn a_cut_scan_shows_the_omitted_files_notice_and_a_whole_one_does_not() {
     let (_, cut) = call(&router, "GET", "/r/r/worktree", "", false).await;
     assert!(cut.contains("data-files-omitted") && cut.contains("limits.worktree_files"), "{cut}");
 }
+
+/// Guard class: the compiler refuses an id-only checkpoint call outside tests (the fn is
+/// `cfg(test)`), and every reply of a web write that takes a checkpoint carries what it gave up.
+#[tokio::test(flavor = "multi_thread")]
+async fn mark_all_viewed_with_an_auto_checkpoint_reports_what_it_gave_up() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let config =
+        gitterrace_config::parse("[review]\nhas_auto_checkpoint = true\n").expect("parse").config;
+    let (app, repo) = server_with(tmp.path(), config);
+    std::fs::write(repo.join("a.txt"), "a\nedited\n").expect("w");
+    let all = r#"{"items":[{"path":"a.txt","patch":"x"}],"checkpoint":true}"#;
+    let (s, body) = call(&app, "POST", "/r/r/_viewed/all", all, true).await;
+    assert_eq!(s, 200, "{body}");
+    assert!(body.contains("\"checkpoint\":\"cp-"), "{body}");
+    assert!(body.contains("\"dropped\":0") && body.contains("\"copies_omitted\":0"), "{body}");
+    let src = include_str!("checkpoints_web.rs");
+    assert!(!src.contains("api.checkpoint_create("), "a web caller must use the report");
+}

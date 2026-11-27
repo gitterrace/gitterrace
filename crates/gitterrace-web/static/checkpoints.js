@@ -33,6 +33,17 @@
     }
     a.href = B + "/worktree?since=" + encodeURIComponent(id);
   }
+  // What a checkpoint write gave up, in words, for the status note.
+  function gaveUp(r) {
+    var m = "";
+    if (r.dropped) {
+      m += " " + r.dropped + " older checkpoint(s) were dropped to keep the log readable.";
+    }
+    if (r.copies_omitted) {
+      m += " " + r.copies_omitted + " file copy(ies) were not kept: too much text.";
+    }
+    return m;
+  }
   function busy(b, on) {
     b.disabled = on;
     if (on) b.setAttribute("aria-busy", "true"); else b.removeAttribute("aria-busy");
@@ -45,13 +56,7 @@
       post("/_checkpoint", { scope: "all", label: "" }).then(function (r) {
         tab(r.id);
         var m = r.created ? "Checkpoint saved." : "Nothing changed since the last checkpoint.";
-        if (r.dropped) {
-          m += " " + r.dropped + " older checkpoint(s) were dropped to keep the log readable.";
-        }
-        if (r.copies_omitted) {
-          m += " " + r.copies_omitted + " file copy(ies) were not kept: too much text.";
-        }
-        say(m);
+        say(m + gaveUp(r));
       }).catch(function () {
         say("The checkpoint was not saved: checkpoints may be off or the cache folder full.");
       }).then(function () { busy(b, false); });
@@ -62,8 +67,8 @@
       function (s) { return { path: s.dataset.path, patch: s.dataset.p }; });
     post("/_viewed/all", { items: items, checkpoint: true }).then(function (r) {
       if (r.checkpoint) tab(r.checkpoint);
-      say(r.checkpoint ? "Checkpoint saved, marks kept: " + r.marked + "."
-        : "Marks kept: " + r.marked + ".");
+      say((r.checkpoint ? "Checkpoint saved, marks kept: " + r.marked + "."
+        : "Marks kept: " + r.marked + ".") + gaveUp(r));
       document.dispatchEvent(new CustomEvent("gt:viewed-changed"));
     }).catch(function () {
       say("The marks were not saved.");
