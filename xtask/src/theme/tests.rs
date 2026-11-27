@@ -32,3 +32,24 @@ fn tokens_css_matches_the_snapshot() {
     let stale = apply(&root, vec![render(&root).expect("render")], Mode::Check).expect("check");
     assert!(stale.is_empty(), "stale: {stale:?}");
 }
+
+/// The class this guards: a token the kit adds that the generator drops, so a page reading it
+/// gets nothing. The display step reaches tokens.css as the kit's own clamp, and one that does
+/// not sit above the scale is refused.
+#[test]
+fn the_display_step_is_emitted_and_must_sit_above_the_scale() {
+    let ty = |min: u64| {
+        serde_json::json!({
+            "scalePx": [11, 26],
+            "display": {"minPx": min, "maxPx": 74, "fluid": "1.2rem + 3.6vw",
+                        "leading": 1, "tracking": "-.02em"}
+        })
+    };
+    assert_eq!(
+        display(&ty(34)).expect("display"),
+        "--text-display:clamp(2.125rem,1.2rem + 3.6vw,4.625rem);\n--leading-display:1;\
+         --tracking-display:-.02em;"
+    );
+    let err = display(&ty(20)).expect_err("under the scale top");
+    assert!(err.to_string().contains("scale top 26 < minPx 20"), "{err}");
+}

@@ -2,7 +2,7 @@
 
 A copy of schwarzwald, written by its `sync.py`. Do not edit these files here.
 
-- From: schwarzwald, synced 2026-11-26T21:17:50Z
+- From: schwarzwald, synced 2026-11-27T15:29:29Z
 - Items: changelog-gen, clone, commit-paths, configs, cross-clippy, design-tokens, disk-floor, disk-sweep, dist-trust, fonts, golden, guards-claude, guards-engine, guards-jcode, guards-rules, help-mk, hook-commit-dates, hook-commit-msg, hook-pre-commit, hook-stale-index, kit-tests, land, lint, lint-run, markdownlint, ratchet, reach-stats, release-date, repro-archive, repro-check, repro-env, rules, sonar-scan, theme-tokens, vale, verify-docs (with tests: commit-paths, golden, guards-engine, hook-commit-dates, hook-commit-msg, hook-stale-index, lint-run)
 - Themes (the rest left out of tokens/theme-tokens.json): kandel
 - Change anything: edit `source/` in schwarzwald, run `make deploy`

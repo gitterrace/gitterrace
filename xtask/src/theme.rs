@@ -276,13 +276,34 @@ fn scales(d: &Value) -> Result<String> {
         d["type"]["trackingLabel"].as_str().context("type.trackingLabel")?,
         d["type"]["measure"].as_str().context("type.measure")?
     );
+    let display = display(&d["type"])?;
     Ok(format!(
-        ":root{{{}\n{}\n{sizes}\n{prose}\n--radius:{}px;--radius-round:{};\n{motion}}}",
+        ":root{{{}\n{}\n{sizes}\n{prose}\n{display}\n--radius:{}px;--radius-round:{};\n{motion}}}",
         text.concat(),
         space.concat(),
         d["radius"]["webPx"],
         d["radius"]["round"].as_str().context("radius.round")?
     ))
+}
+
+/// The display step, the one landing headline: fluid between its two sizes, both above the top
+/// of the scale, as the kit's contract asks.
+fn display(ty: &Value) -> Result<String> {
+    let dp = &ty["display"];
+    let px = |k: &str| dp[k].as_u64().with_context(|| format!("type.display.{k}"));
+    let (min, max) = (px("minPx")?, px("maxPx")?);
+    let top = ty["scalePx"].as_array().and_then(|s| s.last()).and_then(Value::as_u64);
+    let top = top.context("type.scalePx")?;
+    ensure!(
+        top < min && min < max,
+        "type.display needs scale top {top} < minPx {min} < maxPx {max}"
+    );
+    let fluid = dp["fluid"].as_str().context("type.display.fluid")?;
+    let leading = dp["leading"].as_f64().context("type.display.leading")?;
+    let tracking = dp["tracking"].as_str().context("type.display.tracking")?;
+    let rem = |p: u64| format!("{}rem", p as f64 / 16.0);
+    let size = format!("--text-display:clamp({},{fluid},{});", rem(min), rem(max));
+    Ok(format!("{size}\n--leading-display:{leading};--tracking-display:{tracking};"))
 }
 
 /// The tokens file with its generated block rebuilt.

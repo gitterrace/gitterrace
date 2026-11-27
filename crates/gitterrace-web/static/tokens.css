@@ -12,6 +12,8 @@
 --space-1:4px;--space-2:8px;--space-3:12px;--space-4:16px;--space-5:20px;--space-6:24px;--space-8:32px;--space-16:64px;
 --row-h:40px;--control-h:32px;--control-h-sm:28px;--bar-h:6px;--bar-h-sm:4px;
 --tracking-label:.12em;--measure:72ch;
+--text-display:clamp(2.125rem,1.2rem + 3.6vw,4.625rem);
+--leading-display:1;--tracking-display:-.02em;
 --radius:3px;--radius-round:50%;
 --ease:cubic-bezier(0.2,0.7,0.2,1);--dur-fast:120ms;--dur-slow:400ms;}
 :root{color-scheme:light}

@@ -81,6 +81,13 @@
       600
     ],
     "trackingLabel": ".12em",
+    "display": {
+      "minPx": 34,
+      "maxPx": 74,
+      "fluid": "1.2rem + 3.6vw",
+      "leading": 1,
+      "tracking": "-.02em"
+    },
     "measure": "72ch"
   },
   "space": {

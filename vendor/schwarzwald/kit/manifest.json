@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-26T21:17:50Z",
+  "date": "2026-11-27T15:29:29Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -66,7 +66,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "4533927ee0021859175e7e146dab6fe1de487b0014f3d68ee668c85934173877",
+    "README.md": "eeb256f13b48096949e8695055959c442dc461eafca502d02f540c4fda05a673",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -363,7 +363,7 @@
     "lint/shortcut-switch.py": "40b4c9ce172d5c4fe4ff07d35fa9bcc638f7a61bd4cf138e16c9386470ddcfe2",
     "rules/deny.toml": "23d5b06ab976d0ac310af02689174f72bdd4c9d0337a4ed4428e35fb07ca9a6b",
     "rules/rules.md": "d18d5966c4850c05005c2409b4e8a8649950513ede3878772b2613e1a351d68b",
-    "tokens/design-tokens.json": "ea779d2ab121fd26ee65525fe367f09becd65886382ac1c81334e8cf982e2ce1",
+    "tokens/design-tokens.json": "40569c88d955f12dc24353b182c61916078dfc67a1b0368eaa2eef09a976ffb1",
     "tokens/theme-tokens.json": "b7529a2ae749c0f417581d79dc983a408e95e03f6796ec293a5666b2d5ed0853",
     "tools/changelog-gen.sh": "b9aab876265d31419e4a9a9db33c8846311cfa1f040e48ec8de84bfe4855162a",
     "tools/clone.sh": "eecfd9e40ce57f18ee12a17d241a4dda895a5297de03438942fcddc6a33ad4b6",
