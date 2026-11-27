@@ -1,6 +1,6 @@
 #!/bin/sh
 # Open a file at a line in the editor, on any OS. Use with
-#   command = ["~/.config/gitterrace/editor.sh", "{line_start}", "{root}/{path}"]
+#   command = ["~/.config/gitterrace/editor.sh", "{line_start}", "--", "{root}/{path}"]
 #   stdin   = "none"
 # This opens the working-tree copy, which may differ from the commit you are viewing. Each
 # argument arrives as one argv element, never through a shell string.
@@ -12,8 +12,13 @@ set -eu
 # pipefail is POSIX since 2024 but older dash lacks it, so it is set only where supported.
 # shellcheck disable=SC3040
 (set -o pipefail) 2>/dev/null && set -o pipefail
+# The leading "--" keeps a path that starts with "-" from reading as an option.
+if [ "$#" = 3 ] && [ "$2" = "--" ]; then
+  set -- "$1" "$3"
+fi
 if [ "$#" != 2 ]; then
-  echo "gitterrace: editor.sh takes a line and a file: \"{line_start}\", \"{root}/{path}\"."
+  echo "gitterrace: editor.sh takes a line, --, and a file:" \
+    "\"{line_start}\", \"--\", \"{root}/{path}\"."
   exit 1
 fi
 l=${1:-1}

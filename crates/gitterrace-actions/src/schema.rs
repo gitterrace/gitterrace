@@ -128,8 +128,8 @@ pub const PLACEHOLDERS: [(&str, bool, &str); 12] = [
     ("line_end", false, "Last line, or empty."),
     ("sha", false, "The full commit id."),
     ("url", false, "The permalink."),
-    ("repo", false, "The repository name."),
-    ("root", false, "The repository root."),
+    ("repo", true, "The repository name."),
+    ("root", true, "The repository root."),
     ("kind", false, "The kind."),
     ("var.<name>", false, "A value from `[action.vars]`. An undefined name is a load error."),
 ];

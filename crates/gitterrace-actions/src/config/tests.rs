@@ -275,7 +275,7 @@ fn placeholders_load_and_every_refusal_names_its_key() {
     assert_eq!(a.argv[1..], ["--notes", "{markdown}", "--", "{title}", "{{x}}"]);
     assert_eq!(a.stdin, crate::config::Stdin::Markdown);
     // A literal prefix or a trusted first value needs no `--`.
-    let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"{root}/{path}\"]");
+    let prefixed = cmd("command = [\"/bin/echo\", \"x={title}\", \"p={root}/{path}\"]");
     let url = cmd(
         "command = [\"/bin/echo\", \"tendir://new-task?title={title:url}&notes={markdown:url}\", \
         \"{var.v:url}\", \"{sha:url}\"]\nvars = { v = \"x\" }",
@@ -289,6 +289,8 @@ fn placeholders_load_and_every_refusal_names_its_key() {
         ("command = [\"{sha}\"]", "command[0]: the program is literal"),
         ("command = [\"/bin/echo\", \"{title}\"]", "command[1]: {title} comes from the repository"),
         ("command = [\"/bin/echo\", \"{path}\", \"--\"]", "Put a literal \"--\""),
+        ("command = [\"/bin/echo\", \"{repo}\"]", "command[1]: {repo} comes from the repository"),
+        ("command = [\"/bin/echo\", \"{root}\"]", "command[1]: {root} comes from the repository"),
         (
             "command = [\"/bin/echo\", \"--\", \"{title:bogus}\"]",
             "command[2]: {title:bogus}: unknown modifier :bogus, known: :url",
@@ -379,4 +381,51 @@ fn every_documented_example_loads() {
             panic!("docs toml block {i} does not load: {e}\n{text}");
         }
     }
+}
+
+/// Every placeholder the schema marks as repository-borne is guarded at load, and the schema
+/// marks every placeholder a repository can shape (its name and root included).
+#[test]
+fn every_repository_placeholder_needs_a_guard_at_load() {
+    for (name, repo_borne, _) in crate::schema::PLACEHOLDERS {
+        if name.starts_with("var.") {
+            continue;
+        }
+        let command = format!("command = [\"/bin/echo\", \"{{{name}}}\"]");
+        let text = HEAD.replace("command = [\"/bin/echo\"]", &command);
+        assert_eq!(Config::parse(&text, Path::new("/")).is_err(), repo_borne, "{name}");
+    }
+    for name in ["repo", "root"] {
+        assert!(crate::config::REPO_FIELDS.contains(&name), "{name}");
+    }
+}
+
+/// The `command = [...]` line in each docs/actions script header loads, so a rule change that
+/// breaks a shipped example fails here and not only at a user's reload.
+#[test]
+fn every_script_header_command_loads() {
+    let scripts = [
+        include_str!("../../../../docs/actions/agent.sh"),
+        include_str!("../../../../docs/actions/clipboard.sh"),
+        include_str!("../../../../docs/actions/editor.sh"),
+        include_str!("../../../../docs/actions/obsidian.sh"),
+    ];
+    let mut n = 0;
+    for script in scripts {
+        for line in script.lines().filter_map(|l| l.strip_prefix('#')) {
+            let line = line.trim();
+            if !line.starts_with("command = [\"~/") {
+                continue;
+            }
+            let text = format!(
+                "version = 1\n[[action]]\nid = \"a\"\nlabel = \"A\"\nkinds = [\"line\"]\n\
+                 enabled = false\n{line}\n"
+            );
+            if let Err(e) = Config::parse(&text, Path::new("/")) {
+                panic!("script header does not load: {e}\n{line}");
+            }
+            n += 1;
+        }
+    }
+    assert!(n >= 2, "found {n} header commands");
 }

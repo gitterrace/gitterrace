@@ -241,8 +241,8 @@ or `--help` arrives as that literal text. `{{` and `}}` are literal braces.
 | `{line_end}` | no | Last line, or empty. |
 | `{sha}` | no | The full commit id. |
 | `{url}` | no | The permalink. |
-| `{repo}` | no | The repository name. |
-| `{root}` | no | The repository root. |
+| `{repo}` | yes | The repository name. |
+| `{root}` | yes | The repository root. |
 | `{kind}` | no | The kind. |
 | `{var.<name>}` | no | A value from `[action.vars]`. An undefined name is a load error. |
 
@@ -257,7 +257,9 @@ Checked when the file loads:
 - An unknown placeholder, var or modifier is an error naming the element.
 - `shell = true` takes no placeholders. Read the `GITTERRACE_*` environment
   instead.
-- A value from the repository may start with `-` and be read as an option. It
+- A value from the repository may start with `-` and be read as an option. That
+  includes `{repo}` and `{root}`: a directory name may itself start with `-`. Only
+  `{var.NAME}`, fixed by you in `actions.toml`, is exempt. A value from the repository
   may open an element only after a literal `--`, right after a literal option it
   is the argument of (`"--notes", "{markdown}"`), or behind a literal prefix
   (`"--notes={markdown}"`). In the option case, a value that does start with `-`

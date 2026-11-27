@@ -128,19 +128,19 @@ ls "$tmp"/mac/Tilde/Daily/*.md >/dev/null 2>&1 || fail "tilde in vault not expan
 run none obsidian.sh
 expect_rc none-daily 0
 
-# editor: command = [editor.sh, "{line_start}", "{root}/{path}"], stdin = "none"
+# editor: command = [editor.sh, "{line_start}", "--", "{root}/{path}"], stdin = "none"
 f="$tmp/my repo/a b/\$(x).rs"
-runa mac editor.sh '' 7 "$f"
+runa mac editor.sh '' 7 -- "$f"
 expect_rc mac-ed 0
 expect_log mac-ed "--goto"
 expect_log mac-ed "my repo/a b/\$(x).rs:7"
-runa mac editor.sh '' '' "$f"
+runa mac editor.sh '' '' -- "$f"
 expect_rc ed-noline 0
 expect_log ed-noline ".rs:1"
 runa mac editor.sh ''
 expect_rc ed-noargs 1
 one_line ed-noargs
-runa wayland editor.sh '' 7 "$f"
+runa wayland editor.sh '' 7 -- "$f"
 expect_rc none-ed 1
 one_line none-ed
 TEST_EDITOR=VISUAL=vim runa ed editor.sh '' 7 "$f"

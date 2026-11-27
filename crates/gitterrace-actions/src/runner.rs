@@ -19,7 +19,7 @@ use std::time::{Duration, Instant};
 
 use gitterrace_git::percent_encode_segment;
 
-use crate::config::{Action, Cwd, Piece, REPO_FIELDS, Stdin, field_parts, pieces};
+use crate::config::{Action, Cwd, Piece, Stdin, field_parts, pieces};
 use crate::payload::{Payload, flat};
 
 /// The first output line returned to the browser. Full output never leaves the server.
@@ -257,8 +257,10 @@ pub fn expand(template: &[String], payload: &Payload) -> Result<Vec<String>, Run
         }
         // The loader lets a repository value open an element only behind `--` or right after
         // a literal option; in the second case a leading `-` would still read as an option.
+        // Enforced for every placeholder but `var.*` (fixed in actions.toml by its owner), so a
+        // field the loader trusts too much cannot slip a value through.
         let repo_first = matches!(ps.first(),
-            Some(Piece::Field(n)) if REPO_FIELDS.contains(&field_parts(n).0));
+            Some(Piece::Field(n)) if !field_parts(n).0.starts_with("var."));
         if !after_dashdash && repo_first && arg.starts_with('-') {
             return Err(RunError::Refused(format!(
                 "command[{i}] would start with '-' and read as an option. Put '--' before the \

@@ -553,3 +553,25 @@ fn concurrent_runs_never_share_a_stdin_pipe() {
         assert!(done.iter().all(|r| r.as_ref().is_ok_and(|o| o.ok)), "{done:?}");
     }
 }
+
+/// A repository called `-x` or `--upload-pack=x` must not become an option: the runner refuses a
+/// leading `-` from any placeholder but `var.*` unless a `--` came first, `repo` and `root` too.
+#[test]
+fn a_repository_value_starting_with_a_dash_is_refused_before_any_dashdash() {
+    let (t, repo) = fixture();
+    for hostile in ["-x", "--upload-pack=x"] {
+        for field in ["repo", "root"] {
+            let mut p = payload(&repo, Kind::Line);
+            p.repo.name = hostile.into();
+            p.repo.root = hostile.into();
+            let arg = format!("{{{field}}}");
+            let got = record(t.path(), &["--flag", &arg], Stdin::None, &p);
+            assert!(matches!(got, Err(RunError::Refused(_))), "{field} {hostile}: {got:?}");
+            let got = record(t.path(), &["--", &arg], Stdin::None, &p).expect("after --");
+            assert_eq!(got, ["--", hostile], "{field}");
+            let prefixed = format!("--flag={arg}");
+            let got = record(t.path(), &[&prefixed], Stdin::None, &p).expect("prefixed");
+            assert_eq!(got, [format!("--flag={hostile}")]);
+        }
+    }
+}

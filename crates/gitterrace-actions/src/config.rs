@@ -53,9 +53,10 @@ pub(crate) const FIELDS: [&str; 11] = [
     "root",
     "kind",
 ];
-/// Fields whose values come from the browsed repository. One of them opening an argv element
-/// could be read as an option (`--upload-pack=...`), so the loader asks for a guard first.
-pub(crate) const REPO_FIELDS: [&str; 4] = ["title", "markdown", "text", "path"];
+/// Fields whose values come from the browsed repository, its name and its location included
+/// (a directory may be called `--upload-pack=x`). One of them opening an argv element could be
+/// read as an option, so the loader asks for a guard first and the runner refuses a leading `-`.
+pub(crate) const REPO_FIELDS: [&str; 6] = ["title", "markdown", "text", "path", "repo", "root"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConfigError {

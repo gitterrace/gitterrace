@@ -97,7 +97,7 @@ id      = "edit"
 label   = "Open in editor"
 enabled = false
 kinds   = ["line"]
-command = ["~/.config/gitterrace/editor.sh", "{line_start}", "{root}/{path}"]
+command = ["~/.config/gitterrace/editor.sh", "{line_start}", "--", "{root}/{path}"]
 stdin   = "none"
 
 # Adds a task with the tendir command line tool.

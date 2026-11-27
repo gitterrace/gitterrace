@@ -73,6 +73,7 @@ codesign stamp their own data. CI runs the check on every push.
 | MCP server | the process that started it | Read-only tools, the same feature switches as `/api/v1` |
 | `open` and `gitterrace://` | the OS | Strict link parse, only known clones, no network for an unknown id |
 | Static export | wherever it is hosted | No local pages, the content security policy in a `_headers` file the host must apply |
+| Action arguments | the runner | A repository name or path that starts with `-` never opens an argv element without a `--` or a literal prefix: refused at load, and again by the runner |
 | Repository content | rendered pages | Escaped, inline script refused, actions never load from the repository |
 
 Tests walk every route of the built server, so a new route is covered without a
