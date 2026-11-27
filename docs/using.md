@@ -13,7 +13,8 @@ find commits, share a line, work with an agent and change a setting.
 4. Pick a **Send to** target, add a note and press Send.
 
 Good to know: the chip shows only while the tree has changes. Without a
-`[[send]]` target, **Copy as markdown** puts the note on the clipboard.
+`[[send]]` target, **Copy as markdown** puts the note on the clipboard. If the
+clipboard refuses, the window stays open with your draft and shows the error.
 Mail draft is there from the start. `git terrace init` writes `actions.toml`
 with more targets (issues, merge requests, your editor, a webhook). Switch one
 on with `enabled = true`, and [Send to and actions](actions.md) covers the rest.

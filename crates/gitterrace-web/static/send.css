@@ -6,6 +6,9 @@
 .send-ctx{border:0;border-radius:0;resize:none;flex:none;field-sizing:content;min-height:calc(1.5em*4 + var(--space-3)*2);max-height:60vh;overflow-y:auto;padding:var(--space-3) var(--space-4);font-family:var(--font-mono);font-size:var(--text-sm);line-height:1.5;background:transparent;color:var(--fg)}
 .send-foot{display:flex;gap:var(--space-3);align-items:center;padding:var(--space-2) var(--space-4);border-top:var(--border);background:var(--soft);flex:none}
 .send-pick{min-width:0;max-width:50%;height:28px;padding-left:var(--space-3);font:var(--text-sm) var(--sans);color:var(--fg);background-color:var(--bg);border:var(--border);border-radius:var(--radius)}
+.send-err{margin:0;padding:var(--space-2) var(--space-4) 0;color:var(--del);
+  font-size:var(--text-sm);flex:none}
+.send-err:empty{display:none}
 .send-hint{margin-left:auto;color:var(--muted);font-size:var(--text-xs)}
 .send-head{margin:0;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-base);font-weight:var(--weight-semibold);color:var(--fg);flex:none}
 .send-lab{display:block;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-xs);color:var(--muted);flex:none}

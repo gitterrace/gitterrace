@@ -97,6 +97,8 @@
     cancel.type = "button";
     cancel.addEventListener("click", function () { close(); });
     var hint = el("span", "send-hint", (/Mac|iP/.test(navigator.platform) ? "Cmd" : "Ctrl") + "+Enter to send");
+    var err = el("p", "send-err");
+    err.setAttribute("role", "alert");
     foot.appendChild(pick);
     foot.appendChild(hint);
     foot.appendChild(cancel);
@@ -106,6 +108,7 @@
     box.appendChild(title);
     box.appendChild(ctxLab);
     box.appendChild(ctx);
+    box.appendChild(err);
     box.appendChild(foot);
     cur = { box: dlg, targets: [] };
     window.gtOverlay.open("send", dlg, box, { label: "Send", onClose: function () { if (cur && cur.box === dlg) cur = null; } });
@@ -137,12 +140,17 @@
     void load().then(function (l) { if (cur && cur.box === dlg && Array.isArray(l)) fillPick(l); });
 
     function send() {
+      err.textContent = "";
       var id = pick.value;
       remember(id);
       if (id === COPY) {
         var text = title.value + "\n\n" + ctx.value;
-        // gtCopy toasts its own failure and never rejects.
-        void window.gtCopy(text, "Copied with context").then(function () { close(); });
+        // gtCopy never rejects and answers false on failure: the window stays open with the
+        // draft, and says so beside the buttons as well as in the short-lived toast.
+        void window.gtCopy(text, "Copied with context").then(function (ok) {
+          if (ok) { close(); return; }
+          err.textContent = "Copy failed. Your text is kept; copy it by hand.";
+        });
         return;
       }
       var t = cur.targets.filter(function (x) { return x.id === id; })[0];

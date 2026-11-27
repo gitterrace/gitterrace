@@ -52,5 +52,37 @@ export function checks(env) {
       }
     });
   }
-  return { sendDialog };
+  // A clipboard that refuses keeps the window open with the typed text and shows the error.
+  async function sendCopyFailure() {
+    await eachBrowser(browsers, context, async (ctx, name) => {
+      const p = await ctx.newPage();
+      await p.goto(srv.base + '/blob/HEAD/a.txt', { waitUntil: 'load' });
+      await p.evaluate(() => {
+        Object.defineProperty(navigator, 'clipboard', {
+          configurable: true,
+          value: { writeText: () => Promise.reject(new Error('denied')) },
+        });
+        document.execCommand = () => false;
+      });
+      await p.keyboard.press('.');
+      await p.keyboard.press('s');
+      await p.waitForSelector('.send-ctx');
+      await p.selectOption('.send-pick', '__copy');
+      const note = 'my draft note, not to be lost';
+      await p.fill('.send-ctx', note);
+      await p.click('.send-go');
+      const where = `send-copy-failure ${name}`;
+      await p.waitForSelector('.send-err:not(:empty)', { timeout: 5000 }).then(
+        () => r.ok(`${where}: an error is shown`),
+        () => r.fail(`${where}: no error shown`));
+      const kept = await p.evaluate(() => {
+        const t = /** @type {HTMLTextAreaElement | null} */ (document.querySelector('.send-ctx'));
+        return t ? t.value : null;
+      });
+      if (kept === note) r.ok(`${where}: the draft survives`);
+      else r.fail(`${where}: draft ${JSON.stringify(kept)}`);
+      await p.close();
+    });
+  }
+  return { sendDialog, sendCopyFailure };
 }
