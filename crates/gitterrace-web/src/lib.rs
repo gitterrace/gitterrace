@@ -67,6 +67,7 @@ mod reload;
 mod review_panel;
 mod risk;
 mod routes;
+mod scope_switch;
 mod search;
 #[cfg(test)]
 mod security_class_tests;

@@ -452,14 +452,20 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
                 ..views::chrome(a, "log")
             }
             .pinned(),
-            head: PageHead::new(
-                d.summary.subject.clone(),
-                Tagline::of(&format!(
-                    "{} \u{b7} {}",
-                    fmt::count(d.files.len(), "changed file", "changed files"),
-                    fmt::count(d.summary.parents.len(), "parent", "parents"),
-                )),
-            ),
+            head: PageHead {
+                tools: crate::scope_switch::render(
+                    &crate::scope_switch::Page::Commit { id: &id },
+                    &crate::scope_switch::Scope::of(a),
+                ),
+                ..PageHead::new(
+                    d.summary.subject.clone(),
+                    Tagline::of(&format!(
+                        "{} \u{b7} {}",
+                        fmt::count(d.files.len(), "changed file", "changed files"),
+                        fmt::count(d.summary.parents.len(), "parent", "parents"),
+                    )),
+                )
+            },
             sha: fmt::sha_link(&id),
             body: squeeze_blank_lines(d.body.trim()),
             author: d.summary.author.name.clone(),

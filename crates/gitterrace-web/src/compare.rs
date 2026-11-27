@@ -186,9 +186,18 @@ pub(crate) async fn page(
                 label: "Commits",
                 href: href(&format!("/log/{}", enc_seg(&h2))),
             }],
-            toolbar: CmpForm { action: href("/compare"), base: b2, head: h2, merge }
-                .render()
-                .unwrap_or_default(),
+            toolbar: CmpForm {
+                action: href("/compare"),
+                base: b2.clone(),
+                head: h2.clone(),
+                merge,
+            }
+            .render()
+            .unwrap_or_default(),
+            tools: crate::scope_switch::render(
+                &crate::scope_switch::Page::Compare { base: &b2, head: &h2 },
+                &crate::scope_switch::Scope::of(a),
+            ),
             ..PageHead::new("Compare", tagline)
         };
         ComparePage { c, page_head, pick: pick.or(state), error, result }

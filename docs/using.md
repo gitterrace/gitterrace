@@ -56,6 +56,12 @@ log of each clone that shares a root commit.
 2. On the compare page, **since fork** switches between that view (`A...B`)
    and every commit in B that A lacks (`A..B`).
 
+A commit and a compare page share a **Scope** switch in the page head: **This
+commit**, **Branch vs default branch** and **Working tree**. An entry shows
+only when its page is served. The working tree is left out on a public server
+or when its feature is off, and the branch entry when HEAD is detached or
+compare is off.
+
 From a terminal, `git terrace --ref main...feature` opens the same page.
 `--print` prints the address instead.
 

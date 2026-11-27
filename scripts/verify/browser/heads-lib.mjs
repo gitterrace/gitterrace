@@ -71,6 +71,32 @@ export function checks({ srv, r, browsers, context }) {
       return form && head && head.contains(form) ? [] : ['the form is not in the head toolbar'];
     }), [390]);
   }
+  // The scope switcher sits in the title row of the commit and compare pages, one row at every
+  // width, and each of its links opens a page that exists.
+  async function scopeSwitch() {
+    const pages = ['/commit/HEAD', '/compare?base=HEAD~2&head=HEAD'];
+    for (const path of pages) {
+      await each(`scope ${path}`, path, async (p) => {
+        const bad = await p.evaluate(() => {
+          const out = [];
+          const seg = document.querySelector('main>.ph .segctl[aria-label="Scope"]');
+          if (!seg) return ['no scope switcher in the page head'];
+          const labels = [...seg.querySelectorAll('.segs a')].map((a) => a.textContent.trim());
+          if (!labels.includes('This commit') || labels.length < 2) out.push(`entries ${labels}`);
+          if (seg.querySelectorAll('.segs a[aria-current]').length > 1) out.push('two current');
+          return out;
+        });
+        const hrefs = await p.evaluate(() => [...document
+          .querySelectorAll('main>.ph .segctl[aria-label="Scope"] .segs a')]
+          .map((a) => /** @type {HTMLAnchorElement} */ (a).href));
+        for (const h of hrefs) {
+          const res = await p.request.get(h);
+          if (!res.ok()) bad.push(`${h} answers ${res.status()}`);
+        }
+        return bad;
+      }, [1440, 390]);
+    }
+  }
   async function crumbHeads() {
     // The path flows as one line of text: no crumb starts a new line while the "/" before it ends
     // the previous one, unless that crumb alone is wider than the heading.
@@ -149,5 +175,5 @@ export function checks({ srv, r, browsers, context }) {
       return bad;
     }));
   }
-  return { pageHeads, crumbHeads, compareHeads, commitHeads, searchHeads };
+  return { pageHeads, crumbHeads, compareHeads, commitHeads, searchHeads, scopeSwitch };
 }
