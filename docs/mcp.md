@@ -39,7 +39,9 @@ history and find risky code. It needs the
    `baseline_missing` true means that commit is gone and the files the
    checkpoint did not list were compared with the current HEAD, and
    `content_gone` names files whose saved copy was dropped and that show
-   against HEAD. `review.plan_files` caps the list and `review.test_siblings`
+   against HEAD. `history_unreadable` true is a different failure: the commits
+   since the checkpoint could not be read (a missing or unreadable tree), so
+   files only they changed may be missing from the plan. `review.plan_files` caps the list and `review.test_siblings`
    says what a test beside a file looks like.
 3. For the top files call `compare` or `worktree_diff` and `read_file` to
    read the change, and `blame` on the touched lines to see who holds them.

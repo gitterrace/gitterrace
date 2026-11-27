@@ -61,7 +61,9 @@ pub(super) fn review_text(a: &ReviewArgs) -> String {
          ownership, untested), and `skipped` names the lockfiles, generated and binary files left \
          out. If `truncated` is true, `files` holds only the riskiest rows (at most `limit`, never \
          more than `review.plan_files`) and `total_files` counts them all. `limit` and `query` \
-         cannot list the rest, so {rest}\n\
+         cannot list the rest, so {rest} With `since`, a true `baseline_missing` or \
+         `history_unreadable` means the plan may miss files, and `content_gone` names files shown \
+         against HEAD: say so in the report.\n\
          2. For the top files read the change with `compare` or `worktree_diff` and \
          `read_file`, and call `blame` on the lines it touches to see who knows the code.\n\
          3. Report each risk with the evidence from the tools: hotspot rank, owners, a missing \

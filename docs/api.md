@@ -52,7 +52,7 @@ each cap.
 | `GET /blame` | `rev`, `path` | commit, lines, link, path, permalink, rev, truncated |
 | `GET /contributors` | `rev`, `q`, `period`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | authors, bus_factor, rev |
 | `GET /file_insight` | `rev`, `q`, `period`, `path`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | age, authors_90d, bus_factor, churn, hot, kind, link, owners, partners, path, paths, permalink, rev |
-| `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, baseline_missing, content_gone, files, files_omitted, head, since, skipped, source, total_files, truncated |
+| `GET /review_plan` | `source`, `base`, `head`, `three_dot`, `scope`, `since`, `q`, `period`, `limit`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | base, baseline_missing, content_gone, files, files_omitted, head, history_unreadable, since, skipped, source, total_files, truncated |
 | `GET /insights` |  | insights |
 | `GET /insights/{name}` | `rev`, `q`, `period`, `label`, `metric`, `limit`, `path`, `author`, `min_support`, `cross_dir`, `bots`, `merges`, `generated`, `ignore`, `ws`, `exclude` | commits_indexed, data, insight, query, rev |
 

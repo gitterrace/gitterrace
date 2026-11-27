@@ -282,3 +282,40 @@ fn an_ordinary_plan_has_no_checkpoint_state_and_is_byte_stable() {
     assert!(a.since.is_none() && !a.baseline_missing && a.content_gone.is_empty());
     assert_eq!(a.base, git(d.path(), &["rev-parse", "HEAD"]).trim());
 }
+
+/// The existing missing-tree scenario: a checkpoint taken while `sub` was committed, then `sub`
+/// removed in a later commit whose old tree object is gone. Returns the checkpoint id.
+fn unreadable_history(s: &ApiState, p: &std::path::Path) -> String {
+    std::fs::create_dir(p.join("sub")).expect("mkdir");
+    std::fs::write(p.join("sub/x.txt"), "x\n").expect("w");
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "feat: sub"]);
+    let (id, _) = s.checkpoint_create("", false).expect("checkpoint");
+    let sub = git(p, &["rev-parse", "HEAD:sub"]).trim().to_owned();
+    git(p, &["rm", "-rq", "sub"]);
+    git(p, &["commit", "-qm", "fix: drop sub"]);
+    std::fs::remove_file(p.join(".git/objects").join(&sub[..2]).join(&sub[2..])).expect("object");
+    id
+}
+
+#[test]
+fn a_since_plan_carries_history_unreadable_like_the_worktree_answer() {
+    let d = tempfile::tempdir().expect("tmp");
+    let s = state(d.path());
+    let id = unreadable_history(&s, d.path());
+    std::fs::write(d.path().join("src/b.rs"), "fn b() { 7 }\n").expect("w");
+    let w = s.worktree_diff_since(None, None, Some(&id)).expect("worktree");
+    let plan = since_plan(&s, &id);
+    assert!(w.history_unreadable, "the worktree answer warns");
+    assert_eq!(plan.history_unreadable, w.history_unreadable);
+    assert!(!plan.baseline_missing && !plan.files_omitted, "a distinct state");
+    assert!(plan.files.iter().any(|f| f.path == "src/b.rs"), "the degraded plan keeps the files");
+    assert_eq!(plan.total_files, plan.files.len() + plan.skipped.len());
+    assert!(plan.files.iter().all(|f| f.hotspot.is_none()), "degraded: no history facts");
+    // A plan without `since` carries no flag. Checked in a healthy repository: this one's
+    // history is broken on purpose, and only a since plan has the flag to degrade under.
+    let h = tempfile::tempdir().expect("tmp");
+    let unpinned =
+        state(h.path()).review_plan(&PlanRequest::default(), &Params::default()).expect("plain");
+    assert!(!unpinned.history_unreadable);
+}

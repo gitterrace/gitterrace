@@ -40,6 +40,11 @@ pub fn risk_terms() -> [(&'static str, String); 4] {
     ]
 }
 
+/// The facts of a file whose history could not be read: no hotspot, no owners.
+const fn no_facts() -> FileFacts {
+    FileFacts { hotspot: None, owners: Vec::new(), bus_factor_one: false, sole_owner: false }
+}
+
 /// Folders whose files are tests themselves.
 const TEST_DIRS: [&str; 4] = ["test", "tests", "__tests__", "spec"];
 
@@ -80,6 +85,7 @@ struct Source {
     list: Vec<FileDiff>,
     since: Option<String>,
     baseline_missing: bool,
+    history_unreadable: bool,
     content_gone: Vec<String>,
     files_omitted: bool,
 }
@@ -106,6 +112,7 @@ impl ApiState {
             list,
             since,
             baseline_missing,
+            history_unreadable,
             content_gone,
             files_omitted,
         } = self.plan_source(req)?;
@@ -148,7 +155,14 @@ impl ApiState {
             let ins = self.insights(&tip, all, scope.options().clone());
             let counted = insights::counted(&ins, &scope, &**all);
             ins.file_facts(&heads, &counted, &paths)
-        })?;
+        });
+        let facts = match facts {
+            Ok(f) => f,
+            // Unreadable history is why the cache cannot record the commits either: the plan
+            // still lists the files, unscored by history, and says so through the flag.
+            Err(_) if history_unreadable => paths.iter().map(|_| no_facts()).collect(),
+            Err(e) => return Err(e),
+        };
         let mut files: Vec<PlanFile> = scored
             .iter()
             .zip(facts)
@@ -178,6 +192,7 @@ impl ApiState {
             files,
             files_omitted,
             head,
+            history_unreadable,
             since,
             skipped,
             source,
@@ -196,9 +211,11 @@ impl ApiState {
                 let w = self.worktree_list(req.scope, req.since)?;
                 let mut base = self.repo.resolve("HEAD")?;
                 let mut baseline_missing = false;
+                let mut history_unreadable = false;
                 let mut content_gone = Vec::new();
                 if let Some((_, cp_head, d)) = &w.since {
                     baseline_missing = d.baseline_missing;
+                    history_unreadable = d.history_unreadable;
                     content_gone.clone_from(&d.gone);
                     // The comparison is against the checkpoint's commit; with it missing, the
                     // base stays the current HEAD, which `base` already is.
@@ -214,6 +231,7 @@ impl ApiState {
                     list: w.files,
                     since: w.since.map(|s| s.0),
                     baseline_missing,
+                    history_unreadable,
                     content_gone,
                     files_omitted: w.files_omitted,
                 })
@@ -238,6 +256,7 @@ impl ApiState {
                     list,
                     since: None,
                     baseline_missing: false,
+                    history_unreadable: false,
                     content_gone: Vec::new(),
                     files_omitted: false,
                 })

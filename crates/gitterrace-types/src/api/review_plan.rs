@@ -107,6 +107,10 @@ pub struct PlanSkipped {
 }
 
 /// `GET /review_plan`.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "the contract lists each fact as its own JSON field"
+)]
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct ReviewPlan {
     /// The commit the changes are against. With `since`, the commit the checkpoint was taken
@@ -127,6 +131,10 @@ pub struct ReviewPlan {
     pub files_omitted: bool,
     /// Null for the working tree.
     pub head: Option<String>,
+    /// With `since`: the commits between the checkpoint and HEAD could not be read (a missing
+    /// or unreadable tree), so files only they changed may be missing from the plan. Not the
+    /// same as `baseline_missing`. False otherwise.
+    pub history_unreadable: bool,
     pub since: Option<String>,
     /// Files with no risk, in path order.
     pub skipped: Vec<PlanSkipped>,

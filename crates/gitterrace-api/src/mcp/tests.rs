@@ -497,4 +497,39 @@ async fn review_plan_since_a_checkpoint_reports_base_missing_baseline_and_gone_c
     let gone_id = add(vec![copy], &head);
     let gone = call(plan(serde_json::json!({ "since": gone_id })).await);
     assert_eq!(gone["content_gone"], serde_json::json!(["src/b.rs"]));
+    assert_eq!(gone["history_unreadable"], false);
+}
+
+/// The MCP plan carries `history_unreadable` when the commits since the checkpoint cannot be
+/// read, as the worktree answer does, and says so in its guidance.
+#[tokio::test]
+async fn review_plan_since_a_checkpoint_reports_unreadable_history() {
+    use rmcp::handler::server::wrapper::Parameters;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let p = dir.path();
+    let _ = Fixture::init(p).write("a.txt", "a\n").commit("feat: first");
+    let state = ApiState::open(p).expect("open");
+    state.refresh_index().expect("index");
+    std::fs::create_dir(p.join("sub")).expect("mkdir");
+    std::fs::write(p.join("sub/x.txt"), "x\n").expect("w");
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "feat: sub"]);
+    let (id, _) = state.checkpoint_create("", false).expect("checkpoint");
+    let sub = git(p, &["rev-parse", "HEAD:sub"]).trim().to_owned();
+    git(p, &["rm", "-rq", "sub"]);
+    git(p, &["commit", "-qm", "fix: drop sub"]);
+    std::fs::remove_file(p.join(".git/objects").join(&sub[..2]).join(&sub[2..])).expect("obj");
+    let w = state.worktree_diff_since(None, None, Some(&id)).expect("worktree");
+    assert!(w.history_unreadable);
+    let s = McpServer::new(state);
+    let a = Parameters(serde_json::from_value(serde_json::json!({ "since": id })).expect("args"));
+    let plan = call(s.review_plan(a).await);
+    assert_eq!(plan["history_unreadable"], true);
+    assert_eq!(plan["baseline_missing"], false);
+    assert!(
+        crate::mcp::prompts::review_text(&crate::mcp::prompts::ReviewArgs::default())
+            .contains("history_unreadable"),
+        "the guidance names the state"
+    );
 }
