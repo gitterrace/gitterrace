@@ -57,6 +57,17 @@ Phone: the commit page on a 390 px wide screen.
 
 Shows [ripgrep 15.2.0](https://github.com/BurntSushi/ripgrep/tree/15.2.0).
 
+## Hotspots on a phone
+
+Hotspots on a phone: the key numbers and the chart on a 390 px wide screen.
+
+<picture>
+<source media="(prefers-color-scheme: dark)" srcset="narrow-insights-dark.webp">
+<img src="narrow-insights-light.webp" alt="Hotspots on a phone: the key numbers and the chart on a 390 px wide screen.">
+</picture>
+
+Shows [jq jq-1.8.2](https://github.com/jqlang/jq/tree/jq-1.8.2).
+
 ## Send to
 
 Send to: marked lines with their context, ready for mail, an issue, a merge

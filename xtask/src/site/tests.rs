@@ -7,60 +7,57 @@ fn landing() -> String {
     pages.into_iter().find(|p| p.0 == "index.html").map(|p| p.1).expect("landing page")
 }
 
-/// The landing page shows the hero thumbnail and one full-size showcase, each one picture whose
-/// dark source follows the system, with a link to the live demo and no overlay.
+/// The window on the landing page turns through the views of `REEL`, each one picture whose
+/// dark source follows the system and each with a link that names it. The phone's first view
+/// and the two crops are the only other pictures.
 #[test]
-fn landing_shows_one_full_size_screenshot_beside_the_hero() {
-    let page = landing();
+fn the_window_shows_every_view_once_with_a_link_to_it() {
+    let page = landing().replace('\n', " ");
     assert_eq!(page.matches("<figure ").count(), 1);
-    assert_eq!(page.matches("screenshots/insights-light.webp").count(), 1);
-    assert_eq!(page.matches("screenshots/insights-dark.webp").count(), 1);
-    assert_eq!(page.matches("screenshots/overview-light.thumb.webp").count(), 1);
-    assert_eq!(page.matches("<picture").count(), 2);
-    assert!(!page.contains("class=\"x\"") && !page.contains("id=\"shot-"));
-}
-
-/// Every code fence on the landing page carries `s-*` highlight classes. A fence that bypasses
-/// the shared handler comes out bare, and so does a fence whose language the highlighter does
-/// not know (a typo such as `tomll`), which would otherwise pass as plain text unseen.
-#[test]
-fn every_landing_code_block_is_highlighted() {
-    let page = landing();
-    let mut seen = 0;
-    for block in page.split("<pre>").skip(1) {
-        let block = block.split("</pre>").next().expect("pre body");
-        seen += 1;
-        assert!(block.contains("class=\"s-"), "unhighlighted code block: {block}");
+    for stem in landing::REEL {
+        assert_eq!(page.matches(&format!("screenshots/{stem}-light.webp")).count(), 1, "{stem}");
+        assert_eq!(page.matches(&format!("screenshots/{stem}-dark.webp")).count(), 1, "{stem}");
+        assert_eq!(page.matches(&format!(" id=\"{stem}\"")).count(), 1, "{stem}");
+        assert_eq!(page.matches(&format!(" href=\"#{stem}\"")).count(), 1, "{stem}");
     }
-    assert!(seen >= 5, "{seen} code blocks");
+    assert_eq!(page.matches("<picture").count(), landing::REEL.len() + 3);
+    assert!(!page.contains(".thumb.webp"));
 }
 
-/// Only the hero loads at once, and it is the one marked high priority.
+/// The first view is hotspots, the one that loads with the page, and it is marked high
+/// priority. Every other image waits until it comes near.
 #[test]
-fn only_the_hero_picture_is_eager() {
+fn only_the_first_view_is_eager() {
     let page = landing().replace('\n', " ");
     let eager = page.matches("<img ").count() - page.matches("loading=\"lazy\"").count();
     assert_eq!(eager, 1);
-    assert!(page.contains("fetchpriority=\"high\""));
+    let first = page.split("<img ").nth(1).expect("an image");
+    assert!(first.starts_with("src=\"/assets/screenshots/insights-light.webp"), "{first}");
+    assert!(first.split('>').next().is_some_and(|t| t.contains("fetchpriority=\"high\"")));
 }
 
-/// The hero names the brew command first with `git terrace` under it, and the buttons go to
-/// the install section, the demo and the repository.
+/// Above the window the page names the brew command first with `git terrace` under it, a
+/// Copy button that carries that command, and where the other ways to install are.
 #[test]
-fn the_hero_shows_brew_and_git_terrace_above_the_fold() {
-    let page = landing();
-    let hero = page.split_once("<div class=\"trust\"").map_or("", |h| h.0);
-    let plain = hero.split('<').map(|s| s.split_once('>').map_or(s, |x| x.1)).collect::<String>();
-    let brew = plain.find("brew install").expect("brew in hero");
+fn the_fold_shows_brew_and_git_terrace_with_a_copy_button() {
+    let page = landing().replace('\n', " ");
+    let fold = page.split_once("<figure class=\"shots\"").map_or("", |h| h.0);
+    let plain = fold.split('<').map(|s| s.split_once('>').map_or(s, |x| x.1)).collect::<String>();
+    let brew = plain.find("brew install").expect("brew in the fold");
     assert!(plain[brew..].contains("git terrace"));
-    assert!(hero.contains("href=\"#install\""));
-    assert!(hero.contains(">GitHub</a>"));
+    assert!(fold.contains("data-copy=\"brew install "), "{fold}");
+    assert!(fold.contains("href=\"/docs/getting-started/#install\""));
+    assert_eq!(fold.matches("class=\"btn\"").count(), 1, "one button beside the command");
 }
 
-/// The hand-off section shows the MCP registration the docs name.
+/// The page carries its script inline, and the buttons that script switches on are hidden
+/// until it runs, so without it nothing on the page is a dead control.
 #[test]
-fn the_hand_off_names_the_mcp_command() {
-    assert!(landing().contains("git terrace mcp --served"));
+fn the_landing_script_is_inline_and_its_buttons_start_hidden() {
+    let page = landing();
+    assert!(page.contains(&format!("<script>{}</script>", landing_script())));
+    assert!(page.replace('\n', " ").contains("class=\"turn\" hidden>"));
+    assert!(!landing_script().contains("\n//"));
 }
 
 #[test]
@@ -119,15 +116,6 @@ fn internals_pages_give_every_heading_its_slug_as_id() {
         docs::body(text, "docs/internals/x.md", &links, &mut |_, h| docs::slug(h)).expect("body");
     assert!(html.contains("<h2 id=\"code-age-and-releases\">Code age and releases</h2>"));
     assert_eq!(docs::page_path("architecture"), "docs/architecture/");
-}
-
-/// The install tabs show every way, brew first and open, and each way has a radio, a label
-/// and a panel the CSS can reach.
-#[test]
-fn install_tabs_pair_every_radio_with_a_panel() {
-    for way in ["curl", "brew", "cargo"] {
-        assert!(PAGE_CSS.contains(&format!("#install-{way}:checked~#panel-{way}")));
-    }
 }
 
 /// Every relative link, image and `#anchor` of the generated pages that does not resolve to a

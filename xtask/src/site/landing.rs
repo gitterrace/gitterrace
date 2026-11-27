@@ -1,29 +1,27 @@
-//! The landing page from `templates/landing.html`: the pitch, the why beside the overview,
-//! install, the quickstart, one large screenshot with two lines for what it cannot show, and the
-//! promises. Its prose lives in `docs/landing.md`, each sentence once, and no landing sentence
-//! repeats on the page or in another doc.
+//! The landing page from `templates/landing.html`: the pitch broken over a step, the install
+//! command, the app in a window that turns through a few real views, the review and hand-off
+//! stories, and the promises. Its prose lives in `docs/landing.md`, each sentence once, and no
+//! landing sentence repeats on the page or in another doc.
 
 use askama::Template;
 use pulldown_cmark::{Parser, html};
 
 use crate::facts::Workspace;
 use crate::readme_agents_md;
-use crate::site::docs::{Links, code_block, fences};
+use crate::site::docs::{Links, fences};
 
 /// The landing page's words, one `##` section per block, each sentence here once.
 pub(crate) const LANDING: &str = "docs/landing.md";
 /// The section of the landing copy with the promises, which link to the security model.
 pub(crate) const SAFETY: &str = "What it does with your code";
-/// The section of the landing copy beside the overview picture.
-const WHY: &str = "Why";
 /// The folder under `.git/` the cache lives in (`Index::open`). The files in it are
 /// `CACHE_FILES`, so the prose may name only those.
 const CACHE_DIR: &str = ".git/gitterrace/";
 
-/// The screenshots (the landing page shows the hero and `SHOWCASE`): file stem,
-/// alt text ("Caption: what it shows"), caption. The site has a WebP pair per entry; the
-/// README shows the first, and `docs/screenshots/` keeps only the PNG files the README links.
-pub const SHOTS: [(&str, &str, &str); 8] = [
+/// The screenshots: file stem, alt text ("Caption: what it shows"), caption. The repository
+/// has a WebP pair per entry, the README shows two, and the landing page shows `REEL`,
+/// `NARROW` and the two crops.
+pub const SHOTS: [(&str, &str, &str); 9] = [
     (
         "insights",
         "Hotspots: the files that change most, against how many people touch them.",
@@ -42,6 +40,11 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
     ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
     ("narrow", "Phone: the commit page on a 390 px wide screen.", "Phone"),
     (
+        NARROW,
+        "Hotspots on a phone: the key numbers and the chart on a 390 px wide screen.",
+        "Hotspots on a phone",
+    ),
+    (
         "send",
         "Send to: marked lines with their context, ready for mail, an issue, a merge request or \
          your task list.",
@@ -59,29 +62,35 @@ pub const SHOTS: [(&str, &str, &str); 8] = [
     ),
 ];
 
-/// The one large screenshot on the landing page, shown full size.
-pub(super) const SHOWCASE: &str = "insights";
-pub(super) const HERO: &str = "overview";
+/// The views the window on the landing page turns through, in order. The first loads with
+/// the page, the others when they come near.
+pub(super) const REEL: [&str; 4] = ["insights", "ownership", "blame", "overview"];
+/// The first view on a phone: hotspots in the 390 px layout, where the wide shot would be
+/// too small to read.
+pub(super) const NARROW: &str = "narrow-insights";
+/// The shots the two stories show a part of: the diff of a commit, the Send to window.
+pub(super) const CROPS: [&str; 2] = ["commit", "send"];
 
-/// The pixel size of a shot's thumbnail and of its full-size file. The phone crop is a 390 px
+/// The pixel size of a shot's thumbnail and of its full-size file. A phone shot is a 390 px
 /// wide screen at 2x, the rest a 1280x800 window at 2x.
 pub(crate) fn sizes(stem: &str) -> ((u32, u32), (u32, u32)) {
-    if stem == "narrow" { ((390, 780), (780, 1560)) } else { ((1280, 800), (2560, 1600)) }
+    match stem {
+        "narrow" => ((390, 780), (780, 1560)),
+        NARROW => ((390, 600), (780, 1200)),
+        _ => ((1280, 800), (2560, 1600)),
+    }
 }
 
-/// The alt text of the hero under the pitch: the repository page, which shows what it is.
-const HERO_ALT: &str = "The repository page: README, last commit, file list and key numbers.";
-
-/// What the screenshots cannot show, one line each: (title, docs page, docs section whose
-/// first paragraph is the line). The text is the doc's own, so the landing page says nothing
-/// the docs do not.
-const LINES: [(&str, &str, &str); 2] = [
-    ("Actions", "docs/actions.md", "Actions"),
-    ("Many repositories", "docs/using.md", "Browse several repositories"),
+/// What the review story links, under its picture: (label, docs path with anchor). The
+/// site's link check fails on an anchor that is gone.
+const REVIEW: [(&str, &str); 4] = [
+    ("Mark files as viewed", "docs/using/#mark-files-as-viewed"),
+    ("Find in the whole diff", "docs/using/#find-in-the-whole-diff"),
+    ("Review order", "docs/using/#review-order"),
+    ("Checkpoints", "docs/using/#checkpoints"),
 ];
 
-/// Where a finding goes, shown as a row under the pitch so "any tool" reads at a glance:
-/// (label, docs path with anchor). The site's link check fails on an anchor that is gone.
+/// Where a finding goes, under the hand-off picture, so "any tool" reads at a glance.
 const DESTINATIONS: [(&str, &str); 6] = [
     ("Coding agents", "docs/actions/#hand-a-finding-to-an-agent"),
     ("Your editor", "docs/actions/#the-starter-file"),
@@ -94,21 +103,24 @@ const DESTINATIONS: [(&str, &str); 6] = [
 #[derive(Template)]
 #[template(path = "landing.html")]
 struct Landing<'a> {
-    pitch: &'a str,
-    install: Vec<(&'static str, String)>,
-    bin: &'a str,
-    requires: Vec<String>,
-    quickstart: String,
-    showcase: (&'a str, &'a str, &'a str, &'a str),
-    hero: (&'a str, &'a str),
-    hero_cmds: String,
-    handoff: String,
+    /// The pitch's two headline lines, one per step.
+    l1: &'a str,
+    l2: &'a str,
+    why: &'a str,
     demo: &'a str,
-    repo: &'a str,
-    lines: Vec<(&'a str, String, String)>,
+    demo_note: &'a str,
+    /// The first install command, which Copy copies.
+    cmd: &'a str,
+    addr: &'a str,
+    reel: Vec<(&'a str, &'a str, &'a str)>,
+    narrow: (&'a str, &'a str),
+    review: &'a str,
+    review_links: &'a [(&'a str, &'a str)],
+    diff: (&'a str, &'a str),
+    handoff: &'a str,
+    handoff_links: &'a [(&'a str, &'a str)],
+    send: (&'a str, &'a str),
     promises: &'a str,
-    story: &'a str,
-    destinations: &'a [(&'a str, &'a str)],
 }
 
 /// The landing page's body, its h1 first. `read` reads a repository file.
@@ -118,79 +130,70 @@ pub(crate) fn body(
     links: &Links,
     read: &dyn Fn(&str) -> anyhow::Result<String>,
 ) -> anyhow::Result<String> {
-    let pkg = ws.packages.get("gitterrace").ok_or_else(|| anyhow::anyhow!("package gitterrace"))?;
     let copy = read(LANDING)?;
-    let promises = section(&copy, SAFETY)
-        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {SAFETY}' section"))?;
+    let part = |title: &str| {
+        section(&copy, title)
+            .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {title}' section"))
+    };
+    let promises = part(SAFETY)?;
     check_facts(promises)?;
-    let story = section(&copy, WHY)
-        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## {WHY}' section"))?;
-    let mut rows = Vec::new();
-    for (title, doc, head) in LINES {
-        let text = read(doc)?;
-        let para = section(&text, head)
-            .and_then(|s| s.split("\n\n").map(str::trim).find(|p| !p.is_empty()))
-            .ok_or_else(|| anyhow::anyhow!("{doc} has no '## {head}' paragraph"))?;
-        let para = lead(para).ok_or_else(|| {
-            anyhow::anyhow!("{doc} '## {head}' opens with no sentence that stands alone")
-        })?;
-        let path = crate::site::docs::page_path(crate::site::docs::stem(doc));
-        rows.push((title, format!("{path}#{}", crate::site::docs::slug(head)), plain(para)));
-    }
-    let (file, alt, cap) = SHOTS
-        .iter()
-        .find(|s| s.0 == SHOWCASE)
-        .copied()
-        .ok_or_else(|| anyhow::anyhow!("no shot {SHOWCASE}"))?;
-    let what = alt.split_once(": ").map_or(alt, |(_, rest)| rest);
-    let handoff = section(&copy, "Hand-off")
-        .ok_or_else(|| anyhow::anyhow!("{LANDING} has no '## Hand-off' section"))?;
+    let (l1, l2) = headline(pitch)?;
     let install = readme_agents_md::install_lines(ws);
+    let reel = REEL.iter().copied().map(shot).collect::<anyhow::Result<Vec<_>>>()?;
+    let pair = |stem: &str| shot(stem).map(|s| (s.0, s.1));
     let html = Landing {
-        pitch,
-        install: install
-            .iter()
-            .map(|(way, line)| (*way, code_block(&format!("{line}\n"), "bash")))
-            .collect(),
-        bin: pkg.bins.first().map_or("", String::as_str),
-        requires: requirements(ws),
-        quickstart: code_block(&readme_agents_md::quickstart(), "bash"),
-        showcase: (file, alt, cap, what),
-        hero: (HERO, HERO_ALT),
-        hero_cmds: code_block(
-            &format!("{}\ngit terrace\n", install.first().map_or("", |(_, l)| l.as_str())),
-            "bash",
-        ),
-        handoff: md(handoff, links)?,
+        l1,
+        l2: &l2,
+        why: &md(part("Why")?, links)?,
         demo: &ws.demo,
-        repo: &pkg.repository,
-        lines: rows,
+        demo_note: &listed(ws.demo_repos.iter().map(|r| r.0.as_str())),
+        cmd: install.first().map_or("", |(_, l)| l.as_str()),
+        addr: gitterrace_config::DEFAULT_ADDR,
+        reel,
+        narrow: pair(NARROW)?,
+        review: &md(part("Review")?, links)?,
+        review_links: &REVIEW,
+        diff: pair(CROPS[0])?,
+        handoff: &md(opening(part("Hand-off")?), links)?,
+        handoff_links: &DESTINATIONS,
+        send: pair(CROPS[1])?,
         promises: &md(promises, links)?,
-        story: &md(story, links)?,
-        destinations: &DESTINATIONS,
     }
     .render()?;
     Ok(format!("{html}\n"))
 }
 
-/// What the release ships for Windows and the Rust a `cargo install` needs, both from cargo
-/// metadata. There is no git version to name: every read goes through gix, and git itself
-/// only dispatches `git terrace`.
-pub(crate) fn requirements(ws: &Workspace) -> Vec<String> {
-    let mut parts = Vec::new();
-    let windows = ws.targets.iter().any(|t| t.contains("windows"));
-    if windows && !ws.windows_archive.is_empty() {
-        parts.push(format!(
-            "Windows: a {} from the release",
-            ws.windows_archive.trim_start_matches('.')
-        ));
+/// The entry of `SHOTS` with this stem.
+fn shot(stem: &str) -> anyhow::Result<(&'static str, &'static str, &'static str)> {
+    SHOTS.iter().find(|s| s.0 == stem).copied().ok_or_else(|| anyhow::anyhow!("no shot {stem}"))
+}
+
+/// The pitch's first clause as the headline's two lines, broken before "before": line one
+/// stands on the upper step and line two, with its full stop, on the lower. The rest of the
+/// pitch is what the hand-off story shows. A pitch of another form fails generation, since
+/// the page is drawn around this break.
+fn headline(pitch: &str) -> anyhow::Result<(&str, String)> {
+    let clause = pitch.split([',', '.']).next().unwrap_or(pitch);
+    let (l1, rest) = clause
+        .split_once(" before ")
+        .ok_or_else(|| anyhow::anyhow!("the pitch has no ' before ' to break the headline at"))?;
+    Ok((l1, format!("before {rest}.")))
+}
+
+/// The first paragraph of a section. The hand-off story shows its lead beside a picture; the
+/// examples under it stay in the copy, which the site also serves as the page's markdown.
+fn opening(section: &str) -> &str {
+    section.split("\n\n").map(str::trim).find(|p| !p.is_empty()).unwrap_or("")
+}
+
+/// Names as a phrase: "a", "a and b", "a, b and c".
+fn listed<'a>(names: impl Iterator<Item = &'a str>) -> String {
+    let names: Vec<&str> = names.collect();
+    match names.split_last() {
+        Some((last, rest)) if !rest.is_empty() => format!("{} and {last}", rest.join(", ")),
+        Some((last, _)) => (*last).to_owned(),
+        None => String::new(),
     }
-    if let Some(msrv) =
-        ws.packages.get("gitterrace").map(|p| p.rust_version.as_str()).filter(|v| !v.is_empty())
-    {
-        parts.push(format!("With cargo, Rust {msrv} or newer"));
-    }
-    parts
 }
 
 /// The body of the `## title` section of a markdown text, up to the next `## `.
@@ -199,36 +202,6 @@ pub(crate) fn section<'a>(text: &'a str, title: &str) -> Option<&'a str> {
     let start = text.find(&head)? + head.len();
     let end = text[start..].find("\n## ").map_or(text.len(), |i| start + i);
     Some(&text[start..end])
-}
-
-/// The sentences of a paragraph up to the last one that ends in `.`, so a lead-in to a
-/// code block ("...holds repositories:") never ends a landing line. None if there is none.
-fn lead(para: &str) -> Option<&str> {
-    let t = para.trim_end();
-    if t.ends_with('.') {
-        return Some(t);
-    }
-    // Markdown wraps lines, so a sentence end is ". " or ".\n".
-    let end = t.rfind([' ', '\n']).and_then(|_| {
-        t.char_indices()
-            .rfind(|&(i, c)| c == '.' && t[i + 1..].starts_with([' ', '\n']))
-            .map(|(i, _)| i + 1)
-    })?;
-    Some(&t[..end])
-}
-
-/// One markdown paragraph as plain text for an escaped template value: links keep their
-/// words, code keeps its text, line breaks become spaces.
-fn plain(para: &str) -> String {
-    let mut out = String::new();
-    for ev in Parser::new_ext(para, gitterrace_web::markdown_options()) {
-        match ev {
-            pulldown_cmark::Event::Text(t) | pulldown_cmark::Event::Code(t) => out.push_str(&t),
-            pulldown_cmark::Event::SoftBreak => out.push(' '),
-            _ => {}
-        }
-    }
-    out
 }
 
 /// Fails when the prose names a fact the code owns and gets it wrong: an `ip:port` in code that
@@ -296,13 +269,6 @@ mod tests {
     /// The promises name the default address the code uses, and a wrong address, cache
     /// folder or cache file fails the build.
     #[test]
-    fn a_landing_line_ends_on_a_full_stop_never_on_a_colon() {
-        assert_eq!(lead("One. Two."), Some("One. Two."));
-        assert_eq!(lead("One server. Give paths:"), Some("One server."));
-        assert_eq!(lead("Give several paths:"), None);
-    }
-
-    #[test]
     fn landing_prose_that_names_a_wrong_address_or_cache_path_fails() {
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../docs/landing.md");
         let copy = std::fs::read_to_string(path).expect("landing.md");
@@ -316,20 +282,41 @@ mod tests {
         check_facts("`.git/gitterrace/`, `.git/info/exclude` and `127.0.0.1:4242`").expect("ok");
     }
 
-    /// The requirements name the Windows archive and the MSRV from cargo metadata, so a bump
-    /// in Cargo.toml shows on the page without an edit.
+    /// The headline is the pitch's first clause in two lines, and a pitch that cannot be
+    /// broken that way stops generation instead of drawing a one-line step.
     #[test]
-    fn requirements_come_from_cargo_metadata() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
-        let ws = crate::facts::load(&root).expect("metadata");
-        let msrv = &ws.packages["gitterrace"].rust_version;
-        assert_eq!(
-            requirements(&ws),
-            [
-                "Windows: a zip from the release".to_owned(),
-                format!("With cargo, Rust {msrv} or newer")
-            ]
-        );
+    fn the_headline_breaks_the_pitch_before_before() {
+        let (l1, l2) = headline("Review your repo before you push, and hand it on.").expect("ok");
+        assert_eq!((l1, l2.as_str()), ("Review your repo", "before you push."));
+        assert!(headline("Browse any repository.").is_err());
+    }
+
+    /// The demo note names every repository the demo shows, however many there are.
+    #[test]
+    fn names_read_as_a_phrase() {
+        assert_eq!(listed(["a", "b", "c"].into_iter()), "a, b and c");
+        assert_eq!(listed(["a", "b"].into_iter()), "a and b");
+        assert_eq!(listed(["a"].into_iter()), "a");
+        assert_eq!(listed(std::iter::empty()), "");
+    }
+
+    /// The hand-off story is its lead alone, and a fence in the copy still comes out
+    /// highlighted, so a block the page shows later cannot bypass the shared handler.
+    #[test]
+    fn a_story_shows_its_first_paragraph_and_a_fence_is_highlighted() {
+        let copy = "\nLead one.\nStill lead.\n\n```toml\na = 1\n```\n";
+        assert_eq!(opening(copy), "Lead one.\nStill lead.");
+        assert_eq!(opening("\n"), "");
+        let s = md("```toml\na = 1\n```\n", &Links::new("R")).expect("md");
+        assert!(s.contains("<pre>") && s.contains("class=\"s-"), "{s}");
+    }
+
+    /// Every shot the page shows is in `SHOTS`, so its files are checked and it has alt text.
+    #[test]
+    fn every_shot_the_page_shows_is_registered() {
+        for stem in REEL.iter().chain(&CROPS).chain([&NARROW]) {
+            shot(stem).expect("registered");
+        }
     }
 
     /// A relative doc link in the promises points at its page on the site.
@@ -343,11 +330,10 @@ mod tests {
     }
 
     #[test]
-    fn a_section_ends_at_the_next_heading_and_a_paragraph_reads_as_plain_text() {
-        let text = "# T\n\n## A\n\nOne [link](x.md) and `code`\nwrapped.\n\nTwo.\n\n## B\n\nb\n";
+    fn a_section_ends_at_the_next_heading() {
+        let text = "# T\n\n## A\n\nOne.\n\nTwo.\n\n## B\n\nb\n";
         let a = section(text, "A").expect("A");
         assert!(!a.contains("## B") && a.contains("Two."), "{a:?}");
-        assert_eq!(plain("One [link](x.md) and `code`\nwrapped."), "One link and code wrapped.");
         assert!(section(text, "C").is_none());
     }
 }

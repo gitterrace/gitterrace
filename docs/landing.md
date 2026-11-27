@@ -6,8 +6,12 @@ tagline. Each sentence lives here once.
 
 ## Why
 
-Read a repository the way a reviewer will, before you push it. Review what your
-agents wrote, then pass each finding on with its context.
+Code, commits, blame, branches, worktrees, stashes and insights, with no
+database, accounts or network.
+
+## Review
+
+Review what your agents wrote, then pass each finding on with its context.
 
 ## What it does with your code
 
@@ -19,7 +23,9 @@ agents wrote, then pass each finding on with its context.
 ## Hand-off
 
 A finding is plain text with a source line, so it goes to the agent, editor,
-tracker or script you already use. One entry in `actions.toml` adds a target.
+tracker or script you already use.
+
+One entry in `actions.toml` adds a target.
 
 <!-- BEGIN GENERATED: example-claude -->
 ```toml

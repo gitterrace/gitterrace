@@ -138,9 +138,13 @@ pub fn render(root: &Path, ws: &Workspace) -> Result<Vec<Out>> {
         "<script type=\"application/ld+json\">{}</script>\n",
         agents::json_ld(pkg, &ws.targets)
     );
+    let script = vec![landing_script()];
     outs.push(Out::file(
         at("index.html"),
-        page(&site, &Body { desc: &pitch, inner: &h, head: &ld, ..Body::default() }),
+        page(
+            &site,
+            &Body { desc: &pitch, inner: &h, head: &ld, scripts: script, ..Body::default() },
+        ),
     ));
     let (pages, paths, twins) = docs::pages(root, &site)?;
     outs.extend(pages);
@@ -273,14 +277,23 @@ document.addEventListener('click',function(e){if(d.open&&!d.contains(e.target))d
 /// Every inline script on the page, so the CSP lists exactly these by hash.
 const SCRIPTS: [&str; 3] = [THEME_INIT_JS, THEME_TOGGLE_JS, MENU_JS];
 
-/// The body of the outline's inline script on a docs page with a rail: the app's own script,
-/// from a fresh line so its first line fits the page's line width. Its whole-line comments stay
-/// in the app's file: every docs page carries this copy, so it is held to the page's length.
+/// The body of the outline's inline script on a docs page with a rail: the app's own script.
+/// Every docs page carries this copy, so it is held to the page's length.
 pub(crate) fn outline_script() -> String {
-    let code: String = gitterrace_web::OUTLINE_JS
-        .split_inclusive('\n')
-        .filter(|l| !l.trim_start().starts_with("//"))
-        .collect();
+    code_lines(gitterrace_web::OUTLINE_JS)
+}
+
+/// The landing page's script (Copy on the install command, the buttons and the current mark of
+/// the window), from `templates/landing.js`. The page works without it.
+fn landing_script() -> String {
+    code_lines(include_str!("../templates/landing.js"))
+}
+
+/// A script file as an inline script body: without its whole-line comments, which stay in the
+/// file, and from a fresh line so its first line fits the page's line width.
+fn code_lines(js: &str) -> String {
+    let code: String =
+        js.split_inclusive('\n').filter(|l| !l.trim_start().starts_with("//")).collect();
     format!("\n{code}")
 }
 
@@ -290,7 +303,7 @@ fn script_hashes() -> String {
     SCRIPTS
         .iter()
         .map(|s| (*s).to_owned())
-        .chain([outline_script()])
+        .chain([outline_script(), landing_script()])
         .map(|s| csp_hash(&s))
         .collect::<Vec<_>>()
         .join(" ")

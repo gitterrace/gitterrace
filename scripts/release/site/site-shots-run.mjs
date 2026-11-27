@@ -90,6 +90,19 @@ SHOTS.push(
   // The repository page on a phone: the 390 px layout, 2x like the rest.
   { name: 'narrow', path: '/r/ripgrep/commit/068a63e', viewport: { width: 390, height: 780 } },
   {
+    // Hotspots on a phone, scrolled to its tab row so the key numbers and the whole chart
+    // show: what the landing page opens with on a narrow screen.
+    name: 'narrow-insights',
+    path: '/r/jq/stats/hotspots',
+    viewport: { width: 390, height: 600 },
+    async prepare(p) {
+      await p.evaluate(() => {
+        const tabs = /** @type {HTMLElement} */ (document.querySelector('main nav.tabs'));
+        window.scrollTo(0, tabs.getBoundingClientRect().top + window.scrollY - 12);
+      });
+    },
+  },
+  {
     // The actions menu on a marked line, with the coding agent entry beside the other targets.
     name: 'agent',
     path: '/r/ripgrep/blob/release/crates/core/main.rs#L14-L17',

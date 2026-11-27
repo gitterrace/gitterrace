@@ -97,8 +97,9 @@ if (!raw.length) {
   for (const f of readdirSync(siteShots)) if (f.endsWith('.webp')) rmSync(join(siteShots, f));
   for (const f of raw) {
     const src = join(rawDir, f);
-    // The phone crop is 780 px wide at 2x, so its thumbnail is the 390 px layout at 1x.
-    const half = f.startsWith('narrow-') ? ['-resize', '390', '780'] : ['-resize', '1280', '800'];
+    // A phone shot is 780 px wide at 2x, so its thumbnail is the 390 px layout at 1x, at
+    // whatever height that shot has.
+    const half = f.startsWith('narrow-') ? ['-resize', '390', '0'] : ['-resize', '1280', '800'];
     /** @type {[string[], string][]} */
     const variants = [[[], '.webp'], [half, '.thumb.webp']];
     // Lossless: the page glow steps 1 to 2 color levels, and lossy encoding turns it into bands.

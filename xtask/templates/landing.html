@@ -1,68 +1,90 @@
-{#- The landing page body: a hero with the install command and the pitch, a trust strip,
-what the insights show, the hand-off, then install and quickstart. Its prose comes from
-docs/landing.md, each sentence once, the rest from the code. The h1 is text, because the bar
-already draws the wordmark, so the page loads one image: the overview, eager. The install tabs
-are radio inputs and CSS, so they need no script, and with CSS off every command still shows.
-Every image is
-one picture whose dark source follows the system, and the theme button points that source's
-media at its choice. -#}
-<div class="hero">
-<h1>{{ pitch }}</h1>
-<div class="story">{{ story|safe }}</div>
-<div class="cmd">{{ hero_cmds|safe }}</div>
-<p class="cta"><a class="btn" href="#install">Install</a>
-{%- if !demo.is_empty() %} <a class="btn" href="{{ demo }}">Demo</a>{% endif %}
-<a class="btn" href="{{ repo }}">GitHub</a></p>
-<picture class="overview"><source media="(prefers-color-scheme: dark)"
-srcset="/assets/screenshots/{{ hero.0 }}-dark.thumb.webp">
-<img src="/assets/screenshots/{{ hero.0 }}-light.thumb.webp" alt="{{ hero.1 }}" width="1280"
-height="800" loading="eager" fetchpriority="high" decoding="async"></picture>
+{#- The landing page body: the pitch broken over a step (the mark, at headline size), the
+install command beside it, the app in a window that turns through a few real views, two
+stories (review, hand-off) one step down, then the promises. Its prose comes from
+docs/landing.md, each sentence once, the rest from the code. The window is a scroll-snap row,
+so it turns with no script; the page's script shows the two buttons in the window's bar and
+marks the view in sight.
+Only the first view loads at once, the rest are lazy. A phone gets its own hotspots shot,
+a second picture because the theme button rewrites every source's media. Every image is one
+picture whose dark source follows the system, and the theme button points that source's media
+at its choice. -#}
+<div class="stage">
+<div class="step">
+<h1><span class="l1">{{ l1 }}</span> <span class="l2">{{ l2 }}</span></h1>
+<div class="pitch">{{ why|safe }}
+{%- if !demo.is_empty() %}
+<p class="go"><a class="btn" href="{{ demo }}">Try the live demo</a>
+<span>{{ demo_note }}</span></p>
+{%- endif %}
 </div>
-<div class="trust" id="your-code">{{ promises|safe }}</div>
-<section id="features">
-<h2>Find what a diff never shows</h2>
-<figure class="showcase"><picture><source media="(prefers-color-scheme: dark)"
-srcset="/assets/screenshots/{{ showcase.0 }}-dark.webp">
-<img src="/assets/screenshots/{{ showcase.0 }}-light.webp" alt="{{ showcase.1 }}" width="2560"
-height="1600" loading="lazy" decoding="async"></picture>
-<figcaption><b>{{ showcase.2 }}.</b> {{ showcase.3 }}
-{%- if !demo.is_empty() %} <a href="{{ demo }}">Try the live demo</a>.{% endif %}
-</figcaption></figure>
-<ul class="lines" data-from="docs">
-{%- for l in lines %}
-<li><b><a href="/{{ l.1 }}">{{ l.0 }}</a>.</b> {{ l.2 }}</li>
+<div class="inst" id="install">
+<pre><i>$ </i><b>{{ cmd }}</b>
+<i>$ </i>git terrace  <em># serves on {{ addr }}</em></pre>
+<div class="side"><button class="copy" type="button" data-copy="{{ cmd }}"
+aria-live="polite">Copy</button>
+<a href="/docs/getting-started/#install">Other ways</a></div>
+</div>
+</div>
+<figure class="shots">
+<figcaption>
+<b>Find what a diff never shows.</b>
+<nav class="marks" aria-label="Views">
+{%- for s in reel %}
+<a href="#{{ s.0 }}">{{ s.2 }}</a>
+{%- endfor %}
+</nav>
+</figcaption>
+<div class="win">
+<div class="strip"><span>http://{{ addr }}</span>
+<span class="turn" hidden><button type="button">Previous</button>
+<button type="button">Next</button></span></div>
+<div class="reel" id="reel" tabindex="0" role="group" aria-label="Screenshots">
+{%- for s in reel %}
+<div id="{{ s.0 }}"><picture{% if loop.first %} class="wide"{% endif %}>
+<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ s.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ s.0 }}-light.webp" alt="{{ s.1 }}" width="2560" height="1600"
+{%- if loop.first %} fetchpriority="high" decoding="async"
+{%- else %} loading="lazy"
+{%- endif %}></picture>
+{%- if loop.first %}
+<picture class="narrow">
+<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ narrow.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ narrow.0 }}-light.webp" alt="{{ narrow.1 }}" width="780"
+height="1200" loading="lazy"></picture>
+{%- endif %}</div>
+{%- endfor %}
+</div>
+</div>
+</figure>
+<div class="levels">
+<section class="lv">
+<p class="label">Review</p>
+<h2>Read a repository the way a reviewer will.</h2>
+{{ review|safe }}
+<div class="win"><picture class="crop c-diff">
+<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ diff.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ diff.0 }}-light.webp" alt="{{ diff.1 }}" width="2560"
+height="1600" loading="lazy"></picture></div>
+<ul class="to">
+{%- for l in review_links %}
+<li><a href="/{{ l.1 }}">{{ l.0 }}</a></li>
 {%- endfor %}
 </ul>
 </section>
-<section class="handoff">
+<section class="lv lv2">
+<p class="label">Hand-off</p>
 <h2 id="hand-off">Mark lines. Send the finding.</h2>
-<div class="snip">{{ handoff|safe }}</div>
-<ul class="destinations" aria-label="Where a finding goes">
-{%- for d in destinations %}
-<li><a href="/{{ d.1 }}">{{ d.0 }}</a></li>
+{{ handoff|safe }}
+<div class="win"><picture class="crop c-send">
+<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ send.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ send.0 }}-light.webp" alt="{{ send.1 }}" width="2560"
+height="1600" loading="lazy"></picture></div>
+<ul class="to">
+{%- for l in handoff_links %}
+<li><a href="/{{ l.1 }}">{{ l.0 }}</a></li>
 {%- endfor %}
 </ul>
-<p class="more"><a href="/docs/why/#compared-with">How it compares</a> with the
-tools you know.</p>
 </section>
-<section>
-<h2 id="install">Install</h2>
-<div class="tabs">
-{%- for i in install %}
-<input type="radio" name="install" id="install-{{ i.0 }}" class="tab-radio"
-{%- if loop.first %} checked{% endif %}>
-<label for="install-{{ i.0 }}" class="tab-label">{{ i.0 }}</label>
-{%- endfor %}
-{%- for i in install %}
-<div class="tab-panel" id="panel-{{ i.0 }}">{{ i.1|safe }}</div>
-{%- endfor %}
 </div>
-<p>Installs <code>{{ bin }}</code>; git runs it as <code>git terrace</code>.
-{%- for r in requires %} {{ r }}.{% endfor %}</p>
-</section>
-<section>
-<h2 id="quickstart">Quickstart</h2>
-<div data-from="docs/getting-started/">{{ quickstart|safe }}</div>
-<p class="more"><a href="/docs/getting-started/">Getting started</a> covers Windows,
-upgrading and troubleshooting. <a href="/docs/cli/">All commands</a>.</p>
-</section>
+<div class="facts" id="your-code">{{ promises|safe }}</div>
+</div>

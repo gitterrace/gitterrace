@@ -6,13 +6,13 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 
 use crate::out::Out;
-use crate::site::landing::{HERO, SHOWCASE};
+use crate::site::landing::{CROPS, NARROW, REEL};
 use crate::site::{SHOTS, at, sizes};
 
 pub(super) const SHOT_DIR: &str = "docs/screenshots";
 
 /// Checks the screenshots without copying them. `docs/screenshots/` holds exactly a
-/// full-size WebP at 2560x1600 and a 1280x800 thumbnail for every entry in `SHOTS`, all from
+/// full-size WebP and a thumbnail at half that for every entry in `SHOTS` (`sizes`), all from
 /// `make site-shots`; a missing, extra or wrongly sized file fails generation and names it.
 pub(super) fn check_shots(root: &Path) -> Result<()> {
     let have = list(root, SHOT_DIR, "make site-shots")?;
@@ -47,14 +47,14 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
     Ok(())
 }
 
-/// The site's copy of the files the landing page shows, under `assets/screenshots/`: the hero's
-/// thumbnails and the showcase at full size. The rest stay in the repository for the README.
-/// Run after `check_shots`, so each one is there at its size.
+/// The site's copy of the files the landing page shows, under `assets/screenshots/`, at full
+/// size: the views of the window, the phone's first view and the two crops. The rest stay in
+/// the repository for the README. Run after `check_shots`, so each one is there at its size.
 pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
-    for (n, ext) in [(HERO, "thumb.webp"), (SHOWCASE, "webp")] {
+    for n in REEL.iter().chain(&CROPS).chain([&NARROW]) {
         for c in ["light", "dark"] {
-            let f = format!("{n}-{c}.{ext}");
+            let f = format!("{n}-{c}.webp");
             let path = format!("{SHOT_DIR}/{f}");
             let body =
                 std::fs::read(root.join(&path)).with_context(|| format!("reading {path}"))?;
