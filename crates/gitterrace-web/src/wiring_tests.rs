@@ -448,3 +448,24 @@ fn raw_mb_defaults_to_ten_and_refuses_one_byte_over() {
     bad.limits.raw_concurrent_mb = 0;
     assert!(bad.validate().is_err(), "a zero budget would serve nothing");
 }
+
+/// Guard class: background work that fills caches runs under the warming guard. A root walk
+/// held in flight when the idle release runs defers it, so nothing refills the caches after
+/// it, and the release lands once the walk ends. No timing: the hold is a latch and the walk's
+/// handle is awaited.
+#[tokio::test]
+async fn an_idle_release_waits_for_an_in_flight_related_warm() {
+    let (dir, app, head) = crate::tests::one_commit_app();
+    app.env.related.add(&app.key, dir.path().to_owned());
+    drop(app.source(&head).expect("source"));
+    assert!(app.source_held(), "a read filled the source");
+    crate::related::hold::set(dir.path(), true);
+    let walk = app.warm_related();
+    assert!(!app.release_idle(Duration::ZERO), "released under a warm in flight");
+    assert!(app.source_held(), "the caches were cut while the warm ran");
+    crate::related::hold::set(dir.path(), false);
+    walk.await.expect("walk");
+    assert!(app.release_idle(Duration::ZERO), "the release did not follow the warm");
+    assert!(!app.source_held(), "a cache survived the release");
+    assert!(!app.release_idle(Duration::ZERO), "nothing left to release");
+}

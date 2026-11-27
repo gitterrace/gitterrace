@@ -213,6 +213,12 @@ synthetic history as ceilings, and
 `crates/gitterrace-web/tests/memory_budget.rs` guards serving memory on
 synthetic repositories of growing size.
 
+Every background task that fills a cache (the warmers, the related-root walk
+after a HEAD move) holds the warming guard from before it is spawned until it
+ends, and the idle release defers while any guard is held. A release that ran
+between such a task's reads and its stores would leave the caches full until the
+next period.
+
 The bench harness, corpus and results are in [benchmarks](benchmarks.md).
 
 ## Routes

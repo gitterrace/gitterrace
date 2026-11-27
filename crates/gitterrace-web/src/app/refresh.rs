@@ -40,13 +40,17 @@ impl App {
     /// repository's, and any peer's not warmed lately. A page only reads what this caches.
     /// The walk takes no job slot and not the page's handle: it opens its own, so a page never
     /// queues behind it. The repository id comes first: permalinks need it, so the root walks
-    /// queue behind it and never the other way round.
-    fn warm_related(self: &Arc<Self>) {
+    /// queue behind it and never the other way round. The warming guard is taken before the
+    /// task is spawned and dropped when it ends, so [`App::release_idle`] never runs between
+    /// the walk's reads and the caches it fills.
+    pub(crate) fn warm_related(self: &Arc<Self>) -> tokio::task::JoinHandle<()> {
         let app = Arc::clone(self);
+        let guard = self.warming();
         tokio::task::spawn_blocking(move || {
             app.repo.id();
             app.env.related.warm(&app.key);
-        });
+            drop(guard);
+        })
     }
 }
 
