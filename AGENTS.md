@@ -81,7 +81,9 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
 - Pushing main: `make act-check` first. It runs `ci.yml` through `act` on a
   clean clone of main, and `scripts/hooks/pre-push` refuses a main without
   that pass (or a `make release-gate` one). A red run is fixed on main before
-  anything is pushed.
+  anything is pushed. The fix for a red hosted main goes with
+  `TEST_ALLOW_RED_CI=<failed run id>` (logged, matches that run only), never
+  `git push --no-verify`.
 - Accepting commits written without a build:
   `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the
   files and diffstat and runs the cargo-free gates those file types need,

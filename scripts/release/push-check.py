@@ -17,6 +17,9 @@ A push is refused when it would make CI read a changelog its tag does not match:
 5. main pushed while the hosted CI run of the remote's current main (`gh run list`) failed
    (the job is named) or is still running. No gh or no network only warns, so offline work is
    never blocked. TEST_ALLOW_PENDING_CI=1 lets the harness pass a running run.
+   TEST_ALLOW_RED_CI=<run id> lets the fix for a red main through: it passes only a failed run
+   whose id equals it (a stale value matches nothing), prints a loud line naming the run and its
+   failed jobs, and leaves every other rule running (--no-verify skips them all).
 Deletes always pass: re-tagging deletes the remote tag first (make release-gate RETAG=1).
 
   scripts/hooks/pre-push <remote> <url> < refs     the hook
@@ -93,7 +96,7 @@ def hosted_ci(repo: Path, remote: str) -> tuple[list[str], list[str]]:
         return [], ["gh is not installed, hosted CI result not checked"]
     p = subprocess.run(
         ["gh", "run", "list", "--branch", "main", "--commit", sha,
-         "--json", "name,conclusion,status"],
+         "--json", "name,conclusion,status,databaseId"],
         cwd=repo, capture_output=True, text=True, check=False,
     )  # fmt: skip
     try:
@@ -103,12 +106,25 @@ def hosted_ci(repo: Path, remote: str) -> tuple[list[str], list[str]]:
     if not isinstance(runs, list):
         return [], ["gh could not reach GitHub, hosted CI result not checked"]
     bad, pending = [], []
+    failed: dict[str, list[str]] = {}
     for r in runs:
         name = r.get("name") or "?"
         if r.get("status") != "completed":
             pending.append(name)
         elif r.get("conclusion") not in ("success", "skipped", "neutral"):
+            failed.setdefault(str(r.get("databaseId", "?")), []).append(name)
             bad.append(f"hosted CI job {name} {r.get('conclusion')} on {remote}/main {sha[:12]}")
+    allow = os.environ.get("TEST_ALLOW_RED_CI", "").strip()
+    if failed and set(failed) == {allow}:
+        print(
+            f"pre-push: !!! RED CI OVERRIDE: pushing over failed hosted run {allow} on"
+            f" {remote}/main {sha[:12]} (failed jobs: {', '.join(failed[allow])})",
+            file=sys.stderr,
+        )
+        bad = []
+    elif failed and allow:
+        named = ", ".join(sorted(failed))
+        bad.append(f"TEST_ALLOW_RED_CI={allow} does not match the failed run(s) {named}")
     if pending and not os.environ.get("TEST_ALLOW_PENDING_CI"):
         bad.append(
             f"hosted CI still running on {remote}/main {sha[:12]} ({', '.join(pending)}),"
@@ -185,14 +201,27 @@ def hosted_self_test() -> list[str]:
             "-m", "c")  # fmt: skip
         git(repo, "update-ref", "refs/remotes/origin/main", "HEAD")
         stub = bin_dir / "gh"
-        old = {k: os.environ.get(k) for k in ("PATH", "TEST_ALLOW_PENDING_CI")}
+        old = {k: os.environ.get(k) for k in ("PATH", "TEST_ALLOW_PENDING_CI", "TEST_ALLOW_RED_CI")}
         os.environ.pop("TEST_ALLOW_PENDING_CI", None)
-        os.environ["PATH"] = f"{bin_dir}{os.pathsep}/usr/bin{os.pathsep}/bin"
+        os.environ.pop("TEST_ALLOW_RED_CI", None)
+        # Only the stub dir and links to what the cases run (git, and cat for the stub): a runner
+        # image ships gh in /usr/bin, so any system dir on PATH would let the real gh answer.
+        for tool in ("git", "cat"):
+            real = shutil.which(tool)
+            if real is None:
+                sys.exit(f"push-check self-test: {tool} not found")
+            (bin_dir / tool).symlink_to(real)
+        os.environ["PATH"] = str(bin_dir)
         if shutil.which("gh"):
             fails.append("gh leaked into the stub PATH")
 
         def case(
-            name: str, out: str | None, want_bad: str, want_warn: str, pending_ok: bool = False
+            name: str,
+            out: str | None,
+            want_bad: str,
+            want_warn: str,
+            pending_ok: bool = False,
+            red_id: str = "",
         ):
             if out is None:
                 stub.unlink(missing_ok=True)
@@ -201,20 +230,41 @@ def hosted_self_test() -> list[str]:
                 stub.chmod(0o755)
             if pending_ok:
                 os.environ["TEST_ALLOW_PENDING_CI"] = "1"
+            if red_id:
+                os.environ["TEST_ALLOW_RED_CI"] = red_id
             bad, warn = hosted_ci(repo, "origin")
             os.environ.pop("TEST_ALLOW_PENDING_CI", None)
+            os.environ.pop("TEST_ALLOW_RED_CI", None)
             if want_bad not in " ".join(bad) or (not want_bad and bad):
                 fails.append(f"hosted {name}: refusals {bad}")
             if want_warn not in " ".join(warn) or (not want_warn and warn):
                 fails.append(f"hosted {name}: warnings {warn}")
 
         ok = '{"name":"ci","conclusion":"success","status":"completed"}'
-        red = '{"name":"reproducible-build","conclusion":"failure","status":"completed"}'
+        red = (
+            '{"name":"reproducible-build","conclusion":"failure",'
+            '"status":"completed","databaseId":77}'
+        )
         run = '{"name":"ci","conclusion":"","status":"in_progress"}'
         case("red run names the job", f"[{ok},{red}]", "reproducible-build", "")
         case("green run passes", f"[{ok}]", "", "")
         case("pending run refuses", f"[{run}]", "still running", "")
         case("pending run with the harness override", f"[{run}]", "", "", pending_ok=True)
+        case("red run with the matching id passes", f"[{ok},{red}]", "", "", red_id="77")
+        case(
+            "red run with a wrong id is refused", f"[{ok},{red}]", "does not match", "", red_id="78"
+        )
+        case("red run with the id unset is refused", f"[{ok},{red}]", "reproducible-build", "")
+        case(
+            "red override does not pass a pending run", f"[{run}]", "still running", "", red_id="77"
+        )
+        case(
+            "pending override does not pass a red run",
+            f"[{red}]",
+            "reproducible-build",
+            "",
+            pending_ok=True,
+        )
         case("no gh only warns", None, "", "gh is not installed")
         case("gh failing only warns", "not json", "", "could not reach")
         for k, v in old.items():
