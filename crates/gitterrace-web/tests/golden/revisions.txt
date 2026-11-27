@@ -1,3 +1,4 @@
+# the commit and compare pages gain the scope switcher and the folded-files bar
 03177244ea3f591e1d193651f7935db5 8c15e6431cc45ad9412f7b141c7d69f5 [HEAD~3] /?period=1m&bots=0&q=author%3Abob%40y.io&rev=HEAD~3
 03177244ea3f591e1d193651f7935db5 8c15e6431cc45ad9412f7b141c7d69f5 [HEAD~3] /?period=1m&bots=0&q=path%3Asrc&rev=HEAD~3
 03177244ea3f591e1d193651f7935db5 8c15e6431cc45ad9412f7b141c7d69f5 [HEAD~3] /?period=1m&bots=0&q=scope%3Acore&rev=HEAD~3

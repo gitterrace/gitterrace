@@ -19,7 +19,8 @@ pub(crate) use crate::views::code::{
     blame_first, blame_rows, clear_code_memo, code, code_first, code_tail_html,
 };
 pub(crate) use crate::views::diff::{
-    DiffSource, MediaFacts, diff_fragment, diff_html_with, worktree_fragment, worktree_generated,
+    DiffSource, Folded, MediaFacts, diff_fragment, diff_sections, worktree_fragment,
+    worktree_generated,
 };
 pub(crate) use crate::views::look::DiffLook;
 
@@ -32,7 +33,7 @@ pub(crate) struct Render {
     pub(crate) highlight_bytes: usize,
     /// Lines a file page shows (`limits.blob_lines`).
     pub(crate) blob_lines: usize,
-    /// Lines of one file's diff shown before it folds (`limits.diff_fold_lines`).
+    /// Lines of one file's diff shown before it folds (`display.diff_open_lines`).
     pub(crate) fold_lines: usize,
 }
 
@@ -59,7 +60,7 @@ impl Render {
             cache_bytes,
             highlight_bytes: c.limits.highlight_kb.saturating_mul(1024),
             blob_lines: c.limits.blob_lines,
-            fold_lines: c.limits.diff_fold_lines,
+            fold_lines: c.display.diff_open_lines,
         }
     }
 }

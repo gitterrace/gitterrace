@@ -157,7 +157,7 @@ async fn generated_files_fold_in_the_diff_and_sort_last_in_search() {
 }
 
 #[tokio::test]
-async fn limits_diff_fold_lines_folds_a_big_file_diff() {
+async fn display_diff_open_lines_folds_a_big_file_diff() {
     let dir = tempfile::tempdir().expect("tmp");
     let p = repo(dir.path(), "r");
     let (_, head) = get(&router(&p, Config::default()), "/log/HEAD").await;
@@ -169,9 +169,27 @@ async fn limits_diff_fold_lines_folds_a_big_file_diff() {
         .to_owned();
     let (_, open) = get(&router(&p, Config::default()), &format!("/commit/{id}")).await;
     assert!(!open.contains("data-load-diff"));
-    let fold = with(|c| c.limits.diff_fold_lines = 1);
+    let fold = with(|c| c.display.diff_open_lines = 1);
     let (_, folded) = get(&router(&p, fold), &format!("/commit/{id}")).await;
     assert!(folded.contains("data-load-diff"), "two changed lines fold at 1");
+}
+
+/// Only a file over `display.diff_open_lines` folds, and the bar says so and offers Open all.
+#[tokio::test]
+async fn the_diff_bar_counts_folded_files_and_hooks_open_all() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = Fixture::init(&dir.path().join("r"))
+        .write("small.txt", "one\ntwo\n")
+        .write("big.txt", &"line\n".repeat(150))
+        .commit("feat: add")
+        .path()
+        .to_owned();
+    let (_, open) = get(&router(&p, Config::default()), "/commit/HEAD").await;
+    assert!(!open.contains("data-open-all") && !open.contains("files open"), "{open}");
+    let cfg = with(|c| c.display.diff_open_lines = 100);
+    let (_, bar) = get(&router(&p, cfg), "/commit/HEAD").await;
+    assert!(bar.contains("1 of 2 files open, 1 folded (150 lines)"), "{bar}");
+    assert!(bar.contains("data-open-all") && bar.contains("data-load-diff"), "{bar}");
 }
 
 #[tokio::test]

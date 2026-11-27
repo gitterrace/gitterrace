@@ -10,7 +10,7 @@ use axum::{
 use gitterrace_git::{FileDiff, LineKind};
 use serde::{Deserialize, Serialize};
 
-use crate::{app::blocking, error::Result, routes::Shared, search::MAX_QUERY_BYTES};
+use crate::{app::blocking, error::Result, routes::Shared, search::MAX_QUERY_BYTES, views::Folded};
 
 /// Lines listed in all with their match ranges: the counts stay exact, the list stops. Not
 /// configurable: the page steps through a preview of the hits, the counts are complete.
@@ -128,15 +128,31 @@ fn find(files: &[FileDiff], needle: &str) -> Found {
 struct Toolbar {
     files: usize,
     label: String,
+    /// How many files are open and how many wait behind a link, empty when all are open.
+    open: String,
+    has_folded: bool,
 }
 
-/// The bar for a diff of `files` files, empty when there is nothing to find in.
-pub(crate) fn toolbar(files: usize) -> String {
+/// The bar for a diff of `files` files, `folded` of them behind a Load diff link. Empty when
+/// there is nothing to find in.
+pub(crate) fn toolbar(files: usize, folded: Folded) -> String {
     if files == 0 {
         return String::new();
     }
     let label = format!("Viewed 0 of {files}");
-    Toolbar { files, label }.render().unwrap_or_default()
+    let has_folded = folded.files > 0;
+    let open = if has_folded {
+        format!(
+            "{} of {} open, {} folded ({})",
+            files.saturating_sub(folded.files),
+            crate::fmt::count(files, "file", "files"),
+            folded.files,
+            crate::fmt::count(folded.lines, "line", "lines")
+        )
+    } else {
+        String::new()
+    };
+    Toolbar { files, label, open, has_folded }.render().unwrap_or_default()
 }
 
 fn needle(q: &FindQuery) -> String {
@@ -264,7 +280,16 @@ mod tests {
 
     #[test]
     fn the_bar_is_empty_without_files_and_names_the_total() {
-        assert_eq!(toolbar(0), "");
-        assert!(toolbar(9).contains("Viewed 0 of 9"));
+        assert_eq!(toolbar(0, Folded::default()), "");
+        let all_open = toolbar(9, Folded::default());
+        assert!(all_open.contains("Viewed 0 of 9"));
+        assert!(!all_open.contains("data-open-all"), "{all_open}");
+    }
+
+    #[test]
+    fn the_bar_counts_folded_files_and_offers_open_all() {
+        let bar = toolbar(41, Folded { files: 3, lines: 9800 });
+        assert!(bar.contains("38 of 41 files open, 3 folded (9,800 lines)"), "{bar}");
+        assert!(bar.contains("data-open-all"), "{bar}");
     }
 }

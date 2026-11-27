@@ -444,6 +444,15 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     }
     let p = blocking(&app, move |a| {
         let d = a.repo.commit(&id)?;
+        let parent = d.summary.parents.first().map(String::as_str);
+        let media = media_facts(a, &id, parent, &d.files);
+        let paths = d.files.iter().map(|f| f.path.as_str());
+        let generated = gitterrace_git::generated_paths(&a.repo, &id, paths)?;
+        let (diff, folded) = views::diff_sections(
+            &views::Render::of(a),
+            views::DiffSource::Commit { rev: &id, parent, media: &media, generated: &generated },
+            &d.files,
+        );
         Ok(CommitPage {
             c: Chrome {
                 commit: id.clone(),
@@ -473,27 +482,12 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             date: fmt::date(d.summary.author.time, d.summary.author.offset),
             parents: d.summary.parents.iter().map(|p| fmt::sha_link(p)).collect(),
             files_summary: fmt::count(d.files.len(), "changed file", "changed files"),
-            tools: crate::diff_find::toolbar(d.files.len()),
+            tools: crate::diff_find::toolbar(d.files.len(), folded),
             total_add: fmt::thousands(d.files.iter().map(|f| u64::from(f.additions)).sum::<u64>()),
             total_del: fmt::thousands(d.files.iter().map(|f| u64::from(f.deletions)).sum::<u64>()),
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
-            diff: {
-                let parent = d.summary.parents.first().map(String::as_str);
-                let media = media_facts(a, &id, parent, &d.files);
-                let paths = d.files.iter().map(|f| f.path.as_str());
-                let generated = gitterrace_git::generated_paths(&a.repo, &id, paths)?;
-                views::diff_html_with(
-                    &views::Render::of(a),
-                    views::DiffSource::Commit {
-                        rev: &id,
-                        parent,
-                        media: &media,
-                        generated: &generated,
-                    },
-                    &d.files,
-                )
-            },
+            diff,
             id,
         })
     })

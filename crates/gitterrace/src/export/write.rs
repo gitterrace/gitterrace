@@ -17,7 +17,7 @@ use unicode_normalization::UnicodeNormalization;
 const MAX_BODY: usize = 64 * 1024 * 1024;
 /// The settings that make a page larger, named when one does not fit.
 const SHRINK: &str = "Lower limits.blob_lines, limits.highlight_kb, limits.text_kb or \
-                      limits.diff_fold_lines in config.toml";
+                      display.diff_open_lines in config.toml";
 
 /// File the page lands in: HTML pages become `<path>/index.html` so their links
 /// resolve when the folder is served by any static server. `None` for a path with a segment

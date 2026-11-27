@@ -66,6 +66,8 @@ body[data-diff-wrap] div.diff .ch{width:auto}
 .difftools[data-state=error] .find-status{color:var(--del)}
 .dt-prev,.dt-next{min-width:32px;padding:0 var(--space-2)}
 .dt-hint{flex:none}
+.dt-open{display:flex;align-items:center;gap:var(--space-2);flex-wrap:wrap}
+.dt-open .open-count{color:var(--muted);font-variant-numeric:tabular-nums}
 .dt-hide{display:inline-flex;align-items:center;gap:var(--space-2);margin-left:auto;
   color:var(--muted);cursor:pointer}
 html:has(.difftools){--dt-h:49px}

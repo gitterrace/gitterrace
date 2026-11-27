@@ -11,5 +11,9 @@ scripts only fill it in, so the page never shifts when they load. -#}
 <button type="button" class="dt-prev" aria-label="Previous match" disabled>&uarr;</button>
 <button type="button" class="dt-next" aria-label="Next match" disabled>&darr;</button>
 <kbd class="dt-hint" title="Press f to find, n and N to step">f</kbd></div>
+{%- if has_folded %}
+<div class="dt-open"><span class="open-count" role="status">{{ open }}</span>
+<button type="button" class="btn sm" data-open-all>Open all</button></div>
+{%- endif %}
 <label class="dt-hide"><input type="checkbox" class="dt-hide-box"> Hide viewed</label>
 </form>

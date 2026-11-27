@@ -506,6 +506,15 @@ async fn worktree(
             .collect();
         let mut head = crate::pagehead::worktree_head(files.len(), adds.into(), dels.into(), tabs);
         head.tools = review.bar();
+        let (diff, folded) = views::diff_sections(
+            &views::Render::of(a),
+            views::DiffSource::Worktree {
+                generated: &views::worktree_generated(&a.repo, files),
+                scope,
+                since: review.since_id(),
+            },
+            files,
+        );
         Ok(WorktreePage {
             head,
             c: views::chrome(a, "files").live(Mode::WORKTREE),
@@ -513,15 +522,7 @@ async fn worktree(
             clean: files.is_empty() && review.since_id().is_none(),
             empty: Empty::new(crate::worktree_scope::empty_text(scope))
                 .step("Browse the commits", fmt::href("/log/HEAD")),
-            diff: views::diff_html_with(
-                &views::Render::of(a),
-                views::DiffSource::Worktree {
-                    generated: &views::worktree_generated(&a.repo, files),
-                    scope,
-                    since: review.since_id(),
-                },
-                files,
-            ),
+            diff,
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),
@@ -530,7 +531,7 @@ async fn worktree(
                 &crate::review_panel::Source::Worktree { scope, since: review.since_id() },
             ),
             omitted: review.files_omitted(),
-            tools: review.since_note() + &crate::diff_find::toolbar(stats.len()),
+            tools: review.since_note() + &crate::diff_find::toolbar(stats.len(), folded),
             files: stats,
         })
     })

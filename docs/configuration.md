@@ -123,8 +123,8 @@ Exceptions, each on purpose:
   keeps in a code search. Past it the file says more matched.
 - `search_commits` (integer, default `200`): Most commits a commit search lists.
   Past it the search stops and says it was cut off.
-- `diff_fold_lines` (integer, default `400`): Most lines of one file's diff
-  shown before it folds. A folded file loads on demand.
+- `diff_fold_lines` (integer, default `400`): Changed lines of one file at which
+  a review plan's size term tops out.
 - `blob_lines` (integer, default `20000`): Most lines a file page shows. Past it
   the page cuts the file and says so. `api.blob_lines` is the API's own cut.
 - `highlight_kb` (integer, default `256`): Largest text highlighted, in KiB: a
@@ -200,6 +200,9 @@ Exceptions, each on purpose:
 - `diff_tab_chars` (integer, default `4`): Width of a tab in a diff, in
   characters.
 - `diff_font_px` (integer, default `13`): Code font size in a diff, in pixels.
+- `diff_open_lines` (integer, default `1000`): Most changed lines of one file a
+  diff opens in full. A larger file folds behind a Load diff link, and the bar
+  over the diff counts what is folded.
 - `has_line_hover` (bool, default `true`): Tint the whole line under the pointer
   in a file, its blame and a diff.
 - `sidebar` (list of strings, default

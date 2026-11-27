@@ -118,6 +118,22 @@ impl Config {
     }
 }
 
+/// A DNS name or IP literal, nothing else: no `*`, scheme, port, path or empty label.
+pub(crate) fn plain_host(h: &str) -> bool {
+    if h.parse::<std::net::IpAddr>().is_ok() {
+        return true;
+    }
+    !h.is_empty()
+        && h.len() <= 253
+        && h.split('.').all(|l| {
+            !l.is_empty()
+                && l.len() <= 63
+                && !l.starts_with('-')
+                && !l.ends_with('-')
+                && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use crate::features::{Feature, INSIGHT_PAGES};

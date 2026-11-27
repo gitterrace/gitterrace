@@ -183,6 +183,13 @@ browser's localStorage, per page address, and never leave the machine. A file
 marked viewed whose diff changed since (a live refresh of the working tree, say)
 is unchecked and shows a **Changed since viewed** badge until you mark it again.
 
+## Diffs open in full
+
+A diff opens every file in full, except one over `display.diff_open_lines`
+changed lines and the files past the page's budget. The bar above the diff then
+says how many files are open and how many are folded, with an **Open all**
+button that loads them all. A generated file stays folded until asked.
+
 ## Find in the whole diff
 
 The box above a commit's or the working tree's diff searches every changed

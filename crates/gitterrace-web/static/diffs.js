@@ -25,6 +25,13 @@
     });
   }
   document.addEventListener("click", function (e) {
+    var o = e.target.closest && e.target.closest("[data-open-all]");
+    if (o && !e.button) {
+      e.preventDefault();
+      document.querySelectorAll("[data-load-diff]").forEach(loadDiff);
+      o.disabled = true;
+      return;
+    }
     var g = e.target.closest && e.target.closest("[data-expand-generated]");
     var b = g ? null : e.target.closest && e.target.closest("[data-load-diff]");
     if (!(g || b) || e.button || e.metaKey || e.ctrlKey || e.shiftKey) return;

@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use gitterrace_types::{ColorScheme, DateStyle, DiffPalette, LinkStyle, Period};
 
-use crate::features::{Feature, INSIGHT_PAGES};
+use crate::features::{Feature, INSIGHT_PAGES, plain_host};
 use crate::value::{Control, Show};
 
 /// The overview sidebar's sections, in their default order: what is open (the branch, then the
@@ -215,6 +215,7 @@ fn repo_features(name: &str, t: Option<&toml::Value>) -> Result<Vec<Feature>, cr
 pub const BOUNDS: &[(&str, u64, u64)] = &[
     ("display.diff_tab_chars", 1, 16),
     ("display.diff_font_px", 8, 32),
+    ("display.diff_open_lines", 1, 1_000_000),
     ("server.public_timeout_secs", 1, 3600),
     ("limits.search_file_lines", 1, 100_000),
     ("limits.search_commits", 1, 100_000),
@@ -313,7 +314,7 @@ settings! {
         search_file_lines: usize = 100 => Live + cost,
         /// Most commits a commit search lists. Past it the search stops and says it was cut off.
         search_commits: usize = 200 => Live + cost,
-        /// Most lines of one file's diff shown before it folds. A folded file loads on demand.
+        /// Changed lines of one file at which a review plan's size term tops out.
         diff_fold_lines: usize = 400 => Live + cost,
         /// Most lines a file page shows. Past it the page cuts the file and says so.
         /// `api.blob_lines` is the API's own cut.
@@ -393,6 +394,9 @@ settings! {
         diff_tab_chars: u64 = 4 => Live,
         /// Code font size in a diff, in pixels.
         diff_font_px: u64 = 13 => Live,
+        /// Most changed lines of one file a diff opens in full. A larger file folds behind a
+        /// Load diff link, and the bar over the diff counts what is folded.
+        diff_open_lines: usize = 1000 => Live + cost,
         /// Tint the whole line under the pointer in a file, its blame and a diff.
         has_line_hover: bool = true => Live,
         /// Overview sidebar sections, in the order shown: `now`, `loose_ends`, `recent`,
@@ -581,20 +585,4 @@ impl Config {
             )
         })
     }
-}
-
-/// A DNS name or IP literal, nothing else: no `*`, scheme, port, path or empty label.
-fn plain_host(h: &str) -> bool {
-    if h.parse::<std::net::IpAddr>().is_ok() {
-        return true;
-    }
-    !h.is_empty()
-        && h.len() <= 253
-        && h.split('.').all(|l| {
-            !l.is_empty()
-                && l.len() <= 63
-                && !l.starts_with('-')
-                && !l.ends_with('-')
-                && l.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-')
-        })
 }

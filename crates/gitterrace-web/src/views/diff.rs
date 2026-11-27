@@ -183,10 +183,20 @@ fn no_hunks_line(f: &FileDiff) -> String {
     format!("<p class=\"muted pad moved\">{line}, no content change.</p>")
 }
 
-/// Every file of a page's diff as a section. The first files render in full until the page
+/// The sections of [`diff_sections`] alone. The first files render in full until the page
 /// has spent one of its budgets (files, lines, bytes); every later file, and any file over
 /// `r.fold_lines`, is a header whose body loads on demand.
+#[cfg(test)]
 pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]) -> String {
+    diff_sections(r, src, files).0
+}
+
+/// Every file of a page's diff as a section, and what folded, for the bar over the diff.
+pub(crate) fn diff_sections(
+    r: &Render,
+    src: DiffSource<'_>,
+    files: &[FileDiff],
+) -> (String, Folded) {
     let mut out = String::new();
     let mut used = Spent::default();
     let folded = files.iter().filter(|f| is_generated(src, f)).count();
@@ -244,7 +254,7 @@ pub(crate) fn diff_html_with(r: &Render, src: DiffSource<'_>, files: &[FileDiff]
         out.push_str(&file_body(r, src, i, f, &mut used));
         out.push_str("</section>");
     }
-    out
+    (out, used.folded)
 }
 
 /// Whether a file of the diff is generated.
@@ -310,12 +320,20 @@ fn patch_attr(src: DiffSource<'_>, f: &FileDiff) -> String {
     format!(" data-p=\"{}\"", id.get(..16).unwrap_or(&id))
 }
 
+/// The files whose body waits behind a Load diff link, and the lines they changed.
+#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+pub(crate) struct Folded {
+    pub(crate) files: usize,
+    pub(crate) lines: usize,
+}
+
 /// What the files rendered in full so far cost.
 #[derive(Default)]
 struct Spent {
     files: usize,
     lines: usize,
     bytes: usize,
+    folded: Folded,
 }
 
 fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut Spent) -> String {
@@ -350,6 +368,8 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
     // Generated files fold whatever their size and spend no budget, so a lockfile never
     // pushes the hand-written files below it into folds.
     if is_generated(src, f) {
+        used.folded.files += 1;
+        used.folded.lines += changed;
         return fold_button(
             src,
             i,
@@ -371,6 +391,8 @@ fn file_body(r: &Render, src: DiffSource<'_>, i: usize, f: &FileDiff, used: &mut
     used.lines += changed;
     used.bytes += bytes;
     if alone || page_full {
+        used.folded.files += 1;
+        used.folded.lines += changed;
         fold_button(
             src,
             i,

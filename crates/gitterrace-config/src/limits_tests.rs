@@ -89,6 +89,7 @@ fn cost_tagged_keys_are_the_per_request_knobs() {
             "api.blob_kb",
             "api.blame_lines",
             "api.diff_lines",
+            "display.diff_open_lines",
         ]
     );
     // Every numeric key under [api] costs per request, so none may be left untagged.
