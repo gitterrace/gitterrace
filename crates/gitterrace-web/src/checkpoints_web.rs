@@ -43,7 +43,7 @@ struct Since {
     id: String,
     created: i64,
     label: String,
-    /// Changed files the checkpoint already holds as they are now.
+    /// Files the checkpoint holds as they are now: the ones the API counts as unchanged.
     unchanged: Vec<String>,
     /// Files whose copy was not kept: they show against HEAD.
     gone: usize,
@@ -403,10 +403,14 @@ mod tests {
             .collect();
         let mut old_sorted = old;
         old_sorted.sort();
-        assert_eq!(d.unchanged_paths, old_sorted);
+        assert!(old_sorted.iter().all(|p| d.unchanged_paths.contains(p)));
         assert!(d.unchanged_paths.contains(&"held.txt".to_owned()), "{:?}", d.unchanged_paths);
         assert!(d.unchanged_paths.contains(&"later.txt".to_owned()), "not held, equal to base");
-        assert!(!d.unchanged_paths.contains(&"saved.txt".to_owned()));
+        assert!(
+            d.unchanged_paths.contains(&"saved.txt".to_owned()),
+            "saved then committed as saved: still unchanged since the checkpoint"
+        );
+        assert_eq!(d.unchanged_paths.len(), d.unchanged, "the page lists what the API counts");
         assert!(moved.contains("moved.txt") && d.gone == ["x.dat"]);
     }
 }
