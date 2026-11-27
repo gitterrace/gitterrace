@@ -37,12 +37,11 @@ Get-Content .\gitterrace-x86_64-pc-windows-msvc.zip.sha256
 
 <!-- END GENERATED: verify -->
 
-Every release archive also carries a build provenance attestation:
-`gh attestation verify <archive> --repo gitterrace/gitterrace`.
-
-The binaries are built auditable, so `cargo audit bin` on the installed binary lists the
-dependencies they were built from, and each release carries a CycloneDX SBOM
-for the workspace crates.
+Every release archive also carries a build provenance attestation, and the
+binaries are built auditable, so `cargo audit bin` on the installed binary lists
+the dependencies they were built from. Each release carries a CycloneDX SBOM for
+the workspace crates, `gitterrace.cdx.xml`. [Check your download](#check-your-download)
+shows the commands.
 
 ### Install in an MCP client
 
@@ -52,6 +51,41 @@ the bundle for your platform from the release page. Each release carries one
 `gitterrace-mcp-<target>.mcpb` per platform, which holds only the program and
 runs its `mcp` command. To wire it up by hand, add `git terrace mcp` as a stdio
 server instead.
+
+<!-- schwarzwald:verify -->
+
+## Check your download
+
+### Build attestation
+
+This proves the file was built by the workflow of that repository, from the
+commit it names.
+
+```sh
+gh attestation verify gitterrace-aarch64-apple-darwin.tar.gz --repo gitterrace/gitterrace
+```
+
+### SHA-256
+
+This proves the file arrived whole. Put the file and its `.sha256` in one
+folder.
+
+On macOS:
+
+```sh
+shasum -a 256 -c gitterrace-aarch64-apple-darwin.tar.gz.sha256
+```
+
+If shasum also warns about an improperly formatted line, the check still passed
+when it prints OK.
+
+On Linux:
+
+```sh
+sha256sum -c gitterrace-aarch64-apple-darwin.tar.gz.sha256
+```
+
+<!-- /schwarzwald:verify -->
 
 ## Quickstart
 

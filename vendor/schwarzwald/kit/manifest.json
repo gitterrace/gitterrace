@@ -2,7 +2,7 @@
   "version": 2,
   "schwarzwald": null,
   "dirty": false,
-  "date": "2026-11-26T20:39:05Z",
+  "date": "2026-11-26T21:17:50Z",
   "items": [
     "changelog-gen",
     "clone",
@@ -38,7 +38,8 @@
     "rules",
     "sonar-scan",
     "theme-tokens",
-    "vale"
+    "vale",
+    "verify-docs"
   ],
   "tests": [
     "commit-paths",
@@ -65,7 +66,7 @@
     "tools"
   ],
   "files": {
-    "README.md": "117f56250bc01bf9e584ae58140b4bf7256255264ebd2b1984aae52ef8e2d95a",
+    "README.md": "4533927ee0021859175e7e146dab6fe1de487b0014f3d68ee668c85934173877",
     "check.py": "f2010c9104de3029c23dbee64dc417efbd1ec27ddcbe9f158f118263657c6947",
     "configs/cliff-base.toml": "af6d61d5605368953ec077c37cd66b6670cd54ae8dbfb7681a2e33c2cf71d4cf",
     "configs/clippy-base.toml": "e2d4a22a5fbdab27da1188a8a664eefc40134d12f1d56cbe4af0a45936c2b77a",
@@ -383,7 +384,8 @@
     "tools/repro-check.sh": "85e9397d55a4bcaa6aea036949768bd40043d09683fda71ed8fdcd3d17b84c24",
     "tools/repro-env.sh": "0e1ca378d390f27fb1935cfd39dc22774ce1feac61ae10b8b2fbf93c4f787bcf",
     "tools/sonar-scan.sh": "bbdf7404efce6a25edf957db5b05d4f987d9a79fba1c5076e7d199ca340285ea",
-    "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e"
+    "tools/test-sandbox.sh": "e58e5ce84dccfd9add2bc62467cb38e37346580e45c850a2c9b6118ae64f402e",
+    "tools/verify-docs.py": "2f591e35f34995fc149a60f5f2b36cb308378402be05b6a9eb402b4db2addd57"
   },
   "exec": [
     "check.py",

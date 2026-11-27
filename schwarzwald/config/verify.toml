@@ -1,0 +1,7 @@
+# The "Check your download" section of docs/getting-started.md, made by the kit's verify-docs
+# item and checked by make lint. Not the sbom method: its text says each download has an SBOM
+# next to it, but the release carries one for the whole workspace, gitterrace.cdx.xml, which
+# the prose above the section names.
+repo = "gitterrace/gitterrace"
+methods = ["gh-attestation", "sha256"]
+artifact = "gitterrace-aarch64-apple-darwin.tar.gz"
