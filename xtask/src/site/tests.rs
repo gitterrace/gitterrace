@@ -9,7 +9,7 @@ fn landing() -> String {
 
 /// The window on the landing page turns through the views of `REEL`, each one picture whose
 /// dark source follows the system and each with a link that names it. The phone's first view
-/// and the two crops are the only other pictures.
+/// and the hand-off's crop are the only other pictures.
 #[test]
 fn the_window_shows_every_view_once_with_a_link_to_it() {
     let page = landing().replace('\n', " ");
@@ -20,8 +20,22 @@ fn the_window_shows_every_view_once_with_a_link_to_it() {
         assert_eq!(page.matches(&format!(" id=\"{stem}\"")).count(), 1, "{stem}");
         assert_eq!(page.matches(&format!(" href=\"#{stem}\"")).count(), 1, "{stem}");
     }
-    assert_eq!(page.matches("<picture").count(), landing::REEL.len() + 3);
+    assert_eq!(page.matches("<picture").count(), landing::REEL.len() + 2);
     assert!(!page.contains(".thumb.webp"));
+}
+
+/// The links that name the views are the window's own tabs: they sit in its bar, after the
+/// address and before the two buttons, so nothing stands between the command and the app.
+#[test]
+fn the_views_are_tabs_in_the_window_bar() {
+    let page = landing().replace('\n', " ");
+    let bar = page.split_once("<div class=\"strip\">").map_or("", |h| h.1);
+    let bar = bar.split_once("<div class=\"reel\"").map_or("", |h| h.0);
+    let (addr, tabs, turn) =
+        (bar.find("http://"), bar.find("class=\"marks\""), bar.find("class=\"turn\""));
+    assert!(addr.is_some() && addr < tabs && tabs < turn, "{bar}");
+    assert_eq!(bar.matches(" href=\"#").count(), landing::REEL.len());
+    assert!(!page.contains("<figcaption"));
 }
 
 /// The first view is hotspots, the one that loads with the page, and it is marked high

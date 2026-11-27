@@ -1,9 +1,9 @@
 {#- The landing page body: the pitch broken over a step (the mark, at headline size), the
-install command beside it, the app in a window that turns through a few real views, two
-stories (review, hand-off) one step down, then the promises. Its prose comes from
-docs/landing.md, each sentence once, the rest from the code. The window is a scroll-snap row,
-so it turns with no script; the page's script shows the two buttons in the window's bar and
-marks the view in sight.
+install command beside it, the app in a window that turns through a few real views, the
+hand-off one step down (the claim on the upper tread, the Send to window on the lower), then
+the promises. Its prose comes from docs/landing.md, each sentence once, the rest from the
+code. The window is a scroll-snap row whose bar holds the views as tabs, so it turns with no
+script; the page's script shows the two buttons in that bar and marks the view in sight.
 Only the first view loads at once, the rest are lazy. A phone gets its own hotspots shot,
 a second picture because the theme button rewrites every source's media. Every image is one
 picture whose dark source follows the system, and the theme button points that source's media
@@ -26,16 +26,13 @@ aria-live="polite">Copy</button>
 </div>
 </div>
 <figure class="shots">
-<figcaption>
-<b>Find what a diff never shows.</b>
+<div class="win">
+<div class="strip"><span>http://{{ addr }}</span>
 <nav class="marks" aria-label="Views">
 {%- for s in reel %}
 <a href="#{{ s.0 }}">{{ s.2 }}</a>
 {%- endfor %}
 </nav>
-</figcaption>
-<div class="win">
-<div class="strip"><span>http://{{ addr }}</span>
 <span class="turn" hidden><button type="button">Previous</button>
 <button type="button">Next</button></span></div>
 <div class="reel" id="reel" tabindex="0" role="group" aria-label="Screenshots">
@@ -58,33 +55,19 @@ height="1200" loading="lazy"></picture>
 </figure>
 <div class="levels">
 <section class="lv">
-<p class="label">Review</p>
-<h2>Read a repository the way a reviewer will.</h2>
-{{ review|safe }}
-<div class="win"><picture class="crop c-diff">
-<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ diff.0 }}-dark.webp">
-<img src="/assets/screenshots/{{ diff.0 }}-light.webp" alt="{{ diff.1 }}" width="2560"
-height="1600" loading="lazy"></picture></div>
-<ul class="to">
-{%- for l in review_links %}
-<li><a href="/{{ l.1 }}">{{ l.0 }}</a></li>
-{%- endfor %}
-</ul>
-</section>
-<section class="lv lv2">
 <p class="label">Hand-off</p>
 <h2 id="hand-off">Mark lines. Send the finding.</h2>
 {{ handoff|safe }}
-<div class="win"><picture class="crop c-send">
-<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ send.0 }}-dark.webp">
-<img src="/assets/screenshots/{{ send.0 }}-light.webp" alt="{{ send.1 }}" width="2560"
-height="1600" loading="lazy"></picture></div>
 <ul class="to">
 {%- for l in handoff_links %}
 <li><a href="/{{ l.1 }}">{{ l.0 }}</a></li>
 {%- endfor %}
 </ul>
 </section>
+<div class="lv2"><div class="win"><picture class="crop c-send">
+<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ send.0 }}-dark.webp">
+<img src="/assets/screenshots/{{ send.0 }}-light.webp" alt="{{ send.1 }}" width="2560"
+height="1600" loading="lazy"></picture></div></div>
 </div>
 <div class="facts" id="your-code">{{ promises|safe }}</div>
 </div>

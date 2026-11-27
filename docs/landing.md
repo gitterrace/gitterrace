@@ -6,12 +6,8 @@ tagline. Each sentence lives here once.
 
 ## Why
 
-Code, commits, blame, branches, worktrees, stashes and insights, with no
-database, accounts or network.
-
-## Review
-
-Review what your agents wrote, then pass each finding on with its context.
+See what your agents wrote, with its history, blame and insights, on your own
+machine. No account, no database, no network.
 
 ## What it does with your code
 

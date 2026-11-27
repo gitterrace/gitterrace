@@ -48,8 +48,9 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
 }
 
 /// The site's copy of the files the landing page shows, under `assets/screenshots/`, at full
-/// size: the views of the window, the phone's first view and the two crops. The rest stay in
-/// the repository for the README. Run after `check_shots`, so each one is there at its size.
+/// size: the views of the window, the phone's first view and the hand-off's crop. The rest
+/// stay in the repository for the README. Run after `check_shots`, so each one is there at its
+/// size.
 pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
     for n in REEL.iter().chain(&CROPS).chain([&NARROW]) {

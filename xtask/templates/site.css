@@ -223,9 +223,9 @@ text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 
 /* The landing page. The pitch is broken over a step: line one stands on an ink tread, the
    riser drops, line two stands on the accent slab, which runs off the right edge. That is the
-   mark at headline size. The riser's place comes from line two's own width, and the two
-   stories further down step at the same place, through one shared grid. Every gap is a step
-   of the 4 px space grid, and the headline is the kit's display step. */
+   mark at headline size. The riser's place comes from line two's own width, and the hand-off
+   further down steps at the same place, through one shared grid. Every gap is a step of the
+   4 px space grid, and the headline is the kit's display step. */
 /* The slab leaves the page on the right. The root's clip goes to the viewport, so the body's
    own is what stops the page from scrolling sideways. */
 :is(html,body):has(.stage){overflow-x:clip}
@@ -285,25 +285,24 @@ transition:border-color var(--dur-fast) var(--ease),color var(--dur-fast) var(--
 .copy{min-width:calc(var(--space-16) + var(--space-5))}
 .copy[data-state=copied]{border-color:var(--add);color:var(--add)}
 .copy[data-state=selected]{border-color:var(--warn);color:var(--warn)}
-/* The app, in a window whose bar holds its address and the two buttons. The views sit in one
-   row that snaps, so it turns by touch, by the arrow keys once it has focus and by its
-   links, with no script. */
+/* The app, in a window whose bar holds its address, the views as tabs and the two buttons.
+   The views sit in one row that snaps, so it turns by touch, by the arrow keys once it has
+   focus and by its tabs, with no script. */
 .win{border:1px solid var(--line-strong);border-radius:var(--radius);overflow:hidden;
 background:var(--bg)}
-.strip{display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
-min-height:var(--row-h);padding:var(--space-1) var(--space-1) var(--space-1) var(--space-3);
+.strip{display:flex;align-items:center;gap:0 var(--space-6);
+min-height:var(--row-h);padding:0 var(--space-1) 0 var(--space-3);
 background:var(--header);border-bottom:var(--border);
 font:var(--weight-regular) var(--text-xs)/var(--leading-tight) var(--mono);color:var(--muted)}
-.shots{margin:calc(var(--space-8) + var(--space-2)) 0 0}
-.shots figcaption{display:flex;flex-wrap:wrap;align-items:baseline;
-gap:var(--space-2) var(--space-6);margin:0 0 var(--space-3);color:var(--fg)}
-.shots figcaption b{margin-right:auto;
-font:var(--weight-semibold) var(--text-lg)/var(--leading-tight) var(--serif)}
-.marks{display:flex;gap:var(--space-5)}
-.marks a{padding:var(--space-2) 0;border-bottom:2px solid transparent;color:var(--muted);
-text-decoration:none}
+.shots{margin:var(--space-8) 0 0}
+/* A tab stands on the bar's lower edge, as the app's own tabs do, so its mark covers the
+   hairline there. */
+.marks{align-self:stretch;display:flex;gap:var(--space-5);margin:0 auto -1px 0}
+.marks a{display:flex;align-items:center;border:solid transparent;border-width:2px 0;
+color:var(--muted);text-decoration:none}
 .marks a:hover{color:var(--fg)}
-.marks a[aria-current]{color:var(--fg);border-color:var(--accent)}
+.marks a:focus-visible{outline-offset:-2px}
+.marks a[aria-current]{color:var(--fg);border-bottom-color:var(--accent)}
 /* Hidden until the page's script switches the two buttons on: display would undo that. */
 .turn:not([hidden]){display:flex;gap:var(--space-1)}
 .reel{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;
@@ -319,27 +318,31 @@ overscroll-behavior-x:contain;scrollbar-width:none}
 .crop{display:block;overflow:hidden;aspect-ratio:var(--w)/var(--h)}
 .crop img{max-width:none;width:calc(144000%/var(--w));
 margin:calc(var(--y)*-100%/var(--w)) 0 0 calc(var(--x)*-100%/var(--w))}
-/* Both stories cut their shot to one shape: the Send to window whole, and as much of the
-   diff as that shape holds. */
-.c-diff{--x:72;--y:330;--w:850;--h:517}
+/* The hand-off shows the Send to window whole. */
 .c-send{--x:430;--y:288;--w:580;--h:353}
-/* The second level: the two stories step down at the headline's riser, in ink only. */
+/* The second level, in ink only: the claim stands on the upper tread and the window that
+   proves it one riser down, at the headline's riser. The places a finding goes are a ruled
+   list at the foot of the claim, so both sides end on one line. */
 .levels{margin-top:calc(var(--space-8) + var(--space-4))}
-.lv{border-top:2px solid var(--fg);padding:var(--space-5) var(--gut) 0 0}
-.lv2{position:relative;contain:inline-size;margin-top:var(--space-8);
-padding:var(--space-5) 0 0 calc(var(--in) + 2px)}
+.lv,.lv2{border-top:2px solid var(--fg);padding-top:var(--space-5)}
+.lv{display:flex;flex-direction:column;padding-right:var(--gut)}
+.lv2{position:relative;contain:inline-size;margin-top:var(--space-8)}
 .lv2::before{content:"";position:absolute;left:0;bottom:100%;height:var(--space-8);
 border-left:2px solid var(--fg)}
 .lv h2{margin:0 0 var(--space-2);text-wrap:balance}
-.lv>p:not(.label){margin:0;color:var(--muted)}
-.lv .win{margin:var(--space-4) 0 var(--space-3)}
-.to{display:flex;flex-wrap:wrap;gap:var(--space-1) var(--space-5);margin:0;padding:0;
-list-style:none;font-size:var(--text-sm)}
+.lv>p:not(.label){margin:0 0 var(--space-5);color:var(--muted)}
+.to{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--space-6);
+margin:auto 0 0;padding:0;list-style:none;font-size:var(--text-base)}
+.to li{border-top:var(--border)}
+.to a{display:flex;align-items:center;min-height:var(--row-h);color:var(--fg);
+text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.to a:hover{color:var(--accent-ink)}
 /* The promises: four short ones in a row, two by two on a tablet, one column on a phone. */
-.facts{margin-top:calc(var(--space-8) + var(--space-4));padding-top:var(--space-5);
+.facts{margin-top:var(--space-8);padding-top:var(--space-5);
 border-top:var(--border)}
-/* The promises close the page, so the footer follows them closer than it follows a doc. */
-.frame:has(.stage)>footer{margin-top:var(--space-8)}
+/* The promises close the page, so the footer follows them closer than it follows a doc, and
+   ends closer under its own line. */
+.frame:has(.stage)>footer{margin-top:var(--space-8);padding-bottom:var(--space-8)}
 .facts ul{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
 gap:var(--space-4) var(--space-8);margin:0;padding:0;list-style:none;
 font-size:var(--text-base);color:var(--muted)}
@@ -352,7 +355,7 @@ font-size:var(--text-base);color:var(--muted)}
 padding-left:var(--space-4)}
 .levels{display:block}
 .lv{padding-right:0}
-.lv2{margin-top:calc(var(--space-8) + var(--space-4));padding-left:0}
+.lv2{max-width:34rem;margin-top:var(--space-5);padding:0;border:0}
 .lv2::before{content:none}
 .facts ul{grid-template-columns:repeat(2,minmax(0,1fr))}}
 /* A phone: a short tread over a long slab, as in the mark. The first view is its own shot
@@ -364,14 +367,17 @@ padding-left:var(--space-4)}
 .side{flex-direction:row;align-items:center;margin-top:var(--space-2);
 padding-top:var(--space-2);border-top:var(--border)}
 .copy,.turn button{height:var(--row-h)}
-.marks{gap:var(--space-4)}
-.marks a{padding:var(--space-3) 0}
-.shots figcaption b{flex-basis:100%}
+/* The bar is two rows: the address and the buttons, then the tabs across the window. */
+.strip{flex-wrap:wrap;justify-content:space-between;
+padding:var(--space-1) var(--space-1) 0 var(--space-3)}
+.marks{order:1;flex-basis:100%;justify-content:space-between;gap:var(--space-2);
+margin:var(--space-1) calc(-1*var(--space-1)) -1px calc(-1*var(--space-3));min-height:0;
+padding:0 var(--space-3);border-top:var(--border)}
+.marks a{min-height:var(--row-h)}
 .reel picture{aspect-ratio:13/20}
 .reel img{height:100%;object-fit:cover;object-position:0 0}
 .reel .wide{display:none}
 .reel .narrow{display:block}
-.c-diff{--y:556;--w:440;--h:273}
 .c-send{--x:438;--w:460;--h:285}
 .facts ul{grid-template-columns:minmax(0,1fr)}}
 /* Important, because the rules above name their own transitions and would win otherwise. */

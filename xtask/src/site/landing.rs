@@ -1,7 +1,7 @@
 //! The landing page from `templates/landing.html`: the pitch broken over a step, the install
-//! command, the app in a window that turns through a few real views, the review and hand-off
-//! stories, and the promises. Its prose lives in `docs/landing.md`, each sentence once, and no
-//! landing sentence repeats on the page or in another doc.
+//! command, the app in a window that turns through a few real views, the hand-off beside its
+//! Send to window, and the promises. Its prose lives in `docs/landing.md`, each sentence once,
+//! and no landing sentence repeats on the page or in another doc.
 
 use askama::Template;
 use pulldown_cmark::{Parser, html};
@@ -20,7 +20,7 @@ const CACHE_DIR: &str = ".git/gitterrace/";
 
 /// The screenshots: file stem, alt text ("Caption: what it shows"), caption. The repository
 /// has a WebP pair per entry, the README shows two, and the landing page shows `REEL`,
-/// `NARROW` and the two crops.
+/// `NARROW` and the crop.
 pub const SHOTS: [(&str, &str, &str); 9] = [
     (
         "insights",
@@ -62,14 +62,15 @@ pub const SHOTS: [(&str, &str, &str); 9] = [
     ),
 ];
 
-/// The views the window on the landing page turns through, in order. The first loads with
-/// the page, the others when they come near.
-pub(super) const REEL: [&str; 4] = ["insights", "ownership", "blame", "overview"];
+/// The views the window on the landing page turns through, in order: one of each kind of page
+/// (insights, a file, a change, the repository), so no view repeats another's proof. The
+/// first loads with the page, the others when they come near.
+pub(super) const REEL: [&str; 4] = ["insights", "blame", "commit", "overview"];
 /// The first view on a phone: hotspots in the 390 px layout, where the wide shot would be
 /// too small to read.
 pub(super) const NARROW: &str = "narrow-insights";
-/// The shots the two stories show a part of: the diff of a commit, the Send to window.
-pub(super) const CROPS: [&str; 2] = ["commit", "send"];
+/// The shot the hand-off shows a part of: the Send to window.
+pub(super) const CROPS: [&str; 1] = ["send"];
 
 /// The pixel size of a shot's thumbnail and of its full-size file. A phone shot is a 390 px
 /// wide screen at 2x, the rest a 1280x800 window at 2x.
@@ -81,16 +82,9 @@ pub(crate) fn sizes(stem: &str) -> ((u32, u32), (u32, u32)) {
     }
 }
 
-/// What the review story links, under its picture: (label, docs path with anchor). The
-/// site's link check fails on an anchor that is gone.
-const REVIEW: [(&str, &str); 4] = [
-    ("Mark files as viewed", "docs/using/#mark-files-as-viewed"),
-    ("Find in the whole diff", "docs/using/#find-in-the-whole-diff"),
-    ("Review order", "docs/using/#review-order"),
-    ("Checkpoints", "docs/using/#checkpoints"),
-];
-
-/// Where a finding goes, under the hand-off picture, so "any tool" reads at a glance.
+/// Where a finding goes, as a ruled list beside the hand-off picture, so "any tool" reads at
+/// a glance: (label, docs path with anchor). The site's link check fails on an anchor that
+/// is gone.
 const DESTINATIONS: [(&str, &str); 6] = [
     ("Coding agents", "docs/actions/#hand-a-finding-to-an-agent"),
     ("Your editor", "docs/actions/#the-starter-file"),
@@ -114,9 +108,6 @@ struct Landing<'a> {
     addr: &'a str,
     reel: Vec<(&'a str, &'a str, &'a str)>,
     narrow: (&'a str, &'a str),
-    review: &'a str,
-    review_links: &'a [(&'a str, &'a str)],
-    diff: (&'a str, &'a str),
     handoff: &'a str,
     handoff_links: &'a [(&'a str, &'a str)],
     send: (&'a str, &'a str),
@@ -151,12 +142,9 @@ pub(crate) fn body(
         addr: gitterrace_config::DEFAULT_ADDR,
         reel,
         narrow: pair(NARROW)?,
-        review: &md(part("Review")?, links)?,
-        review_links: &REVIEW,
-        diff: pair(CROPS[0])?,
         handoff: &md(opening(part("Hand-off")?), links)?,
         handoff_links: &DESTINATIONS,
-        send: pair(CROPS[1])?,
+        send: pair(CROPS[0])?,
         promises: &md(promises, links)?,
     }
     .render()?;
