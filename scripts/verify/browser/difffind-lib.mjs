@@ -12,7 +12,7 @@
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { eachBrowser, serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { eachBrowser, serve, sh, commitAll, ready } from '../../lib/browser-lib.mjs';
 
 const BOX = '.difftools input[type=search]';
 
@@ -141,6 +141,8 @@ export function checks(env) {
           });
           await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
           await p.waitForSelector('section.file input.viewed', { timeout: 10000 });
+          // The find keys (f, n, /) are bound by the lazy script, which loads apart from viewed.
+          await ready(p, 'diffs-find');
           // Layout shifts land after fonts swap in, one frame past paint.
           await p.evaluate(() => document.fonts.ready.then(() => new Promise((r) =>
             requestAnimationFrame(() => requestAnimationFrame(r)))));
