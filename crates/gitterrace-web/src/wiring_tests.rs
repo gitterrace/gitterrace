@@ -437,6 +437,43 @@ async fn raw_budget_blocks_a_third_concurrent_reader_until_a_body_is_sent() {
     assert_eq!(a.env.raw_budget.available_permits(), 2, "every share comes back");
 }
 
+/// Guard class: a memory share belongs to the read that uses the memory, not to the request.
+/// A request dropped while its read is latched in flight keeps the whole budget taken until the
+/// read ends. No timing: the hold is a latch and the release is awaited.
+#[tokio::test]
+async fn a_canceled_raw_request_keeps_its_share_until_the_read_ends() {
+    let dir = tempfile::tempdir().expect("tmp");
+    let p = repo(dir.path(), "r");
+    let a = app(
+        &p,
+        with(|c| {
+            c.limits.raw_mb = 1;
+            c.limits.raw_concurrent_mb = 1;
+        }),
+    );
+    let r = crate::routes::router(Arc::clone(&a));
+    let latch = Path::new("mid.txt");
+    let idle_jobs = a.env.idle_jobs();
+    crate::related::hold::set(latch, true);
+    let req = Request::get("/raw/HEAD/mid.txt").body(Body::empty()).expect("req");
+    let call = tokio::spawn(async move { r.oneshot(req).await });
+    let budget = a.env.raw_budget.clone();
+    // The job slot is taken just before the read is spawned, so the read is in flight.
+    gitterrace_testkit::wait::until("the read is in flight", || async {
+        budget.available_permits() == 0 && a.env.idle_jobs() < idle_jobs
+    })
+    .await;
+    call.abort();
+    assert!(call.await.is_err(), "the request was canceled");
+    gitterrace_testkit::wait::pause(Duration::from_millis(100)).await;
+    assert_eq!(a.env.raw_budget.available_permits(), 0, "the share left with the request");
+    crate::related::hold::set(latch, false);
+    gitterrace_testkit::wait::until("the share returns once the read ends", || async {
+        budget.available_permits() == 1
+    })
+    .await;
+}
+
 #[test]
 fn raw_mb_defaults_to_ten_and_refuses_one_byte_over() {
     let mb = Config::default().limits.raw_mb;

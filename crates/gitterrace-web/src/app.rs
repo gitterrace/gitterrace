@@ -120,6 +120,12 @@ impl Env {
         self.jobs.take().await.map_err(|_| std::io::Error::other("blocking job slots closed"))
     }
 
+    /// Page-building slots free right now, so a test can tell a read is in flight.
+    #[cfg(test)]
+    pub(crate) fn idle_jobs(&self) -> usize {
+        self.jobs.available_permits()
+    }
+
     pub(crate) fn new(cfg: Config) -> Self {
         let jobs = job_slots(&cfg);
         let public = cfg.server.is_public;

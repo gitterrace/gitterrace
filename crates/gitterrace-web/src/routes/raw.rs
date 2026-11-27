@@ -30,7 +30,7 @@ fn tag_matches(headers: &axum::http::HeaderMap, tag: &str) -> bool {
 enum Raw {
     TooLarge,
     Fresh(String),
-    Bytes(Vec<u8>, String),
+    Bytes(Vec<u8>, String, Slot),
 }
 
 /// Serves blob bytes for relative images. Content is untrusted, so scripts are disabled.
@@ -43,20 +43,24 @@ pub(super) async fn raw(
     let name = path.trim_matches('/').to_owned();
     let limit = app.cfg().limits.raw_mb;
     let permit = raw_permit(&app).await?;
+    // Moved into the read and handed back with its result: a request dropped mid-read (client
+    // gone, timeout) frees the share only once the read has exited and its bytes are freed.
     let loaded = blocking(&app, move |a| {
+        #[cfg(test)]
+        crate::related::hold::wait(std::path::Path::new(&name));
         // One resolve and one tree walk; the header size comes before any content read.
         let blob = a.repo.raw_blob(&rev, &name, |id, size| {
             raw_refused(size, limit) || tag_matches(&headers, &format!("\"{id}\""))
         })?;
         let tag = format!("\"{}\"", blob.id);
         Ok(match blob.bytes {
-            Some(bytes) => Raw::Bytes(bytes, tag),
+            Some(bytes) => Raw::Bytes(bytes, tag, permit),
             None if raw_refused(blob.size, limit) => Raw::TooLarge,
             None => Raw::Fresh(tag),
         })
     })
     .await?;
-    let (bytes, tag) = match loaded {
+    let (body, tag) = match loaded {
         Raw::TooLarge => {
             // 413 names the request body, and 5xx reads as a server fault worth retrying: the
             // file exists but this server does not hand it out, so 404 with the reason.
@@ -77,9 +81,9 @@ pub(super) async fn raw(
             )
                 .into_response());
         }
-        Raw::Bytes(bytes, tag) => (bytes, tag),
+        Raw::Bytes(bytes, tag, permit) => (held(bytes, permit), tag),
     };
-    Ok(media_response(&path, held(bytes, permit), Some(&tag)))
+    Ok(media_response(&path, body, Some(&tag)))
 }
 
 /// A share of `limits.raw_concurrent_mb` for one raw response, reserved before the read and
@@ -161,11 +165,14 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
     let name = path.trim_matches('/').to_owned();
     let permit = raw_permit(&app).await?;
     let limit = app.cfg().limits.raw_mb << 20;
-    let bytes =
-        blocking(&app, move |a| Ok(gitterrace_git::worktree_bytes(&a.repo, &name, limit)?)).await?;
-    Ok(bytes.map_or_else(
+    // The share rides in the read, as in `raw`.
+    let read = blocking(&app, move |a| {
+        Ok((gitterrace_git::worktree_bytes(&a.repo, &name, limit)?, permit))
+    })
+    .await?;
+    Ok(read.0.map_or_else(
         || crate::error::not_found("This file is not a changed file of the working tree."),
-        |b| media_response(&path, held(b, permit), None),
+        |b| media_response(&path, held(b, read.1), None),
     ))
 }
 
