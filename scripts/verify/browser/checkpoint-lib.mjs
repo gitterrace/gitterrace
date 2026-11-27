@@ -8,11 +8,14 @@
 // - an edit to a marked file turns the mark into "Changed since viewed"
 // - Mark all viewed marks every file
 // - with no owner cookie the buttons answer 403 and nothing is saved
+// checkpoint-between: two checkpoints with an edit between them. The Since and Until lists of
+// the checkpoint page pick the older one and then the newer one, and the page then lists only
+// the file edited between the two, not the one edited after the second.
 // A screenshot of the checkpoint page goes to $TMPDIR/gt-checkpoint-<browser>.png.
 import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
-import { serve, sh, commitAll } from '../../lib/browser-lib.mjs';
+import { serve, sh, commitAll, poll } from '../../lib/browser-lib.mjs';
 
 function makeRepo() {
   const dir = mkdtempSync(join(tmpdir(), 'gt-checkpoint-'));
@@ -117,5 +120,58 @@ export function checks(env) {
       }
     }
   }
-  return { checkpointSinceTab };
+  async function checkpointBetween() {
+    for (const name of browsers) {
+      const dir = makeRepo();
+      const srv = await serve(bin, dir, cfg);
+      const w = `checkpoint-between ${name}`;
+      try {
+        const { b, ctx } = await context(name);
+        try {
+          await ctx.addCookies([await srv.owner()]);
+          const p = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+          await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
+          await p.waitForSelector('[data-checkpoint]', WAIT);
+          await p.click('[data-checkpoint]');
+          await p.waitForSelector('.cpnote:text("Checkpoint saved")', WAIT);
+          writeFileSync(join(dir, 'c.txt'), 'one\ntwo\nbetween\n');
+          await p.click('[data-checkpoint]');
+          // poll, not waitForFunction with an async predicate: in webkit that returned before
+          // the second checkpoint existed, and the edit below went into it.
+          await poll(() => p.evaluate(async () => {
+            const m = document.querySelector('meta[name="gt-base"]');
+            const r = await fetch(`${m?.getAttribute('content') ?? ''}/api/v1/checkpoints`);
+            return (await r.json()).checkpoints.length === 2;
+          }), 'the second checkpoint');
+          writeFileSync(join(dir, 'b.txt'), 'one\ntwo\nafter\n');
+          await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
+          await p.locator('.tabs a:text-is("Since checkpoint")').click();
+          await p.waitForSelector('[data-cp-pick]', WAIT);
+          const links = (sel) => p.$$eval(`${sel} a`, (a) => a.map((x) => x.getAttribute('href')));
+          const since = await links('[data-cp-since-pick]');
+          const root = `${new URL(srv.base).pathname.replace(/\/$/, '')}/worktree?since=`;
+          say(since.length === 2 && since.every((h) => h.startsWith(root)),
+            `${w}: the Since list holds both checkpoints behind the base path`,
+            `${w}: Since links ${since}`);
+          await p.goto(new URL(since[1], srv.base).href, { waitUntil: 'load' });
+          const until = await links('[data-cp-until-pick]');
+          await p.goto(new URL(until[0], srv.base).href, { waitUntil: 'load' });
+          await p.waitForSelector('[data-cp-since]', WAIT);
+          const shown = await paths(p);
+          say(shown.join() === 'c.txt', `${w}: since the first up to the second lists only c.txt`,
+            `${w}: shown ${shown}`);
+          const note = await p.$eval('[data-cp-since]', (e) => e.textContent);
+          say(/up to the one taken/.test(note), `${w}: the note says it is not the working tree`,
+            `${w}: note was ${note}`);
+          await p.close();
+        } finally { await b.close(); }
+      } catch (e) {
+        r.fail(`${w}: ${e && e.stack}`);
+      } finally {
+        srv.stop();
+        rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+      }
+    }
+  }
+  return { checkpointSinceTab, checkpointBetween };
 }

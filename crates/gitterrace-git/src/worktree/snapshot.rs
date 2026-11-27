@@ -218,5 +218,111 @@ pub fn worktree_diff_since(
     Ok(out)
 }
 
+/// A checkpoint as [`worktree_diff_between`] reads it.
+#[derive(Clone, Copy, Debug)]
+pub struct Held<'a> {
+    pub files: &'a [SnapFile],
+    /// The commit the checkpoint was taken at.
+    pub head: &'a str,
+    /// The checkpoint's own file list may be incomplete.
+    pub omitted: bool,
+}
+
+/// What a checkpoint held of `path`: its copy, or the file at its commit when it did not list
+/// it. The flag is true for a listed file whose copy is gone, which reads as "too big to diff".
+fn held_read(
+    r: &gix::Repository,
+    known: &BTreeMap<&str, &SnapFile>,
+    tree: &gix::Tree<'_>,
+    path: &str,
+    big: u64,
+) -> (Read, bool) {
+    known.get(path).map_or_else(
+        || (head_blob(r, tree, path, big), false),
+        |f| match (&f.text, f.hash.as_str()) {
+            (Some(t), _) => (Read::data(t.clone()), false),
+            (None, "") => (Read::Missing, false),
+            (None, _) => (Read::Big, true),
+        },
+    )
+}
+
+/// The content id a side stands for, `None` when it cannot be told (too large to read).
+fn side_id(read: &Read, known: &BTreeMap<&str, &SnapFile>, path: &str) -> Option<String> {
+    match known.get(path) {
+        Some(f) if f.text.is_none() && !f.hash.is_empty() => {
+            (f.hash != BIG_HASH).then(|| f.hash.clone())
+        }
+        _ => match read {
+            Read::Data(d) => Some(content_id(d)),
+            Read::Missing => Some(String::new()),
+            Read::Big | Read::Skip => None,
+        },
+    }
+}
+
+/// Checkpoint `from` against checkpoint `to`: only files whose content differs are listed.
+///
+/// A file a checkpoint did not list read as its own commit then, so the files the commits
+/// between the two heads changed are walked too. A file whose copy is gone on either side is
+/// named in `gone` and listed without hunks when its content cannot be shown to match.
+/// `baseline_missing` says a checkpoint's commit is not in this repository: its unlisted files
+/// were read at the current HEAD instead.
+pub fn worktree_diff_between(repo: &Repo, from: &Held<'_>, to: &Held<'_>) -> Result<SinceDiff> {
+    let r = open(repo)?;
+    let big = repo.worktree_diff_bytes();
+    let head = r.head_commit().ok().and_then(|c| c.tree().ok());
+    let now_tree = || head.clone().unwrap_or_else(|| r.empty_tree());
+    let (a_tree, b_tree) = (baseline_tree(&r, from.head), baseline_tree(&r, to.head));
+    let mut out = SinceDiff {
+        files_omitted: from.omitted || to.omitted,
+        baseline_missing: a_tree.is_none() || b_tree.is_none(),
+        ..SinceDiff::default()
+    };
+    let (a_tree, b_tree) = (a_tree.unwrap_or_else(now_tree), b_tree.unwrap_or_else(now_tree));
+    let mut all: BTreeSet<String> =
+        from.files.iter().chain(to.files).map(|f| f.path.clone()).collect();
+    if from.head != to.head {
+        let walked = tree_paths(&r, &a_tree, &b_tree, repo.worktree_files());
+        out.files_omitted |= walked.cut;
+        out.history_unreadable = walked.failed;
+        all.extend(walked.paths);
+    }
+    if all.len() > repo.worktree_files() {
+        all = all.into_iter().take(repo.worktree_files()).collect();
+        out.files_omitted = true;
+    }
+    let ka: BTreeMap<&str, &SnapFile> = from.files.iter().map(|f| (f.path.as_str(), f)).collect();
+    let kb: BTreeMap<&str, &SnapFile> = to.files.iter().map(|f| (f.path.as_str(), f)).collect();
+    for path in all {
+        if !is_plain(&path) {
+            continue;
+        }
+        let (old, old_lost) = held_read(&r, &ka, &a_tree, &path, big);
+        let (new, new_lost) = held_read(&r, &kb, &b_tree, &path, big);
+        let lost = old_lost || new_lost;
+        let same = lost
+            && side_id(&old, &ka, &path)
+                .is_some_and(|a| side_id(&new, &kb, &path).is_some_and(|b| a == b));
+        if same {
+            out.unchanged += 1;
+            out.unchanged_paths.push(path);
+            continue;
+        }
+        if lost {
+            out.gone.push(path.clone());
+        }
+        match classify(&path, &old, &new) {
+            Some(d) => out.files.push(d),
+            None if lost => {}
+            None => {
+                out.unchanged += 1;
+                out.unchanged_paths.push(path);
+            }
+        }
+    }
+    Ok(out)
+}
+
 #[cfg(test)]
 mod tests;

@@ -135,6 +135,8 @@ pub(crate) enum DiffSource<'a> {
         scope: gitterrace_types::WorktreeScope,
         /// The checkpoint the page compares with: folded files load against it too.
         since: Option<&'a str>,
+        /// The second checkpoint of a comparison between two.
+        until: Option<&'a str>,
     },
 }
 
@@ -143,10 +145,10 @@ pub(crate) enum DiffSource<'a> {
 fn fold_button(src: DiffSource<'_>, i: usize, f: &FileDiff, label: &str, lazy: bool) -> String {
     let url = match src {
         DiffSource::Commit { rev, .. } => crate::fmt::href(&format!("/diff/{}/{i}", enc_seg(rev))),
-        DiffSource::Worktree { scope, since, .. } => crate::fmt::href(&format!(
+        DiffSource::Worktree { scope, since, until, .. } => crate::fmt::href(&format!(
             "/worktree/diff/{}{}",
             enc_path(&f.path),
-            crate::worktree_scope::query_of(scope, since)
+            crate::worktree_scope::query_of(scope, since, until)
         )),
     };
     // A link, so it is reachable by keyboard, works without script and is a page an export
@@ -428,13 +430,14 @@ pub(crate) async fn worktree_fragment(
 ) -> Result<Html<String>> {
     let scope = q.scope();
     let since = q.since().map(str::to_owned);
+    let until = q.until().map(str::to_owned);
     let html = crate::app::blocking(&app, move |a| {
         let r = Render::of(a);
         let one = match &since {
             None => gitterrace_git::worktree_file_diff_scoped(&a.repo, &path, scope)?,
-            Some(id) => {
-                crate::checkpoints_web::since_files(a, id)?.into_iter().find(|f| f.path == path)
-            }
+            Some(id) => crate::checkpoints_web::since_files(a, id, until.as_deref())?
+                .into_iter()
+                .find(|f| f.path == path),
         };
         Ok(one.map(|f| if f.hunks.is_empty() { no_hunks_line(&f) } else { diff_body_html(&r, &f) }))
     })

@@ -178,6 +178,117 @@ fn worktree_since_a_checkpoint_lists_only_what_changed_after_it() {
     assert_eq!(list.checkpoints[0].files, 2);
 }
 
+/// A checkpoint of the working tree as it is, recorded as if taken `ago` seconds back.
+fn checkpoint_ago(s: &ApiState, ago: i64) -> String {
+    let snap = gitterrace_git::worktree_snapshot(&s.repo, 1 << 20, u64::MAX).expect("snap");
+    let head = s.repo.resolve("HEAD").expect("head");
+    let now = gitterrace_index::wall_clock();
+    s.index.checkpoint_add(&snap, &head, false, "", 20 << 20, now - ago).expect("add").0
+}
+
+fn between(w: &gitterrace_types::api::WorktreeResponse) -> Vec<&str> {
+    w.files.iter().map(|f| f.path.as_str()).collect()
+}
+
+/// Three checkpoints with edits between them: `until` lists what changed between two and
+/// leaves the working tree out, and `since` as a duration picks the newest checkpoint at or
+/// before that long ago.
+#[test]
+fn two_checkpoints_diff_and_a_duration_picks_the_base() {
+    let (dir, srv) = fixture();
+    let p = dir.path();
+    std::fs::write(p.join("a.txt"), "one\ntwo\nthree\nfour\n").expect("write");
+    let first = checkpoint_ago(&srv, 3600);
+    std::fs::write(p.join("a.txt"), "one\ntwo\nthree\nfour\nfive\n").expect("write");
+    std::fs::write(p.join("new.txt"), "new\n").expect("write");
+    let second = checkpoint_ago(&srv, 600);
+    std::fs::write(p.join("src/b.rs"), "fn other() {}\n").expect("write");
+    let third = checkpoint_ago(&srv, 0);
+    let all = Some("all");
+
+    let w = srv.worktree_diff_until(all, None, Some(&first), Some(&second)).expect("between");
+    assert_eq!(between(&w), ["a.txt", "new.txt"]);
+    assert_eq!(
+        (w.since.as_deref(), w.until.as_deref()),
+        (Some(first.as_str()), Some(second.as_str()))
+    );
+    assert_eq!((w.additions, w.deletions), (2, 0));
+    let a = w.files.iter().find(|f| f.path == "a.txt").expect("a");
+    let hunks = a.hunks.as_deref().unwrap_or_default();
+    assert!(hunks.iter().any(|h| h.lines.iter().any(|l| l.text == "five")), "{a:?}");
+
+    // The working tree has moved on since the third checkpoint: `until` never reads it.
+    std::fs::write(p.join("late.txt"), "late\n").expect("write");
+    let w = srv.worktree_diff_until(all, None, Some(&second), Some(&third)).expect("later pair");
+    assert_eq!(between(&w), ["src/b.rs"]);
+    let same = srv.worktree_diff_until(all, None, Some(&third), Some(&third)).expect("same");
+    assert!(same.files.is_empty() && same.unchanged_files == Some(3), "{:?}", same.unchanged_files);
+
+    // 30m back is the first checkpoint (an hour old), 5m back the second (ten minutes old).
+    let by_duration = |t: &str| srv.worktree_diff_until(all, None, Some(t), Some(&third));
+    assert_eq!(by_duration("30m").expect("30m").since.as_deref(), Some(first.as_str()));
+    assert_eq!(by_duration("5m").expect("5m").since.as_deref(), Some(second.as_str()));
+    assert_eq!(by_duration("1h").expect("1h").since.as_deref(), Some(first.as_str()));
+    assert_eq!(srv.resolve_since(&first).expect("id"), first, "an id passes through");
+    assert_eq!(srv.resolve_since("5m").expect("pick"), second);
+    let plain = srv.worktree_diff_since(all, None, Some("5m")).expect("since five minutes");
+    assert!(plain.files.iter().any(|f| f.path == "late.txt"), "no until compares with now");
+}
+
+#[test]
+fn since_outside_the_kept_range_or_missing_is_an_error() {
+    let (d, s) = fixture();
+    std::fs::write(d.path().join("a.txt"), "x\n").expect("write");
+    let only = checkpoint_ago(&s, 120);
+    let err = s.resolve_since("1h").expect_err("older than any checkpoint");
+    let crate::ApiError::CheckpointNotFound(why) = &err else { panic!("{err:?}") };
+    assert!(why.contains("1h") && why.contains("oldest"), "{why}");
+    for bad in ["30s", "8d", "0m"] {
+        assert!(matches!(s.resolve_since(bad), Err(crate::ApiError::BadRequest(_))), "{bad}");
+    }
+    assert!(matches!(
+        s.worktree_diff_until(Some("all"), None, Some(&only), Some("cp-000000000000")),
+        Err(crate::ApiError::CheckpointNotFound(_))
+    ));
+    assert!(matches!(
+        s.worktree_diff_until(Some("all"), None, Some("cp-000000000000"), Some(&only)),
+        Err(crate::ApiError::CheckpointNotFound(_))
+    ));
+    assert!(matches!(
+        s.worktree_diff_until(Some("all"), None, None, Some(&only)),
+        Err(crate::ApiError::BadRequest(_))
+    ));
+    assert!(matches!(
+        s.worktree_diff_until(Some("staged"), None, Some(&only), Some(&only)),
+        Err(crate::ApiError::BadRequest(_))
+    ));
+}
+
+/// The routes take `until` and a duration `since`, and answer 404 for a checkpoint not kept.
+#[tokio::test]
+async fn the_worktree_route_takes_until_and_a_duration() {
+    let (d, s) = fixture();
+    std::fs::write(d.path().join("a.txt"), "x\n").expect("write");
+    let one = checkpoint_ago(&s, 3600);
+    std::fs::write(d.path().join("a.txt"), "y\n").expect("write");
+    let two = checkpoint_ago(&s, 0);
+    let (st, v) = get(&s, &format!("/worktree?since={one}&until={two}")).await;
+    assert_eq!(st, StatusCode::OK, "{v}");
+    assert_eq!(
+        (v["since"].as_str(), v["until"].as_str()),
+        (Some(one.as_str()), Some(two.as_str()))
+    );
+    let (st, v) = get(&s, &format!("/worktree?since=30m&until={two}")).await;
+    assert_eq!((st, v["since"].as_str()), (StatusCode::OK, Some(one.as_str())));
+    let (st, v) = get(&s, "/worktree?since=3d").await;
+    assert_eq!(
+        (st, v["error"]["code"].as_str()),
+        (StatusCode::NOT_FOUND, Some("checkpoint_not_found"))
+    );
+    let (st, _) = get(&s, "/worktree?since=1s").await;
+    assert_eq!(st, StatusCode::BAD_REQUEST);
+}
+
 #[test]
 fn viewed_marks_round_trip_through_the_state() {
     let (_d, s) = fixture();

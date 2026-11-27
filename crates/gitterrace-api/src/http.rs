@@ -220,6 +220,7 @@ pub(crate) async fn compare(
 #[derive(Deserialize)]
 pub(crate) struct WorktreeQuery {
     since: Option<String>,
+    until: Option<String>,
     scope: Option<String>,
     max_lines: Option<usize>,
 }
@@ -229,7 +230,12 @@ pub(crate) async fn worktree(
     Query(q): Query<WorktreeQuery>,
 ) -> Reply<WorktreeResponse> {
     blocking(&s, move |s| {
-        s.worktree_diff_since(q.scope.as_deref(), q.max_lines, q.since.as_deref())
+        s.worktree_diff_until(
+            q.scope.as_deref(),
+            q.max_lines,
+            q.since.as_deref(),
+            q.until.as_deref(),
+        )
     })
     .await
 }

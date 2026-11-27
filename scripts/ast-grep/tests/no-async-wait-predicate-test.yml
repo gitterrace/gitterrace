@@ -1,0 +1,10 @@
+id: no-async-wait-predicate
+valid:
+  - 'await p.waitForFunction(() => document.querySelector("x") !== null);'
+  - 'await p.waitForFunction((w) => document.title === w, want, WAIT);'
+  - 'await poll(() => p.evaluate(async () => (await fetch(u)).ok), "ready");'
+  - 'await p.waitForFunction(function () { return window.ok; });'
+invalid:
+  - 'await p.waitForFunction(async () => (await fetch(u)).ok, null, WAIT);'
+  - 'await p.waitForFunction(async (w) => { const r = await fetch(w); return r.ok; }, u);'
+  - 'await page.waitForFunction(async function () { return (await fetch(u)).ok; });'

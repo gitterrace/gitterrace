@@ -219,9 +219,11 @@ args! {
     WorktreeArgs {
         /// `all` (default), `staged` or `unstaged`.
         scope: Option<String>,
-        /// A checkpoint id from `list_checkpoints`: list only the files that differ from it.
-        /// Needs scope `all`.
+        /// A checkpoint id from `list_checkpoints`, or a duration `1m` to `7d` such as `15m`
+        /// (newest checkpoint at or before it): only files that differ from it. Scope `all`.
         since: Option<String>,
+        /// A second checkpoint id: with `since`, what changed between the two.
+        until: Option<String>,
         /// Cap on diff lines returned across all files. Defaults to 400.
         max_lines: Option<usize>,
     }
@@ -424,10 +426,11 @@ impl McpServer {
         Parameters(a): Parameters<WorktreeArgs>,
     ) -> Result<CallToolResult, ErrorData> {
         self.run("worktree_diff", a.repo.clone(), move |s| {
-            s.worktree_diff_since(
+            s.worktree_diff_until(
                 a.scope.as_deref(),
                 Some(a.max_lines.unwrap_or(DEFAULT_MAX_LINES)),
                 a.since.as_deref(),
+                a.until.as_deref(),
             )
         })
         .await
@@ -435,8 +438,8 @@ impl McpServer {
 
     /// Checkpoints of the uncommitted work, newest first: id, time, file count and the bytes
     /// of copies held. Pass an id as `since` to `worktree_diff` to see only what changed after
-    /// it. Taking one is a button on the working tree page: this server never writes. Refused
-    /// on a public server.
+    /// it, or an id as `until` too for what changed between two. Taking one is a button on the
+    /// working tree page: this server never writes. Refused on a public server.
     #[tool(name = "list_checkpoints", annotations(read_only_hint = true))]
     async fn list_checkpoints(
         &self,

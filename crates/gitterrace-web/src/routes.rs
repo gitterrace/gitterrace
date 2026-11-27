@@ -476,6 +476,7 @@ async fn worktree(
 ) -> Result<Html<String>> {
     let scope = q.scope();
     let since = q.since().map(str::to_owned);
+    let until = q.until().map(str::to_owned);
     let p = blocking(&app, move |a| {
         // Taken before the diff: an edit in between shows once more, never not at all. The
         // oldest render not yet compared stays: a newer one may already hold an edit an older
@@ -486,7 +487,7 @@ async fn worktree(
         {
             *g = sig;
         }
-        let review = crate::checkpoints_web::read(a, scope, since.as_deref())?;
+        let review = crate::checkpoints_web::read(a, scope, since.as_deref(), until.as_deref())?;
         let files = &review.files;
         let tabs = review
             .tabs(crate::worktree_scope::tabs(scope, gitterrace_git::worktree_counts(&a.repo)?));
@@ -512,6 +513,7 @@ async fn worktree(
                 generated: &views::worktree_generated(&a.repo, files),
                 scope,
                 since: review.since_id(),
+                until: review.until_id(),
             },
             files,
         );
@@ -526,12 +528,19 @@ async fn worktree(
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),
             files_summary: fmt::count(stats.len(), "changed file", "changed files"),
-            plan: crate::review_panel::render(
-                a,
-                &crate::review_panel::Source::Worktree { scope, since: review.since_id() },
-            ),
+            // The plan reads the working tree: a comparison of two checkpoints has none.
+            plan: if review.until_id().is_some() {
+                String::new()
+            } else {
+                crate::review_panel::render(
+                    a,
+                    &crate::review_panel::Source::Worktree { scope, since: review.since_id() },
+                )
+            },
             omitted: review.files_omitted(),
-            tools: review.since_note() + &crate::diff_find::toolbar(stats.len(), folded),
+            tools: review.since_note()
+                + &review.picker()
+                + &crate::diff_find::toolbar(stats.len(), folded),
             files: stats,
         })
     })

@@ -9,7 +9,8 @@ mod limit_tests;
 mod pair;
 mod snapshot;
 pub use snapshot::{
-    BIG_HASH, SinceDiff, SnapFile, Snapshot, content_id, worktree_diff_since, worktree_snapshot,
+    BIG_HASH, Held, SinceDiff, SnapFile, Snapshot, content_id, worktree_diff_between,
+    worktree_diff_since, worktree_snapshot,
 };
 
 use std::collections::BTreeSet;

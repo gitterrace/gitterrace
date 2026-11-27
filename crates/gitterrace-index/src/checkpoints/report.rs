@@ -1,5 +1,15 @@
 //! What a checkpoint write reports and the budgets it works within.
 
+use crate::checkpoints::Checkpoint;
+
+impl Checkpoint {
+    /// The checkpoint as `worktree_diff_between` reads one side.
+    #[must_use]
+    pub fn held(&self) -> gitterrace_git::Held<'_> {
+        gitterrace_git::Held { files: &self.files, head: &self.head, omitted: self.files_omitted }
+    }
+}
+
 #[expect(
     clippy::trivially_copy_pass_by_ref,
     reason = "serde's skip_serializing_if passes a reference"

@@ -1,6 +1,9 @@
 use gitterrace_testkit::{Fixture, git};
 
-use super::{BIG_HASH, SinceDiff, SnapFile, content_id, worktree_diff_since, worktree_snapshot};
+use super::{
+    BIG_HASH, Held, SinceDiff, SnapFile, content_id, worktree_diff_between, worktree_diff_since,
+    worktree_snapshot,
+};
 use crate::Repo;
 
 fn repo() -> (tempfile::TempDir, Repo) {
@@ -278,4 +281,64 @@ fn the_union_with_saved_paths_is_bounded_and_reported() {
     let d = since_at(&repo, &snap, &at);
     assert!(d.files.len() + d.unchanged <= 5, "{} + {}", d.files.len(), d.unchanged);
     assert!(d.files_omitted);
+}
+
+fn between(repo: &Repo, a: (&[SnapFile], &str), b: (&[SnapFile], &str)) -> SinceDiff {
+    let (a, b) = (
+        Held { files: a.0, head: a.1, omitted: false },
+        Held { files: b.0, head: b.1, omitted: false },
+    );
+    worktree_diff_between(repo, &a, &b).expect("between")
+}
+
+#[test]
+fn between_two_checkpoints_lists_the_edits_made_in_that_window_only() {
+    let (d, repo) = repo();
+    let p = d.path();
+    let head = repo.resolve("HEAD").expect("head");
+    std::fs::write(p.join("a.txt"), "1\nx\n").expect("write");
+    let one = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    std::fs::write(p.join("a.txt"), "1\nx\ny\n").expect("write");
+    std::fs::write(p.join("b.txt"), "B\n").expect("write");
+    let two = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    let d = between(&repo, (&one, &head), (&two, &head));
+    assert_eq!(paths(&d), ["a.txt", "b.txt"]);
+    assert_eq!((d.files[0].additions, d.files[0].deletions), (1, 0));
+    assert_eq!(d.unchanged, 0);
+    let back = between(&repo, (&two, &head), (&one, &head));
+    assert_eq!((back.files[0].additions, back.files[0].deletions), (0, 1));
+    let same = between(&repo, (&two, &head), (&two, &head));
+    assert!(same.files.is_empty() && same.unchanged == 2);
+}
+
+#[test]
+fn between_reads_a_commit_made_after_the_first_checkpoint() {
+    let (d, repo) = repo();
+    let p = d.path();
+    let before = repo.resolve("HEAD").expect("head");
+    std::fs::write(p.join("a.txt"), "1\n2\n3\n").expect("write");
+    git(p, &["commit", "-qam", "more"]);
+    let after = repo.resolve("HEAD").expect("head");
+    let d = between(&repo, (&[], &before), (&[], &after));
+    assert_eq!(paths(&d), ["a.txt"]);
+    assert!(!d.baseline_missing && !d.history_unreadable);
+    let gone = between(&repo, (&[], "0123456789012345678901234567890123456789"), (&[], &after));
+    assert!(gone.baseline_missing);
+}
+
+#[test]
+fn between_names_a_file_whose_copy_is_gone_and_keeps_equal_hashes_unchanged() {
+    let (d, repo) = repo();
+    let p = d.path();
+    let head = repo.resolve("HEAD").expect("head");
+    std::fs::write(p.join("a.txt"), "1\nx\n").expect("write");
+    let kept = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    let bare = worktree_snapshot(&repo, 0, u64::MAX).expect("snap").files;
+    let same = between(&repo, (&kept, &head), (&bare, &head));
+    assert!(same.files.is_empty() && same.unchanged == 1 && same.gone.is_empty());
+    std::fs::write(p.join("a.txt"), "1\nz\n").expect("write");
+    let moved = worktree_snapshot(&repo, 0, u64::MAX).expect("snap").files;
+    let d = between(&repo, (&kept, &head), (&moved, &head));
+    assert_eq!(d.gone, ["a.txt"]);
+    assert_eq!(paths(&d), ["a.txt"]);
 }

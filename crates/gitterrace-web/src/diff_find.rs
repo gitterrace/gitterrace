@@ -21,6 +21,7 @@ pub(crate) struct FindQuery {
     q: Option<String>,
     scope: Option<String>,
     since: Option<String>,
+    until: Option<String>,
 }
 
 /// One matching line: where it sits in its file (`kind` and `no` name the line the page marks)
@@ -187,9 +188,10 @@ pub(crate) async fn worktree(
     let n = needle(&q);
     let scope = crate::worktree_scope::named(q.scope.as_deref());
     let since = q.since.filter(|s| !s.is_empty());
+    let until = q.until.filter(|s| !s.is_empty());
     let found = blocking(&app, move |a| {
         let files = match &since {
-            Some(id) => crate::checkpoints_web::since_files(a, id)?,
+            Some(id) => crate::checkpoints_web::since_files(a, id, until.as_deref())?,
             None => gitterrace_git::worktree_diff_scoped(&a.repo, scope)?,
         };
         Ok(find(&files, &n))

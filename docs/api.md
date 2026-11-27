@@ -43,7 +43,7 @@ each cap.
 | `GET /log` | `rev`, `path`, `page`, `per_page` | commits, has_more, page, path, per_page, rev |
 | `GET /commits/{id}` | `diff`, `max_lines` | author, body, committer, files, id, link, parents, permalink, subject, truncated |
 | `GET /compare` | `base`, `head`, `path`, `three_dot`, `max_lines` | additions, base, deletions, files, from, head, path, three_dot, truncated |
-| `GET /worktree` | `scope`, `max_lines`, `since` | additions, baseline_missing, content_gone, deletions, files, files_omitted, history_unreadable, scope, since, truncated, unchanged_files |
+| `GET /worktree` | `scope`, `max_lines`, `since`, `until` | additions, baseline_missing, content_gone, deletions, files, files_omitted, history_unreadable, scope, since, truncated, unchanged_files, until |
 | `GET /checkpoints` |  | bytes_used, cap_bytes, checkpoints, dropped, persisted |
 | `GET /viewed` |  | viewed |
 | `GET /findings` |  | cap_entries, count, findings, persisted |
@@ -83,9 +83,13 @@ each cap.
 
 - `scope` (string): `all` (default), `staged` or `unstaged`.
 - `max_lines` (integer): Most diff lines, at most `api.diff_lines`.
-- `since` (string): A checkpoint id from `/checkpoints`: list only the files
-  that differ from it. Needs scope `all`. An unknown id is 404
-  `checkpoint_not_found`.
+- `since` (string): A checkpoint id from `/checkpoints`, or a duration from `1m`
+  to `7d` such as `15m` for the newest checkpoint at or before that long ago:
+  list only the files that differ from it. Needs scope `all`. No such checkpoint
+  is 404 `checkpoint_not_found`.
+- `until` (string): A second checkpoint id: with `since`, list what changed
+  between the two checkpoints instead of up to now. The working tree is not
+  read.
 
 `/tree`: One directory level.
 
@@ -259,9 +263,10 @@ so to the model.
   `period?` (string), `query` (string), `repo?` (string), `rev?` (string).
 - `list_checkpoints`: Checkpoints of the uncommitted work, newest first: id,
   time, file count and the bytes of copies held. Pass an id as `since` to
-  `worktree_diff` to see only what changed after it. Taking one is a button on
-  the working tree page: this server never writes. Refused on a public server.
-  Parameters: `repo?` (string).
+  `worktree_diff` to see only what changed after it, or an id as `until` too for
+  what changed between two. Taking one is a button on the working tree page:
+  this server never writes. Refused on a public server. Parameters: `repo?`
+  (string).
 - `list_findings`: The review basket: findings the user collected with a note
   each, oldest first, and for each where its code is now (`untouched`,
   `lines changed`, `file changed` or `file gone`: a status says what happened to
@@ -316,7 +321,7 @@ so to the model.
   `staged`, `unstaged` or `all`. Reads this machine's working tree, so it is
   refused on a public server. Use to review work in progress before it is
   committed. Parameters: `max_lines?` (integer), `repo?` (string), `scope?`
-  (string), `since?` (string).
+  (string), `since?` (string), `until?` (string).
 
 A trailing `?` marks an optional parameter.
 

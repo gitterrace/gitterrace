@@ -176,7 +176,10 @@ survives later writes). A checkpoint that reaches the 256 MiB restore budget
 keeps the path and hash of the files whose copy it skipped and reports how many
 (`copies_omitted`) in the create result and the list. A commit range walked for
 a comparison stops at `limits.worktree_files` paths during the traversal, not
-after it, and the comparison reports `files_omitted`.
+after it, and the comparison reports `files_omitted`. Comparing two
+checkpoints reads both from the log and never the working tree, and a
+duration `since` resolves to a checkpoint id from the list's times first, so
+the cache format is the same.
 
 The review basket is rewritten by atomic rename, except when a frame is
 damaged: reads skip that frame, adds append, and removes are refused, so no

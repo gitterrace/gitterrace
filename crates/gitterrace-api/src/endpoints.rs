@@ -189,8 +189,16 @@ pub const ENDPOINTS: &[Endpoint] = &[
             p(
                 "since",
                 "string",
-                "A checkpoint id from `/checkpoints`: list only the files that differ from it. \
-                Needs scope `all`. An unknown id is 404 `checkpoint_not_found`.",
+                "A checkpoint id from `/checkpoints`, or a duration from `1m` to `7d` such as \
+                `15m` for the newest checkpoint at or before that long ago: list only the files \
+                that differ from it. Needs scope `all`. No such checkpoint is 404 \
+                `checkpoint_not_found`.",
+            ),
+            p(
+                "until",
+                "string",
+                "A second checkpoint id: with `since`, list what changed between the two \
+                checkpoints instead of up to now. The working tree is not read.",
             ),
         ],
         schema: of::<WorktreeResponse>,

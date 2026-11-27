@@ -1,6 +1,8 @@
 <div class="cp-since" data-cp-since><p class="muted">Changes since the checkpoint taken
 {{ when }}
-{%- if !label.is_empty() %} ({{ label }}){% endif %}. A checkpoint copies your changed text
+{%- if !label.is_empty() %} ({{ label }}){% endif %}
+{%- if let Some(u) = until %} and up to the one taken {{ u }}, not the working tree
+now{% endif %}. A checkpoint copies your changed text
 files into <code>.git/gitterrace</code> and writes nothing else.</p>
 {%- if baseline_missing %}<p class="muted" data-cp-baseline-missing>The commit this checkpoint
 was taken at is not in this repository, so files it did not list are compared with the current

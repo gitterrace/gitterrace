@@ -116,6 +116,9 @@ pub struct WorktreeResponse {
     /// Only with `since`: files that read the same as in the checkpoint, left out of `files`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub unchanged_files: Option<u64>,
+    /// Only with `until`: the second checkpoint, so `files` is what changed between the two.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub until: Option<String>,
 }
 
 /// `GET /commits/{id}`.

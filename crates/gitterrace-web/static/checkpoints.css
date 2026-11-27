@@ -2,3 +2,6 @@
 .cpbar .cpnote{font-size:var(--text-sm)}
 .cp-since ul{font-family:var(--mono)}
 .cp-since summary{cursor:pointer}
+.cp-pick{display:flex;gap:var(--space-4)}
+.cp-pick summary{cursor:pointer}
+.cp-pick ul{font-family:var(--mono)}

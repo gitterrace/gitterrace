@@ -31,6 +31,8 @@ pub(crate) struct Review {
     /// The files the page lists: the tab's, or the ones that differ from the checkpoint.
     pub(crate) files: Vec<FileDiff>,
     since: Option<Since>,
+    /// Every checkpoint, newest first, for the Since and Until pickers.
+    choices: Vec<Choice>,
     /// The newest checkpoint, which the Since checkpoint tab opens.
     latest: Option<String>,
     persisted: bool,
@@ -39,10 +41,20 @@ pub(crate) struct Review {
     files_omitted: bool,
 }
 
+/// One checkpoint in a picker.
+struct Choice {
+    id: String,
+    text: String,
+    since: bool,
+    until: bool,
+}
+
 /// The checkpoint a page is compared with.
 struct Since {
     id: String,
     created: i64,
+    /// The second checkpoint of a comparison between two: its id and when it was taken.
+    until: Option<(String, i64)>,
     label: String,
     /// Files the checkpoint holds as they are now: the ones the API counts as unchanged.
     unchanged: Vec<String>,
@@ -60,48 +72,93 @@ fn missing(id: &str) -> Error {
     ))
 }
 
-/// The comparison with checkpoint `id`.
-fn since_diff(a: &App, id: &str) -> Result<SinceDiff> {
-    let cp = a.index.checkpoint(id)?.ok_or_else(|| missing(id))?;
-    Ok(gitterrace_git::worktree_diff_since(&a.repo, &cp.files, &cp.head, cp.files_omitted)?)
+/// The checkpoint a `since` value names: an id, or a duration such as `15m`.
+fn resolved(a: &App, since: &str) -> Result<String> {
+    let api = a.api().ok_or_else(|| missing(since))?;
+    api.resolve_since(since).map_err(|e| Error::Missing(e.to_string()))
 }
 
-/// The files that differ from checkpoint `id`, for the folded files and find in the diff.
-pub(crate) fn since_files(a: &App, id: &str) -> Result<Vec<FileDiff>> {
-    Ok(since_diff(a, id)?.files)
+/// The comparison with checkpoint `id`, up to checkpoint `until` when one is named.
+fn since_diff(a: &App, id: &str, until: Option<&str>) -> Result<SinceDiff> {
+    let id = resolved(a, id)?;
+    let cp = a.index.checkpoint(&id)?.ok_or_else(|| missing(&id))?;
+    let Some(end) = until else {
+        return Ok(gitterrace_git::worktree_diff_since(
+            &a.repo,
+            &cp.files,
+            &cp.head,
+            cp.files_omitted,
+        )?);
+    };
+    let to = a.index.checkpoint(end)?.ok_or_else(|| missing(end))?;
+    Ok(gitterrace_git::worktree_diff_between(&a.repo, &cp.held(), &to.held())?)
+}
+
+/// The files that differ from checkpoint `id` (up to `until`), for the folded files and find in
+/// the diff.
+pub(crate) fn since_files(a: &App, id: &str, until: Option<&str>) -> Result<Vec<FileDiff>> {
+    Ok(since_diff(a, id, until)?.files)
 }
 
 /// What the page lists for `scope`, or against checkpoint `since` when one is named.
-pub(crate) fn read(a: &App, scope: WorktreeScope, since: Option<&str>) -> Result<Review> {
+pub(crate) fn read(
+    a: &App,
+    scope: WorktreeScope,
+    since: Option<&str>,
+    until: Option<&str>,
+) -> Result<Review> {
     let list = a.api().and_then(|x| x.checkpoints().ok());
     let persisted = list.as_ref().is_some_and(|l| l.persisted);
     let latest = list.as_ref().and_then(|l| l.checkpoints.first()).map(|c| c.id.clone());
-    let Some(id) = since else {
+    let id = since.map(|s| resolved(a, s)).transpose()?;
+    let choices = list.as_ref().map_or_else(Vec::new, |l| {
+        l.checkpoints
+            .iter()
+            .map(|c| Choice {
+                id: c.id.clone(),
+                text: if c.label.is_empty() {
+                    fmt::ago(c.created, fmt::now()).text
+                } else {
+                    format!("{} ({})", fmt::ago(c.created, fmt::now()).text, c.label)
+                },
+                since: id.as_deref() == Some(c.id.as_str()),
+                until: until == Some(c.id.as_str()),
+            })
+            .collect()
+    });
+    let Some(id) = id.as_deref() else {
         let l = gitterrace_git::worktree_listed(&a.repo, scope)?;
         return Ok(Review {
             files: l.files,
             since: None,
+            choices,
             latest,
             persisted,
             files_omitted: l.files_omitted,
         });
     };
-    let info = list
-        .and_then(|l| l.checkpoints.into_iter().find(|c| c.id == id))
-        .ok_or_else(|| missing(id))?;
-    let mut d = since_diff(a, id)?;
+    let kept = list.map(|l| l.checkpoints).unwrap_or_default();
+    let info = kept.iter().find(|c| c.id == id).ok_or_else(|| missing(id))?;
+    let end = until
+        .map(|u| {
+            let c = kept.iter().find(|c| c.id == u).ok_or_else(|| missing(u))?;
+            Ok::<_, Error>((c.id.clone(), c.created))
+        })
+        .transpose()?;
+    let mut d = since_diff(a, id, until)?;
     let unchanged = std::mem::take(&mut d.unchanged_paths);
     let since = Since {
-        id: info.id,
+        id: info.id.clone(),
         created: info.created,
-        label: info.label,
+        until: end,
+        label: info.label.clone(),
         unchanged,
         gone: d.gone.len(),
         baseline_missing: d.baseline_missing,
         history_unreadable: d.history_unreadable,
     };
     let files_omitted = d.files_omitted;
-    Ok(Review { files: d.files, since: Some(since), latest, persisted, files_omitted })
+    Ok(Review { files: d.files, since: Some(since), choices, latest, persisted, files_omitted })
 }
 
 impl Review {
@@ -113,6 +170,42 @@ impl Review {
     /// The checkpoint id the page is compared with, if any.
     pub(crate) fn since_id(&self) -> Option<&str> {
         self.since.as_ref().map(|s| s.id.as_str())
+    }
+
+    /// The second checkpoint the page is compared with, if any.
+    pub(crate) fn until_id(&self) -> Option<&str> {
+        self.since.as_ref().and_then(|s| s.until.as_ref()).map(|u| u.0.as_str())
+    }
+
+    /// The Since and Until pickers of a checkpoint page: empty without one. Picking a value
+    /// follows a plain link, so it works without script.
+    pub(crate) fn picker(&self) -> String {
+        if self.since.is_none() {
+            return String::new();
+        }
+        Picker { since: self.links(false), until: self.links(true) }.render().unwrap_or_default()
+    }
+
+    /// The links of one picker: each checkpoint keeps the other end of the comparison.
+    fn links(&self, until: bool) -> Vec<Link> {
+        self.choices
+            .iter()
+            .map(|c| {
+                let (from, to) = if until {
+                    (self.since_id(), Some(c.id.as_str()))
+                } else {
+                    (Some(c.id.as_str()), self.until_id())
+                };
+                Link {
+                    href: fmt::href(&format!(
+                        "/worktree{}",
+                        crate::worktree_scope::query_of(WorktreeScope::All, from, to)
+                    )),
+                    text: c.text.clone(),
+                    on: if until { c.until } else { c.since },
+                }
+            })
+            .collect()
     }
 
     /// `tabs` with Since checkpoint after them when one exists: on for a checkpoint page, and
@@ -148,6 +241,7 @@ impl Review {
         };
         SinceNote {
             when: fmt::ago(s.created, fmt::now()),
+            until: s.until.as_ref().map(|u| fmt::ago(u.1, fmt::now())),
             label: s.label.clone(),
             gone: if s.gone > 0 { fmt::count(s.gone, "file", "files") } else { String::new() },
             unchanged_count: fmt::count(s.unchanged.len(), "file", "files"),
@@ -158,6 +252,20 @@ impl Review {
         .render()
         .unwrap_or_default()
     }
+}
+
+/// One link of a picker.
+struct Link {
+    href: String,
+    text: String,
+    on: bool,
+}
+
+#[derive(Template)]
+#[template(path = "checkpoint_pick.html")]
+struct Picker {
+    since: Vec<Link>,
+    until: Vec<Link>,
 }
 
 #[derive(Template)]
@@ -171,6 +279,7 @@ struct Bar {
 #[template(path = "checkpoint_since.html")]
 struct SinceNote {
     when: When,
+    until: Option<When>,
     label: String,
     gone: String,
     unchanged_count: String,

@@ -1,0 +1,10 @@
+<nav class="cp-pick muted" data-cp-pick aria-label="Compare checkpoints">
+<details data-cp-since-pick><summary>Since</summary><ul>
+{%- for l in since %}
+<li><a href="{{ l.href }}"{% if l.on %} aria-current="true"{% endif %}>{{ l.text }}</a></li>
+{%- endfor %}</ul></details>
+<details data-cp-until-pick><summary>Until</summary><ul>
+{%- for l in until %}
+<li><a href="{{ l.href }}"{% if l.on %} aria-current="true"{% endif %}>{{ l.text }}</a></li>
+{%- endfor %}</ul></details>
+</nav>

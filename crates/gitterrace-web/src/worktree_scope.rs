@@ -11,6 +11,7 @@ use crate::pagehead::Tab;
 pub(crate) struct ScopeQuery {
     scope: Option<String>,
     since: Option<String>,
+    until: Option<String>,
 }
 
 impl ScopeQuery {
@@ -22,6 +23,11 @@ impl ScopeQuery {
     /// scope says.
     pub(crate) fn since(&self) -> Option<&str> {
         self.since.as_deref().filter(|s| !s.is_empty())
+    }
+
+    /// `?until=<checkpoint id>`: with `since`, the page lists what changed between the two.
+    pub(crate) fn until(&self) -> Option<&str> {
+        self.until.as_deref().filter(|s| !s.is_empty())
     }
 }
 
@@ -38,10 +44,14 @@ pub(crate) const fn query(scope: WorktreeScope) -> &'static str {
     }
 }
 
-/// The query string of a page that compares with checkpoint `since` when one is named, else the
-/// one `scope` selects.
-pub(crate) fn query_of(scope: WorktreeScope, since: Option<&str>) -> String {
-    since.map_or_else(|| query(scope).to_owned(), |id| format!("?since={}", fmt::enc_seg(id)))
+/// The query string of a page that compares with checkpoint `since` when one is named (up to
+/// checkpoint `until` when that is too), else the one `scope` selects.
+pub(crate) fn query_of(scope: WorktreeScope, since: Option<&str>, until: Option<&str>) -> String {
+    let Some(id) = since else {
+        return query(scope).to_owned();
+    };
+    let end = until.map_or_else(String::new, |u| format!("&until={}", fmt::enc_seg(u)));
+    format!("?since={}{end}", fmt::enc_seg(id))
 }
 
 /// The scope tabs for the page head: "Staged (n)" and so on, the current one on.
@@ -94,7 +104,7 @@ mod tests {
             (Some("bogus"), WorktreeScope::All),
             (None, WorktreeScope::All),
         ] {
-            let q = ScopeQuery { scope: raw.map(str::to_owned), since: None };
+            let q = ScopeQuery { scope: raw.map(str::to_owned), since: None, until: None };
             assert_eq!(q.scope(), want);
         }
     }

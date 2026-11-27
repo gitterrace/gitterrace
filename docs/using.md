@@ -120,6 +120,10 @@ show only what changed since.
    mark holds while the file's patch is the same: edit the file again and it
    reads **Changed since viewed**.
 
+With two or more checkpoints the checkpoint page has a **Since** and an
+**Until** list. Pick a later checkpoint as **Until** to see what changed
+between the two, without the working tree as it is now.
+
 The Checkpoint button and the viewed marks write only the cache folder
 `.git/gitterrace`. Your repository and working tree are never changed. Marks
 survive a reload and show in a second tab. Marks an older version kept in the
@@ -128,7 +132,11 @@ Without a writable cache folder the buttons are replaced by a note and viewed
 marks stay in the browser.
 
 `GET /api/v1/worktree?since=<id>` (and the
-`worktree_diff` tool) lists the files whose content differs from it. A file
+`worktree_diff` tool) lists the files whose content differs from it. `since`
+also takes a duration from `1m` to `7d`, such as `15m`: the newest checkpoint
+taken at or before that long ago, or a 404 `checkpoint_not_found` that names
+the age of the oldest one kept. Add `until=<id>` to compare two checkpoints
+instead of the checkpoint and the working tree. A file
 whose copy was not kept (binary, over `review.checkpoint_file_kb`, or dropped
 by `review.checkpoint_mb`) is diffed against HEAD and named in `content_gone`.
 Set `review.has_auto_checkpoint` to take one before Mark all viewed.

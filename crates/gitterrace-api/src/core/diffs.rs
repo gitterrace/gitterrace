@@ -74,7 +74,7 @@ impl ApiState {
         scope: Option<&str>,
         max_lines: Option<usize>,
     ) -> Result<WorktreeResponse, ApiError> {
-        self.worktree_diff_since(scope, max_lines, None)
+        self.worktree_diff_until(scope, max_lines, None, None)
     }
 
     /// [`ApiState::worktree_diff`] against a checkpoint when `since` names one: only the files
@@ -87,8 +87,21 @@ impl ApiState {
         max_lines: Option<usize>,
         since: Option<&str>,
     ) -> Result<WorktreeResponse, ApiError> {
+        self.worktree_diff_until(scope, max_lines, since, None)
+    }
+
+    /// [`ApiState::worktree_diff_since`] up to a second checkpoint: with `until` the files that
+    /// differ between the two, and the working tree is not read. `since` is a checkpoint id or
+    /// a duration such as `15m` (see [`ApiState::resolve_since`]). `until` needs `since`.
+    pub fn worktree_diff_until(
+        &self,
+        scope: Option<&str>,
+        max_lines: Option<usize>,
+        since: Option<&str>,
+        until: Option<&str>,
+    ) -> Result<WorktreeResponse, ApiError> {
         let WorktreeList { files: list, files_omitted, since: since_part } =
-            self.worktree_list(scope, since)?;
+            self.worktree_list_until(scope, since, until)?;
         let (files, truncated) = wire::files(&list, true, self.diff_cap(max_lines));
         let (additions, deletions) = totals(&list);
         let baseline_missing = since_part.as_ref().is_some_and(|(_, _, d)| d.baseline_missing);
@@ -109,6 +122,7 @@ impl ApiState {
             since,
             truncated,
             unchanged_files,
+            until: until.map(str::to_owned),
         })
     }
 
@@ -119,6 +133,19 @@ impl ApiState {
         scope: Option<&str>,
         since: Option<&str>,
     ) -> Result<WorktreeList, ApiError> {
+        self.worktree_list_until(scope, since, None)
+    }
+
+    /// [`ApiState::worktree_list`] up to checkpoint `until` when one is named.
+    fn worktree_list_until(
+        &self,
+        scope: Option<&str>,
+        since: Option<&str>,
+        until: Option<&str>,
+    ) -> Result<WorktreeList, ApiError> {
+        if until.is_some() && since.is_none() {
+            return Err(ApiError::BadRequest("until needs since".to_owned()));
+        }
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden("the working tree"));
         }
@@ -133,7 +160,9 @@ impl ApiState {
                 let l = gitterrace_git::worktree_listed(&self.repo, which)?;
                 (l.files, l.files_omitted, None)
             }
-            Some(id) => {
+            Some(raw_since) => {
+                let id = self.resolve_since(raw_since)?;
+                let id = id.as_str();
                 if which != WorktreeScope::All {
                     return Err(ApiError::BadRequest(
                         "since compares the whole working tree: use scope `all`".to_owned(),
@@ -143,12 +172,21 @@ impl ApiState {
                     .index
                     .checkpoint(id)?
                     .ok_or_else(|| ApiError::CheckpointNotFound(id.to_owned()))?;
-                let d = gitterrace_git::worktree_diff_since(
-                    &self.repo,
-                    &cp.files,
-                    &cp.head,
-                    cp.files_omitted,
-                )?;
+                let d = match until {
+                    None => gitterrace_git::worktree_diff_since(
+                        &self.repo,
+                        &cp.files,
+                        &cp.head,
+                        cp.files_omitted,
+                    )?,
+                    Some(end) => {
+                        let to = self
+                            .index
+                            .checkpoint(end)?
+                            .ok_or_else(|| ApiError::CheckpointNotFound(end.to_owned()))?;
+                        gitterrace_git::worktree_diff_between(&self.repo, &cp.held(), &to.held())?
+                    }
+                };
                 (d.files.clone(), d.files_omitted, Some((id.to_owned(), cp.head, d)))
             }
         };

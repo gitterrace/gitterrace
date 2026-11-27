@@ -12,6 +12,27 @@ use crate::error::ApiError;
 /// keeps its name and hash.
 const UNPACKED_PER_PACKED: u64 = 8;
 
+/// The shortest and longest `since` duration, in seconds: a minute to a week. Not configurable:
+/// a request bound on the syntax, not a resource cap. An older base is named by its id.
+const SINCE_MIN: i64 = 60;
+const SINCE_MAX: i64 = 7 * 24 * 3600;
+
+/// Seconds in a duration such as `90s`, `15m`, `2h` or `1d`, `None` when it is not one.
+fn parse_duration(text: &str) -> Option<i64> {
+    let unit = match text.chars().last()? {
+        's' => 1,
+        'm' => 60,
+        'h' => 3600,
+        'd' => 86400,
+        _ => return None,
+    };
+    let digits = &text[..text.len() - 1];
+    if digits.is_empty() || digits.len() > 9 || !digits.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    digits.parse::<i64>().ok().map(|n| n * unit)
+}
+
 fn now() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -65,6 +86,33 @@ impl ApiState {
                 })
                 .collect(),
             persisted,
+        })
+    }
+
+    /// The checkpoint id `since` names: an id as it is, or a duration (`15m`, one minute to
+    /// seven days) as the newest checkpoint taken at or before that long ago.
+    ///
+    /// # Errors
+    /// A duration out of range is a bad request. When no checkpoint is that old the error is
+    /// `checkpoint_not_found` and names the oldest one's age.
+    pub fn resolve_since(&self, since: &str) -> Result<String, ApiError> {
+        let Some(secs) = parse_duration(since) else {
+            return Ok(since.to_owned());
+        };
+        if !(SINCE_MIN..=SINCE_MAX).contains(&secs) {
+            return Err(ApiError::BadRequest(format!(
+                "since {since:?} is out of range: use 1m to 7d, or a checkpoint id"
+            )));
+        }
+        self.only_here("checkpoints")?;
+        let list = if self.persists() { self.index.checkpoint_list()?.items } else { Vec::new() };
+        let at = now() - secs;
+        list.iter().find(|c| c.created <= at).map(|c| c.id.clone()).ok_or_else(|| {
+            let oldest = list.last().map_or_else(
+                || "none is kept".to_owned(),
+                |c| format!("the oldest was taken {}s ago", (now() - c.created).max(0)),
+            );
+            ApiError::CheckpointNotFound(format!("none at or before {since} ago ({oldest})"))
         })
     }
 
@@ -139,5 +187,21 @@ impl ApiState {
             return Err(ApiError::BadRequest("the cache belongs to a newer gitterrace".to_owned()));
         }
         Ok(self.index.viewed_add_missing(items, now())?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::parse_duration;
+
+    #[test]
+    fn a_duration_has_digits_and_a_unit_and_an_id_is_not_one() {
+        assert_eq!(parse_duration("15m"), Some(900));
+        assert_eq!(parse_duration("2h"), Some(7200));
+        assert_eq!(parse_duration("1d"), Some(86400));
+        assert_eq!(parse_duration("90s"), Some(90));
+        for no in ["", "m", "cp-0123456789am", "-5m", "1.5h", "5x", "9999999999m"] {
+            assert_eq!(parse_duration(no), None, "{no}");
+        }
     }
 }

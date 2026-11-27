@@ -115,6 +115,7 @@ fn the_working_tree_folds_too_and_loads_by_path() {
             generated: &std::collections::HashSet::new(),
             scope: gitterrace_types::WorktreeScope::All,
             since: None,
+            until: None,
         },
         &files,
     );
