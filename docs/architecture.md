@@ -157,7 +157,14 @@ A checkpoint is a framed record with zstd copies of the
 changed text files. A torn tail is ignored, so a crash mid-write loses only
 that checkpoint. The writer and the reader share one set of header bounds: the
 writer drops the oldest whole checkpoints, or refuses a header the reader would
-refuse, so nothing written is unreadable.
+refuse, so nothing written is unreadable. Neither limit is silent: when the
+64 MiB header budget forces a drop, the write result and the checkpoint list
+carry the count of dropped checkpoints (kept in the newest header, so it
+survives later writes). A checkpoint that reaches the 256 MiB restore budget
+keeps the path and hash of the files whose copy it skipped and reports how many
+(`copies_omitted`) in the create result and the list. A commit range walked for
+a comparison stops at `limits.worktree_files` paths during the traversal, not
+after it, and the comparison reports `files_omitted`.
 
 The review basket is rewritten by atomic rename, except when a frame is
 damaged: reads skip that frame, adds append, and removes are refused, so no

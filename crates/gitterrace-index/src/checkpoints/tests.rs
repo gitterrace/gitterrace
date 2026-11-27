@@ -136,6 +136,8 @@ fn frame(files: Vec<super::FileMeta>, blobs: &[u8]) -> io::Result<Vec<u8>> {
         label: String::new(),
         files,
         omitted: false,
+        copies_omitted: 0,
+        dropped: 0,
     };
     super::encode(&meta, blobs)
 }
@@ -404,10 +406,10 @@ fn an_incompressible_copy_at_the_size_limit_reads_back() -> io::Result<()> {
 #[test]
 fn the_cumulative_header_bound_is_met_exactly_at_the_limit() {
     let half = super::MAX_HEADERS / 2;
-    assert_eq!(super::oldest_to_drop(&[half, half]), 0);
-    assert_eq!(super::oldest_to_drop(&[half, half + 1]), 1);
-    assert_eq!(super::oldest_to_drop(&[1, half, half]), 1);
-    assert_eq!(super::oldest_to_drop(&[super::MAX_HEADERS + 1]), 0, "the newest stays");
+    assert_eq!(super::oldest_to_drop(&[half, half], super::MAX_HEADERS), 0);
+    assert_eq!(super::oldest_to_drop(&[half, half + 1], super::MAX_HEADERS), 1);
+    assert_eq!(super::oldest_to_drop(&[1, half, half], super::MAX_HEADERS), 1);
+    assert_eq!(super::oldest_to_drop(&[super::MAX_HEADERS + 1], super::MAX_HEADERS), 0, "newest");
 }
 
 /// A meta whose header is exactly `n` bytes: one path pads it.
@@ -420,6 +422,8 @@ fn meta_with_header(n: usize) -> super::Meta {
         label: String::new(),
         files: vec![super::FileMeta { path: String::new(), hash: String::new(), copy: None }],
         omitted: false,
+        copies_omitted: 0,
+        dropped: 0,
     };
     let base = serde_json::to_vec(&m).map_or(0, |v| v.len());
     m.files[0].path = "p".repeat(n - base);
@@ -435,5 +439,46 @@ fn a_header_is_written_at_the_reader_limit_and_refused_one_byte_over() -> io::Re
     assert!(!found.damaged && found.frames.len() == 1);
     let err = super::encode(&meta_with_header(limit + 1), &[]).expect_err("one over");
     assert_eq!(err.kind(), io::ErrorKind::InvalidInput);
+    Ok(())
+}
+
+/// Guard class: a write that gives up stored user data (a checkpoint dropped for the header
+/// budget, a copy skipped for the restore budget) says so in its result and in the list, so
+/// no limit acts silently.
+#[test]
+fn a_header_budget_drop_is_reported_by_the_write_and_stays_in_the_list() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let small = super::Budgets { headers: 700, ..super::Budgets::with_cap(1 << 20) };
+    let snap_of = |i: usize| Snapshot {
+        files: vec![snap(&format!("f{i}.txt"), &format!("v{i}\n"))],
+        files_omitted: false,
+    };
+    let mut dropped = 0;
+    let mut ids = Vec::new();
+    for i in 0..12 {
+        let r = idx.checkpoint_add_with(&snap_of(i), "h", false, "", 1, small)?;
+        dropped += r.dropped;
+        ids.push(r.id);
+    }
+    assert!(dropped > 0, "the small budget must have forced a drop");
+    let list = idx.checkpoint_list()?;
+    assert!(!list.items.is_empty() && list.items.len() < 12);
+    assert_eq!(list.items[0].id, ids[11], "the newest always stays");
+    assert_eq!(list.dropped, dropped, "the list reports every checkpoint the writes dropped");
+    assert_eq!(list.items.len() + list.dropped, 12, "nothing vanishes unaccounted");
+    Ok(())
+}
+
+#[test]
+fn a_restore_budget_omission_is_reported_by_the_write_and_the_list() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    let small = super::Budgets { restore: 10, ..super::Budgets::with_cap(1 << 20) };
+    let files = [snap("a.txt", "123456\n"), snap("b.txt", "abcdef\n"), snap("c.txt", "xy\n")];
+    let snap = Snapshot { files: files.to_vec(), files_omitted: false };
+    let r = idx.checkpoint_add_with(&snap, "h", false, "", 1, small)?;
+    assert_eq!(r.copies_omitted, 1, "b.txt does not fit the budget of 10 bytes");
+    assert_eq!(idx.checkpoint_list()?.items[0].copies_omitted, 1);
+    let got = idx.checkpoint_files(&r.id)?.expect("known");
+    assert!(got[0].text.is_some() && got[1].text.is_none() && got[2].text.is_some());
     Ok(())
 }

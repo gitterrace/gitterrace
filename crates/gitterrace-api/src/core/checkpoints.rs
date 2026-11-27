@@ -47,6 +47,7 @@ impl ApiState {
         };
         Ok(CheckpointsResponse {
             bytes_used: list.bytes_used,
+            dropped: list.dropped,
             cap_bytes: self.cap_bytes(),
             checkpoints: list
                 .items
@@ -57,6 +58,7 @@ impl ApiState {
                     created: c.created,
                     files: c.files,
                     files_omitted: c.files_omitted,
+                    copies_omitted: c.copies_omitted,
                     head: c.head,
                     id: c.id,
                     label: c.label,
@@ -69,6 +71,18 @@ impl ApiState {
     /// Takes a checkpoint of the working tree now and returns its id and whether it is new
     /// (the same state again returns the old id). Web only: the API and MCP never call it.
     pub fn checkpoint_create(&self, label: &str, auto: bool) -> Result<(String, bool), ApiError> {
+        let r = self.checkpoint_create_report(label, auto)?;
+        Ok((r.id, r.is_new))
+    }
+
+    /// Takes a checkpoint of the working tree now and reports what the write gave up: older
+    /// checkpoints dropped for the header budget and copies not kept for the restore budget,
+    /// for the caller to show. The same state again returns the old id.
+    pub fn checkpoint_create_report(
+        &self,
+        label: &str,
+        auto: bool,
+    ) -> Result<gitterrace_index::AddReport, ApiError> {
         self.only_here("checkpoints")?;
         if !self.persists() {
             return Err(ApiError::BadRequest(
@@ -84,7 +98,7 @@ impl ApiState {
             self.cap_bytes().saturating_mul(UNPACKED_PER_PACKED),
         )?;
         let head = self.repo.resolve("HEAD").unwrap_or_default();
-        Ok(self.index.checkpoint_add(&snap, &head, auto, label, self.cap_bytes(), now())?)
+        Ok(self.index.checkpoint_add_report(&snap, &head, auto, label, self.cap_bytes(), now())?)
     }
 
     /// Whether Mark all viewed takes a checkpoint first (`review.has_auto_checkpoint`).

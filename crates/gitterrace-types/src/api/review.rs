@@ -19,6 +19,9 @@ pub struct CheckpointItem {
     /// The scan of the working tree stopped at `limits.worktree_files`, so the checkpoint may
     /// not hold every changed file. Raise the limit and take another checkpoint.
     pub files_omitted: bool,
+    /// Changed text files saved without a copy because the checkpoint reached the restore
+    /// budget (256 MiB unpacked). They keep path and hash, so a diff says they changed.
+    pub copies_omitted: usize,
     /// The commit HEAD was at.
     pub head: String,
     /// `cp-` and 12 hex digits of the hash of the state: the same state is the same id.
@@ -30,6 +33,9 @@ pub struct CheckpointItem {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 pub struct CheckpointsResponse {
     pub bytes_used: u64,
+    /// Older checkpoints discarded whole to keep the log's headers within the reader's
+    /// 64 MiB bound, in all. Not rebuildable: a nonzero count means checkpoints are gone.
+    pub dropped: usize,
     /// `review.checkpoint_mb` in bytes. 0 means checkpoints are off.
     pub cap_bytes: u64,
     /// Newest first.

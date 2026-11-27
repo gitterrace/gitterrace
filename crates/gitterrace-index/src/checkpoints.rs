@@ -8,12 +8,17 @@
 //! Not rebuildable: this is the user's data. It lives beside the index and, like it, is only ever
 //! written through `cache`, so it cannot leave `.git/gitterrace/`.
 
+mod report;
+
 use std::io::{self, Read, Seek, SeekFrom};
 
 use gitterrace_git::{SnapFile, Snapshot, content_id};
 use serde::{Deserialize, Serialize};
 
+use self::report::{Budgets, is_zero};
 use crate::{Index, cache};
+
+pub use self::report::AddReport;
 
 pub(crate) const FILE: &str = "checkpoints";
 
@@ -37,12 +42,12 @@ const MAX_PACKED: u64 = MAX_COPY + (MAX_COPY >> 8) + 128;
 /// Most bytes of copies one read unpacks, so many small claims cannot add up to gigabytes. The
 /// writer keeps no more than this unpacked per checkpoint, so a restore never drops a copy the
 /// log holds.
-const MAX_RESTORE: u64 = 256 << 20;
+pub(super) const MAX_RESTORE: u64 = 256 << 20;
 /// Largest blob of one frame: `review.checkpoint_mb` tops out at 1 GiB.
 const MAX_BLOB: u64 = 1 << 30;
 /// Most bytes of headers one log holds, so a planted log cannot make every list parse
 /// gigabytes of JSON.
-const MAX_HEADERS: u64 = 64 << 20;
+pub(super) const MAX_HEADERS: u64 = 64 << 20;
 const ZSTD_LEVEL: i32 = 3;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -72,6 +77,12 @@ struct Meta {
     /// before the field, which reads as complete.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     omitted: bool,
+    /// Text files kept without a copy: this checkpoint reached the restore budget.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    copies_omitted: u32,
+    /// Older checkpoints dropped whole, in all, for the header budget. Carried forward.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    dropped: u32,
 }
 
 /// What a list shows of one checkpoint.
@@ -88,6 +99,8 @@ pub struct CheckpointInfo {
     /// The working tree had more changed files than the scan lists, so the checkpoint may not
     /// hold them all.
     pub files_omitted: bool,
+    /// Text files saved without a copy because the checkpoint hit the restore budget.
+    pub copies_omitted: usize,
 }
 
 /// The checkpoints, newest first, and what they hold in all.
@@ -95,6 +108,8 @@ pub struct CheckpointInfo {
 pub struct CheckpointList {
     pub items: Vec<CheckpointInfo>,
     pub bytes_used: u64,
+    /// Older checkpoints discarded whole over the log's lifetime to keep its headers readable.
+    pub dropped: usize,
 }
 
 /// One checkpoint read back: where HEAD was and what the working tree held that differed from it.
@@ -142,9 +157,9 @@ struct Scan {
     damaged: bool,
 }
 
-/// Keeps the copies of `meta` that lie inside a blob of `blob_len` bytes and are within bounds.
-/// A frame we wrote always passes. A planted one loses the copy and so reads as gone, instead of
-/// feeding an offset or a size it made up to a read.
+/// Keeps the copies of `meta` inside a blob of `blob_len` bytes and within bounds. A frame we
+/// wrote always passes. A planted one loses the copy and so reads as gone, not feeding a read
+/// an offset or size it made up.
 fn sound(meta: &mut Meta, blob_len: u64) {
     let mut used = 0u64;
     for f in &mut meta.files {
@@ -262,17 +277,16 @@ fn held(meta: &Meta) -> u64 {
 
 /// How many of the oldest frames, with headers of `sizes` bytes, go so the rest are within
 /// `MAX_HEADERS`. The newest never goes.
-fn oldest_to_drop(sizes: &[u64]) -> usize {
+fn oldest_to_drop(sizes: &[u64], budget: u64) -> usize {
     let mut headers: u64 = sizes.iter().sum();
     let mut drop = 0;
-    while headers > MAX_HEADERS && drop + 1 < sizes.len() {
+    while headers > budget && drop + 1 < sizes.len() {
         headers -= sizes[drop];
         drop += 1;
     }
     drop
 }
 
-/// The header length of an encoded frame.
 fn hdr_of(frame: &[u8]) -> u64 {
     u64::from(u32_at(frame, 4))
 }
@@ -287,17 +301,18 @@ fn build(
     label: &str,
     created: i64,
     cap: u64,
+    restore: u64,
 ) -> io::Result<(Meta, Vec<u8>)> {
     let files = &snap.files;
     let mut blobs = Vec::new();
-    let mut unpacked = 0u64;
+    let (mut unpacked, mut copies_omitted) = (0u64, 0u32);
     let mut metas = Vec::with_capacity(files.len());
     for f in files {
         let copy = match &f.text {
             Some(t)
                 if (blobs.len() as u64) <= cap
                     && t.len() as u64 <= MAX_COPY
-                    && unpacked + t.len() as u64 <= MAX_RESTORE =>
+                    && unpacked + t.len() as u64 <= restore =>
             {
                 let z = zstd::bulk::compress(t, ZSTD_LEVEL)?;
                 unpacked += t.len() as u64;
@@ -309,6 +324,10 @@ fn build(
                 };
                 blobs.extend_from_slice(&z);
                 Some(c)
+            }
+            Some(t) if t.len() as u64 <= MAX_COPY && (blobs.len() as u64) <= cap => {
+                copies_omitted += 1;
+                None
             }
             _ => None,
         };
@@ -322,6 +341,8 @@ fn build(
         label: label.chars().take(MAX_LABEL).collect(),
         files: metas,
         omitted: snap.files_omitted,
+        copies_omitted,
+        dropped: 0,
     };
     Ok((meta, blobs))
 }
@@ -334,9 +355,11 @@ fn trimmed(
     mut frames: Vec<Frame>,
     newest: (Meta, Vec<u8>),
     cap: u64,
-) -> io::Result<Vec<u8>> {
+    budget: u64,
+) -> io::Result<(Vec<u8>, usize)> {
     let excess = (frames.len() + 1).saturating_sub(MAX_CHECKPOINTS);
     frames.drain(..excess);
+    let carried = frames.last().map_or(0, |x| x.meta.dropped);
     let mut total = held(&newest.0) + frames.iter().map(|x| held(&x.meta)).sum::<u64>();
     let mut stripped = vec![false; frames.len()];
     for (i, fr) in frames.iter().enumerate() {
@@ -357,13 +380,24 @@ fn trimmed(
             encoded.push(encode(&m, &blobs)?);
         }
     }
-    let fitted = if total > cap { bare(newest.0) } else { newest };
-    encoded.push(encode(&fitted.0, &fitted.1)?);
-    // The reader bounds the headers of the whole log, so the oldest checkpoints go whole until
-    // what is kept can be read back. The newest always stays.
+    let mut fitted = if total > cap { bare(newest.0) } else { newest };
+    // The oldest checkpoints go whole until the headers read back. The newest stays and
+    // records how many went, so the loss is listed. Its header grows with that count.
     let sizes: Vec<u64> = encoded.iter().map(|b| hdr_of(b)).collect();
-    let drop = oldest_to_drop(&sizes);
-    Ok(encoded.drain(drop..).flatten().collect())
+    let mut drop = 0;
+    let last = loop {
+        fitted.0.dropped = carried.saturating_add(u32::try_from(drop).unwrap_or(u32::MAX));
+        let last = encode(&fitted.0, &fitted.1)?;
+        let mut all = sizes.clone();
+        all.push(hdr_of(&last));
+        let need = oldest_to_drop(&all, budget);
+        if need <= drop {
+            break last;
+        }
+        drop = need;
+    };
+    encoded.push(last);
+    Ok((encoded.drain(drop..).flatten().collect(), drop))
 }
 
 /// `frame` without its copies: every path and hash stays.
@@ -395,8 +429,38 @@ impl Index {
         cap_bytes: u64,
         now: i64,
     ) -> io::Result<(String, bool)> {
+        let b = Budgets::with_cap(cap_bytes);
+        let r = self.checkpoint_add_with(snap, head, auto, label, now, b)?;
+        Ok((r.id, r.is_new))
+    }
+
+    /// [`Self::checkpoint_add`] that reports dropped checkpoints and skipped copies.
+    ///
+    /// # Errors
+    /// As `checkpoint_add`.
+    pub fn checkpoint_add_report(
+        &self,
+        snap: &Snapshot,
+        head: &str,
+        auto: bool,
+        label: &str,
+        cap_bytes: u64,
+        now: i64,
+    ) -> io::Result<AddReport> {
+        self.checkpoint_add_with(snap, head, auto, label, now, Budgets::with_cap(cap_bytes))
+    }
+
+    pub(crate) fn checkpoint_add_with(
+        &self,
+        snap: &Snapshot,
+        head: &str,
+        auto: bool,
+        label: &str,
+        now: i64,
+        budgets: Budgets,
+    ) -> io::Result<AddReport> {
         self.writable()?;
-        let cap_bytes = cap_bytes.min(MAX_BLOB);
+        let cap_bytes = budgets.cap.min(MAX_BLOB);
         // The cache's writer lock: a rewrite replaces the file, so it must not run between
         // another writer's scan and append, in this process or another.
         let _lock = crate::store::WriteLock::take(self.dir())?;
@@ -421,34 +485,36 @@ impl Index {
         // that matches an older frame (A, then B, then A again) is a new checkpoint, so the
         // newest one is always the state the user last saved, whatever the cap dropped.
         if frames.as_ref().and_then(|(_, fr)| fr.last()).is_some_and(|x| x.meta.id == id) {
-            return Ok((id, false));
+            return Ok(AddReport { id, is_new: false, dropped: 0, copies_omitted: 0 });
         }
-        let (meta, blobs) = build(snap, head, auto, label, now, cap_bytes)?;
+        let (meta, blobs) = build(snap, head, auto, label, now, cap_bytes, budgets.restore)?;
+        let copies_omitted = meta.copies_omitted as usize;
         let Some((f, fr)) = frames.as_mut() else {
             // The first frame meets the same cap as every later one.
             let bytes = fit((meta, blobs), cap_bytes)?;
             cache::write_atomic(self.dir(), FILE, &bytes)?;
-            return Ok((id, true));
+            return Ok(AddReport { id, is_new: true, dropped: 0, copies_omitted });
         };
         let size = f.metadata()?.len();
         let total = held(&meta) + fr.iter().map(|x| held(&x.meta)).sum::<u64>();
+        let meta = Meta { dropped: fr.last().map_or(0, |x| x.meta.dropped), ..meta };
         let bytes = encode(&meta, &blobs)?;
         let headers = hdr_of(&bytes) + fr.iter().map(|x| u64::from(x.hdr_len)).sum::<u64>();
         if valid == size
             && total <= cap_bytes
-            && headers <= MAX_HEADERS
+            && headers <= budgets.headers
             && fr.len() < MAX_CHECKPOINTS
         {
             use std::io::Write;
             let mut out = cache::open_append(self.dir(), FILE)?;
             out.write_all(&bytes)?;
             out.sync_data()?;
-        } else {
-            let all = std::mem::take(fr);
-            let bytes = trimmed(f, all, (meta, blobs), cap_bytes)?;
-            cache::write_atomic(self.dir(), FILE, &bytes)?;
+            return Ok(AddReport { id, is_new: true, dropped: 0, copies_omitted });
         }
-        Ok((id, true))
+        let all = std::mem::take(fr);
+        let (bytes, dropped) = trimmed(f, all, (meta, blobs), cap_bytes, budgets.headers)?;
+        cache::write_atomic(self.dir(), FILE, &bytes)?;
+        Ok(AddReport { id, is_new: true, dropped, copies_omitted })
     }
 
     /// The checkpoints, newest first. A missing or empty log lists nothing.
@@ -472,10 +538,12 @@ impl Index {
                 auto: x.meta.auto,
                 label: x.meta.label.clone(),
                 files_omitted: x.meta.omitted,
+                copies_omitted: x.meta.copies_omitted as usize,
             })
             .collect();
         let bytes_used = items.iter().map(|i| i.bytes).sum();
-        Ok(CheckpointList { items, bytes_used })
+        let dropped = frames.last().map_or(0, |x| x.meta.dropped as usize);
+        Ok(CheckpointList { items, bytes_used, dropped })
     }
 
     /// The files of checkpoint `id` with their copies, `None` for an unknown id. A copy that is
