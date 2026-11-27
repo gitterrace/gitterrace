@@ -36,8 +36,10 @@ pub(crate) async fn blocking<T: Send + 'static>(
     let switch =
         crate::fmt::REQUEST_SWITCH.try_with(Clone::clone).unwrap_or_else(|_| "/".to_owned());
     // Moved into the job, so a cancelled request cannot free the slot while git still runs.
-    let slot = Arc::clone(&app.env.jobs)
-        .acquire_owned()
+    let slot = app
+        .env
+        .jobs
+        .take()
         .await
         .map_err(|_| std::io::Error::other("blocking job slots closed"))?;
     let cfg = app.cfg();

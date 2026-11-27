@@ -1,17 +1,17 @@
 //! The `/raw` route: blob bytes with an `ETag`, refused above `limits.raw_mb`.
 
-use std::sync::Arc;
-
 use axum::{
     body::Body,
     extract::{Path, State},
     http::{HeaderValue, StatusCode, header},
     response::{IntoResponse, Response},
 };
-use tokio::sync::OwnedSemaphorePermit;
 
 use crate::routes::Shared;
-use crate::{app::blocking, error::Result};
+use crate::{
+    app::{Slot, blocking},
+    error::Result,
+};
 
 /// Whether a blob of `size` bytes is too big for `/raw` under `limits.raw_mb`.
 pub(crate) const fn raw_refused(size: u64, raw_mb: u64) -> bool {
@@ -86,18 +86,20 @@ pub(super) async fn raw(
 /// held until the body is sent: gix inflates whole objects and a working tree file is read
 /// whole, so the budget bounds the bytes in memory, not the bytes on the wire. `/raw` and
 /// `/worktree/raw` both take it here.
-async fn raw_permit(app: &crate::app::App) -> Result<OwnedSemaphorePermit> {
+async fn raw_permit(app: &crate::app::App) -> Result<Slot> {
     let (limit, budget) = (app.cfg().limits.raw_mb, app.cfg().limits.raw_concurrent_mb);
-    Ok(Arc::clone(&app.env.raw_budget)
+    Ok(app
+        .env
+        .raw_budget
         // Never more than the whole budget, so a budget below raw_mb serves one at a time.
-        .acquire_many_owned(u32::try_from(limit.min(budget)).unwrap_or(1))
+        .take_many(u32::try_from(limit.min(budget)).unwrap_or(1))
         .await
         .map_err(|_| std::io::Error::other("raw budget closed"))?)
 }
 
 /// A body of `bytes` that keeps `permit` until the bytes are handed on, or the client leaves.
 /// Fused: compression polls a body once more after its end, and a bare `unfold` panics then.
-fn held(bytes: Vec<u8>, permit: OwnedSemaphorePermit) -> Body {
+fn held(bytes: Vec<u8>, permit: Slot) -> Body {
     use futures_util::StreamExt;
     let state = (Some(bytes), permit);
     Body::from_stream(
@@ -169,10 +171,7 @@ pub(crate) async fn worktree_raw(State(app): Shared, Path(path): Path<String>) -
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use axum::body::{Body, HttpBody};
-    use tokio::sync::Semaphore;
 
     /// Guard: every media kind is served with `nosniff` and a policy that loads nothing.
     /// Only the formats that run no author code go without the sandbox, and a PDF is a download.
@@ -200,7 +199,7 @@ mod tests {
     /// end again, not panic.
     #[tokio::test]
     async fn a_held_body_polled_past_its_end_stays_ended() {
-        let permit = Arc::new(Semaphore::new(1)).acquire_owned().await.expect("permit");
+        let permit = crate::app::Slots::new(1).take().await.expect("permit");
         let mut body = super::held(b"abc".to_vec(), permit);
         let mut seen = 0;
         for _ in 0..4 {

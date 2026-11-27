@@ -13,7 +13,7 @@ use gitterrace_config::{Cache, Config};
 use gitterrace_git::LastCommit;
 use gitterrace_git::Repo;
 use gitterrace_index::{Index, Progress};
-use tokio::sync::{Notify, Semaphore, broadcast, watch};
+use tokio::sync::{Notify, broadcast, watch};
 
 use crate::live::Change;
 
@@ -35,6 +35,7 @@ mod memo;
 mod records;
 mod refresh;
 mod sched;
+mod slots;
 mod state;
 mod touched;
 
@@ -44,6 +45,7 @@ pub use child::index_child;
 pub(crate) use history::PathLog;
 pub(crate) use jobs::{blocking, cancel_flag};
 pub(crate) use refresh::{keep_index_fresh_supervised, release_when_idle};
+pub(crate) use slots::{Slot, Slots};
 pub(crate) use state::RepoState;
 
 /// What every repository of one server shares: settings, job cap and the shutdown signal.
@@ -111,49 +113,12 @@ pub(crate) fn repo_limits(cfg: &Config) -> (u64, usize) {
     (cfg.limits.text_kb << 10, cfg.cache_bytes(Cache::Blame))
 }
 
-/// A semaphore with the number of slots in force beside it, so a resize cannot drift from it.
-/// Clones share both.
-#[derive(Clone)]
-pub(crate) struct Slots {
-    sem: Arc<Semaphore>,
-    cap: Arc<Mutex<usize>>,
-}
-
-impl Slots {
-    fn new(n: usize) -> Self {
-        Self { sem: Arc::new(Semaphore::new(n)), cap: Arc::new(Mutex::new(n)) }
-    }
-
-    /// Moves to `new` slots. Slots in use are not taken back, so a lower cap settles as they
-    /// are released; `cap` then keeps the number actually in force.
-    fn resize(&self, new: usize) {
-        let Ok(mut cap) = self.cap.lock() else { return };
-        if new >= *cap {
-            self.sem.add_permits(new - *cap);
-            *cap = new;
-        } else {
-            *cap -= self.sem.forget_permits(*cap - new);
-        }
-    }
-}
-
-impl std::ops::Deref for Slots {
-    type Target = Arc<Semaphore>;
-
-    fn deref(&self) -> &Arc<Semaphore> {
-        &self.sem
-    }
-}
-
 impl Env {
     /// One page-building slot, for blocking work outside [`blocking`] such as the
     /// multi-repository home. Move it into the blocking task, so a dropped request frees it
     /// only when the work exits.
-    pub(crate) async fn job_slot(&self) -> std::io::Result<tokio::sync::OwnedSemaphorePermit> {
-        Arc::clone(&self.jobs)
-            .acquire_owned()
-            .await
-            .map_err(|_| std::io::Error::other("blocking job slots closed"))
+    pub(crate) async fn job_slot(&self) -> std::io::Result<Slot> {
+        self.jobs.take().await.map_err(|_| std::io::Error::other("blocking job slots closed"))
     }
 
     pub(crate) fn new(cfg: Config) -> Self {
@@ -495,7 +460,7 @@ impl App {
             }
         }));
         api.share_pages(self.pages_share());
-        api.share_jobs(Arc::clone(&self.env.jobs));
+        api.share_jobs(self.env.jobs.semaphore());
         self.api.set(api).ok();
     }
 

@@ -469,3 +469,39 @@ async fn an_idle_release_waits_for_an_in_flight_related_warm() {
     assert!(!app.source_held(), "a cache survived the release");
     assert!(!app.release_idle(Duration::ZERO), "nothing left to release");
 }
+
+/// Guard class: every `Slots` (jobs, live streams, the raw budget) honours a cut made while
+/// slots are busy. Two of three held, cut to one: the cut is owed, and once both come back one
+/// slot exists, not three.
+#[tokio::test]
+async fn a_cut_made_while_slots_are_busy_lands_when_they_return() {
+    let slots = crate::app::Slots::new(3);
+    let (a, b) = (slots.take().await.expect("slot"), slots.take().await.expect("slot"));
+    slots.resize(1);
+    drop((a, b));
+    assert_eq!(slots.available_permits(), 1, "the old cap came back");
+    let held = slots.try_take().expect("the one slot in force");
+    assert!(slots.try_take().is_none(), "a second slot exists past the cut");
+    drop(held);
+    assert_eq!(slots.available_permits(), 1);
+}
+
+/// A raise after a cut pays the debt first, then adds only what is left, and a raise past the
+/// old cap grows it.
+#[tokio::test]
+async fn a_raise_after_a_cut_pays_the_debt_first() {
+    let slots = crate::app::Slots::new(3);
+    let held = [
+        slots.take().await.expect("slot"),
+        slots.take().await.expect("slot"),
+        slots.take().await.expect("slot"),
+    ];
+    slots.resize(1);
+    slots.resize(2);
+    drop(held);
+    assert_eq!(slots.available_permits(), 2, "the raise did not cancel the debt");
+    slots.resize(4);
+    assert_eq!(slots.available_permits(), 4);
+    slots.resize(1);
+    assert_eq!(slots.available_permits(), 1, "a free cut lands at once");
+}

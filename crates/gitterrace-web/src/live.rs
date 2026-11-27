@@ -183,7 +183,7 @@ fn sse(
 
 /// `GET /events`: one stream per tab. Refused with 503 past `server.live_streams`.
 pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQuery>) -> Response {
-    let Ok(slot) = Arc::clone(&app.streams).try_acquire_owned() else {
+    let Some(slot) = app.streams.try_take() else {
         return too_many();
     };
     let rx = app.changes.subscribe();
@@ -202,7 +202,7 @@ pub(crate) async fn events(State(app): State<Arc<App>>, Query(q): Query<EventsQu
 /// `repos` kind, so an open home lists a repository that joined or left. Refused with 503 past
 /// `server.live_streams`.
 pub(crate) fn home_events(env: &Env, q: &EventsQuery) -> Response {
-    let Ok(slot) = Arc::clone(&env.home_streams).try_acquire_owned() else {
+    let Some(slot) = env.home_streams.try_take() else {
         return too_many();
     };
     let rx = env.home.subscribe();
