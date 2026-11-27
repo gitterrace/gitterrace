@@ -105,7 +105,7 @@ nothing about who is asking, and a secret in a page is a secret given away.
   the browser. `git terrace launch --print` prints the link, which works once
   and is on the terminal, so it is the user's to guard.
   When that page cannot be written, the opener gets the plain front page, never
-  the link (`a_failed_launch_handoff_opens_a_ticket_free_page`).
+  the link (`a_failed_launch_handoff_opens_a_ticket_free_page_and_says_so`).
 - Cache files that are appended to (findings, checkpoints, the lock) are opened
   `O_NOFOLLOW` and refused when the opened inode has other hard links (on
   Windows the opened handle's link count, `GetFileInformationByHandle`), so

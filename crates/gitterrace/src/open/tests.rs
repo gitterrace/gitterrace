@@ -456,21 +456,56 @@ fn a_file_url_names_the_same_path_on_every_os() {
     assert_eq!(file_path(&unc, true).as_deref(), Some("\\\\host\\share\\a b.html"));
 }
 
-/// Guard class: a failed handoff never opens the live link instead. Also catches a page
-/// built from the link's own parts (its host and query), which would carry the ticket too.
+/// Guard class: a failed handoff never opens the live link instead, and says why owner access
+/// is missing. Also catches a page built from the link's own parts (host and query), and a
+/// silent swap that leaves the user to find out from refused writes.
 #[test]
-fn a_failed_launch_handoff_opens_a_ticket_free_page() {
+fn a_failed_launch_handoff_opens_a_ticket_free_page_and_says_so() {
     let tmp = tempfile::tempdir().expect("tmp");
     let state = tmp.path().join("state");
     std::fs::create_dir_all(&state).expect("dir");
     let addr: std::net::SocketAddr = "127.0.0.1:7878".parse().expect("addr");
-    let link = "http://127.0.0.1:7878/_launch?t=TICKET-abc_123&to=/".to_owned();
-    // A directory at the page's name: the atomic write fails.
-    std::fs::create_dir(state.join("launch-7878.html")).expect("hostile dir");
-    let got = super::launch_opener_arg(Some(&state), addr, link.clone());
-    assert_eq!(got, "http://127.0.0.1:7878/");
-    // A missing state folder fails the write too.
+    let link = "http://127.0.0.1:7878/_launch?t=TICKET-abc_123&to=/";
     let gone = tmp.path().join("gone");
-    let got = super::launch_opener_arg(Some(&gone), addr, link);
-    assert!(!got.contains("TICKET") && !got.contains("_launch"), "{got}");
+    // A directory at the page's name and a missing state folder both fail the write.
+    std::fs::create_dir(state.join("launch-7878.html")).expect("hostile dir");
+    for dir in [Some(state.as_path()), Some(gone.as_path()), None] {
+        let mut args = Vec::new();
+        let mut notes = Vec::new();
+        crate::open::launch::launch_open(
+            dir,
+            addr,
+            link,
+            |a| {
+                args.push(a.to_owned());
+                Ok(())
+            },
+            |m| notes.push(m.to_owned()),
+        )
+        .expect("open");
+        assert_eq!(args, ["http://127.0.0.1:7878/"]);
+        assert_eq!(notes.len(), 1, "one notice: {notes:?}");
+        assert!(notes[0].contains("owner access was not established"), "{notes:?}");
+        assert!(notes[0].contains("launch-7878.html") || dir.is_none(), "names why: {notes:?}");
+        for text in args.iter().chain(&notes) {
+            assert!(!text.contains("TICKET") && !text.contains("_launch"), "leak: {text}");
+        }
+    }
+    // A working handoff opens the page and says nothing.
+    let ok = tmp.path().join("ok");
+    std::fs::create_dir_all(&ok).expect("dir");
+    let mut args = Vec::new();
+    let mut notes = Vec::new();
+    crate::open::launch::launch_open(
+        Some(&ok),
+        addr,
+        link,
+        |a| {
+            args.push(a.to_owned());
+            Ok(())
+        },
+        |m| notes.push(m.to_owned()),
+    )
+    .expect("open");
+    assert!(notes.is_empty() && args[0].starts_with("file:") && !args[0].contains("TICKET"));
 }
