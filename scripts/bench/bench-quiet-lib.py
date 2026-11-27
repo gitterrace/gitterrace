@@ -203,6 +203,9 @@ def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
 
 
 CONTROL_MIN_PCT = 50
+# A shared runner can starve one spin for a moment; a broken probe reads low every time. So
+# the bar stays and only the number of chances to clear it grows.
+CONTROL_TRIES = 3
 _control_done = False
 
 
@@ -228,13 +231,17 @@ def require_control() -> None:
     global _control_done
     if _control_done:
         return
-    pct = cpu_control()
-    if pct < CONTROL_MIN_PCT:
-        raise RuntimeError(
-            f"idle CPU probe is broken: a busy loop read {pct:.0f}%, under "
-            f"{CONTROL_MIN_PCT}%, so a 0% server reading would mean nothing"
-        )
-    _control_done = True
+    reads = []
+    for _ in range(CONTROL_TRIES):
+        reads.append(cpu_control())
+        if reads[-1] >= CONTROL_MIN_PCT:
+            _control_done = True
+            return
+    shown = ", ".join(f"{p:.0f}%" for p in reads)
+    raise RuntimeError(
+        f"idle CPU probe is broken: a busy loop read {shown} in {CONTROL_TRIES} tries, under "
+        f"{CONTROL_MIN_PCT}%, so a 0% server reading would mean nothing"
+    )
 
 
 def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
@@ -263,12 +270,20 @@ def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
 
 
 def self_test() -> int:
-    """The control passes a probe that sees the spinner and fails one stuck at 0."""
+    """The control passes a probe that sees the spinner, passes one starved on its first
+    try only, and fails one stuck at 0."""
     global cpu_secs, _control_done
     real = cpu_secs
+    calls = [0]
+
+    def starved_once(_pid: int) -> float:
+        # Two reads per try: the first try sees no CPU, later tries see the spinner.
+        calls[0] += 1
+        return 0.0 if calls[0] <= 2 else time.perf_counter()
+
     verdicts = []
     try:
-        for probe in (lambda _pid: time.perf_counter(), lambda _pid: 0.0):
+        for probe in (lambda _pid: time.perf_counter(), starved_once, lambda _pid: 0.0):
             cpu_secs, _control_done = probe, False
             try:
                 require_control()
@@ -278,7 +293,7 @@ def self_test() -> int:
     finally:
         cpu_secs = real
         _control_done = False
-    ok = verdicts == [True, False]
+    ok = verdicts == [True, True, False]
     print("self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
