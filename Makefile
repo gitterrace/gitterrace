@@ -167,6 +167,7 @@ lines:
 	python3 scripts/lint/docs-install-check.py
 	python3 vendor/schwarzwald/kit/tools/verify-docs.py --check docs/getting-started.md
 	python3 scripts/lint/browser-all-check.py --self-test && python3 scripts/lint/browser-all-check.py
+	python3 scripts/lint/lazy-ready-check.py --self-test && python3 scripts/lint/lazy-ready-check.py
 	python3 scripts/lint/browser-gate-check.py --self-test
 	python3 scripts/lint/browser-gate-check.py
 

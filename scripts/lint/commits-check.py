@@ -87,6 +87,11 @@ GATES: list[Gate] = [
         ("scripts/verify/", "scripts/lint/browser-all-check.py"),
     ),
     (
+        "lazy-ready",
+        [PY, "scripts/lint/lazy-ready-check.py"],
+        ("scripts/verify/", "scripts/lib/browser-lib.mjs", "crates/gitterrace-web/static/"),
+    ),
+    (
         "browser-gate",
         [PY, "scripts/lint/browser-gate-check.py"],
         (

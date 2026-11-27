@@ -24,6 +24,14 @@ export const RESCAN_SECS = 5;
 /** How long a working tree change may take to show: the documented rescan bound plus a margin. */
 export const WATCH_BOUND_MS = (RESCAN_SECS + 5) * 1000;
 
+/**
+ * Waits until the lazy script `name` (app.js gtLazy) has run, so its key listeners exist. It
+ * sets data-<name>-ready on <html> itself; pressing keys before that loses them on a slow run.
+ */
+export const ready = (p, name, timeout = 10000) => p.waitForFunction(
+  (k) => document.documentElement.dataset[k] === '1',
+  name.replace(/-(\w)/g, (m, c) => c.toUpperCase()) + 'Ready', { timeout });
+
 /** The insights pages, one per tab of the /stats row. */
 export const STATS = ['/stats', '/stats/hotspots', '/stats/contributors', '/stats/ownership',
   '/stats/languages'];

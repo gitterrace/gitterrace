@@ -250,6 +250,9 @@
       var one = function () {
         if (--left > 0) return;
         s.ready = true;
+        // Checks wait for this: keys sent before the script ran are lost (data-<name>-ready).
+        var key = name.replace(/-(\w)/g, function (m, c) { return c.toUpperCase(); });
+        document.documentElement.dataset[key + "Ready"] = "1";
         s.wait.splice(0).forEach(function (f) { f(); });
       };
       if (CSS[name]) {

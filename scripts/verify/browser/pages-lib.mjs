@@ -5,6 +5,7 @@ import { writeFileSync, rmSync, mkdirSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import {
   root,
+  ready,
   WATCH_BOUND_MS,
   launch,
   openPage,
@@ -286,8 +287,11 @@ async function doctabs() {
 // ---- chords -----------------------------------------------------------------------------------
 async function chords() {
   const { b, ctx } = await context('chromium');
+  // Running an action is a write: the server refuses it (403) without the owner cookie.
+  await ctx.addCookies([await srv.owner()]);
   const p = await ctx.newPage();
   await p.goto(srv.base + '/', { waitUntil: 'load' });
+  await ready(p, 'actions');
   await p.keyboard.press('a');
   await p.keyboard.press('x');
   // Waits for the marker itself: a fixed pause lost to a slow action runner.
