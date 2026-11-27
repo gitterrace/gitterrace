@@ -119,7 +119,9 @@ async function truncation() {
       const e = document.createElement('div');
       e.className = cls;
       e.textContent = 'a commit subject far too long to fit in the narrow column of a phone';
-      e.setAttribute('style', `width:120px;white-space:nowrap;overflow:hidden;${css}`);
+      // CSSOM, not the style attribute: the strict style-src refuses an inline attribute, which
+      // left the planted box unstyled and the red case blind.
+      e.style.cssText = (`width:120px;white-space:nowrap;overflow:hidden;${css}`);
       document.querySelector('main').prepend(e);
     }
   });

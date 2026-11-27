@@ -1,0 +1,68 @@
+id: no-style-attribute-write
+snapshots:
+  "document.createElement('div').setAttribute('style', css);":
+    labels:
+    - source: document.createElement('div').setAttribute('style', css)
+      style: primary
+      start: 0
+      end: 56
+    - source: setAttribute
+      style: secondary
+      start: 30
+      end: 42
+    - source: document.createElement('div').setAttribute
+      style: secondary
+      start: 0
+      end: 42
+    - source: "'style'"
+      style: secondary
+      start: 43
+      end: 50
+    - source: "'style'"
+      style: secondary
+      start: 43
+      end: 50
+  "e.setAttribute(\"style\", `width:${w}px`);":
+    labels:
+    - source: e.setAttribute("style", `width:${w}px`)
+      style: primary
+      start: 0
+      end: 39
+    - source: setAttribute
+      style: secondary
+      start: 2
+      end: 14
+    - source: e.setAttribute
+      style: secondary
+      start: 0
+      end: 14
+    - source: "\"style\""
+      style: secondary
+      start: 15
+      end: 22
+    - source: "\"style\""
+      style: secondary
+      start: 15
+      end: 22
+  "e.setAttribute('style', 'width:1px');":
+    labels:
+    - source: e.setAttribute('style', 'width:1px')
+      style: primary
+      start: 0
+      end: 36
+    - source: setAttribute
+      style: secondary
+      start: 2
+      end: 14
+    - source: e.setAttribute
+      style: secondary
+      start: 0
+      end: 14
+    - source: "'style'"
+      style: secondary
+      start: 15
+      end: 22
+    - source: "'style'"
+      style: secondary
+      start: 15
+      end: 22

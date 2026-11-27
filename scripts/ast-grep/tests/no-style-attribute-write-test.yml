@@ -1,0 +1,9 @@
+id: no-style-attribute-write
+valid:
+  - 'e.style.cssText = "width:1px";'
+  - 'e.setAttribute("class", "x");'
+  - 'e.setAttribute("data-style", "x");'
+invalid:
+  - "e.setAttribute('style', 'width:1px');"
+  - 'e.setAttribute("style", `width:${w}px`);'
+  - "document.createElement('div').setAttribute('style', css);"

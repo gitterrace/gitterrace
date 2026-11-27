@@ -16,7 +16,11 @@
           for (var i = 0; i < cells.length; i++) {
             if (cells[i].getAttribute("data-name") === a.getAttribute("data-name")) {
               var th = cells[i].parentNode.querySelector("th");
-              if (th) th.appendChild(a);
+              if (th) {
+                // A space keeps the name and "Hot" two words in text, copy and screen readers.
+                th.appendChild(document.createTextNode(" "));
+                th.appendChild(a);
+              }
               break;
             }
           }
