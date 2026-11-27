@@ -15,6 +15,8 @@ die() {
   exit 1
 }
 
+# A red or still-running hosted run of origin/main refuses; no gh or network only warns.
+python3 "$root/scripts/release/push-check.py" --hosted-ci origin || die "hosted CI is not green"
 command -v act >/dev/null || die "act is not installed"
 docker info >/dev/null 2>&1 || die "docker is not running"
 sha=$(git -C "$root" rev-parse --verify --quiet "$rev^{commit}") || die "no commit $rev"

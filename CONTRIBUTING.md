@@ -142,6 +142,12 @@ clean clone of main and records the pass in `.git/act-pass/<sha>`.
 or a `make release-gate` one. Run it after the last land, never before it:
 the record names one commit.
 
+Both `make act-check` and the hook also ask the host (`gh run list`) for the hosted
+CI result of the remote's current main. A failed job (named in the message) or a
+run still in progress refuses the push, so a hosted-only job such as the
+reproducible build cannot stay red unnoticed. Without `gh` or a network they
+only warn. The harness sets `TEST_ALLOW_PENDING_CI=1` to pass a running run.
+
 ## Releasing (maintainers)
 
 gitterrace.dev ships from a maintainer's machine with `make deploy`, with no
