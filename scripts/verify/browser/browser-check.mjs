@@ -81,7 +81,12 @@ for (const f of readdirSync(here).filter((n) => LIB.test(n)).sort()) {
 const checks = Object.fromEntries(ALL.map((c) => [c, exported[ALIAS[c] ?? c.replace(/-(\w)/g, (_, x) => x.toUpperCase())]]));
 for (const c of ALL) if (!checks[c]) { console.error(`no export for check ${c}`); process.exit(2); }
 try {
-  for (const c of wanted) { console.log(`-- ${c}`); await checks[c](); }
+  for (const c of wanted) {
+    console.log(`-- ${c}`);
+    // A case that throws (a server that will not start, a command that fails) fails that case
+    // alone, so the cases behind it still report.
+    try { await checks[c](); } catch (e) { r.fail(`${c}: ${e?.stack ?? e}`); }
+  }
 } finally {
   srv.stop();
   rmSync(dir, { recursive: true, force: true });

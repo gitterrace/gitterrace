@@ -12,7 +12,7 @@ export function checks(env) {
     const others = [makeRepo(), makeRepo()];
     const one = await serve(bin, dir, cfg);
     for (const o of others) {
-      sh(o, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, o);
+      one.cli(o, o);
     }
     const count = async () => (await (await fetch(one.origin + '/api/repos')).json()).length;
     await poll(async () => (await count()) >= 3, 'three repositories');

@@ -312,7 +312,15 @@ export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'
   const m = /href="(\/r\/[^"\/]+)\/?"/.exec(await (await fetch(origin + '/')).text());
   const secret = join(state, 'gitterrace', `add-token-${port}`);
   const owner = () => ownerCookie(origin, secret);
-  return { origin, base: m ? origin + m[1] : origin, stop: () => child.kill(), owner };
+  // The one way a case runs the binary against this server. The join and remove commands read
+  // the add secret from this server's own state folder (a caller's XDG_STATE_HOME is not it: with
+  // the wrong one the command finds no secret and tries to bind the port itself, EADDRINUSE).
+  // The address is the real port the server bound, so no case names a port.
+  const cli = (cwd, ...rest) => execFileSync(
+    bin, ['--addr', `127.0.0.1:${port}`, '--config', cfg, ...rest],
+    { cwd, stdio: 'pipe', env: { ...process.env, ...ident, XDG_STATE_HOME: state } },
+  ).toString().trim();
+  return { origin, base: m ? origin + m[1] : origin, stop: () => child.kill(), owner, cli, state };
 }
 
 /**

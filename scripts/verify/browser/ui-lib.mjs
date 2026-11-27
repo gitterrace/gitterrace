@@ -443,7 +443,7 @@ async function repoSwitch() {
         await p.evaluate(() => document.fonts.ready);
         await frames(p);
         const alone = await shown(p);
-        sh(two, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, two);
+        one.cli(two, two);
         // No reload: the open page hears the join over its live stream and shows the switcher.
         await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !!s && !s.hidden; }, null, { timeout: 5000 }).catch(() => {});
         const joined = await shown(p);
@@ -482,7 +482,7 @@ async function repoSwitch() {
         }
         // `git terrace remove` takes the second one off again: the open page hears it and the
         // switcher hides (one repository left), and the removed one's pages answer 404.
-        sh(two, bin, '--addr', one.origin.replace('http://', ''), '--config', cfg, 'remove', two);
+        one.cli(two, 'remove', two);
         await p.waitForFunction(() => { const s = document.getElementById('reposwitch'); return !s || s.hidden; }, null, { timeout: 5000 }).catch(() => {});
         const left = !(await shown(p));
         const gone = visits[0]?.pick ? (await fetch(`${one.origin}/r/${visits[0].pick}/`)).status : 0;

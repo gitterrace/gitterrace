@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Fail when a browser check is exported by a lib but missing from ALL in browser-check.mjs.
+"""Fail when a browser case names a port, or a check is missing from ALL in browser-check.mjs.
+
+A check is missing when a lib exports it but ALL does not list it.
 
 Each scripts/verify/browser/*-lib.mjs exports `checks(env)`, which returns an object of check
 functions. browser-check.mjs runs only the names in its ALL list, so a check added to a lib and
@@ -84,9 +86,23 @@ def problems(runner: str, libs: dict[str, str]) -> list[str]:
     return bad
 
 
+ADDR = re.compile(r"--addr|127\.0\.0\.1:\$?\{?[0-9]*[1-9]|localhost:[0-9]*[1-9]")
+
+
+def port_problems(libs: dict[str, str]) -> list[str]:
+    """A case names no address or port: `serve()` binds port 0 and its `cli()` runs the binary."""
+    return [
+        f"{name}:{n}: names an address or port. Use serve() from lib/browser-lib.mjs and its cli()"
+        for name, text in sorted(libs.items())
+        for n, line in enumerate(text.splitlines(), 1)
+        if ADDR.search(line)
+    ]
+
+
 def check_tree() -> int:
     libs = {p.name: p.read_text(encoding="utf-8") for p in sorted(DIR.glob("*-lib.mjs"))}
     bad = problems(RUNNER.read_text(encoding="utf-8"), libs)
+    bad += port_problems(libs)
     for line in bad:
         print(line)
     if bad:
@@ -106,7 +122,11 @@ def self_test() -> int:
     arrow = problems(
         RUNNER_FIXTURE, {"a-lib.mjs": "export function checks(e) {\n  return { x: () => 1 };\n}\n"}
     )
+    fixed = port_problems({"f-lib.mjs": "sh(d, bin, '--addr', '127.0.0.1:38625', d);\n"})
+    fixed2 = port_problems({"f-lib.mjs": "const u = 'http://127.0.0.1:8080';\n"})
+    clean = port_problems({"c-lib.mjs": "const s = await serve(bin, dir);\ns.cli(d, d);\n"})
     ok = not green and len(red) == 1 and "forgotten" in red[0] and len(arrow) == 1
+    ok = ok and len(fixed) == 1 and len(fixed2) == 1 and not clean
     print("browser-all-check self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 
