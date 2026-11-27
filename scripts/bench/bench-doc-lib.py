@@ -216,6 +216,8 @@ def versus(key: str, name: str, repo: Json, earlier: list[Json]) -> tuple[str, s
         r = run["repos"].get(name)
         if not r or key not in r["budget"]:
             continue
+        if bc.collapsed(key, name, run, earlier, repo):
+            continue
         when, p = run["when"][:10], r["budget"][key]
         if not bc.comparable(key, r, repo):
             return bc.fmt(key, p["value"]), when, f"new measure (was {when})"
@@ -250,6 +252,12 @@ def comparison(cur: Json, earlier: list[Json]) -> list[str]:
                 continue
             was, _, ch = versus(k, n, r, earlier)
             L.append(f"| {n} | {bc.SHORT[k]} | {was} | {bc.fmt(k, b['value'])} | {ch} |")
+    if bad := bc.invalid_samples(cur, earlier):
+        L += [
+            "",
+            "Invalid samples, refused as a baseline (under 25% of the repo's median over the "
+            "other recorded runs, a missed sample), still recorded: " + "; ".join(bad) + ".",
+        ]
     return [*L, ""]
 
 
@@ -559,3 +567,23 @@ def stray(root: Path = bc.RESULTS) -> list[str]:
         for p in sorted(other)
         if p not in skip
     ]
+
+
+def baseline_guard_test() -> None:
+    """A collapsed memory sample is no baseline: the newest valid run is, and it is named."""
+
+    def run(when: str, mb: float) -> Json:
+        return {
+            "when": when,
+            "repos": {"a": {"index": {}, "budget": {"rss_mb": {"value": mb}}}},
+        }
+
+    cur = run("2026-01-05", 112.0)
+    earlier = [run("2026-01-01", 109.0), run("2026-01-02", 7.6), run("2026-01-03", 110.0)]
+    ok = versus("rss_mb", "a", cur["repos"]["a"], earlier)[2]
+    bad = versus("rss_mb", "a", cur["repos"]["a"], [*earlier[:2], run("2026-01-04", 7.6)])[2]
+    named = bc.invalid_samples(cur, earlier)
+    if ok != "2% more memory (vs 2026-01-03)" or "2026-01-01" not in bad:
+        sys.exit(f"bench-report self-test failed: baseline guard {ok} / {bad}")
+    if len(named) != 1 or "2026-01-02" not in named[0] or "7.6" not in named[0]:
+        sys.exit(f"bench-report self-test failed: collapsed sample not named {named}")

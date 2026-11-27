@@ -8,6 +8,7 @@ from __future__ import annotations
 import importlib
 import json
 import re
+import statistics
 import sys
 from html import escape
 from pathlib import Path
@@ -223,12 +224,54 @@ def comparable(key: str, old: Json, new: Json) -> bool:
     return (CHILD_FIELD in old["index"]) == (CHILD_FIELD in new["index"])
 
 
+# Memory metrics where a missed sample reads far too low. A run under this share of the median
+# of the repo's other recorded runs is refused as a baseline, never deleted.
+COLLAPSE_KEYS = ("rss_mb", "footprint_idle_mb")
+COLLAPSE_SHARE = 0.25
+COLLAPSE_MIN_OTHERS = 2
+
+
+def collapsed(key: str, name: str, run: Json, earlier: list[Json], repo: Json) -> bool:
+    """Whether the run's sample of the metric is far below the median of the repo's other
+    recorded runs (the earlier ones and the current one), so it is a missed sample."""
+    if key not in COLLAPSE_KEYS:
+        return False
+    r = run["repos"].get(name)
+    if not r or key not in r["budget"]:
+        return False
+    others = [
+        o["repos"][name]["budget"][key]["value"]
+        for o in earlier
+        if o is not run and name in o["repos"] and key in o["repos"][name]["budget"]
+    ] + [repo["budget"][key]["value"]]
+    if len(others) < COLLAPSE_MIN_OTHERS:
+        return False
+    return r["budget"][key]["value"] < COLLAPSE_SHARE * statistics.median(others)
+
+
+def invalid_samples(cur: Json, earlier: list[Json]) -> list[str]:
+    """One line per refused sample, naming the run, repo and metric."""
+    out = []
+    for run in earlier:
+        for n, r in cur["repos"].items():
+            for k in COLLAPSE_KEYS:
+                if collapsed(k, n, run, earlier, r):
+                    v = run["repos"][n]["budget"][k]["value"]
+                    out.append(f"{run['when'][:10]} {n} {k} ({v:.1f} MB)")
+    return out
+
+
 def previous(earlier: list[Json], name: str, key: str, repo: Json) -> tuple[Json, Json] | None:
     """The newest earlier run (oldest first in the list) that measured the repo's metric the
     same way, with its budget entry."""
     for run in reversed(earlier):
         r = run["repos"].get(name)
-        if r and key in r["budget"] and comparable(key, r, repo):
+        if (
+            r
+            and key in r["budget"]
+            and comparable(key, r, repo)
+            and not collapsed(key, name, run, earlier, repo)
+        ):
             return run, r["budget"][key]
     return None
 

@@ -65,7 +65,10 @@ recorded measured something else, so the comparison table calls its peak memory
 a new measure and never puts a percentage on it.
 
 The comparison table sets each repo against the newest earlier kept run that
-measured it, and names that run in the change column.
+measured it, and names that run in the change column. A memory sample under
+25% of the median of the repo's other recorded runs is a missed sample. The
+report marks it invalid, names it, and compares against the newest valid run
+instead. The result file keeps it.
 
 <!-- BEGIN GENERATED: budgets -->
 | Class | Warm ms | Cold ms | Index s | Ready s | Idle CPU % | Peak MB | Idle MB | Export s |

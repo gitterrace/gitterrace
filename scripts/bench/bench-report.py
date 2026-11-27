@@ -155,6 +155,7 @@ def self_test() -> None:
     commit_test()
     wrap_test()
     footprint_test()
+    bd.baseline_guard_test()
     bl.phase_cpu_test()
     bl.ready_recorded_test()
     export_test()
