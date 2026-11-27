@@ -1,14 +1,16 @@
-//! Concurrency caps that a config change can lower while slots are busy.
+//! Concurrency caps that a config change can lower while slots are busy. The only way to a
+//! permit, so no holder can return one past a cut that is still owed.
 
 use std::sync::{Arc, Mutex};
 
 use tokio::sync::Semaphore;
 
 /// A semaphore with the number of slots in force beside it, so a resize cannot drift from it.
+///
 /// Clones share both. Permits come out as [`Slot`]s: a cut that found slots busy is owed, and
 /// each slot that comes back pays it off instead of returning, so the lower cap always lands.
 #[derive(Clone)]
-pub(crate) struct Slots {
+pub struct Slots {
     sem: Arc<Semaphore>,
     state: Arc<Mutex<SlotCount>>,
 }
@@ -20,13 +22,14 @@ struct SlotCount {
 }
 
 /// Permits held out of a [`Slots`]. Dropping it returns them, minus whatever the cap still owes.
-pub(crate) struct Slot {
+pub struct Slot {
     permit: Option<tokio::sync::OwnedSemaphorePermit>,
     slots: Slots,
 }
 
 impl Slots {
-    pub(crate) fn new(n: usize) -> Self {
+    #[must_use]
+    pub fn new(n: usize) -> Self {
         Self {
             sem: Arc::new(Semaphore::new(n)),
             state: Arc::new(Mutex::new(SlotCount { cap: n, owed: 0 })),
@@ -35,7 +38,7 @@ impl Slots {
 
     /// Moves to `new` slots. Slots in use are not taken back at once: the cut that could not
     /// be made is owed and settles as they are released. A raise pays the debt off first.
-    pub(crate) fn resize(&self, new: usize) {
+    pub fn resize(&self, new: usize) {
         let Ok(mut st) = self.state.lock() else { return };
         let target = st.cap - st.owed;
         if new >= target {
@@ -53,32 +56,33 @@ impl Slots {
     }
 
     /// Waits for one slot.
-    pub(crate) async fn take(&self) -> Result<Slot, tokio::sync::AcquireError> {
+    ///
+    /// # Errors
+    /// When the slots are closed.
+    pub async fn take(&self) -> Result<Slot, tokio::sync::AcquireError> {
         self.take_many(1).await
     }
 
     /// Waits for `n` slots at once.
-    pub(crate) async fn take_many(&self, n: u32) -> Result<Slot, tokio::sync::AcquireError> {
+    ///
+    /// # Errors
+    /// When the slots are closed.
+    pub async fn take_many(&self, n: u32) -> Result<Slot, tokio::sync::AcquireError> {
         let permit = Arc::clone(&self.sem).acquire_many_owned(n).await?;
         Ok(Slot { permit: Some(permit), slots: self.clone() })
     }
 
     /// One slot if one is free now.
-    pub(crate) fn try_take(&self) -> Option<Slot> {
+    #[must_use]
+    pub fn try_take(&self) -> Option<Slot> {
         let permit = Arc::clone(&self.sem).try_acquire_owned().ok()?;
         Some(Slot { permit: Some(permit), slots: self.clone() })
     }
 
     /// Slots free right now.
-    #[cfg(test)]
-    pub(crate) fn available_permits(&self) -> usize {
+    #[must_use]
+    pub fn available_permits(&self) -> usize {
         self.sem.available_permits()
-    }
-
-    /// The raw semaphore, for a holder outside this type. Its permits return without paying
-    /// the debt, so only the pages' own slots are exact under a cut.
-    pub(crate) fn semaphore(&self) -> Arc<Semaphore> {
-        Arc::clone(&self.sem)
     }
 }
 

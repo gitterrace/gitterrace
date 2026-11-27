@@ -1,8 +1,6 @@
 //! What the configuration and the server put in force for every clone of a state: link
 //! style, counting defaults, answer caps and the blocking-read slots.
 
-use std::sync::Arc;
-
 use gitterrace_index::Options;
 use gitterrace_types::LinkStyle;
 
@@ -43,7 +41,7 @@ impl Default for Settings {
 
 impl ApiState {
     /// Runs every blocking read of this state and its clones under `jobs`.
-    pub fn share_jobs(&self, jobs: Arc<tokio::sync::Semaphore>) {
+    pub fn share_jobs(&self, jobs: crate::Slots) {
         match self.jobs.write() {
             Ok(mut g) => *g = jobs,
             Err(e) => *e.into_inner() = jobs,
@@ -52,12 +50,12 @@ impl ApiState {
 
     /// One blocking-read slot. The caller moves it into the blocking task, so a request that
     /// is dropped or times out frees it only once the read itself has exited.
-    pub(crate) async fn job_slot(&self) -> Option<tokio::sync::OwnedSemaphorePermit> {
+    pub(crate) async fn job_slot(&self) -> Option<crate::Slot> {
         let jobs = match self.jobs.read() {
-            Ok(g) => Arc::clone(&g),
-            Err(e) => Arc::clone(&e.into_inner()),
+            Ok(g) => g.clone(),
+            Err(e) => e.into_inner().clone(),
         };
-        jobs.acquire_owned().await.ok()
+        jobs.take().await.ok()
     }
 
     /// Link style and counting defaults from the configuration: `links.style`, `insights.*`

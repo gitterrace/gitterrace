@@ -35,17 +35,16 @@ mod memo;
 mod records;
 mod refresh;
 mod sched;
-mod slots;
 mod state;
 mod touched;
 
 pub(crate) use dirty::DirtyMemo;
 
 pub use child::index_child;
+pub(crate) use gitterrace_api::{Slot, Slots};
 pub(crate) use history::PathLog;
 pub(crate) use jobs::{blocking, cancel_flag};
 pub(crate) use refresh::{keep_index_fresh_supervised, release_when_idle};
-pub(crate) use slots::{Slot, Slots};
 pub(crate) use state::RepoState;
 
 /// What every repository of one server shares: settings, job cap and the shutdown signal.
@@ -460,7 +459,7 @@ impl App {
             }
         }));
         api.share_pages(self.pages_share());
-        api.share_jobs(self.env.jobs.semaphore());
+        api.share_jobs(self.env.jobs.clone());
         self.api.set(api).ok();
     }
 

@@ -11,6 +11,7 @@ mod error;
 mod http;
 mod insights;
 mod mcp;
+mod slots;
 mod wire;
 
 pub use core::{ApiState, Pages, PlanRequest, Rebuild, options_from, risk_terms};
@@ -22,6 +23,7 @@ pub use insights::{
     INSIGHTS, Insight, OWNERSHIP_DEPTH, Params, index as insight_index, list as insight_list,
 };
 pub use mcp::{McpRepo, McpServer, ToolDoc, serve_mcp, serve_mcp_repos, tool_on};
+pub use slots::{Slot, Slots};
 
 #[cfg(test)]
 mod compare_tests;

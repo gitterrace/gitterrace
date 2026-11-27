@@ -525,9 +525,9 @@ async fn server_errors_hide_the_inner_message() {
 #[tokio::test]
 async fn api_reads_wait_for_a_shared_job_slot() {
     let (_d, s) = fixture();
-    let jobs = Arc::new(tokio::sync::Semaphore::new(1));
-    s.share_jobs(Arc::clone(&jobs));
-    let held = Arc::clone(&jobs).acquire_owned().await.expect("permit");
+    let jobs = crate::Slots::new(1);
+    s.share_jobs(jobs.clone());
+    let held = jobs.take().await.expect("permit");
     let waiting = tokio::spawn({
         let s = s.clone();
         async move { get(&s, "/repo").await.0 }
@@ -571,4 +571,20 @@ async fn file_insight_matches_the_hotspots_row() {
     assert_eq!(st, StatusCode::BAD_REQUEST, "path is required");
     let (st, _) = get(&s, "/file_insight?path=a.txt&rev=nope").await;
     assert_eq!(st, StatusCode::NOT_FOUND, "an unknown rev is 404");
+}
+
+/// A cut made through the shared slots while an API read holds a job lands when the read ends:
+/// the API takes its slots from the same `Slots`, so its return pays the debt.
+#[tokio::test]
+async fn an_api_job_returned_after_a_cut_does_not_restore_the_old_cap() {
+    let (_d, s) = fixture();
+    let jobs = crate::Slots::new(3);
+    s.share_jobs(jobs.clone());
+    let held = [s.job_slot().await.expect("slot"), s.job_slot().await.expect("slot")];
+    jobs.resize(1);
+    drop(held);
+    assert_eq!(jobs.available_permits(), 1, "the API's return brought the old cap back");
+    let one = s.job_slot().await.expect("the slot in force");
+    assert!(jobs.try_take().is_none(), "a second job fits past the cut");
+    drop(one);
 }

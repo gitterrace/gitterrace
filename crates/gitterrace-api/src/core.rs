@@ -79,7 +79,7 @@ pub struct ApiState {
     rebuilding: Arc<std::sync::atomic::AtomicBool>,
     /// Slots for blocking reads. One per core on its own; the web server hands in its page
     /// job slots ([`ApiState::share_jobs`]), so API reads and pages share one bound.
-    jobs: Arc<RwLock<Arc<tokio::sync::Semaphore>>>,
+    jobs: Arc<RwLock<crate::Slots>>,
 }
 
 /// Deletes an unreadable cache and starts its rebuild. Returns at once: the answer meanwhile
@@ -111,9 +111,9 @@ impl ApiState {
             on_unreadable: Arc::default(),
             pages: Arc::default(),
             rebuilding: Arc::default(),
-            jobs: Arc::new(RwLock::new(Arc::new(tokio::sync::Semaphore::new(
+            jobs: Arc::new(RwLock::new(crate::Slots::new(
                 std::thread::available_parallelism().map_or(2, usize::from),
-            )))),
+            ))),
         }
     }
 

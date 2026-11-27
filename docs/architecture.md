@@ -220,8 +220,9 @@ between such a task's reads and its stores would leave the caches full until the
 next period.
 
 Concurrency caps (page jobs, live streams, the raw budget) are one `Slots`
-type. A cut that finds slots busy is owed, and each slot that returns retires
-part of the debt, so a lowered `[limits]` or `[server]` value always lands. A
+type, defined in `gitterrace-api` so the API's job reads share it and no holder
+can reach the raw semaphore. A cut that finds slots busy is owed, and each slot
+that returns retires part of the debt, so a lowered `[limits]` or `[server]` value always lands. A
 raise pays the debt off first.
 
 The bench harness, corpus and results are in [benchmarks](benchmarks.md).
