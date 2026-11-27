@@ -9,6 +9,8 @@
 // - a note with markup shows as text, never as an element
 // - with no owner cookie a write answers 403 and nothing is kept
 // - a basket of 501 entries sends a chosen subset of 500 and keeps every entry
+// - blob-finding-marker: a finding on lines 4-5 puts a gutter dot on those rows, its link opens
+//   the panel, and edited lines lose it
 // A screenshot of the panel goes to $TMPDIR/gt-basket-<browser>.png.
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -173,5 +175,53 @@ export function checks(env) {
       }
     }
   }
-  return { basketSendAll, basketSendSubset };
+  // The file view marks the lines a finding points at, and the marker opens the basket.
+  async function blobFindingMarker() {
+    for (const name of browsers) {
+      const dir = mkdtempSync(join(tmpdir(), 'gt-basket-'));
+      const cfg = mkdtempSync(join(tmpdir(), 'gt-basket-cfg-'));
+      sh(dir, 'git', 'init', '-q', '-b', 'main');
+      writeFileSync(join(dir, 'a.txt'), BODY);
+      commitAll(dir, 'init');
+      const srv = await serve(bin, dir, cfg);
+      const w = `blob-finding-marker ${name}`;
+      try {
+        const { b, ctx } = await context(name);
+        try {
+          await ctx.addCookies([await srv.owner()]);
+          const p = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+          await p.goto(`${srv.base}/blob/main/a.txt#L4-L5`, { waitUntil: 'load' });
+          await p.waitForSelector('#basketbtn', WAIT);
+          await p.keyboard.press('.');
+          await p.locator('.actmenu li:has-text("Add to review")').click();
+          await p.locator('textarea.basket-note').fill('mind this');
+          await p.locator('.basket form button[type=submit]').click();
+          await p.waitForSelector('.basket', { state: 'detached', ...WAIT });
+          await p.goto(`${srv.base}/blob/main/a.txt`, { waitUntil: 'load' });
+          const marked = await p.$$eval('.src .l.fm', (rows) => rows.map((x) => x.dataset.n));
+          say(marked.join() === '4,5', `${w}: lines 4 and 5 are marked`, `${w}: marked ${marked}`);
+          const links = await p.$$eval('.fm-link', (a) => a.map((x) => x.getAttribute('title')));
+          say(links.length === 1 && links[0] === 'mind this', `${w}: one link carries the note`,
+            `${w}: links ${links}`);
+          await p.locator('.fm-link').click({ force: true });
+          await p.waitForSelector('.basket-row', WAIT).then(
+            () => r.ok(`${w}: the marker opens the basket`),
+            () => r.fail(`${w}: the marker did not open the basket`));
+          await p.keyboard.press('Escape');
+          writeFileSync(join(dir, 'a.txt'), BODY.replace('line 4', 'changed 4'));
+          await p.goto(`${srv.base}/worktree/blob/a.txt`, { waitUntil: 'load' });
+          say((await p.$$('.fm-link')).length === 0, `${w}: edited lines lose the marker`,
+            `${w}: a marker stayed on edited lines`);
+          await p.close();
+        } finally { await b.close(); }
+      } catch (e) {
+        r.fail(`${w}: ${e && e.stack}`);
+      } finally {
+        srv.stop();
+        const gone = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
+        for (const d of [dir, cfg]) rmSync(d, gone);
+      }
+    }
+  }
+  return { basketSendAll, basketSendSubset, blobFindingMarker };
 }

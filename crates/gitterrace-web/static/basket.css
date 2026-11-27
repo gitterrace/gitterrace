@@ -83,3 +83,18 @@
 }
 .basket-msg{flex:1;min-width:0;font-size:var(--text-xs)}
 .basket-pick{min-width:0;max-width:40%}
+
+/* A file row the basket points at: a dot in the gutter that opens the panel. */
+.src .l.fm::before{color:var(--accent-fg)}
+.fm-link{position:absolute;left:0;top:0;width:var(--space-3);height:100%;cursor:pointer}
+.fm-link::after{
+  content:"";
+  position:absolute;
+  left:var(--space-1);
+  top:50%;
+  width:var(--space-2);
+  height:var(--space-2);
+  margin-top:calc(var(--space-1)*-1);
+  border-radius:var(--radius-round);
+  background:var(--accent);
+}

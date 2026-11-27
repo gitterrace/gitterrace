@@ -44,6 +44,8 @@ keys lives in `gitterrace_config::naming`.
 - **Read-only, pinned.** Every read takes a resolved commit id, so a commit
   landing mid-request cannot tear a page. Only the uncommitted view reads the
   worktree, and so does the review basket: an anchor is checked against it.
+  The file view marks the anchored lines of the basket (`blob_marks.rs`, from the same
+  anchors, drawn on the page and never kept in the highlight memo).
   Every findings surface (page, JSON API, MCP tool and review prompt) is
   gated on `worktree_enabled`, file-wide or per repository, and is refused on
   a public server. The repository and the worktree are never written: the

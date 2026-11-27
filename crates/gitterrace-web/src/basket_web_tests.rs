@@ -155,3 +155,46 @@ fn selecting_a_batch_does_not_reload_the_basket() {
     assert!(!handler.contains("load("), "select first must not call load(): {handler}");
     assert!(handler.contains("sync();"));
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn a_blob_marks_the_lines_of_an_open_finding_and_links_the_note() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let app = server(tmp.path());
+    assert_eq!(call(&app, "POST", "/r/r/_findings", NOTE, true).await.0, 200);
+    let (s, html) = call(&app, "GET", "/r/r/blob/HEAD/a.txt", "", false).await;
+    assert_eq!(s, 200);
+    assert_eq!(html.matches("class=\"l fm\"").count(), 2, "lines 2 and 3 are marked: {html}");
+    assert_eq!(html.matches("class=\"fm-link\"").count(), 1, "one link per finding");
+    assert!(html.contains("href=\"#L2\" data-finding=\"f-"), "{html}");
+    assert!(html.contains("title=\"&#60;img src=x onerror=alert(1)&#62;\""), "note is escaped");
+    assert!(!html.contains("<img src=x onerror"), "{html}");
+}
+
+/// A public server never reads the basket, so a blob carries no marker and no note, even when
+/// the cache holds a finding on its lines.
+#[tokio::test(flavor = "multi_thread")]
+async fn a_public_server_shows_no_finding_marker_on_a_blob() {
+    const HOST: &str = "git.example.com";
+    let tmp = tempfile::tempdir().expect("tmp");
+    let p = tmp.path().join("r");
+    let f = Fixture::init(&p).write("a.txt", "a\nb\nc\n").commit("feat: one");
+    let new = gitterrace_types::api::NewFinding {
+        kind: "line".into(),
+        lines: Some(gitterrace_types::api::FindingLines { end: 3, start: 2 }),
+        note: "secret note".into(),
+        path: Some("a.txt".into()),
+        query: None,
+        rev: "HEAD".into(),
+        sha: None,
+    };
+    gitterrace_api::ApiState::open(&p).expect("open").finding_add(&new).expect("add");
+    let cfg = format!("[server]\nis_public = true\nhosts = [\"{HOST}\"]\n");
+    let cfg = gitterrace_config::parse(&cfg).expect("parse").config;
+    let app = crate::app_router_with(f.path(), cfg).expect("router");
+    let req =
+        Request::get("/r/r/blob/HEAD/a.txt").header("host", HOST).body(Body::empty()).expect("req");
+    let (s, html) = gitterrace_testkit::send(&app, req).await;
+    assert_eq!(s, 200, "{html}");
+    assert!(html.contains("id=\"L2\""), "the blob rendered");
+    assert!(!html.contains("fm-link") && !html.contains("l fm") && !html.contains("secret note"));
+}

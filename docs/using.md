@@ -172,6 +172,11 @@ or `file gone`), with a Remove button, plus **Clear**. **Send all** runs one of
 your actions of kind `review` with every entry in a single payload. The page
 names the entries by id and the server reads the notes from its own basket, so
 a page cannot send words of its own. Notes are plain text and shown as text.
+In the file view a dot in the gutter marks the lines of an `untouched`
+entry, where they are now even if they moved, and shows the note on hover.
+Click it to open the panel. Only a file at HEAD or in the working tree is
+marked, and an older revision shows just the entries made at it. Lines that
+changed get no marker: the panel still lists them.
 The button, the notes and Send all are on local servers only, a public server
 leaves them out.
 

@@ -289,6 +289,13 @@
 
   if (btn) {
     btn.addEventListener("click", panel);
+    // A gutter marker on a file row (blob_marks.rs) opens the panel; without script it is a link
+    // to its line.
+    document.addEventListener("click", function (e) {
+      if (!e.target.closest || !e.target.closest(".fm-link")) return;
+      e.preventDefault();
+      if (!cur) panel();
+    });
     refresh();
   }
   window.gtBasket = { add: add, refresh: refresh };

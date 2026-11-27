@@ -8,6 +8,7 @@ mod app;
 mod basket_web;
 #[cfg(test)]
 mod basket_web_tests;
+mod blob_marks;
 mod bounded;
 mod caches;
 mod card;

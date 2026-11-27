@@ -207,7 +207,7 @@ pub(super) async fn blob(
             } else {
                 (a.repo.blob(&id, &path)?, Vec::new())
             };
-        Ok(blob_page(a, BlobAt::Rev(&rev), path, &b, &bytes))
+        Ok(blob_page(a, BlobAt::Rev(&rev), path, &b, &bytes, Some(id.as_str())))
     })
     .await?;
     Ok(Styled(p.render()?))
@@ -225,7 +225,7 @@ pub(super) async fn worktree_blob(
     let p = blocking(&app, move |a| {
         let limit = a.cfg().limits.raw_mb << 20;
         Ok(gitterrace_git::worktree_blob(&a.repo, &path, limit)?
-            .map(|(b, bytes)| blob_page(a, BlobAt::Worktree, path, &b, &bytes)))
+            .map(|(b, bytes)| blob_page(a, BlobAt::Worktree, path, &b, &bytes, None)))
     })
     .await?;
     match p {
@@ -260,6 +260,7 @@ fn blob_page(
     path: String,
     b: &gitterrace_git::Blob,
     bytes: &[u8],
+    sha: Option<&str>,
 ) -> BlobPage {
     // Relative Markdown links and the chrome's revision resolve against HEAD for the worktree.
     let rev = match at {
@@ -286,6 +287,8 @@ fn blob_page(
     });
     let cut = code.as_ref().is_some_and(|c| c.cut);
     let (html, named) = code.map_or((None, Vec::new()), |c| (Some(c.html), c.symbols));
+    // The marks are drawn on the page, never in the shared highlight memo.
+    let html = html.map(|h| crate::blob_marks::apply(h, &crate::blob_marks::marks(a, sha, &path)));
     let preview = crate::features::on(Feature::MarkdownPreview);
     let doc = text.filter(|_| preview && is_markdown(&path)).map(|t| {
         let dir = path.rsplit_once('/').map_or("", |(d, _)| d);
