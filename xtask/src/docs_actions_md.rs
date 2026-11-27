@@ -3,6 +3,7 @@
 use std::fmt::Write as _;
 
 use anyhow::{Context as _, Result};
+use gitterrace_actions::Config;
 use gitterrace_actions::SOURCE_FORMAT;
 use gitterrace_actions::config::{MAX_TIMEOUT, WINDOWS_EXTENSIONS};
 use gitterrace_actions::examples;
@@ -13,16 +14,13 @@ use gitterrace_actions::schema::{
     ACTION_KEYS, ENV_VARS, Item, KINDS, MODIFIERS, PAYLOAD_FIELDS, PLACEHOLDERS, SCRIPT_KEYS,
     SEND_KEYS, SEND_PLACEHOLDERS,
 };
-use gitterrace_actions::{Config, kind_name};
 
 use crate::action_scripts::Script;
 
 pub(crate) fn kinds() -> String {
     let rows: Vec<String> = KINDS
         .iter()
-        .map(|(k, doc)| {
-            format!("`{}` ({})", kind_name(*k), doc.trim_end_matches('.').to_lowercase())
-        })
+        .map(|(k, doc)| format!("`{}` ({})", k.name(), doc.trim_end_matches('.').to_lowercase()))
         .collect();
     format!("{}.\n", rows.join(", "))
 }

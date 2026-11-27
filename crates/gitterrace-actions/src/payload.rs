@@ -336,7 +336,7 @@ impl Payload {
         };
         put("GITTERRACE_PAYLOAD_VERSION", &self.v.to_string());
         put("GITTERRACE_ACTION", &self.action);
-        put("GITTERRACE_KIND", kind_name(self.kind));
+        put("GITTERRACE_KIND", self.kind.name());
         put("GITTERRACE_REPO", &self.repo.name);
         put("GITTERRACE_ROOT", &self.repo.root);
         put("GITTERRACE_SHA", &self.sha);
@@ -373,7 +373,7 @@ impl Payload {
             "url" => self.permalink.clone(),
             "repo" => self.repo.name.clone(),
             "root" => self.repo.root.clone(),
-            "kind" => kind_name(self.kind).to_string(),
+            "kind" => self.kind.to_string(),
             _ => self.vars.get(name.strip_prefix("var.")?)?.clone(),
         })
     }
@@ -385,21 +385,6 @@ impl Payload {
             .iter()
             .map(|(k, v)| (format!("{VAR_PREFIX}{}", k.to_ascii_uppercase()), v.clone()))
             .collect()
-    }
-}
-
-/// The kebab-case name of `k`, as written in `actions.toml` and the payload.
-pub const fn kind_name(k: Kind) -> &'static str {
-    match k {
-        Kind::Line => "line",
-        Kind::File => "file",
-        Kind::Commit => "commit",
-        Kind::Hunk => "hunk",
-        Kind::Blame => "blame",
-        Kind::SearchHit => "search-hit",
-        Kind::Insight => "insight",
-        Kind::Page => "page",
-        Kind::Review => "review",
     }
 }
 

@@ -4,7 +4,7 @@
 //! limited to [`gitterrace_index::MAX_NOTE`] bytes, a longer one is refused: it is escaped
 //! wherever it is shown.
 
-use gitterrace_actions::{kind_name, schema::KINDS};
+use gitterrace_actions::Kind;
 use gitterrace_git::{Anchor, AnchorQuery};
 use gitterrace_index::StoredFinding;
 use gitterrace_types::AnchorBasis;
@@ -21,7 +21,7 @@ fn now() -> i64 {
 
 /// The kinds a finding may have: every kind but the basket's own.
 fn is_finding_kind(k: &str) -> bool {
-    KINDS.iter().any(|(kind, _)| kind_name(*kind) == k && k != "review")
+    k.parse::<Kind>().is_ok_and(|kind| kind != Kind::Review)
 }
 
 fn anchored(f: StoredFinding, a: &Anchor) -> Finding {

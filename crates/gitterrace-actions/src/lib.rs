@@ -22,7 +22,7 @@ pub use config::{Action, Config, ConfigError, Cwd, Kind, Output, RESERVED_KEYS, 
 pub use link::{Link, LinkError, styled};
 pub use payload::{
     Lines, Locator, MAX_REVIEW_FINDINGS, Payload, PayloadError, ReviewFinding, RunRequest,
-    kind_name, permalink,
+    permalink,
 };
 pub use runner::{Limits, Outcome, RunError, Runner};
 pub use send::{Part, fill};

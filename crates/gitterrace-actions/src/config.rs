@@ -90,6 +90,50 @@ pub enum Kind {
     Review,
 }
 
+impl Kind {
+    /// Every kind, in the order the docs list them.
+    pub const ALL: [Self; 9] = [
+        Self::Line,
+        Self::File,
+        Self::Commit,
+        Self::Hunk,
+        Self::Blame,
+        Self::SearchHit,
+        Self::Insight,
+        Self::Page,
+        Self::Review,
+    ];
+
+    /// The kebab-case name, as written in `actions.toml` and the payload.
+    pub const fn name(self) -> &'static str {
+        match self {
+            Self::Line => "line",
+            Self::File => "file",
+            Self::Commit => "commit",
+            Self::Hunk => "hunk",
+            Self::Blame => "blame",
+            Self::SearchHit => "search-hit",
+            Self::Insight => "insight",
+            Self::Page => "page",
+            Self::Review => "review",
+        }
+    }
+}
+
+impl std::fmt::Display for Kind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+impl std::str::FromStr for Kind {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, ()> {
+        Self::ALL.into_iter().find(|k| k.name() == s).ok_or(())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Cwd {
     Repo,

@@ -5,7 +5,7 @@
 use std::fmt::Write as _;
 
 use clap::CommandFactory as _;
-use gitterrace_actions::{kind_name, schema::KINDS};
+use gitterrace_actions::schema::KINDS;
 
 use crate::action_scripts::Script;
 use crate::facts::Workspace;
@@ -38,7 +38,7 @@ pub fn render(ws: &Workspace, scripts: &[Script]) -> Vec<Out> {
         format!("Building with cargo needs Rust {} or newer.", p.rust_version)
     });
 
-    let kinds: Vec<String> = KINDS.iter().map(|(k, _)| format!("`{}`", kind_name(*k))).collect();
+    let kinds: Vec<String> = KINDS.iter().map(|(k, _)| format!("`{}`", k.name())).collect();
     let files: Vec<String> = scripts.iter().map(|s| format!("`{}`", s.file)).collect();
     let actions = format!(
         "Run your own program on a selection ({}). Examples in `docs/actions/`: {}.\n",

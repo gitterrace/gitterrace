@@ -90,8 +90,7 @@ fn env_table_is_the_environment() {
 
 #[test]
 fn kinds_table_is_the_kind_enum() {
-    let doc: BTreeSet<String> =
-        KINDS.iter().map(|(k, _)| crate::payload::kind_name(*k).to_owned()).collect();
+    let doc: BTreeSet<String> = KINDS.iter().map(|(k, _)| k.name().to_owned()).collect();
     let err = serde_json::from_str::<Kind>("\"nope\"").expect_err("unknown kind");
     assert_eq!(doc, expected(&err.to_string()));
     assert_eq!(doc.len(), KINDS.len(), "a kind is listed twice");
@@ -184,4 +183,17 @@ fn reserved_keys_named_in_the_key_row_are_the_reserved_keys() {
     };
     assert_eq!(named("Not a menu key ("), reserved(true), "menu keys in the key row");
     assert_eq!(named("or a page key ("), reserved(false), "page keys in the key row");
+}
+
+#[test]
+fn kind_codec_matches_serde_and_round_trips() {
+    for k in Kind::ALL {
+        let json = serde_json::to_string(&k).expect("serialize");
+        assert_eq!(json, format!("\"{k}\""), "serde form of {k}");
+        assert_eq!(k.name().parse::<Kind>(), Ok(k));
+        assert_eq!(serde_json::from_str::<Kind>(&json).expect("deserialize"), k);
+    }
+    assert_eq!(Kind::SearchHit.to_string(), "search-hit");
+    assert!("nope".parse::<Kind>().is_err());
+    assert_eq!(KINDS.map(|(k, _)| k), Kind::ALL);
 }
