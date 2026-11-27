@@ -17,9 +17,10 @@ A push is refused when it would make CI read a changelog its tag does not match:
 5. main pushed while the hosted CI run of the remote's current main (`gh run list`) failed
    (the job is named) or is still running. No gh or no network only warns, so offline work is
    never blocked. TEST_ALLOW_PENDING_CI=1 lets the harness pass a running run.
-   TEST_ALLOW_RED_CI=<run id> lets the fix for a red main through: it passes only a failed run
-   whose id equals it (a stale value matches nothing), prints a loud line naming the run and its
-   failed jobs, and leaves every other rule running (--no-verify skips them all).
+   TEST_ALLOW_RED_CI=<run id>[,<run id>...] lets the fix for a red main through: it passes only
+   when the failed runs are exactly the ones named (a stale or partial list matches nothing),
+   prints a loud line naming each run and its failed jobs, and leaves every other rule running
+   (--no-verify skips them all).
 Deletes always pass: re-tagging deletes the remote tag first (make release-gate RETAG=1).
 
   scripts/hooks/pre-push <remote> <url> < refs     the hook
@@ -114,17 +115,22 @@ def hosted_ci(repo: Path, remote: str) -> tuple[list[str], list[str]]:
         elif r.get("conclusion") not in ("success", "skipped", "neutral"):
             failed.setdefault(str(r.get("databaseId", "?")), []).append(name)
             bad.append(f"hosted CI job {name} {r.get('conclusion')} on {remote}/main {sha[:12]}")
-    allow = os.environ.get("TEST_ALLOW_RED_CI", "").strip()
-    if failed and set(failed) == {allow}:
+    # A commit often has more than one run (its push and a manual full run), so the override
+    # names each failed run it passes, comma-separated: every one must be named, and a named
+    # id with no failed run behind it refuses too, so a stale list cannot pass a new failure.
+    allow = {a.strip() for a in os.environ.get("TEST_ALLOW_RED_CI", "").split(",") if a.strip()}
+    if failed and set(failed) == allow:
+        jobs = ", ".join(f"{i}: {', '.join(failed[i])}" for i in sorted(failed))
         print(
-            f"pre-push: !!! RED CI OVERRIDE: pushing over failed hosted run {allow} on"
-            f" {remote}/main {sha[:12]} (failed jobs: {', '.join(failed[allow])})",
+            f"pre-push: !!! RED CI OVERRIDE: pushing over failed hosted run(s) on"
+            f" {remote}/main {sha[:12]} ({jobs})",
             file=sys.stderr,
         )
         bad = []
     elif failed and allow:
         named = ", ".join(sorted(failed))
-        bad.append(f"TEST_ALLOW_RED_CI={allow} does not match the failed run(s) {named}")
+        given = ",".join(sorted(allow))
+        bad.append(f"TEST_ALLOW_RED_CI={given} does not match the failed run(s) {named}")
     if pending and not os.environ.get("TEST_ALLOW_PENDING_CI"):
         bad.append(
             f"hosted CI still running on {remote}/main {sha[:12]} ({', '.join(pending)}),"
@@ -255,6 +261,17 @@ def hosted_self_test() -> list[str]:
             "red run with a wrong id is refused", f"[{ok},{red}]", "does not match", "", red_id="78"
         )
         case("red run with the id unset is refused", f"[{ok},{red}]", "reproducible-build", "")
+        red2 = red.replace("77", "79").replace("reproducible-build", "check-linux")
+        two = f"[{ok},{red},{red2}]"
+        case("two red runs pass when both are named", two, "", "", red_id="77,79")
+        case("two red runs refuse when one is named", two, "does not match", "", red_id="77")
+        case(
+            "a named id with no red run refuses",
+            f"[{ok},{red}]",
+            "does not match",
+            "",
+            red_id="77,78",
+        )
         case(
             "red override does not pass a pending run", f"[{run}]", "still running", "", red_id="77"
         )

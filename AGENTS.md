@@ -82,7 +82,7 @@ HTTP. Nothing outside `gitterrace-git` imports `gix`.
   clean clone of main, and `scripts/hooks/pre-push` refuses a main without
   that pass (or a `make release-gate` one). A red run is fixed on main before
   anything is pushed. The fix for a red hosted main goes with
-  `TEST_ALLOW_RED_CI=<failed run id>` (logged, matches that run only), never
+  `TEST_ALLOW_RED_CI=<failed run ids>` (logged, matches exactly those runs), never
   `git push --no-verify`.
 - Accepting commits written without a build:
   `python3 scripts/lint/commits-check.py --range <base>..<tip>` prints the

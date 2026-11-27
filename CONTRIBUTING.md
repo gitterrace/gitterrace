@@ -147,9 +147,11 @@ CI result of the remote's current main. A failed job (named in the message) or a
 run still in progress refuses the push, so a hosted-only job such as the
 reproducible build cannot stay red unnoticed. Without `gh` or a network they
 only warn. The harness sets `TEST_ALLOW_PENDING_CI=1` to pass a running run.
-The push that fixes a red main sets `TEST_ALLOW_RED_CI=<run id>`: it passes only
-the failed run with that id (a stale value matches nothing), prints a loud line
-naming the run and its failed jobs, and every other rule still runs. Do not use
+The push that fixes a red main sets `TEST_ALLOW_RED_CI=<run id>`,
+comma-separated when the commit has more than one failed run (its push and a
+manual full run): it passes only when the failed runs are exactly the ones named
+(a stale or partial list matches nothing), prints a loud line naming each run
+and its failed jobs, and every other rule still runs. Do not use
 `git push --no-verify`, which skips them all.
 
 ## Releasing (maintainers)
