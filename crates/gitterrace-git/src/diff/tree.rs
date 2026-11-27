@@ -62,3 +62,84 @@ pub(crate) fn tree_changes_capped(
     }
     Ok((raw, cut))
 }
+
+/// The paths a bounded tree walk found.
+pub(crate) struct WalkedPaths {
+    /// Every changed non-tree path, a rename as its removal and its addition. At most `limit`.
+    pub paths: Vec<String>,
+    /// The walk stopped at the limit, so more paths may have changed.
+    pub cut: bool,
+    /// Entries the walk reported, trees included: the work done, which a test bounds.
+    #[cfg(test)]
+    pub visited: usize,
+}
+
+/// Collects paths and stops the traversal itself at `limit`, so nothing is buffered past it.
+struct Capped {
+    rec: gix::diff::tree::Recorder,
+    limit: usize,
+    out: WalkedPaths,
+}
+
+impl gix::diff::tree::Visit for Capped {
+    fn pop_front_tracked_path_and_set_current(&mut self) {
+        self.rec.pop_front_tracked_path_and_set_current();
+    }
+    fn push_back_tracked_path_component(&mut self, c: &gix::bstr::BStr) {
+        self.rec.push_back_tracked_path_component(c);
+    }
+    fn push_path_component(&mut self, c: &gix::bstr::BStr) {
+        self.rec.push_path_component(c);
+    }
+    fn pop_path_component(&mut self) {
+        self.rec.pop_path_component();
+    }
+    fn visit(&mut self, change: gix::diff::tree::visit::Change) -> gix::diff::tree::visit::Action {
+        #[cfg(test)]
+        {
+            self.out.visited += 1;
+        }
+        if change.entry_mode().is_tree() {
+            return std::ops::ControlFlow::Continue(());
+        }
+        if self.out.paths.len() >= self.limit {
+            self.out.cut = true;
+            return std::ops::ControlFlow::Break(());
+        }
+        self.out.paths.push(self.rec.path_clone().to_string());
+        std::ops::ControlFlow::Continue(())
+    }
+}
+
+/// The paths that differ between two trees without rewrite tracking, which would buffer every
+/// change before any limit applies. A rename shows as its two paths, so nothing is lost. The
+/// traversal stops at `limit` paths.
+pub(crate) fn tree_paths_capped(
+    repo: &gix::Repository,
+    old: &gix::Tree<'_>,
+    new_tree: &gix::Tree<'_>,
+    limit: usize,
+) -> Result<WalkedPaths> {
+    let mut delegate = Capped {
+        rec: gix::diff::tree::Recorder::default(),
+        limit,
+        out: WalkedPaths {
+            paths: Vec::new(),
+            cut: false,
+            #[cfg(test)]
+            visited: 0,
+        },
+    };
+    let walked = gix::diff::tree(
+        gix::objs::TreeRefIter::from_bytes(&old.data, old.id.kind()),
+        gix::objs::TreeRefIter::from_bytes(&new_tree.data, new_tree.id.kind()),
+        gix::diff::tree::State::default(),
+        &repo.objects,
+        &mut delegate,
+    );
+    // A stop we asked for may surface as an error: the paths so far stand.
+    if !delegate.out.cut {
+        walked.map_err(git)?;
+    }
+    Ok(delegate.out)
+}

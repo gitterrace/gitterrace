@@ -127,34 +127,19 @@ struct TreePaths {
     failed: bool,
 }
 
-/// The paths that differ between two trees, both sides of a rename, at most `limit` changes.
+/// The paths that differ between two trees, both sides of a rename, at most `limit`. The
+/// traversal itself stops at the limit and tracks no renames, which would buffer every change
+/// first: a rename is its removal and its addition, both listed.
 fn tree_paths(
     r: &gix::Repository,
     old: &gix::Tree<'_>,
     new: &gix::Tree<'_>,
     limit: usize,
 ) -> TreePaths {
-    use gix::bstr::ByteSlice;
-    use gix::object::tree::diff::ChangeDetached as C;
-
-    let failed = TreePaths { paths: Vec::new(), cut: false, failed: true };
-    let Ok(mut cache) = crate::diff::resource_cache(r) else {
-        return failed;
-    };
-    let exact = gix::diff::Rewrites { percentage: None, limit: 0, ..Default::default() };
-    let Ok((changes, cut)) =
-        crate::diff::tree_changes_capped(r, Some(old), new, &mut cache, exact, limit)
-    else {
-        return failed;
-    };
-    let mut paths = Vec::new();
-    for c in &changes {
-        if let C::Rewrite { source_location, .. } = c {
-            paths.push(source_location.to_str_lossy().into_owned());
-        }
-        paths.push(c.location().to_str_lossy().into_owned());
+    match crate::diff::tree_paths_capped(r, old, new, limit) {
+        Ok(w) => TreePaths { paths: w.paths, cut: w.cut, failed: false },
+        Err(_) => TreePaths { paths: Vec::new(), cut: false, failed: true },
     }
-    TreePaths { paths, cut, failed: false }
 }
 
 /// The working tree against a checkpoint taken at `base_head`: only files whose content differs
@@ -188,8 +173,14 @@ pub fn worktree_diff_since(
     }
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
     let known: BTreeMap<&str, &SnapFile> = before.iter().map(|f| (f.path.as_str(), f)).collect();
-    let all: BTreeSet<&str> =
+    let mut all: BTreeSet<&str> =
         paths.iter().map(String::as_str).chain(known.keys().copied()).collect();
+    // The union of three independently capped lists can be three times the bound.
+    let limit = repo.worktree_files();
+    if all.len() > limit {
+        all = all.into_iter().take(limit).collect();
+        out.files_omitted = true;
+    }
     let from_head =
         |path: &str| head.as_ref().map_or(Read::Missing, |t| head_blob(&r, t, path, big));
     let from_base =

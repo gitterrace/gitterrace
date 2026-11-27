@@ -221,3 +221,61 @@ fn a_missing_tree_object_since_the_checkpoint_is_reported_not_empty() {
     assert!(d.history_unreadable);
     assert!(!d.files_omitted, "unreadable is not the same fact as capped");
 }
+
+/// Guard class: a walk of the commits since a checkpoint keeps work and memory within the
+/// configured bound whatever the commit holds (additions, deletions, renames), measured by the
+/// entries the traversal visits and the paths it retains, not by the length of the answer.
+#[test]
+fn a_mass_add_delete_rename_commit_is_walked_only_up_to_the_bound() {
+    let (d, repo) = repo();
+    let p = d.path();
+    std::fs::create_dir(p.join("old")).expect("mkdir");
+    for i in 0..60 {
+        std::fs::write(p.join(format!("old/r{i:02}.txt")), format!("content {i}\n")).expect("w");
+        std::fs::write(p.join(format!("old/d{i:02}.txt")), format!("gone {i}\n")).expect("w");
+    }
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "base"]);
+    let at = repo.resolve("HEAD").expect("head");
+    let snap = worktree_snapshot(&repo, 1 << 20, u64::MAX).expect("snap").files;
+    std::fs::create_dir(p.join("new")).expect("mkdir");
+    for i in 0..60 {
+        std::fs::rename(p.join(format!("old/r{i:02}.txt")), p.join(format!("new/r{i:02}.txt")))
+            .expect("mv");
+        std::fs::remove_file(p.join(format!("old/d{i:02}.txt"))).expect("rm");
+        std::fs::write(p.join(format!("added{i:02}.txt")), format!("add {i}\n")).expect("w");
+    }
+    git(p, &["add", "-A"]);
+    git(p, &["commit", "-qm", "shuffle"]);
+    let r = super::open(&repo).expect("open");
+    let tree = |hex: &str| {
+        let id = gix::ObjectId::from_hex(hex.as_bytes()).expect("id");
+        r.find_commit(id).expect("commit").tree().expect("tree")
+    };
+    let (old, new) = (tree(&at), tree(&repo.resolve("HEAD").expect("head")));
+    let walked = crate::diff::tree_paths_capped(&r, &old, &new, 10).expect("walk");
+    assert!(walked.cut);
+    assert_eq!(walked.paths.len(), 10, "retained paths stop at the cap");
+    assert!(walked.visited <= 10 + 4, "visited {} of 240 paths", walked.visited);
+    let all = crate::diff::tree_paths_capped(&r, &old, &new, usize::MAX).expect("walk");
+    assert!(!all.cut);
+    assert_eq!(all.paths.len(), 60 * 2 + 60 + 60, "a rename lists both of its paths");
+    // The bound also holds for the comparison as a whole.
+    repo.set_worktree_limits(10, crate::WORKTREE_DIFF_BYTES);
+    let d = since_at(&repo, &snap, &at);
+    assert!(d.files.len() <= 10, "{} files", d.files.len());
+    assert!(d.files_omitted);
+}
+
+#[test]
+fn the_union_with_saved_paths_is_bounded_and_reported() {
+    let (_d, repo) = repo();
+    let at = repo.resolve("HEAD").expect("head");
+    let snap: Vec<SnapFile> = (0..20)
+        .map(|i| SnapFile { path: format!("s{i:02}.txt"), hash: String::new(), text: None })
+        .collect();
+    repo.set_worktree_limits(5, crate::WORKTREE_DIFF_BYTES);
+    let d = since_at(&repo, &snap, &at);
+    assert!(d.files.len() + d.unchanged <= 5, "{} + {}", d.files.len(), d.unchanged);
+    assert!(d.files_omitted);
+}
