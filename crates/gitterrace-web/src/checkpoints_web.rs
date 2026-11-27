@@ -9,7 +9,8 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
 };
-use gitterrace_git::{FileDiff, Scope, SinceDiff};
+use gitterrace_git::{FileDiff, SinceDiff};
+use gitterrace_types::WorktreeScope;
 use serde::Deserialize;
 
 use crate::{
@@ -71,7 +72,7 @@ pub(crate) fn since_files(a: &App, id: &str) -> Result<Vec<FileDiff>> {
 }
 
 /// What the page lists for `scope`, or against checkpoint `since` when one is named.
-pub(crate) fn read(a: &App, scope: Scope, since: Option<&str>) -> Result<Review> {
+pub(crate) fn read(a: &App, scope: WorktreeScope, since: Option<&str>) -> Result<Review> {
     let list = a.api().and_then(|x| x.checkpoints().ok());
     let persisted = list.as_ref().is_some_and(|l| l.persisted);
     let latest = list.as_ref().and_then(|l| l.checkpoints.first()).map(|c| c.id.clone());
@@ -355,10 +356,9 @@ pub(crate) async fn viewed_all(axum::extract::State(app): Shared, req: Request) 
 mod tests {
     use std::collections::HashSet;
 
-    use gitterrace_git::{
-        Repo, Scope, worktree_diff_scoped, worktree_diff_since, worktree_snapshot,
-    };
+    use gitterrace_git::{Repo, worktree_diff_scoped, worktree_diff_since, worktree_snapshot};
     use gitterrace_testkit::{Fixture, git};
+    use gitterrace_types::WorktreeScope;
 
     /// Guard class: the unchanged list of the page is the one it always had (changed files
     /// against HEAD that the checkpoint already holds as they are), now read off the single
@@ -404,7 +404,7 @@ mod tests {
         std::fs::write(p.join("x.dat"), b"\0\x02").expect("w");
         let d = worktree_diff_since(&repo, &held, &base, false).expect("since");
         let moved: HashSet<String> = d.files.iter().map(|f| f.path.clone()).collect();
-        let old: Vec<String> = worktree_diff_scoped(&repo, Scope::All)
+        let old: Vec<String> = worktree_diff_scoped(&repo, WorktreeScope::All)
             .expect("scan")
             .into_iter()
             .map(|f| f.path)

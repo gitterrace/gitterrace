@@ -5,14 +5,14 @@
 
 use askama::Template;
 use gitterrace_api::{Params, PlanRequest};
-use gitterrace_git::Scope;
+use gitterrace_types::WorktreeScope;
 use gitterrace_types::api::{PlanFile, PlanSkipped, ReviewPlan, SkipReason};
 
 use crate::{app::App, charttip, fmt};
 
 /// What the panel reads: the changed files of the working tree or of a comparison.
 pub(crate) enum Source<'a> {
-    Worktree { scope: Scope, since: Option<&'a str> },
+    Worktree { scope: WorktreeScope, since: Option<&'a str> },
     Compare { base: &'a str, head: &'a str, three_dot: bool },
 }
 
@@ -52,7 +52,7 @@ pub(crate) fn render(a: &App, source: &Source<'_>) -> String {
     let req = match *source {
         Source::Worktree { scope, since } => PlanRequest {
             source: Some("worktree"),
-            scope: Some(scope_name(scope)),
+            scope: Some(scope.as_str()),
             since,
             ..PlanRequest::default()
         },
@@ -82,14 +82,6 @@ pub(crate) fn render(a: &App, source: &Source<'_>) -> String {
             .map_or_else(|_| String::new(), |id| fmt::commit_file_href(&id, path)),
     };
     panel(&plan, link).render().unwrap_or_default()
-}
-
-const fn scope_name(s: Scope) -> &'static str {
-    match s {
-        Scope::All => "all",
-        Scope::Staged => "staged",
-        Scope::Unstaged => "unstaged",
-    }
 }
 
 fn panel(plan: &ReviewPlan, link: impl Fn(&str) -> String) -> Panel {

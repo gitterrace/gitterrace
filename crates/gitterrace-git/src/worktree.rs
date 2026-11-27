@@ -20,7 +20,7 @@ use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
 use crate::error::git;
 use crate::worktree::beneath::{open_beneath, read_bounded};
-use crate::{Blob, ChangeKind, FileDiff, Repo, Result};
+use crate::{Blob, ChangeKind, FileDiff, Repo, Result, WorktreeScope};
 
 /// Changed files the view lists by default (`limits.worktree_files`): untracked trees can be
 /// enormous (a forgotten `node_modules`), so the view stops there.
@@ -33,19 +33,7 @@ fn open(repo: &Repo) -> Result<gix::Repository> {
     gix::open(repo.git_dir()).map_err(git)
 }
 
-/// Which pair of states the working tree page compares.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum Scope {
-    /// HEAD against the worktree: everything uncommitted.
-    #[default]
-    All,
-    /// HEAD against the index.
-    Staged,
-    /// The index against the worktree, untracked files included.
-    Unstaged,
-}
-
-/// How many files each [`Scope`] lists.
+/// How many files each [`WorktreeScope`] lists.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct ScopeCounts {
     pub all: usize,
@@ -54,7 +42,11 @@ pub struct ScopeCounts {
 }
 
 /// The paths of one scope, sorted, stopping at `limit`.
-fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BTreeSet<String>> {
+fn scoped_paths(
+    repo: &gix::Repository,
+    scope: WorktreeScope,
+    limit: usize,
+) -> Result<BTreeSet<String>> {
     scoped_listing(repo, scope, limit).map(|l| l.0)
 }
 
@@ -63,7 +55,7 @@ fn scoped_paths(repo: &gix::Repository, scope: Scope, limit: usize) -> Result<BT
 /// files reads as possibly incomplete, because proving otherwise would walk the whole tree.
 fn scoped_listing(
     repo: &gix::Repository,
-    scope: Scope,
+    scope: WorktreeScope,
     limit: usize,
 ) -> Result<(BTreeSet<String>, bool)> {
     use gix::status::{UntrackedFiles, index_worktree::Item as Iw};
@@ -74,7 +66,7 @@ fn scoped_listing(
     if repo.workdir().is_none() {
         return Ok((out, false));
     }
-    if scope == Scope::Staged {
+    if scope == WorktreeScope::Staged {
         staged_paths(repo, &mut out, limit)?;
         let cut = out.len() >= limit;
         return Ok((out, cut));
@@ -106,7 +98,7 @@ fn scoped_listing(
             return Ok((out, true));
         }
     }
-    if scope == Scope::All {
+    if scope == WorktreeScope::All {
         staged_paths(repo, &mut out, limit)?;
     }
     let cut = out.len() >= limit;
@@ -118,9 +110,9 @@ fn scoped_listing(
 pub fn worktree_counts(repo: &Repo) -> Result<ScopeCounts> {
     let rows = |scope| worktree_diff_scoped(repo, scope).map(|f| f.len());
     Ok(ScopeCounts {
-        all: rows(Scope::All)?,
-        staged: rows(Scope::Staged)?,
-        unstaged: rows(Scope::Unstaged)?,
+        all: rows(WorktreeScope::All)?,
+        staged: rows(WorktreeScope::Staged)?,
+        unstaged: rows(WorktreeScope::Unstaged)?,
     })
 }
 
@@ -220,25 +212,25 @@ pub fn worktree_signature(repo: &Repo) -> Result<u64> {
 /// True when anything differs from HEAD. Stops at the first difference.
 #[must_use]
 pub fn is_dirty(repo: &Repo) -> bool {
-    open(repo).and_then(|r| scoped_paths(&r, Scope::All, 1)).is_ok_and(|p| !p.is_empty())
+    open(repo).and_then(|r| scoped_paths(&r, WorktreeScope::All, 1)).is_ok_and(|p| !p.is_empty())
 }
 
 /// Every uncommitted file as a diff against HEAD.
 pub fn worktree_diff(repo: &Repo) -> Result<Vec<FileDiff>> {
-    worktree_diff_scoped(repo, Scope::All)
+    worktree_diff_scoped(repo, WorktreeScope::All)
 }
 
-/// The files of one [`Scope`] as diffs: HEAD..index for `Staged`, index..worktree for
+/// The files of one [`WorktreeScope`] as diffs: HEAD..index for `Staged`, index..worktree for
 /// `Unstaged` (untracked files are additions), HEAD..worktree for `All`.
 ///
 /// Only `All` pairs exact renames, see `pair::exact_moves`: it reads HEAD and the disk, so it
 /// would mislabel a half-staged move. Files are read and diffed one at a time, so the bytes
 /// held at once are one file's old and new side, not the whole change.
-pub fn worktree_diff_scoped(repo: &Repo, scope: Scope) -> Result<Vec<FileDiff>> {
+pub fn worktree_diff_scoped(repo: &Repo, scope: WorktreeScope) -> Result<Vec<FileDiff>> {
     worktree_listed(repo, scope).map(|l| l.files)
 }
 
-/// The files of one [`Scope`] and whether the scan stopped at `limits.worktree_files`.
+/// The files of one [`WorktreeScope`] and whether the scan stopped at `limits.worktree_files`.
 #[derive(Debug, Default)]
 pub struct Listed {
     pub files: Vec<FileDiff>,
@@ -248,14 +240,14 @@ pub struct Listed {
 }
 
 /// [`worktree_diff_scoped`] with the completeness of the file list.
-pub fn worktree_listed(repo: &Repo, scope: Scope) -> Result<Listed> {
+pub fn worktree_listed(repo: &Repo, scope: WorktreeScope) -> Result<Listed> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
     let (paths, files_omitted) = scoped_listing(&r, scope, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let index = r.index_or_empty().map_err(git)?;
     let root = r.workdir().and_then(|w| w.canonicalize().ok());
-    let moves = if scope == Scope::All {
+    let moves = if scope == WorktreeScope::All {
         pair::exact_moves(&r, head.as_ref(), root.as_deref(), &paths, big)
     } else {
         pair::Moves::default()
@@ -282,7 +274,7 @@ pub fn worktree_listed(repo: &Repo, scope: Scope) -> Result<Listed> {
 /// The two sides of `path` that `scope` compares.
 fn sides(
     r: &gix::Repository,
-    scope: Scope,
+    scope: WorktreeScope,
     head: Option<&gix::Tree<'_>>,
     index: &gix::index::File,
     root: Option<&Path>,
@@ -293,9 +285,9 @@ fn sides(
     let from_index = || index_blob(r, index, path, big);
     let from_disk = || root.map_or(Read::Skip, |w| read_worktree(w, path, big));
     match scope {
-        Scope::All => (from_head(), from_disk()),
-        Scope::Staged => (from_head(), from_index()),
-        Scope::Unstaged => (from_index(), from_disk()),
+        WorktreeScope::All => (from_head(), from_disk()),
+        WorktreeScope::Staged => (from_head(), from_index()),
+        WorktreeScope::Unstaged => (from_index(), from_disk()),
     }
 }
 
@@ -309,7 +301,7 @@ pub fn worktree_bytes(repo: &Repo, path: &str, max: u64) -> Result<Option<Vec<u8
         return Ok(None);
     }
     let r = open(repo)?;
-    if !scoped_paths(&r, Scope::All, repo.worktree_files())?.contains(path) {
+    if !scoped_paths(&r, WorktreeScope::All, repo.worktree_files())?.contains(path) {
         return Ok(None);
     }
     let Some(root) = r.workdir().and_then(|w| w.canonicalize().ok()) else {
@@ -344,7 +336,7 @@ impl WorktreeView {
     /// Lists the changed files. A bare repository has none.
     pub fn open(repo: &Repo) -> Result<Self> {
         let r = open(repo)?;
-        let changed = scoped_paths(&r, Scope::All, repo.worktree_files())?;
+        let changed = scoped_paths(&r, WorktreeScope::All, repo.worktree_files())?;
         let root = r.workdir().and_then(|w| w.canonicalize().ok());
         Ok(Self { changed, root })
     }
@@ -396,14 +388,14 @@ fn is_plain(path: &str) -> bool {
 /// `None` unless `path` is one of the page's changed files, so an ignored file, anything
 /// under `.git` or a path with `..` is never read, whatever the URL asks for.
 pub fn worktree_file_diff(repo: &Repo, path: &str) -> Result<Option<FileDiff>> {
-    worktree_file_diff_scoped(repo, path, Scope::All)
+    worktree_file_diff_scoped(repo, path, WorktreeScope::All)
 }
 
-/// [`worktree_file_diff`] for one [`Scope`]: `None` unless `path` is changed in that scope.
+/// [`worktree_file_diff`] for one [`WorktreeScope`]: `None` unless `path` is changed in that scope.
 pub fn worktree_file_diff_scoped(
     repo: &Repo,
     path: &str,
-    scope: Scope,
+    scope: WorktreeScope,
 ) -> Result<Option<FileDiff>> {
     if !is_plain(path) {
         return Ok(None);

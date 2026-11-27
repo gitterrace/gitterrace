@@ -67,7 +67,7 @@ pub use text::{CommitText, Mailmap};
 pub use time::{DAY, FIRST_SECOND, LAST_SECOND, civil_from_days, days_from_civil, iso_utc, ymd};
 pub use types::{
     BlameLine, Blob, ChangeKind, CodeCounts, CommitDetail, CommitSummary, FileDiff, Hunk, HunkLine,
-    LineKind, RawBlob, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind,
+    LineKind, RawBlob, RefInfo, RefKind, Signature, TreeEntry, TreeEntryKind, WorktreeScope,
 };
 pub use url::{percent_decode, percent_encode_path, percent_encode_segment};
 pub use walk::{
@@ -77,7 +77,7 @@ pub use walk::{
 pub use watch::{Parts, Watcher};
 pub use worker_hook::{WorkerTime, set_worker_hook};
 pub use worktree::{
-    BIG_HASH, Listed, Scope, ScopeCounts, SinceDiff, SnapFile, Snapshot, WORKTREE_DIFF_BYTES,
+    BIG_HASH, Listed, ScopeCounts, SinceDiff, SnapFile, Snapshot, WORKTREE_DIFF_BYTES,
     WORKTREE_FILES, WorktreeView, WtFile, content_id, is_dirty, worktree_blob, worktree_bytes,
     worktree_counts, worktree_diff, worktree_diff_scoped, worktree_diff_since, worktree_file_diff,
     worktree_file_diff_scoped, worktree_listed, worktree_signature, worktree_snapshot,

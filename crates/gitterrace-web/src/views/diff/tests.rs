@@ -113,7 +113,7 @@ fn the_working_tree_folds_too_and_loads_by_path() {
         &crate::views::Render::fold(400),
         DiffSource::Worktree {
             generated: &std::collections::HashSet::new(),
-            scope: gitterrace_git::Scope::All,
+            scope: gitterrace_types::WorktreeScope::All,
             since: None,
         },
         &files,

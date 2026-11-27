@@ -28,8 +28,8 @@ fn worktree_files_caps_staged_files_too() {
     // Staged and unchanged since, so only the tree-to-index pass sees them.
     git(dir.path(), &["add", "."]);
     let r = super::open(&repo).expect("open");
-    assert_eq!(super::scoped_paths(&r, crate::Scope::All, 100).expect("paths").len(), 5);
-    assert_eq!(super::scoped_paths(&r, crate::Scope::All, 2).expect("paths").len(), 2);
+    assert_eq!(super::scoped_paths(&r, crate::WorktreeScope::All, 100).expect("paths").len(), 5);
+    assert_eq!(super::scoped_paths(&r, crate::WorktreeScope::All, 2).expect("paths").len(), 2);
     assert!(super::is_dirty(&repo), "one staged file is dirty");
 }
 
@@ -73,7 +73,8 @@ fn worktree_files_counts_a_rename_as_one_file() {
 fn a_scan_at_the_limit_says_the_list_may_be_incomplete() {
     let dir = tempfile::tempdir().expect("tempdir");
     let repo = dirty_repo(dir.path());
-    let omitted = |repo: &Repo| crate::worktree_listed(repo, crate::Scope::All).expect("list");
+    let all = crate::WorktreeScope::All;
+    let omitted = |repo: &Repo| crate::worktree_listed(repo, all).expect("list");
     repo.set_worktree_limits(6, crate::WORKTREE_DIFF_BYTES);
     assert!(!omitted(&repo).files_omitted, "five files under a limit of six are all of them");
     repo.set_worktree_limits(5, crate::WORKTREE_DIFF_BYTES);
@@ -91,12 +92,12 @@ fn staged_files_cut_by_the_limit_say_so_too() {
     let repo = dirty_repo(dir.path());
     git(dir.path(), &["add", "."]);
     repo.set_worktree_limits(3, crate::WORKTREE_DIFF_BYTES);
-    for scope in [crate::Scope::All, crate::Scope::Staged] {
+    for scope in [crate::WorktreeScope::All, crate::WorktreeScope::Staged] {
         let l = crate::worktree_listed(&repo, scope).expect("list");
         assert!(l.files_omitted, "{scope:?}");
     }
     repo.set_worktree_limits(50, crate::WORKTREE_DIFF_BYTES);
-    assert!(!crate::worktree_listed(&repo, crate::Scope::All).expect("list").files_omitted);
+    assert!(!crate::worktree_listed(&repo, crate::WorktreeScope::All).expect("list").files_omitted);
 }
 
 #[test]

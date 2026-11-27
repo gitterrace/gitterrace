@@ -1,5 +1,5 @@
 pub use gitterrace_types::api::Signature;
-pub use gitterrace_types::{ChangeKind, LineKind, RefKind, TreeEntryKind};
+pub use gitterrace_types::{ChangeKind, LineKind, RefKind, TreeEntryKind, WorktreeScope};
 
 #[derive(Debug, Clone)]
 pub struct CommitSummary {

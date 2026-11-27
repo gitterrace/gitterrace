@@ -7,10 +7,8 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::worktree::{
-    Read, Scope, classify, head_blob, is_plain, open, read_worktree, scoped_listing,
-};
-use crate::{FileDiff, Repo, Result};
+use crate::worktree::{Read, classify, head_blob, is_plain, open, read_worktree, scoped_listing};
+use crate::{FileDiff, Repo, Result, WorktreeScope};
 
 /// The hash of a file too large to read: it matches nothing, so such a file always reads as
 /// changed.
@@ -84,7 +82,7 @@ pub fn worktree_snapshot(repo: &Repo, copy_bytes: u64, budget_bytes: u64) -> Res
     };
     let mut out = Vec::new();
     let mut kept = 0u64;
-    let (paths, files_omitted) = scoped_listing(&r, Scope::All, repo.worktree_files())?;
+    let (paths, files_omitted) = scoped_listing(&r, WorktreeScope::All, repo.worktree_files())?;
     for path in paths {
         if !is_plain(&path) {
             continue;
@@ -158,7 +156,7 @@ pub fn worktree_diff_since(
 ) -> Result<SinceDiff> {
     let r = open(repo)?;
     let big = repo.worktree_diff_bytes();
-    let (mut paths, now_omitted) = scoped_listing(&r, Scope::All, repo.worktree_files())?;
+    let (mut paths, now_omitted) = scoped_listing(&r, WorktreeScope::All, repo.worktree_files())?;
     let head = r.head_commit().ok().and_then(|c| c.tree().ok());
     let mut out =
         SinceDiff { files_omitted: now_omitted || before_omitted, ..SinceDiff::default() };

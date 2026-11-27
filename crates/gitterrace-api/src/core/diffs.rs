@@ -1,6 +1,7 @@
 //! Reads that compare two revisions or the working tree against HEAD.
 
 use gitterrace_git::FileDiff;
+use gitterrace_types::WorktreeScope;
 use gitterrace_types::api::{CompareResponse, WorktreeResponse};
 
 use crate::bounds::{checked, checked_path};
@@ -121,23 +122,19 @@ impl ApiState {
         if self.repo.is_committed_only() {
             return Err(ApiError::Forbidden("the working tree"));
         }
-        let which = match scope.unwrap_or("all") {
-            "all" => gitterrace_git::Scope::All,
-            "staged" => gitterrace_git::Scope::Staged,
-            "unstaged" => gitterrace_git::Scope::Unstaged,
-            other => {
-                return Err(ApiError::BadRequest(format!(
-                    "unknown scope {other:?}: use `staged`, `unstaged` or `all`"
-                )));
-            }
-        };
+        let raw = scope.unwrap_or("all");
+        let which: WorktreeScope = raw.parse().map_err(|_| {
+            ApiError::BadRequest(format!(
+                "unknown scope {raw:?}: use `staged`, `unstaged` or `all`"
+            ))
+        })?;
         let (list, files_omitted, since_part) = match since {
             None => {
                 let l = gitterrace_git::worktree_listed(&self.repo, which)?;
                 (l.files, l.files_omitted, None)
             }
             Some(id) => {
-                if which != gitterrace_git::Scope::All {
+                if which != WorktreeScope::All {
                     return Err(ApiError::BadRequest(
                         "since compares the whole working tree: use scope `all`".to_owned(),
                     ));

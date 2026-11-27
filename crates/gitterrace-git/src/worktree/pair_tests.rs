@@ -126,7 +126,7 @@ fn bytes_held_stay_one_file_wide() {
     assert!(peak <= 3 * one, "{peak} bytes held at once, one file is {one}");
 }
 
-fn scoped(repo: &Repo, scope: crate::Scope) -> Vec<(String, u32, u32)> {
+fn scoped(repo: &Repo, scope: crate::WorktreeScope) -> Vec<(String, u32, u32)> {
     crate::worktree_diff_scoped(repo, scope)
         .expect("diff")
         .into_iter()
@@ -138,7 +138,7 @@ fn scoped(repo: &Repo, scope: crate::Scope) -> Vec<(String, u32, u32)> {
 /// hunks of that scope's pair of states; untracked counts as unstaged; counts agree.
 #[test]
 fn each_scope_lists_its_files_with_its_own_hunks() {
-    use crate::Scope;
+    use crate::WorktreeScope;
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
     init(p, &[("s.txt", "a\n"), ("u.txt", "a\n"), ("b.txt", "a\n")]);
@@ -149,13 +149,16 @@ fn each_scope_lists_its_files_with_its_own_hunks() {
     std::fs::write(p.join("b.txt"), "a\nstaged\nmore\n").expect("w");
     std::fs::write(p.join("new.txt"), "n\n").expect("w");
     let repo = Repo::discover(p).expect("repo");
-    assert_eq!(scoped(&repo, Scope::Staged), [("b.txt".into(), 1, 0), ("s.txt".into(), 1, 0)]);
     assert_eq!(
-        scoped(&repo, Scope::Unstaged),
+        scoped(&repo, WorktreeScope::Staged),
+        [("b.txt".into(), 1, 0), ("s.txt".into(), 1, 0)]
+    );
+    assert_eq!(
+        scoped(&repo, WorktreeScope::Unstaged),
         [("b.txt".into(), 1, 0), ("new.txt".into(), 1, 0), ("u.txt".into(), 1, 0)]
     );
     assert_eq!(
-        scoped(&repo, Scope::All),
+        scoped(&repo, WorktreeScope::All),
         [
             ("b.txt".into(), 2, 0),
             ("new.txt".into(), 1, 0),
@@ -165,16 +168,15 @@ fn each_scope_lists_its_files_with_its_own_hunks() {
     );
     let c = crate::worktree_counts(&repo).expect("counts");
     assert_eq!((c.all, c.staged, c.unstaged), (4, 2, 3));
-    assert!(
-        crate::worktree_file_diff_scoped(&repo, "u.txt", Scope::Staged).expect("read").is_none()
-    );
+    let staged = crate::worktree_file_diff_scoped(&repo, "u.txt", WorktreeScope::Staged);
+    assert!(staged.expect("read").is_none());
 }
 
 /// Every tab count is the number of rows its table lists, renames and untracked files
 /// included: a `git mv` is one file, not two paths.
 #[test]
 fn tab_counts_equal_the_rows_of_each_table() {
-    use crate::Scope;
+    use crate::WorktreeScope;
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
     init(p, &[("a.txt", "same\n"), ("b.txt", "other\n"), ("m.txt", "m\n"), ("d.txt", "d\n")]);
@@ -188,6 +190,6 @@ fn tab_counts_equal_the_rows_of_each_table() {
     let rows = |s| crate::worktree_diff_scoped(&repo, s).expect("diff").len();
     assert_eq!(
         (c.staged, c.unstaged, c.all),
-        (rows(Scope::Staged), rows(Scope::Unstaged), rows(Scope::All))
+        (rows(WorktreeScope::Staged), rows(WorktreeScope::Unstaged), rows(WorktreeScope::All))
     );
 }

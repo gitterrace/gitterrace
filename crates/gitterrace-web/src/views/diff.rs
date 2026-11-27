@@ -132,7 +132,7 @@ pub(crate) enum DiffSource<'a> {
         /// edit to them does not move a fold until it is committed.
         generated: &'a std::collections::HashSet<String>,
         /// The tab the page shows, carried to the folded files' URLs.
-        scope: gitterrace_git::Scope,
+        scope: gitterrace_types::WorktreeScope,
         /// The checkpoint the page compares with: folded files load against it too.
         since: Option<&'a str>,
     },
