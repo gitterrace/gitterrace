@@ -53,6 +53,9 @@ async fn a_checkpoint_makes_the_since_tab_show_only_later_edits() {
     assert_eq!(s, 200, "{body}");
     let id = field(&body, "id").to_owned();
     assert!(id.starts_with("cp-"), "{body}");
+    assert!(body.contains("\"dropped\":0") && body.contains("\"copies_omitted\":0"), "{body}");
+    let (_, list) = call(&app, "GET", "/r/r/api/v1/checkpoints", "", false).await;
+    assert!(list.contains("\"dropped\":0") && list.contains("\"copies_omitted\":0"), "{list}");
     std::fs::write(repo.join("b.txt"), "b\nlater\n").expect("w");
     let (_, plain) = call(&app, "GET", "/r/r/worktree", "", false).await;
     assert!(plain.contains("Since checkpoint"), "the tab is offered");

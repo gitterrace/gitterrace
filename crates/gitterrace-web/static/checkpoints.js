@@ -44,7 +44,14 @@
     if (b.hasAttribute("data-checkpoint")) {
       post("/_checkpoint", { scope: "all", label: "" }).then(function (r) {
         tab(r.id);
-        say(r.created ? "Checkpoint saved." : "Nothing changed since the last checkpoint.");
+        var m = r.created ? "Checkpoint saved." : "Nothing changed since the last checkpoint.";
+        if (r.dropped) {
+          m += " " + r.dropped + " older checkpoint(s) were dropped to keep the log readable.";
+        }
+        if (r.copies_omitted) {
+          m += " " + r.copies_omitted + " file copy(ies) were not kept: too much text.";
+        }
+        say(m);
       }).catch(function () {
         say("The checkpoint was not saved: checkpoints may be off or the cache folder full.");
       }).then(function () { busy(b, false); });

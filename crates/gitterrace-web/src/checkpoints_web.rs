@@ -230,8 +230,9 @@ struct CheckpointBody {
     label: String,
 }
 
-/// `POST /_checkpoint` `{"scope":"all","label":""}` answers `{"id","created"}`: a checkpoint of
-/// the whole working tree. The same state again answers the old id with `created: false`.
+/// `POST /_checkpoint` `{"scope":"all","label":""}` answers `{"id","created","dropped",
+/// "copies_omitted"}`: a checkpoint of the whole working tree and what the write gave up (see
+/// `AddReport`). The same state again answers the old id with `created: false`.
 pub(crate) async fn checkpoint(axum::extract::State(app): Shared, req: Request) -> Response {
     if let Some(no) = refused(&app, &req) {
         return no;
@@ -243,8 +244,13 @@ pub(crate) async fn checkpoint(axum::extract::State(app): Shared, req: Request) 
     if !matches!(body.scope.as_str(), "" | "all") {
         return bad();
     }
-    match with_api(&app, move |api| api.checkpoint_create(&body.label, false)).await {
-        Ok((id, created)) => reply(&serde_json::json!({ "id": id, "created": created })),
+    match with_api(&app, move |api| api.checkpoint_create_report(&body.label, false)).await {
+        Ok(r) => reply(&serde_json::json!({
+            "id": r.id,
+            "created": r.is_new,
+            "dropped": r.dropped,
+            "copies_omitted": r.copies_omitted,
+        })),
         Err(res) => *res,
     }
 }
