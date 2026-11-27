@@ -53,6 +53,11 @@ keys lives in `gitterrace_config::naming`.
   are the files of the cache folder, all through `cache.rs`. Of those, the index
   is disposable, while the user's files (see [Cache](#cache)) survive every
   reset (`USER_FILES` in `store.rs`).
+- **MCP resolves a permalink by id, never by path.** `resolve_permalink` and
+  the `gitterrace://` resources parse with the strict `Link` of
+  `gitterrace-actions`, look the repository id up in the scope fixed at
+  start and read through `blob`, so the caps and the refusals of `read_file`
+  apply. Payload v1 is unchanged.
 - **Browsing never waits on the cache.** Only insights pages show "Indexing
   history" while the index builds. The overview shows no progress.
 - **The index builds in a child process.** The server starts its own executable

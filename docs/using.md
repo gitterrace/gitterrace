@@ -228,7 +228,8 @@ Two ways, and you can use both:
   for your agent: history, blame, insights, a comparison of two revisions and
   your uncommitted changes. Register it once in your agent's MCP settings, with
   the command `git terrace mcp --served`. The
-  [tools and prompts](api.md#mcp-stdio) are listed in the API docs, and
+  [tools and prompts](api.md#mcp-stdio) are listed in the API docs, a permalink
+  an action hands over is read back with `resolve_permalink`, and
   [Agents and MCP](mcp.md) is a skill to copy for review, history and hotspots.
 
 ## Read the insights

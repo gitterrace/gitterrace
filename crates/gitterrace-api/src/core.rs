@@ -6,6 +6,7 @@ mod diffs;
 mod file_insight;
 mod findings;
 mod page_tables;
+mod permalink;
 mod rebuild;
 mod review_plan;
 mod settings;

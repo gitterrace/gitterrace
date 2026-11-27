@@ -71,7 +71,7 @@ codesign stamp their own data. CI runs the check on every push.
 | Adding a repository | loopback only | Token from a private file, any browser request refused |
 | Launching a browser | loopback only | One-time ticket for the holder of the private file, spent once, gone in a minute |
 | Every write | all | Never succeeds without the owner secret or the cookie made from it |
-| MCP server | the process that started it | Read-only tools, the same feature switches as `/api/v1` |
+| MCP server | the process that started it | Read-only tools, the same feature switches as `/api/v1`, a permalink or resource names a repository only by an id found in the fixed scope |
 | `open` and `gitterrace://` | the OS | Strict link parse, only known clones, no network for an unknown id |
 | Static export | wherever it is hosted | No local pages, the content security policy in a `_headers` file the host must apply |
 | Action arguments | the runner | A repository name or path that starts with `-` never opens an argv element without a `--` or a literal prefix: refused at load, and again by the runner |

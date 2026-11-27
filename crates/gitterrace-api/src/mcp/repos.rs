@@ -70,6 +70,8 @@ pub(crate) struct Repos {
     gates: Mutex<HashMap<String, Arc<Mutex<()>>>>,
     /// How many times a repository was opened from disk, for the single-flight test.
     opens: AtomicUsize,
+    /// Repo ids read so far by table name: an id walks history once, then answers at once.
+    ids: Mutex<HashMap<String, Option<String>>>,
 }
 
 impl Repos {
@@ -80,6 +82,7 @@ impl Repos {
             open: Mutex::new(Vec::new()),
             gates: Mutex::new(HashMap::new()),
             opens: AtomicUsize::new(0),
+            ids: Mutex::new(HashMap::new()),
         }
     }
 
@@ -160,6 +163,25 @@ impl Repos {
         let over = open.len().saturating_sub(OPEN_MAX);
         open.drain(..over);
         Ok(state)
+    }
+
+    /// The repo id of `entry` (the one permalinks carry), `None` for a repository without
+    /// commits or one that cannot be read. Blocking the first time.
+    pub(crate) fn id(&self, entry: &McpRepo) -> Option<String> {
+        let known = |m: &HashMap<String, Option<String>>| m.get(&entry.name).cloned();
+        let lock = || self.ids.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        let cached = known(&lock());
+        if let Some(id) = cached {
+            return id;
+        }
+        let id = Repo::discover(&entry.path).ok().and_then(|r| r.id());
+        lock().insert(entry.name.clone(), id.clone());
+        id
+    }
+
+    /// The table entries that can be read, as recorded.
+    pub(crate) fn readable(&self) -> Vec<McpRepo> {
+        self.list.iter().filter(|r| r.unavailable.is_none()).cloned().collect()
     }
 
     /// How many opens from disk happened so far.

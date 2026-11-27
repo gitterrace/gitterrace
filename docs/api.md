@@ -302,6 +302,14 @@ so to the model.
   totals (commits, authors, files touched, lines added and removed, first and
   last commit time). Call this first, before drilling into history. Use `log`
   for the commits themselves. Parameters: `repo?` (string).
+- `resolve_permalink`: The code a gitterrace permalink names
+  (`gitterrace://<repo-id>/<sha>/<path>#L<a>-L<b>`, the `permalink` of an action
+  payload), read from git at that commit, with `context_lines` around it, and
+  where that code is now (`anchor`: `untouched`, `lines changed`, `file changed`
+  or `file gone`, with the new path and lines). Same caps as `read_file`, and
+  `truncated` says when cut. A link to a repository outside this server's scope
+  is refused. Parameters: `context_lines?` (integer), `repo?` (string), `url`
+  (string).
 - `review_plan`: The changed files of a branch (`source` `compare`, with `base`)
   or of the uncommitted work (`worktree`, refused on a public server) in the
   order to review them. Each file has a `risk` from 0 to 100 and its `terms`

@@ -79,6 +79,20 @@ and takes these arguments:
 With `findings` it also lists the user's review basket (`list_findings`),
 notes quoted as data.
 
+## Follow a permalink
+
+A link a gitterrace action hands over
+(`gitterrace://<repo-id>/<sha>/<path>#L3-L5`) is read back with
+`resolve_permalink`. It returns the linked lines from git at that commit,
+with `context_lines` around them (at most 50), under the caps of
+`read_file`, and says when it cut (`truncated`). `anchor` says where the
+code is now: `untouched`, `lines changed`, `file changed` or `file gone`,
+with the new path and lines after a rename. A link whose repository id is
+not in scope, or that climbs out of the tree, is refused. The same text is a
+resource, `gitterrace://<repo-id>/<sha>/<path>`, for a client that attaches
+context. `resources/list` holds one overview and one findings entry per
+repository in scope.
+
 ## Explore history
 
 1. Call `log` with `path` to see the commits that touched a file or directory.

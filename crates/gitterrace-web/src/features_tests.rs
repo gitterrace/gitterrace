@@ -379,6 +379,7 @@ const TOOL_ROUTES: &[(&str, &str)] = &[
     ("list_viewed", "/api/v1/viewed"),
     ("list_findings", "/api/v1/findings"),
     ("read_file", "/api/v1/blob"),
+    ("resolve_permalink", "/api/v1/blob"),
     ("list_tree", "/api/v1/tree"),
     ("blame", "/api/v1/blame"),
     ("contributors", "/api/v1/contributors"),

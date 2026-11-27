@@ -13,7 +13,7 @@ fn server(config: &str) -> (tempfile::TempDir, McpServer) {
     (dir, McpServer::new(state).with_config(&cfg))
 }
 
-fn text(res: &rmcp::model::CallToolResult) -> String {
+pub(super) fn text(res: &rmcp::model::CallToolResult) -> String {
     res.content.iter().filter_map(|c| c.as_text().map(|t| t.text.clone())).collect()
 }
 
@@ -37,7 +37,7 @@ async fn a_called_tool_is_refused_when_its_switch_is_off() {
     assert_ne!(res.is_error, Some(true), "{}", text(&res));
 }
 
-fn fixture(root: &std::path::Path, name: &str, msg: &str) -> std::path::PathBuf {
+pub(super) fn fixture(root: &std::path::Path, name: &str, msg: &str) -> std::path::PathBuf {
     let p = root.join(name);
     std::fs::create_dir(&p).expect("mkdir");
     git(&p, &["init", "-q", "-b", "main"]);
@@ -47,7 +47,7 @@ fn fixture(root: &std::path::Path, name: &str, msg: &str) -> std::path::PathBuf 
     p
 }
 
-fn entry(name: &str, path: std::path::PathBuf) -> super::McpRepo {
+pub(super) fn entry(name: &str, path: std::path::PathBuf) -> super::McpRepo {
     super::McpRepo { name: name.to_owned(), path, unavailable: None }
 }
 
