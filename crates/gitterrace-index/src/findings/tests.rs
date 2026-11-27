@@ -2,7 +2,9 @@
 
 use std::io;
 
-use super::{FILE, FIXED, MAGIC, MAX_NOTE, OP_ADD, StoredFinding, clean_note, cut_note, scan};
+use super::{
+    FILE, FIXED, MAGIC, MAX_NOTE, OP_ADD, StoredFinding, clean_note, cut_note, hash_budget, scan,
+};
 use crate::Index;
 
 fn open() -> io::Result<(tempfile::TempDir, Index)> {
@@ -197,6 +199,55 @@ fn garbage_between_frames_is_skipped_to_the_next_whole_frame() {
     let bytes = [a, b"junk-junk-junk-junk".to_vec(), b].concat();
     let found = scan(&bytes).expect("scan");
     assert_eq!((found.items.len(), found.damaged, found.valid), (2, 1, bytes.len()));
+}
+
+/// A file of one valid-looking header repeated, each claiming the largest frame with a bad
+/// checksum: every offset is a plausible candidate overlapping the others.
+fn planted_headers(len: usize) -> Vec<u8> {
+    let mut head = MAGIC.to_vec();
+    head.extend((super::MAX_FRAME as u32).to_le_bytes());
+    head.extend(0xdead_beef_u32.to_le_bytes());
+    head.iter().copied().cycle().take(len).collect()
+}
+
+/// Class guard: the checksum work of a pass is bounded by the file size, whatever the density of
+/// candidates. It measures hashed bytes, not time, and would catch any resync that hashes per
+/// candidate without a shared budget.
+#[test]
+fn planted_headers_cost_a_bounded_checksum_work_and_report_incomplete() {
+    for len in [1 << 20, 4 << 20] {
+        let bytes = planted_headers(len);
+        let found = scan(&bytes).expect("scan");
+        assert!(found.incomplete, "the budget must run out");
+        assert!(found.damaged >= 1);
+        assert!(found.hashed <= hash_budget(len), "hashed {} of {len}", found.hashed);
+        assert!(found.valid < bytes.len());
+    }
+}
+
+/// Class guard: an unread rest is never rewritten or extended, so every original byte stays
+/// through add and remove.
+#[test]
+fn an_incomplete_scan_keeps_every_byte_through_add_and_remove() -> io::Result<()> {
+    let (_t, idx) = open()?;
+    idx.findings_add(&finding("a", 1), 500)?;
+    let path = idx.dir().join(FILE);
+    let mut bytes = std::fs::read(&path)?;
+    bytes.extend(planted_headers(1 << 20));
+    std::fs::write(&path, &bytes)?;
+    assert!(idx.findings_add(&finding("b", 2), 500).is_err());
+    assert!(idx.findings_remove(&[]).is_err());
+    assert_eq!(std::fs::read(&path)?, bytes);
+    Ok(())
+}
+
+#[test]
+fn a_damaged_middle_costs_checksum_work_within_the_budget() {
+    let (a, b) = (super::encode(&finding("a", 1)), super::encode(&finding("b", 2)));
+    let bytes = [a, vec![0xff; 5000], b].concat();
+    let found = scan(&bytes).expect("scan");
+    assert_eq!((found.items.len(), found.damaged, found.incomplete), (2, 1, false));
+    assert!(found.hashed <= hash_budget(bytes.len()));
 }
 
 /// Class guard: the stored note is the cleaned input or a char-boundary prefix of it, at and

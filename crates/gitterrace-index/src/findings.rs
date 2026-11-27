@@ -181,24 +181,47 @@ fn decode(payload: &[u8]) -> io::Result<StoredFinding> {
 /// What a pass over the file found. `valid` is where reading stopped cleanly: the file's length
 /// unless an incomplete last frame (a torn tail) follows. `damaged` counts spans that are no
 /// frame and no torn tail: a flipped byte, a lying length, a magic this build does not know.
+/// `incomplete` is set when the checksum budget ran out before the file was read through: the
+/// rest is unread, so no write may rewrite or extend the file. `hashed` is the checksum input
+/// the pass spent.
 #[derive(Default)]
 struct Scan {
     items: Vec<StoredFinding>,
     valid: usize,
     damaged: usize,
+    incomplete: bool,
+    hashed: usize,
 }
 
-/// The payload of the whole, checksummed frame at `at`, and where it ends.
-fn frame_at(bytes: &[u8], at: usize) -> Option<(usize, &[u8])> {
-    let head = bytes.get(at..at + FIXED)?;
+/// The checksum work a pass may spend: twice the file, so the whole frames (at most the file in
+/// all) never starve the search for the next one, and a planted run of plausible headers cannot
+/// make the cost grow with their number. Not configurable: a bound on a file the repository may
+/// have planted.
+const fn hash_budget(len: usize) -> usize {
+    len.saturating_mul(2)
+}
+
+/// The payload of the whole, checksummed frame at `at`, and where it ends. `Err` when hashing it
+/// would pass `budget`, the checksum input still allowed.
+fn frame_at<'a>(
+    bytes: &'a [u8],
+    at: usize,
+    budget: &mut usize,
+) -> Result<Option<(usize, &'a [u8])>, ()> {
+    let Some(head) = bytes.get(at..at + FIXED) else {
+        return Ok(None);
+    };
     let len = u32::from_le_bytes([head[4], head[5], head[6], head[7]]) as usize;
     let crc = u32::from_le_bytes([head[8], head[9], head[10], head[11]]);
     if &head[..4] != MAGIC || len > MAX_FRAME {
-        return None;
+        return Ok(None);
     }
     let end = at + FIXED + len;
-    let payload = bytes.get(at + FIXED..end)?;
-    (crc32fast::hash(payload) == crc).then_some((end, payload))
+    let Some(payload) = bytes.get(at + FIXED..end) else {
+        return Ok(None);
+    };
+    *budget = budget.checked_sub(len).ok_or(())?;
+    Ok((crc32fast::hash(payload) == crc).then_some((end, payload)))
 }
 
 /// Whether the bytes from `at` are the start of a frame the file ends before finishing.
@@ -211,31 +234,59 @@ fn is_torn(bytes: &[u8], at: usize) -> bool {
     &rest[..4] == MAGIC && len <= MAX_FRAME && FIXED + len > rest.len()
 }
 
+/// The next whole frame start after `from`. `Err` when the budget ran out first.
+fn resync(bytes: &[u8], from: usize, budget: &mut usize) -> Result<Option<usize>, ()> {
+    for i in from..bytes.len() {
+        if frame_at(bytes, i, budget)?.is_some() {
+            return Ok(Some(i));
+        }
+    }
+    Ok(None)
+}
+
 /// The whole frames of `bytes`. A damaged span is skipped to the next whole frame and counted,
 /// so one bad frame never hides the entries after it. Only a trailing incomplete frame is a
-/// torn tail.
+/// torn tail. The checksum work is bounded by [`hash_budget`]: past it the scan stops, counts
+/// the unread rest as damaged and reports `incomplete`.
 fn scan(bytes: &[u8]) -> io::Result<Scan> {
     let mut out = Scan::default();
+    let total = hash_budget(bytes.len());
+    let mut budget = total;
     let mut at = 0;
     while at < bytes.len() {
-        if let Some((end, payload)) = frame_at(bytes, at) {
-            out.items.push(decode(payload)?);
-            at = end;
-            continue;
+        match frame_at(bytes, at, &mut budget) {
+            Ok(Some((end, payload))) => {
+                out.items.push(decode(payload)?);
+                at = end;
+                continue;
+            }
+            Ok(None) => {}
+            Err(()) => {
+                out.incomplete = true;
+                break;
+            }
         }
-        match (at + 1..bytes.len()).find(|&i| frame_at(bytes, i).is_some()) {
-            Some(next) => {
+        match resync(bytes, at + 1, &mut budget) {
+            Ok(Some(next)) => {
                 out.damaged += 1;
                 at = next;
             }
-            None if is_torn(bytes, at) => break,
-            None => {
+            Ok(None) if is_torn(bytes, at) => break,
+            Ok(None) => {
                 out.damaged += 1;
                 at = bytes.len();
             }
+            Err(()) => {
+                out.incomplete = true;
+                break;
+            }
         }
     }
+    if out.incomplete {
+        out.damaged += 1;
+    }
     out.valid = at;
+    out.hashed = total - budget;
     Ok(out)
 }
 
@@ -287,7 +338,11 @@ impl Index {
         // another writer's scan and append.
         let _lock = crate::store::WriteLock::take(self.dir())?;
         let (scan, size) = read(self)?.unwrap_or_default();
-        let Scan { mut items, valid, damaged } = scan;
+        let Scan { mut items, valid, damaged, incomplete, .. } = scan;
+        if incomplete {
+            // Appending would bury the new entry behind bytes never read.
+            return Err(refuse_rewrite(damaged));
+        }
         if items.iter().any(|x| x.id == f.id) {
             return Ok(false);
         }
