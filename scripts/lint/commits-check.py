@@ -107,8 +107,27 @@ CARGO_ONLY_LINTS = (
 
 
 def run(cmd: list[str]) -> tuple[int, str]:
-    p = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True, check=False)
+    # A diff or a gate may print bytes that are not UTF-8: they are shown replaced, never raised.
+    p = subprocess.run(
+        cmd, cwd=ROOT, capture_output=True, encoding="utf-8", errors="replace", check=False
+    )
     return p.returncode, (p.stdout + p.stderr).strip()
+
+
+def show(spec: str) -> tuple[int, str | None]:
+    """`git show <rev>:<path>`: the exit code, and the text or None when it is not UTF-8."""
+    p = subprocess.run(["git", "show", spec], cwd=ROOT, capture_output=True, check=False)
+    try:
+        return p.returncode, p.stdout.decode("utf-8")
+    except UnicodeDecodeError:
+        return p.returncode, None
+
+
+def binary_paths(sha: str) -> set[str]:
+    """The paths git itself calls binary in a commit: `-` for both counts in --numstat."""
+    _, out = run(["git", "diff", "--numstat", "--no-renames", f"{sha}~", sha])
+    rows = (line.split("\t", 2) for line in out.splitlines())
+    return {r[2] for r in rows if len(r) == 3 and r[0] == r[1] == "-"}
 
 
 def changed(rng: str | None) -> list[str]:
@@ -211,27 +230,37 @@ def hand_edited(old: str, new: str) -> list[str]:
     return sorted(i for i in a.keys() & b.keys() if a[i] != b[i])
 
 
-def commits_editing_generated(rng: str) -> list[str]:
-    """Commits that change a GENERATED block without `make docs-gen` in the message.
+def commits_editing_generated(rng: str) -> tuple[list[str], list[str]]:
+    """Commits that change a GENERATED block without `make docs-gen` in the message, and the
+    files left unread as `sha path`.
 
     The blocks come from several generators, so a block is not mapped to one registry: the
-    commit says it regenerated them, or it is a hand edit the docs-gen gate would undo.
+    commit says it regenerated them, or it is a hand edit the docs-gen gate would undo. A file
+    that is not text (an image, or bytes that are not UTF-8) holds no block to compare. It is
+    skipped by name, so a text file wrongly taken for binary shows in the output.
     """
     _, shas = run(["git", "rev-list", "--no-merges", rng])
-    hits = []
+    hits, skipped = [], []
     for sha in shas.split():
         _, msg = run(["git", "log", "-1", "--format=%B", sha])
         if GEN_NOTE in msg:
             continue
+        binary = binary_paths(sha)
         _, names = run(["git", "diff", "--name-only", f"{sha}~", sha])
         for path in names.splitlines():
-            c1, old = run(["git", "show", f"{sha}~:{path}"])
-            c2, new = run(["git", "show", f"{sha}:{path}"])
-            if c1 or c2 or "BEGIN GENERATED" not in new:
+            if path in binary:
+                skipped.append(f"{sha[:9]} {path}")
+                continue
+            c1, old = show(f"{sha}~:{path}")
+            c2, new = show(f"{sha}:{path}")
+            if (c2 == 0 and new is None) or (c1 == 0 and old is None):
+                skipped.append(f"{sha[:9]} {path}")
+                continue
+            if c1 or c2 or old is None or new is None or "BEGIN GENERATED" not in new:
                 continue
             for i in hand_edited(old, new):
                 hits.append(f"{sha[:9]} {path}: block '{i}' changed without '{GEN_NOTE}'")
-    return hits
+    return hits, skipped
 
 
 def self_test() -> int:
@@ -262,14 +291,23 @@ def self_test() -> int:
             f.write_text(blk.format(body), encoding="utf-8")
             subprocess.run([*g, "add", "a.md"], check=True)
             subprocess.run([*g, "commit", "-qm", msg], check=True)
+        # A commit with files that are not UTF-8 text: one git calls binary, one it does not.
+        Path(d, "b.bin").write_bytes(b"\x00\x84\x01")
+        Path(d, "c.txt").write_bytes(b"x\xe9 <!-- BEGIN GENERATED: k -->\n")
+        subprocess.run([*g, "add", "b.bin", "c.txt"], check=True)
+        subprocess.run([*g, "commit", "-qm", "test: add fixtures"], check=True)
         _, shas = run(["git", "-C", d, "rev-list", "--reverse", "HEAD"])
         global ROOT
         keep, ROOT = ROOT, Path(d)
         try:
-            hits = commits_editing_generated(f"{shas.split()[0]}..HEAD")
+            rng = f"{shas.split()[0]}..HEAD"
+            hits, skipped = commits_editing_generated(rng)
+            removals = test_commits_removing_product(rng)
         finally:
             ROOT = keep
         ok = ok and len(hits) == 1 and "'k'" in hits[0]
+        ok = ok and [s.split(" ", 1)[1] for s in skipped] == ["b.bin", "c.txt"]
+        ok = ok and not removals
     mk = (ROOT / "Makefile").read_text(encoding="utf-8")
     ok = ok and not ungated(mk)
     ok = ok and ungated(mk, [g for g in GATES if g[0] != "docs-install"]) == [
@@ -318,7 +356,9 @@ def main() -> int:
             print(h)
         print(f"{'FAIL' if hits else 'PASS'} test-commits-keep-product")
         fails += bool(hits)
-        hits = commits_editing_generated(a.range)
+        hits, skipped = commits_editing_generated(a.range)
+        for s in skipped:
+            print(f"SKIP generated-blocks-regenerated {s}: not UTF-8 text")
         for h in hits:
             print(h)
         print(f"{'FAIL' if hits else 'PASS'} generated-blocks-regenerated")
