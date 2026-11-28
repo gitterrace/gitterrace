@@ -12,7 +12,7 @@
    Every variant gets every state from here: hover, :active (pressed), the shared focus ring
    (app.css), :disabled, and aria-expanded or aria-pressed true, which read as held. */
 button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);
-  box-sizing:border-box;height:var(--control-h);padding:0 var(--space-4);font:inherit;
+  box-sizing:border-box;height:var(--control-h);padding:.5px var(--space-4) 0;font:inherit;
   font-weight:var(--weight-semibold);line-height:normal;white-space:nowrap;color:var(--fg);
   background:var(--soft);border:var(--border);border-radius:var(--radius);cursor:pointer;
   text-decoration:none;transition:background var(--dur-fast),border-color var(--dur-fast),
@@ -33,8 +33,9 @@ button,.btn{display:inline-flex;align-items:center;justify-content:center;gap:va
 .danger:hover:not(:disabled){color:var(--del);background:var(--del-bg);border-color:var(--del)}
 .danger:active:not(:disabled){color:var(--del);background:var(--del-hl);border-color:var(--del)}
 /* At 13px in a 28px box the browser snaps the line to a whole pixel and the capitals land
-   high; line-height:normal keeps the ink as centered as the grid allows. */
-.sm{height:var(--control-h-sm);padding:0 var(--space-3);font-size:var(--text-sm)}
+   high; line-height:normal and a fraction of a pixel on top (.5 at 32, .25 at 28, measured
+   in the three engines) keep the ink centered. */
+.sm{height:var(--control-h-sm);padding:.25px var(--space-3) 0;font-size:var(--text-sm)}
 select.sm{padding-right:calc(var(--space-3)*2 + var(--space-2))}
 .icon{width:var(--control-h);padding:0}.icon.sm{width:var(--control-h-sm)}
 /* A copy button says it worked in the accent for a moment (app.js flashes .copied). */
