@@ -65,6 +65,13 @@ impl CommitRow {
         }
     }
 
+    /// A label's name cut after each slash and underscore, the break points a browser lacks for
+    /// `_`: the template puts a `<wbr>` between the parts so a word is never split mid-way.
+    #[expect(clippy::unused_self, reason = "a template reaches it as a method of the row")]
+    fn label_parts<'a>(&self, name: &'a str) -> Vec<&'a str> {
+        name.split_inclusive(['/', '_']).collect()
+    }
+
     /// Puts `lead` before the commit, for a row that lists a ref.
     #[must_use]
     pub(crate) fn led_by(mut self, lead: Lead) -> Self {
@@ -131,5 +138,17 @@ mod tests {
         assert!(lead < s.find("class=\"av ").expect("avatar"), "{s}");
         assert!(s.contains("<span class=\"tag default\">default</span>"), "{s}");
         assert!(s.find("class=\"cnums\"").expect("counts") > s.find("class=\"sha\"").expect("id"));
+    }
+
+    #[test]
+    fn a_graph_label_may_break_only_after_a_slash_or_underscore() {
+        let rows = vec![("a".to_owned(), Vec::new())];
+        let placed = crate::graph_view::place(&rows, 0, 1);
+        let mut r = CommitRow::of(&summary(), 0);
+        r.graph = Some(crate::graph_view::cell(&placed[0], None, 1, false));
+        r.refs.push(("feature/long_name-x".to_owned(), false));
+        let s = r.to_string();
+        assert!(s.contains(">feature/<wbr>long_<wbr>name-x</span>"), "{s}");
+        assert!(s.contains("title=\"feature/long_name-x\""), "{s}");
     }
 }

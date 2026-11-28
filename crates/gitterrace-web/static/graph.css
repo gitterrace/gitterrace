@@ -52,12 +52,12 @@ stroke-width:1px;stroke-dasharray:2 2}
 gap:2px;flex:none;width:var(--gw);box-sizing:border-box;
 margin:0 0 0 calc(-1 * (var(--gw) + var(--space-3)));
 font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
-max-width:100%;text-align:right}
-/* A label breaks after a slash or a hyphen first, shows 3 lines and carries its full name as a
-   tip; a part wider than the gutter (an underscore is no break point) splits at the gutter edge
-   as a last resort, so no part of a name is clipped away. */
+max-width:100%;text-align:left}
+/* A label breaks only after a slash or underscore (a <wbr> the template adds) or a hyphen and
+   shows 3 lines; a word is never split. Its full name is the tip. Left aligned: a right edge
+   line overflowed by the width of the break after an underscore. */
 .glabels .gref{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
-overflow:hidden;overflow-wrap:break-word;word-break:normal}
+overflow:hidden;overflow-wrap:normal;word-break:normal}
 /* Labels get a narrow gutter here and wrap inside it, so a long branch name grows its row taller
    and the subject keeps the width. */
 @media (max-width:600px){.graphed{--gw:min(var(--lw,104px),5rem)}

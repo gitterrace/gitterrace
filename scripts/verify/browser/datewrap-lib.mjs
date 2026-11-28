@@ -77,8 +77,9 @@ function dateLines() {
     const name = sj.textContent.trim().slice(0, 12);
     if (w && w < min) out.push(`subject "${name}" is ${Math.round(w)}px, under ${min}px`);
   }
-  // A Graph label shows at most 3 lines and never breaks inside a word. At 390 the gutter is
-  // the narrow one, so the same limits hold on the page's labels.
+  // A Graph label shows at most 3 lines and never breaks inside a word (a name ends a
+  // word at a slash, hyphen or underscore, where the template offers a break). At 390 the
+  // gutter is the narrow one, so the same limits hold on the page's labels.
   for (const g of document.querySelectorAll('.glabels .gref')) {
     if (!g.getClientRects().length) continue;
     const cs = getComputedStyle(g);
@@ -86,13 +87,15 @@ function dateLines() {
     const inner = g.getBoundingClientRect().height - parseFloat(cs.paddingTop) * 2 - 2;
     const label = g.textContent.slice(0, 12);
     if (Math.round(inner / line) > 3) out.push(`label "${label}" takes over 3 lines`);
-    const w = document.createTreeWalker(g, NodeFilter.SHOW_TEXT).nextNode();
-    for (const m of w.textContent.matchAll(/[^\s\/-]+[\/-]?/g)) {
-      const rg = document.createRange();
-      rg.setStart(w, m.index);
-      rg.setEnd(w, m.index + m[0].length);
-      const tops = new Set([...rg.getClientRects()].map((q) => Math.round(q.top)));
-      if (tops.size > 1) out.push(`label word "${m[0]}" is broken`);
+    const tw = document.createTreeWalker(g, NodeFilter.SHOW_TEXT);
+    for (let w = tw.nextNode(); w; w = tw.nextNode()) {
+      for (const m of w.textContent.matchAll(/[^\s\/_-]+[\/_-]?/g)) {
+        const rg = document.createRange();
+        rg.setStart(w, m.index);
+        rg.setEnd(w, m.index + m[0].length);
+        const tops = new Set([...rg.getClientRects()].map((q) => Math.round(q.top)));
+        if (tops.size > 1) out.push(`label word "${m[0]}" is broken`);
+      }
     }
   }
   return { seen, out };
