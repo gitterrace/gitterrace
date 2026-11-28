@@ -11,7 +11,9 @@ files: the scan
 stopped at <code>limits.worktree_files</code>. A checkpoint or review plan taken now covers only
 the files listed. Raise that limit in <code>config.toml</code> to see more.</p>{% endif %}
 {{ plan|safe }}
+<div class="withrail">{{ rail|safe }}<div class="railmain">
 {{ tools|safe }}
 {{ diff|safe }}
+</div></div>
 {% endif %}
 {% endblock %}

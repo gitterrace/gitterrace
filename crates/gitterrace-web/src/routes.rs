@@ -456,6 +456,7 @@ struct WorktreePage {
     omitted: bool,
     plan: String,
     files: Vec<WorktreeFileRow>,
+    rail: String,
     diff: String,
     clean: bool,
     empty: Empty,
@@ -524,6 +525,7 @@ async fn worktree(
             clean: files.is_empty() && review.since_id().is_none(),
             empty: Empty::new(crate::worktree_scope::empty_text(scope))
                 .step("Browse the commits", fmt::href("/log/HEAD")),
+            rail: crate::file_rail::render(stats.iter().map(|r| &r.stat)),
             diff,
             adds: fmt::thousands(adds),
             dels: fmt::thousands(dels),

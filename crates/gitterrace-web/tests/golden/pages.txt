@@ -1,4 +1,4 @@
-# the commit and compare pages gain the scope switcher and the folded-files bar
+# commit and compare pages gain the file rail beside the diff
 3d6331935b06992963d36c2eaffb6666 3d6331935b06992963d36c2eaffb6666 [browse] /api/files/HEAD
 5926060c7e0029dde61fa7387dbc2baf 5926060c7e0029dde61fa7387dbc2baf [browse] /api/refs
 0d6c9c97271ee625713a61095fbe9a64 ed2c1468b47f180f81e03860a7d6f06a [browse] /blame/HEAD/missing.rs
@@ -11,11 +11,11 @@
 4f52a20f64f547f355ba976004c075a3 4f52a20f64f547f355ba976004c075a3 [browse] /blob/HEAD/vendor/x.c
 599f277b086ac0a1babd2916d3eca4f3 599f277b086ac0a1babd2916d3eca4f3 [browse] /blob/HEAD~1/src/lib.rs
 f76e60691bc628f0eb0838faee1fe8c3 275fc0654e0b6d411bbbeff978807eb3 [browse] /commit/0000000
-fdfbad958978c2bc7ba557a6e19674f8 74a44266b331bd47248a1207a249db98 [browse] /commit/HEAD
-97601e6114e3980d9163be1f5396f783 fcdaeef64cb625a8220f66fab05a6d39 [browse] /commit/HEAD~1
+b5a2a94dc46247e01e678cf2c45e0ca4 679c36483410887a343ca6d66a8f42c4 [browse] /commit/HEAD
+8de402cc0571eae8333bfd5e630444c9 60db41818a12eb89ea245ad0ff8d35b3 [browse] /commit/HEAD~1
 2d33c84212e584ffda4e1f78019f5d9d 2d33c84212e584ffda4e1f78019f5d9d [browse] /compare
 7a4f57f7b8ad39afe83307b9d048033b 7a4f57f7b8ad39afe83307b9d048033b [browse] /compare?base=HEAD&head=HEAD
-14d76813da7796e221dfc6d6d0a5a2ca c1667d4f65150c89aa1267ea735bfad2 [browse] /compare?base=HEAD~3&head=HEAD
+b3236efa673720cd1ebb16e1fdaa89d9 a829f8f1de42548f76fe2e41ec15f26b [browse] /compare?base=HEAD~3&head=HEAD
 4be5781a40464f3ff666728a4806d52c 4be5781a40464f3ff666728a4806d52c [browse] /compare?base=nope&head=HEAD
 0b9ac81109649e9f2f4435f6e10fedc8 0b9ac81109649e9f2f4435f6e10fedc8 [browse] /diff-find/HEAD?q=fn
 4962ef02d642672ff969f5c3da795081 4962ef02d642672ff969f5c3da795081 [browse] /diff/HEAD/0

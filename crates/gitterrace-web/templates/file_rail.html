@@ -1,0 +1,11 @@
+{#- The rail beside a diff (file_rail.rs): one row per file up to the cap, never per line. -#}
+<nav class="rail" aria-label="Changed files" data-rail><ul>
+{%- for r in rows %}
+<li data-f="{{ r.anchor }}"><a href="#{{ r.anchor }}" title="{{ r.title }}">
+<b>{{ r.base }}</b><span class="dir">{{ r.dir }}</span></a>
+<span class="counts add">+{{ r.additions }} <b class="del">-{{ r.deletions }}</b></span></li>
+{%- endfor %}
+</ul>
+{%- if !more_anchor.is_empty() %}
+<p class="muted more"><a href="#{{ more_anchor }}">and {{ more }} more files</a></p>
+{%- endif %}</nav>

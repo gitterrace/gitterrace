@@ -106,6 +106,14 @@ Good to know: source outlines work in every
 [language](architecture.md#syntax-highlighting) the code view highlights. In a
 large file the list covers the part already highlighted.
 
+## File rail
+
+On a commit or working tree page at least 1100 pixels wide, a rail of the
+changed files stays beside the diff while you scroll. The file in view is
+highlighted, a file you ticked **Viewed** carries a check, and a click jumps to
+that file. Narrower windows keep the changed-files card instead. The links are
+plain anchors, so they work without scripts.
+
 ## Checkpoints
 
 A checkpoint records the uncommitted work as it is now, so a later review can

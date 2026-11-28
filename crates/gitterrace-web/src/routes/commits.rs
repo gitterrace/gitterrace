@@ -426,6 +426,8 @@ struct CommitPage {
     total_add: String,
     total_del: String,
     files: Vec<FileStatRow>,
+    /// The sticky file rail beside the diff, `""` when no file changed.
+    rail: String,
     /// `(label, url)`: "Find this commit in ..." links from the `lookup` of each Send to target.
     lookups: Vec<(String, String)>,
     /// Agent hints from the message trailers.
@@ -487,6 +489,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             tools: crate::diff_find::toolbar(d.files.len(), folded),
             total_add: fmt::thousands(d.files.iter().map(|f| u64::from(f.additions)).sum::<u64>()),
             total_del: fmt::thousands(d.files.iter().map(|f| u64::from(f.deletions)).sum::<u64>()),
+            rail: crate::file_rail::render(&views::file_stats(&d)),
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
             agents: crate::agent_trailers::links(&d.body),

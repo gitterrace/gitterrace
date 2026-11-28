@@ -22,6 +22,7 @@ const SITES: &[(&str, &str, &str)] = &[
     ("blob.html", "outline_rail", "markdown/outline.rs outline_html: escaped labels"),
     ("commit.html", "diff", "views/diff.rs diff_html_with: escaped hunks and paths"),
     ("commit.html", "p", "fmt::sha_link"),
+    ("commit.html", "rail", "file_rail::render: askama-escaped paths and counts"),
     ("commit.html", "sha", "fmt::sha_link"),
     ("commit.html", "tools", "diff_find::toolbar: fixed markup and a count"),
     ("commit_line.html", "self.sha", "fmt::sha_link"),
@@ -51,6 +52,7 @@ const SITES: &[(&str, &str, &str)] = &[
     ("tree.html", "a.html", "about.rs card: render_doc (ammonia) or esc_text in a pre"),
     ("worktree.html", "diff", "views/diff.rs diff_html_with: escaped hunks and paths"),
     ("worktree.html", "plan", "review_panel::render: escaped fields"),
+    ("worktree.html", "rail", "file_rail::render: askama-escaped paths and counts"),
     ("worktree.html", "tools", "diff_find::toolbar and review bar: fixed markup"),
 ];
 

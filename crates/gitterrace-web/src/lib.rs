@@ -30,6 +30,7 @@ mod empty;
 mod error;
 mod far;
 mod features;
+mod file_rail;
 mod filetype;
 mod filter;
 mod fmt;

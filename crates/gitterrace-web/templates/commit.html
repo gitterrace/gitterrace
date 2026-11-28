@@ -20,6 +20,8 @@
 {% endif %}{% if !lookups.is_empty() %}<p class="meta lookups">Find this commit in {% for (label, url) in lookups %}{% if !loop.first %} · {% endif %}<a href="{{ url }}" rel="noopener noreferrer">{{ label }}</a>{% endfor %}</p>
 {% endif %}<details class="card files" open><summary>{{ files_summary }}<span class="counts">{% call deltas::delta(total_add, total_del) %}{% endcall %}</span></summary>
 <ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a>{% call deltas::file_counts(f.additions, f.deletions) %}{% endcall %}</li>{% endfor %}</ul></details>
+<div class="withrail">{{ rail|safe }}<div class="railmain">
 {{ tools|safe }}
 {{ diff|safe }}
+</div></div>
 {% endblock %}

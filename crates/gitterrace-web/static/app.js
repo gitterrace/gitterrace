@@ -302,6 +302,7 @@
     if (!document.querySelector("section.file[data-path]")) return;
     window.gtLazy("diffs-viewed");
     window.gtLazy("diffs-find");
+    if (document.querySelector("[data-rail]")) window.gtLazy("diffs-rail");
     if (document.querySelector("[data-cpbar]")) window.gtLazy("checkpoints");
   }
   withDiffs();

@@ -90,3 +90,26 @@ html:has(.difftools){--dt-h:49px}
 div.diff :is(.add,.del,.ctx,.hh){border-left:var(--space-1) solid transparent}
 div.diff .add{border-left-color:var(--add)}
 div.diff .del{border-left-style:double;border-left-color:var(--del)}
+/* The file rail: a second column from 1100px, sticky under the top of the window. It holds one
+   row per file, never per line. Below that width it is not shown and the files card stays. */
+.rail{display:none}
+@media (min-width:1100px){
+  .withrail:has(>.rail){display:grid;grid-template-columns:15rem minmax(0,1fr);
+    gap:0 var(--space-4);align-items:start}
+  .rail{display:block;position:sticky;top:var(--space-3);max-height:calc(100vh - var(--space-6));
+    overflow:auto;margin-top:var(--space-4);border:var(--border);border-radius:var(--radius);
+    background:var(--bg);font-size:var(--text-xs)}
+  .rail ul{list-style:none;margin:0;padding:0}
+  .rail li{display:flex;flex-direction:column;gap:var(--space-1);
+    padding:var(--space-2) var(--space-3);border-top:var(--border);
+    border-left:var(--space-1) solid transparent}
+  .rail li:first-child{border-top:0}
+  .rail a{display:block;min-width:0;overflow-wrap:anywhere;font-family:var(--mono);
+    color:var(--fg);text-decoration:none}
+  .rail .dir{color:var(--muted)}
+  .rail .counts{font-weight:var(--weight-semibold)}
+  .rail li:hover{background:var(--soft)}
+  .rail li[aria-current]{background:var(--accent-soft);border-left-color:var(--accent)}
+  .rail li[data-seen] a::after{content:" \2713";color:var(--add)}
+  .rail li[data-seen]{opacity:.7}
+}
