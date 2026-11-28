@@ -298,19 +298,29 @@ async function stickyHeads() {
   const sw = { browsers, context, widths: [1440, 375], height: 700 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     await p.goto(`${srv.base}/commit/${sha}`, { waitUntil: 'load' });
-    const m = await p.evaluate(() => {
+    // Read live: the pin line is the sticky toolbar's bottom edge, 0 when there is none. With
+    // `plant`, every head is forced static first: the case must then see an unpinned head.
+    const measure = (plant) => {
       const s = [...document.querySelectorAll('section.file')];
       if (s.length < 2) return null;
+      for (const h of plant ? document.querySelectorAll('section.file>header') : []) {
+        /** @type {HTMLElement} */ (h).style.position = 'static';
+      }
       const r = s[1].getBoundingClientRect();
       scrollTo(0, scrollY + r.top + r.height / 2);
       const top = (el) => el.getBoundingClientRect().top;
       const site = document.querySelector('header.top');
+      const bar = document.querySelector('.difftools');
+      const sticky = bar && getComputedStyle(bar).position === 'sticky';
+      const pin = sticky ? bar.getBoundingClientRect().bottom : 0;
       return {
-        second: top(s[1].querySelector('header')),
-        first: top(s[0].querySelector('header')),
+        second: top(s[1].querySelector('header')) - pin,
+        first: top(s[0].querySelector('header')) - pin,
         site: site ? top(site) : 0,
       };
-    });
+    };
+    const m = await p.evaluate(measure, false);
+    const planted = await p.evaluate(measure, true);
     const where = `sticky-heads ${name} ${scheme} ${width}`;
     const bad = [];
     if (!m) bad.push('fewer than two files on the commit page');
@@ -320,6 +330,10 @@ async function stickyHeads() {
       }
       if (Math.abs(m.first) <= 1) bad.push('first file header still pinned');
       if (width <= 600 && Math.abs(m.site) <= 1) bad.push('site header pinned at 375');
+    }
+    // Self-test: a head planted with position:static must read as not pinned.
+    if (!planted || Math.abs(planted.second) <= 1) {
+      bad.push('a static head still reads as pinned');
     }
     await p.goto(`${srv.base}/blob/${sha}/sticky/two.txt#L120`, { waitUntil: 'load' });
     await scrollSettled(p);

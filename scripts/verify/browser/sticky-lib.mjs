@@ -91,7 +91,11 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
             .find((e) => e.checkVisibility());
           const mainBox = document.querySelector('main').getBoundingClientRect();
           const mainPad = parseFloat(getComputedStyle(document.querySelector('main')).paddingLeft) * 2;
-          return { top: hr.top,
+          // A diff's heads pin under the sticky diff toolbar, so the toolbar's bottom is their top.
+          const bar = document.querySelector('.difftools');
+          const sticky = bar && getComputedStyle(bar).position === 'sticky';
+          const pin = sticky ? bar.getBoundingClientRect().bottom : 0;
+          return { top: hr.top - pin, pin,
             topLine, stuck: h.hasAttribute('data-stuck'), lineW, lineH, content, inBar, codeW: code ? code.closest('.card').getBoundingClientRect().width : null, mainW: mainBox.width - mainPad, scrolled: br.top < 0 };
         }, v);
         const where = `sticky-line ${name} ${scheme} ${width} ${v.name}`;
@@ -99,7 +103,9 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
         if (!m) bad.push('head or box missing');
         else {
           if (!m.scrolled) bad.push('could not scroll past the box top');
-          if (Math.abs(m.top) > 1) bad.push(`head at ${m.top.toFixed(1)}, not pinned`);
+          if (Math.abs(m.top) > 1) {
+            bad.push(`head ${m.top.toFixed(1)} px off its pin line, not pinned`);
+          }
           if (!m.stuck || m.lineH !== 1) {
             bad.push(`no closing line under the head (stuck ${m.stuck}, ${m.lineH}px)`);
           }
