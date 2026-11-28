@@ -1,8 +1,8 @@
-# fix(web): render the basket button with its accessible name
-93b8cbdbcda7eea5c98ab408aa33ff86 f63e1b656d9591495f0c47efe111e0b6 [symbols] /blob/HEAD/cmd/serve.go
-786aa4b3985807477a45684d061ddded 786aa4b3985807477a45684d061ddded [symbols] /blob/HEAD/notes.txt
-6dc0a2947c7b051804ee05747a4cbf0e 1117864653dfbe454570e71ad62c82fe [symbols] /blob/HEAD/src/shapes.rs
-cca7c36e7a7681f2c6808e9fe6bd8f15 cca7c36e7a7681f2c6808e9fe6bd8f15 [symbols] /blob/HEAD/src/two.rs
-2b67e2afc2e2d8af4a9f0e2d55f0dcc1 9ea8f0c686bc24d46f787fc12608753d [symbols] /blob/HEAD/tools/report.py
-0a70270ccbcd61a79ec2cf5c9713e977 c0acb630b3efa7351f6175bfb7ff6faf [symbols] /blob/HEAD/web/store.ts
-854eb93f1cdbda0d04e632305c0ba81a 7fb7b5dfc9bb75af231cd1294e959d8e [symbols] /blob/HEAD/web/view.js
+# fix(web): give every font role a stand-in that matches the web font on Linux too
+644d089cebfe0b2e36567683f133736c a1fdb763a921c1e2cbef2aced885a4ec [symbols] /blob/HEAD/cmd/serve.go
+32b9be068200adbaa7888b789406439b 32b9be068200adbaa7888b789406439b [symbols] /blob/HEAD/notes.txt
+40c69e5cc44ce1c528b50740b95a6c54 f6c9371effc351893b2d6099eeebbb64 [symbols] /blob/HEAD/src/shapes.rs
+c71f47a210726f60c6911a955ff30fd3 c71f47a210726f60c6911a955ff30fd3 [symbols] /blob/HEAD/src/two.rs
+5a3477351c5304e5f81745cb5dc62b37 3629cdcbeeee517f245dfabe61d502f3 [symbols] /blob/HEAD/tools/report.py
+6aee0def7dd10425f6dd59ff6c6f5711 383cf0a79307d3c9c011e7024317df71 [symbols] /blob/HEAD/web/store.ts
+18827a562ee88279adfd91df0ef32cc0 d6a189ea5902e65febe68495cf298654 [symbols] /blob/HEAD/web/view.js

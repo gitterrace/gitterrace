@@ -3,6 +3,8 @@
 // A repository with five uncommitted files. On /worktree, in each browser:
 // - the bar is in the server's HTML and the page shifts by nothing while the scripts load
 //   and while the web fonts swap in
+// - with the web fonts blocked, every font role still has a system stand-in, also on a host
+//   without Arial and Georgia
 // - opening find and running a query leaves every header box where it was
 // - f focuses the box, "/" still belongs to global search
 // - a query shows "n of m" after a step, n and N and Enter and Shift+Enter move it, and the
@@ -53,6 +55,60 @@ export function checks(env) {
    */
   const settle = (p) => p.evaluate(() => document.fonts.ready.then(() => new Promise((r) =>
     requestAnimationFrame(() => requestAnimationFrame(r)))));
+  /**
+   * With the web font files blocked, each role (title, body, mono) must still land on a system
+   * face that its stand-in names, at regular and semibold weight. A stand-in whose local() names
+   * match no installed font falls to the generic family, whose metrics are not the web font's:
+   * the page then shifts when the web font arrives inside the block period. "stand-in" is the
+   * page as served (Arial, Georgia, Courier on macOS). "linux stand-in" strips those names from
+   * the stylesheet and answers the Liberation names with their macOS twins (same metrics), so
+   * the chain Ubuntu walks is run here too.
+   */
+  async function standIns(ctx, srv, where) {
+    const roles = {
+      title: ['Fraunces Standin', 'Fraunces Standin Times'],
+      body: ['Bricolage Standin'],
+      mono: ['JetBrains Mono Standin'],
+    };
+    for (const mode of ['stand-in', 'linux stand-in']) {
+      const p = await ctx.newPage();
+      await p.route(/\.woff2(\?.*)?$/, (route) => route.abort());
+      if (mode === 'linux stand-in') {
+        await p.route(/tokens\.css(\?.*)?$/, async (route) => {
+          const res = await route.fetch();
+          const css = (await res.text())
+            .replace(/local\("(Georgia|Gelasio|Arial|Courier New)( Bold)?"\),?/g, '')
+            .replace(/local\("Liberation Sans Bold"\)/g, 'local("Arial Bold")')
+            .replace(/local\("Liberation Sans"\)/g, 'local("Arial")')
+            .replace(/local\("Liberation Serif Bold"\)/g, 'local("Times New Roman Bold")')
+            .replace(/local\("Liberation Serif"\)/g, 'local("Times New Roman")')
+            .replace(/local\("Liberation Mono Bold"\)/g, 'local("Courier New Bold")')
+            .replace(/local\("Liberation Mono"\)/g, 'local("Courier New")');
+          await route.fulfill({ response: res, body: css });
+        });
+      }
+      await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
+      const got = await p.evaluate(async (roles) => {
+        const out = {};
+        for (const [role, families] of Object.entries(roles)) {
+          for (const weight of [400, 600]) {
+            const loaded = [];
+            for (const f of families) {
+              const faces = await document.fonts.load(`${weight} 16px "${f}"`);
+              loaded.push(...faces.filter((x) => x.status === 'loaded'));
+            }
+            out[`${role} ${weight}`] = loaded.length;
+          }
+        }
+        return out;
+      }, roles);
+      await p.close();
+      const lost = Object.entries(got).filter(([, n]) => n === 0).map(([k]) => k);
+      say(lost.length === 0, `${where}: the ${mode} resolves to a system font for every role`,
+        `${where}: the ${mode} found no system font for: ${lost.join(', ')}`);
+    }
+  }
+
   /** Layout, placement and the accessibility of the markup, at one width. */
   async function shape(p, w) {
     const cls = await p.evaluate(() => /** @type {any} */ (window).__cls);
@@ -148,6 +204,7 @@ export function checks(env) {
         const raw = await (await fetch(`${srv.base}/worktree`)).text();
         say(/<form class="difftools"/.test(raw), `${where}: the bar is server rendered`,
           `${where}: no .difftools in the HTML`);
+        await standIns(ctx, srv, where);
         for (const width of [1440, 390]) {
           const p = await ctx.newPage({ viewport: { width, height: 900 } });
           await p.addInitScript(() => {

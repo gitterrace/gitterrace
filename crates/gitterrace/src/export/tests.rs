@@ -263,7 +263,7 @@ async fn export_writes_every_prewarmed_page() {
         let href = href.split(['"', '?']).next().unwrap_or_default();
         assert!(out.join(href).is_file(), "404.html links {href}, which was not exported");
     }
-    assert!(!lost.contains("type=\"font/woff2\""), "{lost}");
+    assert!(preload_links(&lost).is_empty() && !lost.contains("crossorigin>"), "{lost}");
     // The credit is a footer of its own, not a second snapshot banner.
     let page = std::fs::read_to_string(target(&out, "/r/r/", "text/html").expect("home"))
         .expect("home page");
@@ -271,6 +271,69 @@ async fn export_writes_every_prewarmed_page() {
         page.contains("<footer class=\"credit\" role=\"contentinfo\">"),
         "the credit footer is missing"
     );
+}
+
+/// Every `.html` file under `dir`, with its text.
+fn html_pages(dir: &Path) -> Vec<(std::path::PathBuf, String)> {
+    let (mut pages, mut stack) = (Vec::new(), vec![dir.to_path_buf()]);
+    while let Some(d) = stack.pop() {
+        for e in std::fs::read_dir(&d).expect("read_dir") {
+            let p = e.expect("entry").path();
+            if p.is_dir() {
+                stack.push(p);
+            } else if p.extension().is_some_and(|x| x == "html") {
+                let text = std::fs::read_to_string(&p).expect("read page");
+                pages.push((p, text));
+            }
+        }
+    }
+    pages
+}
+
+/// The `<link>` tags of `html` whose `rel` is `preload`, however the attribute is quoted.
+fn preload_links(html: &str) -> Vec<&str> {
+    html.split("<link")
+        .skip(1)
+        .filter_map(|rest| rest.split('>').next())
+        .filter(|tag| {
+            let tag = tag.to_ascii_lowercase().replace(['"', '\''], "");
+            tag.split_ascii_whitespace().any(|word| word == "rel=preload")
+        })
+        .collect()
+}
+
+/// Class: a preload the served page carries and the copy keeps. An exported page has no server
+/// behind it, so a preload fetches a file that is not there. The pages are the ones the real
+/// templates render, so a preload added to them, or one spelled in a way the export does not
+/// recognise, fails here without this test knowing how the tag is spelled.
+#[tokio::test]
+async fn no_preload_survives_export() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let repo = gitterrace_testkit::Fixture::standard(&dir.path().join("r"));
+    let out = dir.path().join("out");
+    let scope = crate::export::scope_of(5, 64 * 1024, false);
+    let repos = [repo.path().to_path_buf()];
+    // The served page does preload: without that the check below would pass on nothing.
+    let changes = std::sync::Arc::new(gitterrace_git::ChangeMemo::new());
+    let router = gitterrace_web::export_router(repos.to_vec(), &changes, scope.config.clone())
+        .expect("router");
+    let (status, _, served) =
+        crate::export::write::fetch(&router, "/r/r/").await.expect("served page");
+    let served = String::from_utf8_lossy(&served);
+    assert!(status.is_success(), "the home page answered {status}");
+    assert!(!preload_links(&served).is_empty(), "the served page preloads nothing: {served}");
+    drop(router);
+
+    crate::export::export(&repos, &out, &scope, DEFAULT_PAGES).await.expect("export");
+    let pages = html_pages(&out);
+    assert!(pages.len() > gitterrace_web::WARM_PAGES.len(), "too few pages: {}", pages.len());
+    for (file, html) in &pages {
+        let kept = preload_links(html);
+        assert!(kept.is_empty(), "{} still preloads: {kept:?}", file.display());
+        // A tag cut in half leaves its tail as text right where the head's links are.
+        let head = html.split("</head>").next().unwrap_or_default();
+        assert!(!head.contains("crossorigin>"), "{} kept part of a preload", file.display());
+    }
 }
 
 /// Several repositories export like the server serves them: an index at `/`, each one

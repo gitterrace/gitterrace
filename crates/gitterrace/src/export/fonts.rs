@@ -30,6 +30,18 @@ pub(super) fn inline_fonts(css: &str) -> String {
     out
 }
 
+/// Whether `tag` carries the attribute `name` with `value`, quoted either way or not at all.
+/// The preloads are found by what they mean, not by how the template spells them, so an
+/// attribute added, dropped or reordered there cannot stop export from finding them.
+fn has_attr(tag: &str, name: &str, value: &str) -> bool {
+    tag.split_ascii_whitespace().any(|word| {
+        word.trim_end_matches(['>', '/'])
+            .strip_prefix(name)
+            .and_then(|rest| rest.strip_prefix('='))
+            .is_some_and(|v| v.trim_matches(['"', '\'']).eq_ignore_ascii_case(value))
+    })
+}
+
 /// `html` without its `<link rel="preload" ... as="font">` tags, each removed whole with the
 /// line break after it: a tag the template wraps over two lines must not leave its second line
 /// behind as text.
@@ -42,7 +54,7 @@ pub(super) fn drop_font_preloads(html: &str) -> String {
         };
         let tag = &rest[at..at + len];
         out.push_str(&rest[..at]);
-        if tag.contains("rel=\"preload\"") && tag.contains("as=\"font\"") {
+        if has_attr(tag, "rel", "preload") && has_attr(tag, "as", "font") {
             rest = &rest[at + len..];
             rest = rest.strip_prefix('\n').unwrap_or(rest);
         } else {
@@ -83,13 +95,13 @@ mod tests {
     }
 
     /// A preload the template wraps over two lines goes whole: dropping it line by line left
-    /// ` type="font/woff2" crossorigin>` as text on every exported page.
+    /// its second line as text on every exported page.
     #[test]
     fn a_wrapped_font_preload_leaves_no_text_behind() {
         let html = concat!(
             "<head>\n",
             "<link rel=\"preload\" href=\"/static/fonts/a.woff2\" as=\"font\"\n",
-            " type=\"font/woff2\" crossorigin>\n",
+            " crossorigin>\n",
             "<link rel=\"stylesheet\" href=\"/static/app.css\">\n",
         );
         assert_eq!(
@@ -98,8 +110,35 @@ mod tests {
         );
         // The base template the pages are rendered from, as it is now.
         let base = include_str!("../../../gitterrace-web/templates/_base.html");
+        assert!(base.contains("rel=\"preload\""), "the base template preloads no font");
         let out = drop_font_preloads(base);
-        assert!(!out.contains("as=\"font\""), "a font preload stayed");
-        assert!(!out.contains("type=\"font/woff2\""), "a preload left text behind");
+        assert!(!out.contains("preload"), "a font preload stayed");
+        assert!(!out.contains("crossorigin"), "a preload left text behind");
+    }
+
+    /// The tag is found by its meaning: a template that reorders the attributes, changes the
+    /// quotes or adds one must not bring the preloads back into an export.
+    #[test]
+    fn a_font_preload_is_dropped_however_its_attributes_are_written() {
+        for tag in [
+            "<link as=\"font\" crossorigin rel=\"preload\" href=\"/static/fonts/a.woff2\">",
+            "<link rel='preload' href='/static/fonts/a.woff2' as='font' crossorigin>",
+            "<link rel=preload href=/static/fonts/a.woff2 as=font>",
+            "<link rel=\"preload\" as=\"font\" type=\"font/woff2\" href=\"/a.woff2\" />",
+            "<link\n rel=\"preload\"\n as=\"font\"\n href=\"/a.woff2\">",
+        ] {
+            assert_eq!(drop_font_preloads(&format!("<head>\n{tag}\n<p>")), "<head>\n<p>", "{tag}");
+        }
+    }
+
+    #[test]
+    fn links_that_only_resemble_a_font_preload_stay() {
+        for tag in [
+            "<link rel=\"preload\" href=\"/static/app.css\" as=\"style\">",
+            "<link rel=\"preload\" href=\"/static/app.css\" data-as=\"font\" as=\"style\">",
+            "<link rel=\"stylesheet\" href=\"/static/a.css?rel=preload&as=font\">",
+        ] {
+            assert_eq!(drop_font_preloads(tag), tag);
+        }
     }
 }

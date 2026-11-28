@@ -198,12 +198,44 @@ fn palette(light: Colours, dark: Colours) -> String {
     format!(":root{{\n{}\n}}", rows.join("\n"))
 }
 
-/// The same for Fraunces against Georgia, titles being semibold: 94.5% at weight 600. The
-/// vertical overrides are the face's own (97.8%, 25.5%) divided by that.
-const TITLE_STANDIN: &str = "@font-face{font-family:\"Fraunces Standin\";\n\
-src:local(\"Georgia Bold\"),local(\"Georgia\"),local(\"Gelasio\");\n\
-size-adjust:94.5%;ascent-override:103.5%;\n\
-descent-override:27%;line-gap-override:0%}";
+/// Fraunces against Georgia, measured on the UI's own strings: 106.2% of Georgia's width at
+/// weight 400 (the crumb slash) and 94.5% of Georgia Bold's at 600 (titles), so each weight
+/// band gets its own size-adjust. The vertical overrides are the face's own (97.8%, 25.5%)
+/// divided by that.
+const TITLE_STANDIN: [&str; 2] = [
+    "@font-face{font-family:\"Fraunces Standin\";\n\
+src:local(\"Georgia\"),local(\"Gelasio\");\n\
+font-weight:100 500;size-adjust:106.2%;ascent-override:92.1%;\n\
+descent-override:24%;line-gap-override:0%}",
+    "@font-face{font-family:\"Fraunces Standin\";\n\
+src:local(\"Georgia Bold\"),local(\"Gelasio Bold\"),local(\"Georgia\");\n\
+font-weight:501 900;size-adjust:94.5%;ascent-override:103.5%;\n\
+descent-override:27%;line-gap-override:0%}",
+];
+
+/// Where Georgia is missing (Linux), Times: Liberation Serif is metric-identical to it. Fraunces
+/// is 121.2% of its width at weight 400 and 114.6% of its bold at 600. It is its own family, so
+/// a missing Georgia falls to it.
+const TITLE_STANDIN_TIMES: [&str; 2] = [
+    "@font-face{font-family:\"Fraunces Standin Times\";\n\
+src:local(\"Times New Roman\"),local(\"Liberation Serif\"),local(\"Tinos\");\n\
+font-weight:100 500;size-adjust:121.2%;ascent-override:80.7%;\n\
+descent-override:21%;line-gap-override:0%}",
+    "@font-face{font-family:\"Fraunces Standin Times\";\n\
+src:local(\"Times New Roman Bold\"),local(\"Liberation Serif Bold\"),local(\"Tinos Bold\");\n\
+font-weight:501 900;size-adjust:114.6%;ascent-override:85.3%;\n\
+descent-override:22.3%;line-gap-override:0%}",
+];
+
+/// `JetBrains Mono` against `Courier New` and `Liberation Mono`, which share its 0.6em advance,
+/// so no size-adjust. The vertical overrides are the face's own (1.02em, 0.3em). The code,
+/// counts and chips of a diff header are set in it, so a swap after first layout moved them.
+const MONO_STANDIN: &str = "@font-face{font-family:\"JetBrains Mono Standin\";\n\
+src:local(\"Courier New\"),local(\"Liberation Mono\"),local(\"Cousine\");\n\
+font-weight:100 500;ascent-override:102%;descent-override:30%;line-gap-override:0%}\n\
+@font-face{font-family:\"JetBrains Mono Standin\";\n\
+src:local(\"Courier New Bold\"),local(\"Liberation Mono Bold\"),local(\"Cousine Bold\");\n\
+font-weight:501 900;ascent-override:102%;descent-override:30%;line-gap-override:0%}";
 
 /// Bricolage Grotesque's metrics against Arial, measured on the UI's own strings in a browser:
 /// its width is 104.8% of Arial's at weight 400 and 100.6% of Arial Bold's at 600, so each
@@ -215,7 +247,8 @@ src:local(\"Arial\"),local(\"Liberation Sans\"),local(\"Arimo\");\n\
 font-weight:100 500;size-adjust:104.8%;ascent-override:88.7%;\n\
 descent-override:25.8%;line-gap-override:0%}",
     "@font-face{font-family:\"Bricolage Standin\";\n\
-src:local(\"Arial Bold\"),local(\"Arial\"),local(\"Liberation Sans\");\n\
+src:local(\"Arial Bold\"),local(\"Liberation Sans Bold\"),local(\"Arimo Bold\"),\n\
+local(\"Arial\"),local(\"Liberation Sans\");\n\
 font-weight:501 900;size-adjust:100.6%;ascent-override:92.4%;\n\
 descent-override:26.8%;line-gap-override:0%}",
 ];
@@ -232,7 +265,7 @@ fn fonts(design: &Value) -> Result<Vec<String>> {
     let faces = [
         ("Fraunces", "fraunces", "100 900", "optional"),
         ("Bricolage Grotesque", "bricolage-grotesque", "200 800", "optional"),
-        ("JetBrains Mono", "jetbrains-mono", "100 800", "swap"),
+        ("JetBrains Mono", "jetbrains-mono", "100 800", "optional"),
     ];
     let mut lines: Vec<String> = faces
         .iter()
@@ -244,17 +277,23 @@ fn fonts(design: &Value) -> Result<Vec<String>> {
         })
         .collect();
     // Title and body are `optional` and preloaded by the page head: the browser never swaps
-    // them in after first layout, so a late font moves nothing. Mono is below the fold and
-    // keeps `swap`. A face that missed first paint shows its stand-in: Arial or Georgia sized
-    // and spaced like it, so the page still lays out the same.
+    // them in after first layout, so a late font moves nothing. Mono too: the diff headers
+    // and counts use it. A face that missed first paint shows its stand-in: Arial, Georgia,
+    // Times or Courier (or their Liberation twins on Linux) sized and spaced like it, so the
+    // page still lays out the same.
     lines.extend(BODY_STANDIN.map(str::to_owned));
-    lines.push(TITLE_STANDIN.to_owned());
+    lines.extend(TITLE_STANDIN.map(str::to_owned));
+    lines.extend(TITLE_STANDIN_TIMES.map(str::to_owned));
+    lines.push(MONO_STANDIN.to_owned());
     let stack = |k: &str| -> Result<String> {
         let mut names = vec![web(k)?.to_owned()];
         match k {
             "body" => names.push("Bricolage Standin".to_owned()),
-            "title" => names.push("Fraunces Standin".to_owned()),
-            _ => {}
+            "title" => {
+                names.push("Fraunces Standin".to_owned());
+                names.push("Fraunces Standin Times".to_owned());
+            }
+            _ => names.push("JetBrains Mono Standin".to_owned()),
         }
         for n in f[k]["fallback"].as_array().context("fallback")? {
             names.push(n.as_str().context("fallback name")?.to_owned());
