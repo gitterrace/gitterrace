@@ -10,6 +10,7 @@ mod permalink;
 mod rebuild;
 mod review_plan;
 mod settings;
+mod work_state;
 
 pub use page_tables::Pages;
 pub use review_plan::{PlanRequest, risk_terms};

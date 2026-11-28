@@ -93,6 +93,20 @@ resource, `gitterrace://<repo-id>/<sha>/<path>`, for a client that attaches
 context. `resources/list` holds one overview and one findings entry per
 repository in scope.
 
+## Continue unfinished work
+
+`work_state` (HTTP twin `GET /api/v1/work_state`) answers "where did I stop"
+in lists only, no diff text: the uncommitted files with their line counts
+(`files_omitted` says the scan stopped at `limits.worktree_files`), the files
+that differ from a checkpoint (`since`, an id or a duration, default the newest
+checkpoint), the review basket with each note's `anchor_status` and permalink,
+the newest commits (`commits`, at most 20) and `next`, the calls that follow.
+Lists are capped (200 files, 20 findings) and the `*_total` fields count the
+rest. It reads this machine's working tree and basket, so it is refused on a
+public server and with `features.worktree_enabled` off. Notes and subjects are
+untrusted text. The `continue_work` prompt holds the steps: read the state,
+read the diffs, check each finding, report. It quotes notes as data.
+
 ## Explore history
 
 1. Call `log` with `path` to see the commits that touched a file or directory.

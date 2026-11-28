@@ -4,7 +4,7 @@ use gitterrace_testkit::{Fixture, git};
 use super::McpServer;
 use crate::{ApiError, ApiState};
 
-fn server(config: &str) -> (tempfile::TempDir, McpServer) {
+pub(super) fn server(config: &str) -> (tempfile::TempDir, McpServer) {
     let dir = tempfile::tempdir().expect("tempdir");
     let p = dir.path();
     let _ = Fixture::init(p).write("a.txt", "one\n").commit("feat(core): first");
@@ -319,7 +319,7 @@ fn wide(n: usize, cap: usize) -> (tempfile::TempDir, McpServer, Vec<String>) {
     (dir, McpServer::new(state), names)
 }
 
-fn call(res: Result<rmcp::model::CallToolResult, rmcp::ErrorData>) -> serde_json::Value {
+pub(super) fn call(res: Result<rmcp::model::CallToolResult, rmcp::ErrorData>) -> serde_json::Value {
     let res = res.expect("result");
     assert_ne!(res.is_error, Some(true), "{}", text(&res));
     serde_json::from_str(&text(&res)).expect("json")

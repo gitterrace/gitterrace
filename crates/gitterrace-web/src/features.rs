@@ -35,6 +35,7 @@ pub(crate) const FEATURE_ROUTES: &[(Feature, &[&str])] = &[
             "/api/v1/checkpoints",
             "/api/v1/viewed",
             "/api/v1/findings",
+            "/api/v1/work_state",
             "/worktree/diff/{*path}",
             "/worktree/find",
             "/worktree/raw/{*path}",

@@ -12,6 +12,7 @@ const TOOL_NEEDS: &[(&str, &[Feature], Option<&str>)] = &[
     ("compare", &[Feature::Compare], None),
     ("worktree_diff", &[Feature::Worktree], None),
     ("list_checkpoints", &[Feature::Worktree], None),
+    ("work_state", &[Feature::Worktree], None),
     ("list_viewed", &[Feature::Worktree], None),
     ("list_findings", &[Feature::Worktree], None),
     ("read_file", &[], None),

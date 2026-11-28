@@ -32,4 +32,6 @@ mod limit_tests;
 #[cfg(test)]
 mod memo_tests;
 #[cfg(test)]
+mod public_tests;
+#[cfg(test)]
 mod tests;

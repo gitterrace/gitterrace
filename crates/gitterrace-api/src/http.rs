@@ -8,7 +8,7 @@ use gitterrace_types::api::{
     BlameResponse, BlobResponse, CheckpointsResponse, CommitResponse, CompareResponse,
     ContributorsResponse, EndpointDoc, FileInsight, FindingsResponse, IndexResponse, InsightList,
     InsightResponse, LogResponse, ParamDoc, RefsResponse, RepoResponse, ReviewPlan, TreeResponse,
-    ViewedResponse, WorktreeResponse,
+    ViewedResponse, WorkState, WorktreeResponse,
 };
 use serde::{Deserialize, Serialize};
 
@@ -238,6 +238,19 @@ pub(crate) async fn worktree(
         )
     })
     .await
+}
+
+#[derive(Deserialize)]
+pub(crate) struct WorkStateQuery {
+    since: Option<String>,
+    commits: Option<usize>,
+}
+
+pub(crate) async fn work_state(
+    State(s): State<ApiState>,
+    Query(q): Query<WorkStateQuery>,
+) -> Reply<WorkState> {
+    blocking(&s, move |s| s.work_state(q.since.as_deref(), q.commits)).await
 }
 
 #[derive(Deserialize)]

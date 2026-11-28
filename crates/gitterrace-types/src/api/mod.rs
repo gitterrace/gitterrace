@@ -16,6 +16,7 @@ mod file_insight;
 mod insights;
 mod review;
 mod review_plan;
+mod work_state;
 
 #[cfg(test)]
 mod tests;
@@ -41,6 +42,7 @@ pub use review::{
     NewFinding, ViewedItem, ViewedResponse,
 };
 
+pub use work_state::{WorkCommit, WorkFile, WorkFinding, WorkSince, WorkState, WorkTree};
 pub use review_plan::{
     PlanFile, PlanHotspot, PlanOwner, PlanSkipped, PlanSource, PlanTerms, ReviewPlan, SkipReason,
 };
