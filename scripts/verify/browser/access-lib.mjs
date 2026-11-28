@@ -2,7 +2,7 @@
 // sheet and the overview sidebar order. Each runs in every browser, light and dark, at 1400
 // and 900 px. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { createRequire } from 'node:module';
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   root, sh, sweep, reloadUntil, synced, serve, makeRepo,
@@ -20,12 +20,54 @@ const AXE_TAGS = ['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'];
 const AXE_RULES = ['heading-order'];
 const AXE_WIDTHS = [360, 1440];
 
+// Every route literal of the server's sitemap registry maps to the golden page that renders it,
+// or to a reason it is no page of its own (bytes, JSON, a fragment, a write, a redirect, or a
+// page that needs state the test repository lacks). A route the registry gains and this map
+// lacks fails axe-all, so a new page cannot skip the walk.
+const ROUTE_PAGE = {
+  '/': 'overview', '/tree/{rev}': 'tree', '/tree/{rev}/': 'tree', '/tree/{rev}/{*path}': 'tree',
+  '/blob/{rev}/{*path}': 'blob', '/blame/{rev}/{*path}': 'blame',
+  '/log': 'log', '/log/{rev}': 'log', '/history/{*path}': 'history', '/compare': 'compare',
+  '/commit/{id}': 'commit', '/refs': 'refs', '/worktrees': 'worktrees', '/stashes': 'stashes',
+  '/search': 'search', '/stats': 'insights/activity', '/stats/languages': 'insights/languages',
+  '/stats/hotspots': 'insights/hotspots', '/stats/ownership': 'insights/ownership',
+  '/stats/contributors': 'insights/contributors', '/settings': 'settings',
+  '/hl/{rev}/{*path}': 'fragment', '/raw/{rev}/{*path}': 'bytes',
+  '/diff/{rev}/{index}': 'fragment', '/diff-find/{rev}': 'fragment',
+  '/tag/{name}': 'needs a tag', '/worktree': 'needs uncommitted work',
+  '/worktree/diff/{*path}': 'needs uncommitted work', '/worktree/find': 'fragment',
+  '/worktree/raw/{*path}': 'bytes', '/worktree/blob/{*path}': 'needs uncommitted work',
+  '/stats/ownership/{author}': 'needs an author id', '/events': 'stream',
+  '/api/files/{rev}': 'fragment', '/api/refs': 'fragment', '/api/insight/{rev}': 'fragment',
+  '/api/insight/{rev}/{*path}': 'fragment', '/api/last/{rev}': 'fragment',
+  '/api/last/{rev}/{*path}': 'fragment', '/api/progress': 'json', '/go/{*rest}': 'redirect',
+  '/_send/targets': 'json', '/r/{name}/_send/targets': 'json', '/r/{name}': 'prefix',
+  '/r/{name}/': 'prefix', '/r/{name}/{*rest}': 'prefix', '/api/repos': 'json',
+  '/_dirty': 'json', '/_repos': 'write', '/_checkpoint': 'write', '/_viewed': 'write',
+  '/_viewed/all': 'write', '/_findings': 'write', '/_launch': 'write',
+  '/_settings': 'write', '/_settings/file': 'write', '/_settings/check': 'write',
+};
+
+const NOT_A_PAGE = /^(fragment|bytes|json|stream|redirect|prefix|write|needs )/;
+
+/** The route literals of web::sitemap::PAGES, read from its source (the registry itself). */
+function sitemapRoutes() {
+  const src = readFileSync(join(root, 'crates/gitterrace-web/src/sitemap.rs'), 'utf8');
+  const out = new Set();
+  for (const m of src.matchAll(/&\[([^\]]*)\]/g)) {
+    for (const l of m[1].matchAll(/"(\/[^"]*)"/g)) out.add(l[1]);
+  }
+  return out;
+}
+
 /** The page kinds the golden set renders, as paths in the test repository. */
 async function golden(p, base) {
   const fixed = {
     overview: '/', tree: '/tree/HEAD/src', blob: '/blob/HEAD/a.txt',
     'blob-md': '/blob/HEAD/README.md', log: '/log/HEAD', commit: '/commit/HEAD',
     compare: '/compare', search: '/search?q=one', refs: '/refs', settings: '/settings',
+    blame: '/blame/HEAD/a.txt', history: '/history/a.txt', worktrees: '/worktrees',
+    stashes: '/stashes',
   };
   await p.goto(base + '/stats', { waitUntil: 'load' });
   const tabs = await p.$$eval('main .tabs a', (as) => as.map((a) => a.getAttribute('href')));
@@ -234,6 +276,13 @@ export function checks(env) {
       await b.close();
     }
     if (report) return;
+    for (const route of sitemapRoutes()) {
+      const page = ROUTE_PAGE[route];
+      if (page === undefined) r.fail(`axe-all: sitemap route ${route} has no entry in ROUTE_PAGE`);
+      else if (!NOT_A_PAGE.test(page) && !walked.has(page)) {
+        r.fail(`axe-all: sitemap route ${route} maps to ${page}, which is not walked`);
+      }
+    }
     for (const k of KNOWN_VIOLATIONS) {
       const [page] = k.split(' ');
       if (!walked.has(page)) {
