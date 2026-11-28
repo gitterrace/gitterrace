@@ -53,17 +53,23 @@ gap:2px;flex:none;width:var(--gw);box-sizing:border-box;
 margin:0 0 0 calc(-1 * (var(--gw) + var(--space-3)));
 font:var(--text-2xs)/1.25 var(--mono)}.glabels .gref{color:inherit;border-color:currentColor;
 max-width:100%;text-align:right}
-/* A label breaks after a slash or a hyphen only, shows 3 lines and carries its full name as a
-   tip; a part wider than the gutter is clipped, never split. */
+/* A label breaks after a slash or a hyphen first, shows 3 lines and carries its full name as a
+   tip; a part wider than the gutter (an underscore is no break point) splits at the gutter edge
+   as a last resort, so no part of a name is clipped away. */
 .glabels .gref{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;line-clamp:3;
-overflow:hidden;overflow-wrap:normal;word-break:normal}
+overflow:hidden;overflow-wrap:break-word;word-break:normal}
 /* Labels get a narrow gutter here and wrap inside it, so a long branch name grows its row taller
    and the subject keeps the width. */
 @media (max-width:600px){.graphed{--gw:min(var(--lw,104px),5rem)}
-/* The subject keeps 8rem: when the cell, avatar and commit id leave less, the commit id drops
-   under the text, and the cell stretches over both lines. */
-.graphed .crow{flex-wrap:wrap}.graphed .cmain{min-width:8rem;flex:1 1 8rem}
-.graphed .crow>.sha{margin-left:auto}
+/* The row is a grid, so the cell spans both lines when the commit id drops under the text, and
+   the label gutter is the first column of every row, labelled or not. */
+.graphed .crow{display:grid;grid-template-columns:var(--gw) auto auto minmax(8rem,1fr);
+align-items:center;row-gap:0!important;padding-left:var(--space-3)!important}
+.graphed .crow>.glabels{grid-column:1;grid-row:1/span 2;margin:0}
+.graphed .crow>.graph{grid-column:2;grid-row:1/span 2}
+.graphed .crow>.av{grid-column:3;grid-row:1/span 2}
+.graphed .crow>.cmain{grid-column:4;grid-row:1;min-width:0}
+.graphed .crow>.sha{grid-column:4;grid-row:2;justify-self:end}
 /* The row stays one line here, so the cell meets its neighbors and the text gets what is left.
    Author and time stay on one line and are clipped, never broken inside a word. */
 .graphed .cmain .muted{display:block;overflow:hidden;white-space:nowrap}
