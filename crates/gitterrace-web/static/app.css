@@ -2,6 +2,12 @@
 *{box-sizing:border-box}html{scrollbar-gutter:stable;-webkit-text-size-adjust:100%}
 body{margin:0;background:var(--bg);color:var(--fg);font:var(--text-base)/var(--leading) var(--sans);-webkit-font-smoothing:antialiased}
 a{color:var(--accent-fg);text-decoration:none;text-underline-offset:3px}a:hover{text-decoration:underline}
+/* A link inside running text must differ from its words by more than colour (WCAG 1.4.1).
+   Classed links are components (buttons, chips, shas) and the lists below are navigation:
+   both keep their own look. */
+:where(p,li,dd,td,.meta) a:not([class],
+  :where(nav,.tabs,.tabnav,.crumbs,.files,.list,.entries,.sidelist,.outline,.pager,.opts,.repos) a){
+  text-decoration:underline;text-underline-offset:2px}
 /* --focus is opaque (3:1 on every surface, `cargo xtask check`); --ring is a tint for fills. */
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--radius)}
 /* Skip link: the first stop on every page, shown while focused; main takes focus quietly. */
@@ -65,7 +71,9 @@ header.top>.wrap{container:topbar/inline-size}
 .tabnav a.on{color:var(--fg);font-weight:600;border-bottom:1px solid var(--fg);padding-bottom:calc(var(--space-3) + 1px)}.tabs>a.on{color:var(--fg);font-weight:var(--weight-semibold);border-bottom-color:var(--accent)}
 
 /* primitives */
-.muted{color:var(--muted)}.r{text-align:right}.pad{padding:var(--space-4)}
+.muted{color:var(--muted)}
+.muted a{text-decoration:underline;text-underline-offset:2px}
+.r{text-align:right}.pad{padding:var(--space-4)}
 .card{border:var(--border);border-radius:var(--radius);overflow:hidden;overflow-x:auto;background:var(--bg)}
 .scroll{overflow-x:auto}
 .cols{display:grid;grid-template-columns:minmax(0,1fr) 280px;gap:var(--space-8)}
