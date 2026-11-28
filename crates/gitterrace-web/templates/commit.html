@@ -11,7 +11,13 @@
 <button class="actbtn icon sm" type="button" id="actcommit" data-tip="Actions for this commit"
  aria-haspopup="menu" aria-label="Actions for this commit"></button></div>
 {% if !body.is_empty() %}<pre class="body">{{ body }}</pre>{% endif %}
-{% if !lookups.is_empty() %}<p class="meta lookups">Find this commit in {% for (label, url) in lookups %}{% if !loop.first %} · {% endif %}<a href="{{ url }}" rel="noopener noreferrer">{{ label }}</a>{% endfor %}</p>
+{% if !agents.is_empty() %}<ul class="meta agents">{% for a in agents %}<li>{{ a.label }}
+{%- if let Some(id) = a.session %} <code>{{ id }}</code>
+<button class="actbtn sm" type="button" data-copy="{{ id }}"
+ data-copy-label="session id">Copy id</button>{% endif %}
+{%- if let Some(r) = a.resume %} <code>{{ r }}</code>{% endif %}</li>
+{% endfor %}</ul>
+{% endif %}{% if !lookups.is_empty() %}<p class="meta lookups">Find this commit in {% for (label, url) in lookups %}{% if !loop.first %} · {% endif %}<a href="{{ url }}" rel="noopener noreferrer">{{ label }}</a>{% endfor %}</p>
 {% endif %}<details class="card files" open><summary>{{ files_summary }}<span class="counts">{% call deltas::delta(total_add, total_del) %}{% endcall %}</span></summary>
 <ul>{% for f in files %}<li><a href="#{{ f.anchor }}">{{ f.label }}</a>{% call deltas::file_counts(f.additions, f.deletions) %}{% endcall %}</li>{% endfor %}</ul></details>
 {{ tools|safe }}

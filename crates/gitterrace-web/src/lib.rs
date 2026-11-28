@@ -4,6 +4,7 @@ mod about;
 mod actions;
 mod activity;
 mod add;
+mod agent_trailers;
 mod app;
 mod basket_web;
 #[cfg(test)]

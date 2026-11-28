@@ -232,6 +232,12 @@ Two ways, and you can use both:
   an action hands over is read back with `resolve_permalink`, and
   [Agents and MCP](mcp.md) is a skill to copy for review, history and hotspots.
 
+A commit whose message ends with an `Agent-Session: <id>` trailer shows the
+session and a `claude --resume <id>` command on its page. A `Co-authored-by:`
+trailer that names a coding agent shows too. Only the message is read, so this
+needs no setting and no file outside the repository. Matching a commit to the
+agent's own session files is not done.
+
 ## Read the insights
 
 Open insights with `g i`. The languages page counts lines along the

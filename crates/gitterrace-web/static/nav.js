@@ -547,8 +547,10 @@
   document.addEventListener("click", function (e) {
     var t = e.target.closest && e.target.closest("[data-copy],[data-copy-url]");
     if (!t) return;
-    if (t.dataset.copy) window.gtCopy(t.dataset.copy, "Copied sha", t);
-    else {
+    if (t.dataset.copy) {
+      var what = t.dataset.copyLabel || "sha";
+      window.gtCopy(t.dataset.copy, "Copied " + what, t);
+    } else {
       var parts = local(location.pathname).split("/");
       if (commit && parts.length > 2) parts[2] = commit;
       // links.style = "gitterrace": the same file as gitterrace://<id>/<sha>/<path>#L..

@@ -428,6 +428,8 @@ struct CommitPage {
     files: Vec<FileStatRow>,
     /// `(label, url)`: "Find this commit in ..." links from the `lookup` of each Send to target.
     lookups: Vec<(String, String)>,
+    /// Agent hints from the message trailers.
+    agents: Vec<crate::agent_trailers::AgentLink>,
     diff: String,
 }
 
@@ -487,6 +489,7 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
             total_del: fmt::thousands(d.files.iter().map(|f| u64::from(f.deletions)).sum::<u64>()),
             files: views::file_stats(&d),
             lookups: a.lookups(&id),
+            agents: crate::agent_trailers::links(&d.body),
             diff,
             id,
         })
