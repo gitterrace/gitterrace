@@ -29,6 +29,7 @@ import {
   RESCAN_SECS,
   loadPlaywright,
   launch,
+  guard,
   routeFromDisk,
   makeRepo,
   serve,
@@ -69,6 +70,20 @@ async function context(name, opts = {}) {
 }
 
 
+// The same-origin 4xx/5xx a case is meant to provoke, by case name. Any other one fails the
+// case (lib/browser-lib.mjs guard). Keep each entry to the one status and path the case plants.
+const gone = [{ status: 404, path: /^(\/r\/[^/]+)?\/(nothing-here|r\/nope-not-served\/x)$/ }];
+const EXPECT = {
+  'not-found-states': gone,
+  anatomy: [{ status: 404, path: /^(\/r\/[^/]+)?\/blob\/HEAD\/no-such-file$/ }],
+  'huge-diff': [{ status: 503, path: /\/(worktree\/)?diff\// }],
+  'viewed-migrate-rejected': [{ status: 500, path: /^(\/r\/[^/]+)?\/_viewed\/all$/ }],
+  'basket-send-all': [{ status: 403, path: /\/_findings$/ }],
+  'basket-send-subset': [{ status: 403, path: /\/_findings$/ }],
+  'checkpoint-since-tab': [{ status: 403, path: /\/_checkpoint$/ }],
+  'checkpoint-between': [{ status: 403, path: /\/_checkpoint$/ }],
+};
+
 const env = { pw, dir, srv, r, browsers, tabCounts, marker, context, arg, bin, cfg };
 const LIB = /^[a-z]+-lib\.mjs$/;
 // Check names whose export is not the camelCase of the name.
@@ -85,7 +100,12 @@ try {
     console.log(`-- ${c}`);
     // A case that throws (a server that will not start, a command that fails) fails that case
     // alone, so the cases behind it still report.
+    guard.begin(EXPECT[c]);
     try { await checks[c](); } catch (e) { r.fail(`${c}: ${e?.stack ?? e}`); }
+    const unexpected = guard.take();
+    if (unexpected.length) {
+      r.fail(`${c}: unexpected same-origin error responses: ${unexpected.join(', ')}`);
+    }
   }
 } finally {
   await srv.stop();

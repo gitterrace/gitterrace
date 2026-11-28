@@ -218,7 +218,7 @@ async function cspStyle() {
     else if (!loose) r.fail(`csp-style ${name}: diagram page policy: ${diagram.csp}`);
     else if (diagram.hits.length) r.fail(`csp-style ${name}: ${diagram.hits.join(' | ')}`);
     else r.ok(`csp-style ${name}: diagram drawn, 0 violations`);
-    for (const path of ['/log/HEAD', '/refs', '/languages']) {
+    for (const path of ['/log/HEAD', '/refs', '/stats/languages']) {
       const plain = await open(path);
       await plain.p.waitForLoadState('networkidle');
       const strict = /style-src 'self';/.test(plain.csp) && !plain.csp.includes('unsafe-inline');
@@ -300,7 +300,11 @@ async function chords() {
   }
   if (existsSync(marker)) r.ok('chords: a then x opens the action'); else r.fail('chords: a then x did not run the action');
   await p.keyboard.press('?');
-  const sheet = await p.$eval('.help, .ov', (n) => n.textContent).catch(() => '');
+  // The rows fill in after the key list loads: wait for them, never read the bare sheet.
+  const sheet = await p.waitForFunction(() => {
+    const t = document.querySelector('.help, .ov')?.textContent || '';
+    return /Mark/.test(t) && t;
+  }, null, { timeout: 10000 }).then((h) => h.jsonValue()).catch(() => '');
   if (/Mark/.test(sheet)) r.ok('chords: the ? sheet lists a x'); else r.fail('chords: the ? sheet lacks the chord');
   rmSync(marker, { force: true });
   // A static export (body[data-static]) must ignore the chord.

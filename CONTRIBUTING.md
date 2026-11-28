@@ -132,7 +132,8 @@ job, never raise the timeout.
 - `make check` always
 - `make browser-check BIN=target/debug/git-terrace` if you changed templates,
   CSS or `static/` (Playwright). Run `make browser-deps` once per clone first.
-  Flags are in `scripts/verify/browser/browser-check.mjs`
+  Flags are in `scripts/verify/browser/browser-check.mjs`.
+  A same-origin 4xx or 5xx fails a case unless its `EXPECT` entry lists it.
 - `make bench` if you changed how pages, the index or the server do their work
   (see [benchmarks](docs/benchmarks.md))
 - Other systems locally: `scripts/dev/wine-run.sh` (Windows),

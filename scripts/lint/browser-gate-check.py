@@ -58,7 +58,7 @@ def problems(workflow: str, makefile: str, runner: str) -> list[str]:
     for line in body.splitlines():
         if "browser-check" in line and NARROW.search(line):
             bad.append(f"{WORKFLOW}: job browser narrows the run ({line.strip()}); it runs all")
-    for t in ("browser-check", "browser-reap", "browser-disk"):
+    for t in ("browser-check", "browser-reap", "browser-disk", "browser-err"):
         if NARROW.search(recipe(makefile, t)):
             bad.append(f"Makefile: {t} filters cases or browsers; the gate runs them all")
     if not re.search(r"arg\('--checks', ALL\.join\(','\)\)", runner):

@@ -89,9 +89,51 @@ function chromiumPath() {
 export const LAUNCHERS = ['chromium', 'webkit', 'firefox'];
 
 export async function launch(pw, name) {
-  if (name === 'chromium') return pw.chromium.launch({ executablePath: chromiumPath() });
+  if (name === 'chromium') {
+    return watched(await pw.chromium.launch({ executablePath: chromiumPath() }));
+  }
   if (!LAUNCHERS.includes(name)) die(`unknown browser ${name}; known: ${LAUNCHERS.join(', ')}`);
-  return pw[name].launch();
+  return watched(await pw[name].launch());
+}
+
+/**
+ * The same-origin error guard. A page that gets a 4xx or 5xx from the server it came from used to
+ * be a silent no-op (a refused write left the case waiting on nothing for days). Every context
+ * of every browser `launch` returns reports each such response here, and the runner fails the
+ * case unless it listed that status and path in advance (`guard.begin`). Other origins are not
+ * ours to judge.
+ */
+export const guard = {
+  /** @type {string[]} */ faults: [],
+  /** @type {{status: number, path: RegExp}[]} */ allow: [],
+  /** Starts a case: forgets earlier faults and takes the responses this case may get. */
+  begin(allow = []) { this.faults = []; this.allow = allow; },
+  /** Ends a case: the unexpected responses seen since `begin`, each once. */
+  take() { const out = [...new Set(this.faults)]; this.faults = []; return out; },
+  /** Judges one response; the page's `response` event calls it. */
+  see(res) {
+    const status = res.status();
+    const u = new URL(res.url());
+    if (status < 400 || u.hostname !== '127.0.0.1') return;
+    if (this.allow.some((a) => a.status === status && a.path.test(u.pathname))) return;
+    this.faults.push(`${status} ${res.request().method()} ${u.pathname}`);
+  },
+};
+
+const hooked = new WeakSet();
+function hook(ctx) {
+  if (hooked.has(ctx)) return;
+  hooked.add(ctx);
+  ctx.on('response', (res) => guard.see(res));
+}
+
+/** Makes every context (and so every page) of `b` report to the guard. */
+function watched(b) {
+  const newContext = b.newContext.bind(b);
+  b.newContext = async (...a) => { const c = await newContext(...a); hook(c); return c; };
+  const newPage = b.newPage.bind(b);
+  b.newPage = async (...a) => { const p = await newPage(...a); hook(p.context()); return p; };
+  return b;
 }
 
 /**

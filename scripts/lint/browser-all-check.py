@@ -99,10 +99,27 @@ def port_problems(libs: dict[str, str]) -> list[str]:
     ]
 
 
+RAW_LAUNCH = re.compile(r"\b(?:chromium|webkit|firefox|pw\[[^\]]*\])\.launch(?:Persistent\w*)?\(")
+
+
+def launch_problems(files: dict[str, str]) -> list[str]:
+    """Only lib/browser-lib.mjs starts a browser: its launch() hooks the same-origin error guard,
+    so a browser started any other way would let a 403 pass unseen."""
+    return [
+        f"{name}:{n}: starts a browser directly. Use launch() from lib/browser-lib.mjs"
+        for name, text in sorted(files.items())
+        if name != "browser-lib.mjs"
+        for n, line in enumerate(text.splitlines(), 1)
+        if RAW_LAUNCH.search(line)
+    ]
+
+
 def check_tree() -> int:
     libs = {p.name: p.read_text(encoding="utf-8") for p in sorted(DIR.glob("*-lib.mjs"))}
     bad = problems(RUNNER.read_text(encoding="utf-8"), libs)
     bad += port_problems(libs)
+    scripts = [*DIR.glob("*.mjs"), *(ROOT / "scripts/lib").glob("*.mjs")]
+    bad += launch_problems({p.name: p.read_text(encoding="utf-8") for p in scripts})
     for line in bad:
         print(line)
     if bad:
@@ -125,8 +142,14 @@ def self_test() -> int:
     fixed = port_problems({"f-lib.mjs": "sh(d, bin, '--addr', '127.0.0.1:38625', d);\n"})
     fixed2 = port_problems({"f-lib.mjs": "const u = 'http://127.0.0.1:8080';\n"})
     clean = port_problems({"c-lib.mjs": "const s = await serve(bin, dir);\ns.cli(d, d);\n"})
+    raw = launch_problems({"x-lib.mjs": "const b = await pw.chromium.launch();\n"})
+    raw2 = launch_problems({"x.mjs": "await firefox.launchPersistentContext(d);\n"})
+    raw3 = launch_problems({"x.mjs": "const b = await pw[name].launch();\n"})
+    via = launch_problems({"x.mjs": "const b = await launch(pw, 'webkit');\n"})
+    own = launch_problems({"browser-lib.mjs": "return pw.chromium.launch({});\n"})
     ok = not green and len(red) == 1 and "forgotten" in red[0] and len(arrow) == 1
     ok = ok and len(fixed) == 1 and len(fixed2) == 1 and not clean
+    ok = ok and len(raw) == 1 and len(raw2) == 1 and len(raw3) == 1 and not via and not own
     print("browser-all-check self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

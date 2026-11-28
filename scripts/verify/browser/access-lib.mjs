@@ -31,7 +31,7 @@ const ROUTE_PAGE = {
   '/commit/{id}': 'commit', '/refs': 'refs', '/worktrees': 'worktrees', '/stashes': 'stashes',
   '/search': 'search', '/stats': 'insights/activity', '/stats/languages': 'insights/languages',
   '/stats/hotspots': 'insights/hotspots', '/stats/ownership': 'insights/ownership',
-  '/stats/contributors': 'insights/contributors', '/settings': 'settings',
+  '/stats/contributors': 'insights/contributors', '/_settings': 'settings',
   '/hl/{rev}/{*path}': 'fragment', '/raw/{rev}/{*path}': 'bytes',
   '/diff/{rev}/{index}': 'fragment', '/diff-find/{rev}': 'fragment',
   '/tag/{name}': 'needs a tag', '/worktree': 'needs uncommitted work',
@@ -45,7 +45,7 @@ const ROUTE_PAGE = {
   '/r/{name}/': 'prefix', '/r/{name}/{*rest}': 'prefix', '/api/repos': 'json',
   '/_dirty': 'json', '/_repos': 'write', '/_checkpoint': 'write', '/_viewed': 'write',
   '/_viewed/all': 'write', '/_findings': 'write', '/_launch': 'write',
-  '/_settings': 'write', '/_settings/file': 'write', '/_settings/check': 'write',
+  '/_settings/file': 'write', '/_settings/check': 'write',
 };
 
 const NOT_A_PAGE = /^(fragment|bytes|json|stream|redirect|prefix|write|needs )/;
@@ -61,11 +61,15 @@ function sitemapRoutes() {
 }
 
 /** The page kinds the golden set renders, as paths in the test repository. */
+/** The settings page is the server's, not a repository's: it sits at the origin. */
+const SETTINGS = '/_settings';
+const at = (srv, path) => (path === SETTINGS ? srv.origin : srv.base) + path;
+
 async function golden(p, base) {
   const fixed = {
     overview: '/', tree: '/tree/HEAD/src', blob: '/blob/HEAD/a.txt',
     'blob-md': '/blob/HEAD/README.md', log: '/log/HEAD', commit: '/commit/HEAD',
-    compare: '/compare', search: '/search?q=one', refs: '/refs', settings: '/settings',
+    compare: '/compare', search: '/search?q=one', refs: '/refs', settings: SETTINGS,
     blame: '/blame/HEAD/a.txt', history: '/history/a.txt', worktrees: '/worktrees',
     stashes: '/stashes',
   };
@@ -248,7 +252,7 @@ export function checks(env) {
         await p.emulateMedia({ colorScheme: scheme });
         await p.setViewportSize({ width, height: 900 });
         for (const [key, path] of Object.entries(all)) {
-          await p.goto(srv.base + path, { waitUntil: 'load' });
+          await p.goto(at(srv, path), { waitUntil: 'load' });
           if (key.startsWith('insights')) await until(p, 'svg.chart');
           await p.evaluate(() => document.fonts.ready);
           await p.addScriptTag({ path: axePath });
@@ -299,12 +303,12 @@ export function checks(env) {
     const name = browsers.includes('chromium') ? 'chromium' : null;
     if (!name) return r.ok('forced-colors: skipped, needs chromium');
     const { b, ctx } = await context(name);
-    for (const path of ['/', '/log/HEAD', '/stats', '/settings']) {
+    for (const path of ['/', '/log/HEAD', '/stats', SETTINGS]) {
       for (const width of [1400, 360]) {
         const p = await ctx.newPage();
         await p.emulateMedia({ forcedColors: 'active', colorScheme: 'light' });
         await p.setViewportSize({ width, height: 800 });
-        await p.goto(srv.base + path, { waitUntil: 'load' });
+        await p.goto(at(srv, path), { waitUntil: 'load' });
         if (path === '/stats') await until(p, 'svg.chart');
         const where = `forced-colors ${path} ${width}`;
         const bad = [];
@@ -338,7 +342,7 @@ export function checks(env) {
           };
           return { on: look(on), off: off ? look(off) : null };
         });
-        if (path !== '/settings' && (!sel || sel.on === sel.off)) {
+        if (path !== SETTINGS && (!sel || sel.on === sel.off)) {
           bad.push(`selected tab looks like the others (${sel?.on})`);
         }
         bad.length ? r.fail(`${where}: ${[...new Set(bad)].join('; ')}`) : r.ok(where);
