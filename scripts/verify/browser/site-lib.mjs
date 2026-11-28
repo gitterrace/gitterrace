@@ -1,6 +1,6 @@
 // Checks of marks and the generated site: mark seam, about placement, site theme.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
-import { readFileSync, readdirSync, mkdtempSync, renameSync, rmSync } from 'node:fs';
+import { readFileSync, readdirSync, mkdtempSync, renameSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -13,6 +13,7 @@ import {
   sh,
   scrollSettled,
   frames,
+  removeAll,
 } from '../../lib/browser-lib.mjs';
 import { serve } from './sitebar-lib.mjs';
 
@@ -326,7 +327,7 @@ async function exportFromDisk() {
       r.verdict(where, bad, `forwards, styled, a link opens a second page, no server form shows, no script error (${pages.length} form pages)`, ', ');
     } catch (e) { r.fail(`${where}: ${String(e.message).split('\n')[0]}`); } finally { await b.close(); }
   }
-  rmSync(join(out, '..'), { recursive: true, force: true });
+  removeAll(join(out, '..'));
 }
 // The landing page's install tabs: the selected tab merges into its panel (no line at the seam,
 // the panel's colour), an unselected tab keeps the line so it reads as behind. Pixels at the seam.
@@ -439,8 +440,8 @@ async function exportSwitch() {
       r.fail(`${where}: ${String(e.message).split('\n')[0]}`);
     } finally { await b.close(); }
   }
-  rmSync(join(out, '..'), { recursive: true, force: true });
-  rmSync(join(other, '..'), { recursive: true, force: true });
+  removeAll(join(out, '..'));
+  removeAll(join(other, '..'));
 }
 
   return { markSeam, aboutPlace, siteTheme, landingNoSideways, exportFromDisk, exportSwitch, installTabs };

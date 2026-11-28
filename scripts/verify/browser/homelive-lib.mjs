@@ -3,7 +3,7 @@
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { sh, serve, WATCH_BOUND_MS, commitAll } from '../../lib/browser-lib.mjs';
+import { sh, serve, WATCH_BOUND_MS, commitAll, removeAll } from '../../lib/browser-lib.mjs';
 
 /** A one-commit repository in `dir`. */
 function small(dir) {
@@ -68,7 +68,7 @@ export function checks(env) {
       } finally {
         await b.close();
         srv.stop();
-        rmSync(top, { recursive: true, force: true });
+        removeAll(top);
       }
     }
   }

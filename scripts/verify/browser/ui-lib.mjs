@@ -15,6 +15,7 @@ import {
   frames,
   scrollSettled,
   domQuiet,
+  removeAll,
 } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (pw, dir, srv, r, bin, cfg, arg, ...) */
@@ -492,12 +493,12 @@ async function repoSwitch() {
       } finally {
         await b.close();
         one.stop();
-        rmSync(state, { recursive: true, force: true });
+        removeAll(state);
       }
     }
   } finally {
     if (saved === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = saved;
-    rmSync(two, { recursive: true, force: true });
+    removeAll(two);
   }
 }
 
@@ -558,7 +559,7 @@ async function liveScroll() {
     if (one) one.stop();
     if (saved === undefined) delete process.env.XDG_STATE_HOME; else process.env.XDG_STATE_HOME = saved;
     rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-    rmSync(state, { recursive: true, force: true });
+    removeAll(state);
   }
 }
 

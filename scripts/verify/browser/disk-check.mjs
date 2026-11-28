@@ -9,7 +9,7 @@
 // route covering only one file type, or only unbundled sheets, also goes red.
 //
 //   node scripts/verify/browser/disk-check.mjs [--bin target/debug/git-terrace] [--browser webkit]
-import { cpSync, appendFileSync, readdirSync, readFileSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, appendFileSync, readdirSync, readFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import {
@@ -19,6 +19,7 @@ import {
   makeRepo,
   serve,
   routeFromDisk,
+  removeAll,
 } from '../../lib/browser-lib.mjs';
 
 const arg = (k, d) => {
@@ -72,8 +73,8 @@ try {
     'from-disk: the bare-name route never shows the edits, so the probe can go red');
 } finally {
   await b.close();
-  srv.stop();
-  rmSync(dir, { recursive: true, force: true });
-  rmSync(copy, { recursive: true, force: true });
+  await srv.stop();
+  removeAll(dir);
+  removeAll(copy);
 }
 process.exit(bad ? 1 : 0);

@@ -12,6 +12,7 @@ import {
   scrollSettled,
   frames,
   WATCH_BOUND_MS,
+  removeAll,
 } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (r, browsers, context, bin, cfg, ...) */
@@ -242,7 +243,7 @@ export function checks(env) {
       if (saved === undefined) delete process.env.XDG_STATE_HOME;
       else process.env.XDG_STATE_HOME = saved;
       rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-      rmSync(state, { recursive: true, force: true });
+      removeAll(state);
     }
   }
   // A reader at the top of the working tree page stays at scrollY 0 through refreshes that change
@@ -338,7 +339,7 @@ export function checks(env) {
       if (saved === undefined) delete process.env.XDG_STATE_HOME;
       else process.env.XDG_STATE_HOME = saved;
       rmSync(repo, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
-      rmSync(state, { recursive: true, force: true });
+      removeAll(state);
     }
   }
   return { liveRead, worktreeScroll };

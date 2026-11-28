@@ -1,10 +1,10 @@
 // The file card: the blob page shows a card, the tree page a hot badge on a row, neither moves
 // the layout of what was already there, and a server whose index is not built shows nothing.
 // Imported by browser-check.mjs, not run on its own.
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { serve, makeRepo } from '../../lib/browser-lib.mjs';
+import { serve, makeRepo, removeAll } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, dir, bin, ...) */
 export function checks(env) {
@@ -55,9 +55,9 @@ export function checks(env) {
       r.verdict('file-card-fragment cold', body.trim() ? ['a card on a cold index'] : [],
         'nothing shown');
     } finally {
-      cold.stop();
-      rmSync(cfg, { recursive: true, force: true });
-      rmSync(fresh, { recursive: true, force: true });
+      await cold.stop();
+      removeAll(cfg);
+      removeAll(fresh);
     }
   }
 

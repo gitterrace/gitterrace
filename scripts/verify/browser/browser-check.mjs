@@ -17,7 +17,6 @@ import {
   readFileSync,
   readdirSync,
   writeFileSync,
-  rmSync,
   mkdirSync,
   mkdtempSync,
   existsSync,
@@ -36,6 +35,7 @@ import {
   openPage,
   reporter,
   sh,
+  removeAll,
 } from '../../lib/browser-lib.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i < 0 ? d : process.argv[i + 1]; };
@@ -88,8 +88,8 @@ try {
     try { await checks[c](); } catch (e) { r.fail(`${c}: ${e?.stack ?? e}`); }
   }
 } finally {
-  srv.stop();
-  rmSync(dir, { recursive: true, force: true });
-  rmSync(cfg, { recursive: true, force: true });
+  await srv.stop();
+  removeAll(dir);
+  removeAll(cfg);
 }
 process.exit(r.result());

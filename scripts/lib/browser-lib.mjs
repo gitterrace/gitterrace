@@ -12,6 +12,7 @@ import {
   readdirSync,
   readFileSync,
   existsSync,
+  rmSync,
 } from 'node:fs';
 import { createRequire } from 'node:module';
 import { tmpdir, homedir } from 'node:os';
@@ -309,14 +310,16 @@ export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'
   const args = ['serve', '--addr', `127.0.0.1:${port}`, '--config', cfg, ...dirs];
   const child = spawn(bin, args, { stdio: 'ignore', env });
   servers.add(child);
-  child.on('exit', () => servers.delete(child));
+  const exited = new Promise((done) => {
+    child.on('exit', () => { servers.delete(child); done(); });
+  });
   const origin = `http://127.0.0.1:${port}`;
   let up = false;
   for (let i = 0; i < 100 && !up; i++) {
     try { up = (await fetch(origin + '/')).ok; } catch {}
     if (!up) await new Promise((r) => setTimeout(r, 100));
   }
-  if (!up) { child.kill(); throw new Error(`${bin} did not answer on ${origin}`); }
+  if (!up) { child.kill(); await exited; throw new Error(`${bin} did not answer on ${origin}`); }
   const m = /href="(\/r\/[^"\/]+)\/?"/.exec(await (await fetch(origin + '/')).text());
   const secret = join(state, 'gitterrace', `add-token-${port}`);
   const owner = () => ownerCookie(origin, secret);
@@ -328,7 +331,19 @@ export async function serve(bin, dir, cfg = mkdtempSync(join(tmpdir(), 'gt-cfg-'
     bin, ['--addr', `127.0.0.1:${port}`, '--config', cfg, ...rest],
     { cwd, stdio: 'pipe', env: { ...process.env, ...ident, XDG_STATE_HOME: state } },
   ).toString().trim();
-  return { origin, base: m ? origin + m[1] : origin, stop: () => child.kill(), owner, cli, state };
+  // Resolves once the process is gone: it writes its cache under the served folder until then,
+  // so a folder removed before that fails with ENOTEMPTY.
+  const stop = () => { child.kill(); return exited; };
+  return { origin, base: m ? origin + m[1] : origin, stop, owner, cli, state };
+}
+
+/**
+ * Removes folders after their server is stopped. The one cleanup every case uses: retries
+ * cover a late write from a process that is still closing its files.
+ */
+export function removeAll(...paths) {
+  const opts = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
+  for (const d of paths) rmSync(d, opts);
 }
 
 /**
