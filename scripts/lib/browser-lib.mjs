@@ -90,7 +90,12 @@ export const LAUNCHERS = ['chromium', 'webkit', 'firefox'];
 
 export async function launch(pw, name) {
   if (name === 'chromium') {
-    return watched(await pw.chromium.launch({ executablePath: chromiumPath() }));
+    return watched(await pw.chromium.launch({
+      executablePath: chromiumPath(),
+      // Hosted linux draws 15px classic scrollbars. Keep them so a mac run sees the same.
+      ignoreDefaultArgs: ['--hide-scrollbars'],
+      args: ['--disable-features=OverlayScrollbar'],
+    }));
   }
   if (!LAUNCHERS.includes(name)) die(`unknown browser ${name}; known: ${LAUNCHERS.join(', ')}`);
   return watched(await pw[name].launch());

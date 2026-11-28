@@ -95,8 +95,9 @@ export function checks(env) {
               const rc = h.getBoundingClientRect();
               return { vis: h.getClientRects().length > 0, text: t,
                 more: !!h.querySelector('a[href*="#find-commits"]'),
-                fits: rc.left >= 0 && rc.right <= innerWidth,
-                sideways: document.documentElement.scrollWidth - innerWidth };
+                fits: rc.left >= 8 && rc.right <= document.documentElement.clientWidth - 8,
+                sideways: document.documentElement.scrollWidth
+                  - document.documentElement.clientWidth };
             });
             const lists = names.every((n) => shown.text.includes(n + (n === 'merge' ? '' : ':')));
             let closed = true;
