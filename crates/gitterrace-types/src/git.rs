@@ -46,6 +46,7 @@ string_enum! {
     pub enum AnchorStatus [serde] {
         Untouched => "untouched",
         LinesChanged => "lines changed",
+        LinesEdited => "lines edited",
         FileChanged => "file changed",
         FileGone => "file gone",
     }

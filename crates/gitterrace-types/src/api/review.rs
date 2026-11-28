@@ -75,11 +75,13 @@ pub struct FindingLines {
 pub struct FindingAnchor {
     /// `head`, or `worktree` when the uncommitted changes were taken into account.
     pub checked_against: AnchorBasis,
-    /// Only when the status is `untouched` and the lines moved: where the same lines are now.
+    /// When the status is `untouched` and the lines moved, or `lines edited`: where they are
+    /// now. For `lines edited` it is the span the diff maps the old lines to, not a guess.
     pub now_lines: Option<FindingLines>,
     /// The path now, after following renames. Null when the file is gone.
     pub now_path: Option<String>,
-    /// What happened to the code: `untouched`, `lines changed`, `file changed` or `file gone`.
+    /// What happened to the code: `untouched`, `lines changed`, `lines edited`,
+    /// `file changed` or `file gone`.
     /// It never says whether the finding was dealt with.
     pub status: AnchorStatus,
 }

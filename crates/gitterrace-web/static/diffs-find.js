@@ -19,7 +19,10 @@
   function lines(section) {
     var map = {};
     Array.prototype.forEach.call(section.querySelectorAll(".diff div[data-o]"), function (d) {
-      var k = d.className === "del" ? "del" + d.dataset.o : d.className + d.dataset.n;
+      // A finding mark adds a class (`fm`), so the kind is read from the list, not the string.
+      var del = d.classList.contains("del");
+      var kind = d.classList.contains("add") ? "add" : "ctx";
+      var k = del ? "del" + d.dataset.o : kind + d.dataset.n;
       map[k] = d;
     });
     return map;

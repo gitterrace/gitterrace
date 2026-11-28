@@ -387,6 +387,7 @@ pub(super) async fn blame(
     Path((rev, path)): Path<(String, String)>,
     Query(q): Query<BlameQuery>,
 ) -> Result<Html<String>> {
+    let (rev_of, path_of) = (rev.clone(), path.clone());
     let (key, rev, path) = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
         let from = q.from.map_or_else(String::new, |f| f.to_string());
@@ -395,7 +396,7 @@ pub(super) async fn blame(
     })
     .await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html(h));
+        return marked_blame(&app, &rev_of, &path_of, h).await;
     }
     let p = blocking(&app, move |a| {
         let id = a.repo.resolve(&rev)?;
@@ -459,7 +460,20 @@ pub(super) async fn blame(
         Ok(page) => page.render()?,
         Err(rows) => rows,
     };
+    // The memo holds the page without marks: the basket changes without a commit.
     app.memo_put(key, &html);
+    marked_blame(&app, &rev_of, &path_of, html).await
+}
+
+/// `html`, a blame page or its rows, with the basket's finding marks on the lines they point at.
+async fn marked_blame(app: &Arc<App>, rev: &str, path: &str, html: String) -> Result<Html<String>> {
+    let (rev, path) = (rev.to_owned(), path.trim_matches('/').to_owned());
+    let html = blocking(app, move |a| {
+        let id = a.repo.resolve(&rev)?;
+        let marks = crate::blob_marks::marks(a, Some(&id), &path);
+        Ok(crate::blob_marks::apply_blame(html, &marks))
+    })
+    .await?;
     Ok(Html(html))
 }
 

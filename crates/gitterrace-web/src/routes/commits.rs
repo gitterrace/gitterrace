@@ -1,6 +1,7 @@
 //! The log and commit pages, with the commit filter.
 
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 use askama::Template;
 use axum::{
@@ -444,8 +445,9 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     })
     .await?;
     if let Some(h) = app.memo_get(&key) {
-        return Ok(Html(h));
+        return marked_commit(&app, &id, h).await;
     }
+    let id_of = id.clone();
     let p = blocking(&app, move |a| {
         let d = a.repo.commit(&id)?;
         let parent = d.summary.parents.first().map(String::as_str);
@@ -499,7 +501,19 @@ pub(super) async fn commit(State(app): Shared, Path(id): Path<String>) -> Result
     })
     .await?;
     let html = p.render()?;
+    // The memo holds the page without marks: the basket changes without a commit.
     app.memo_put(key, &html);
+    marked_commit(&app, &id_of, html).await
+}
+
+/// `html`, a commit page, with the basket's findings made at that commit marked on its diff.
+async fn marked_commit(app: &Arc<App>, id: &str, html: String) -> Result<Html<String>> {
+    let id = id.to_owned();
+    let html = blocking(app, move |a| {
+        let marks = crate::blob_marks::diff_marks(a, crate::blob_marks::DiffAt::Commit(&id));
+        Ok(crate::blob_marks::apply_diff(html, &marks))
+    })
+    .await?;
     Ok(Html(html))
 }
 

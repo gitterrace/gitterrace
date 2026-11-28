@@ -4,13 +4,17 @@
 //! The finding names a commit, a path and maybe lines. The anchor reads that text at the
 //! commit, then at HEAD (following a rename), then in the working tree when the file is one of
 //! the changed files. The lines are looked for as the same block of text: found where they were
-//! or moved, they are `untouched`, otherwise `lines changed`. When line anchoring is not
+//! or moved, they are `untouched`. Otherwise the old text is diffed against the new and the
+//! range is mapped through the hunks: a range with a surviving or replaced line is
+//! `lines edited` at its mapped span, one whose lines are all gone is `lines changed`. When line
+//! anchoring is not
 //! possible (binary, too large, a range past the end) the detail is dropped to the file and
 //! never guessed. Nothing here writes.
 
 use std::collections::HashMap;
 
 use gitterrace_types::AnchorStatus;
+use gix::diff::blob::{Algorithm, Diff, InternedInput};
 
 use crate::worktree::{WorktreeView, WtFile};
 use crate::{Repo, Result};
@@ -33,7 +37,7 @@ pub struct AnchorQuery {
 pub struct Anchor {
     pub status: AnchorStatus,
     pub now_path: Option<String>,
-    /// Only for `untouched` lines that moved.
+    /// For `untouched` lines that moved and for `lines edited`: where the lines are now.
     pub now_lines: Option<(u32, u32)>,
     /// True when the working tree was part of the check.
     pub worktree: bool,
@@ -162,8 +166,62 @@ fn lines_status(old: &str, new: &str, range: (u32, u32)) -> Option<Located> {
             let len = u32::try_from(want.len()).unwrap_or(u32::MAX);
             (AnchorStatus::Untouched, Some((a, a.saturating_add(len - 1))))
         }
-        None => (AnchorStatus::LinesChanged, None),
+        None => edited_span(old, new, range).map_or((AnchorStatus::LinesChanged, None), |span| {
+            (AnchorStatus::LinesEdited, Some(span))
+        }),
     })
+}
+
+/// One changed run of a line diff: old lines `.0` became new lines `.1`, each 0-based and
+/// end-exclusive.
+type Run = ((u32, u32), (u32, u32));
+
+/// Where one old line is in the new text.
+#[derive(Debug, PartialEq, Eq)]
+enum Spot {
+    /// In an unchanged run: the same line, at this 0-based place.
+    Kept(u32),
+    /// Inside a changed run: the lines that replaced it, 0-based and end-exclusive.
+    Replaced(u32, u32),
+}
+
+fn spot(runs: &[Run], line: u32) -> Spot {
+    let mut shift = 0i64;
+    for &((old_start, old_end), (new_start, new_end)) in runs {
+        if line < old_start {
+            break;
+        }
+        if line < old_end {
+            return Spot::Replaced(new_start, new_end);
+        }
+        shift += i64::from(new_end) - i64::from(new_start);
+        shift -= i64::from(old_end) - i64::from(old_start);
+    }
+    Spot::Kept(u32::try_from(i64::from(line) + shift).unwrap_or(0))
+}
+
+/// The 1-based inclusive span in the new text of the old 0-based lines `first..=last`, or
+/// `None` when every one of them was deleted. Never guesses: the ends come from the diff alone.
+fn map_range(runs: &[Run], first: u32, last: u32) -> Option<(u32, u32)> {
+    let start = match spot(runs, first) {
+        Spot::Kept(n) | Spot::Replaced(n, _) => n,
+    };
+    let end = match spot(runs, last) {
+        Spot::Kept(n) => n.saturating_add(1),
+        Spot::Replaced(_, e) => e,
+    };
+    (end > start).then_some((start.saturating_add(1), end))
+}
+
+/// The lines of `old` at `range`, found in `new` by following the diff between them.
+fn edited_span(old: &str, new: &str, range: (u32, u32)) -> Option<(u32, u32)> {
+    let input = InternedInput::new(old, new);
+    let diff = Diff::compute(Algorithm::Myers, &input);
+    let runs: Vec<Run> = diff
+        .hunks()
+        .map(|h| ((h.before.start, h.before.end), (h.after.start, h.after.end)))
+        .collect();
+    map_range(&runs, range.0.checked_sub(1)?, range.1.checked_sub(1)?)
 }
 
 /// The anchors of `queries`, in the same order. The tree is listed and each blob read at most

@@ -356,7 +356,7 @@ fn findings_round_trip_with_anchors_computed_on_read() {
     assert_eq!(r.findings[0].anchor.checked_against, AnchorBasis::Worktree);
     std::fs::write(d.path().join("a.txt"), "edited\n").expect("write");
     let r = s.findings().expect("list");
-    assert_eq!(r.findings[0].anchor.status, AnchorStatus::LinesChanged);
+    assert_eq!(r.findings[0].anchor.status, AnchorStatus::LinesEdited);
     assert_eq!(r.findings[1].anchor.status, AnchorStatus::FileChanged);
     assert_eq!(s.findings_by_id(std::slice::from_ref(&big)).expect("by id").len(), 1);
     assert!(s.findings_by_id(&["f-nope".to_owned()]).is_err());
@@ -442,7 +442,7 @@ fn findings_are_refused_when_the_worktree_switch_is_off() {
         std::fs::write(d.path().join("a.txt"), "edited\n").expect("write");
         let name = d.path().file_name().expect("name").to_string_lossy().into_owned();
         let on = s.findings().expect("on by default");
-        assert_eq!(on.findings[0].anchor.status, AnchorStatus::LinesChanged);
+        assert_eq!(on.findings[0].anchor.status, AnchorStatus::LinesEdited);
         let cfg = gitterrace_config::parse(&cfg.replace("NAME", &name)).expect("parse").config;
         let s = s.configured(&cfg);
         assert!(matches!(s.findings(), Err(crate::ApiError::Forbidden(_))), "{cfg:?}");

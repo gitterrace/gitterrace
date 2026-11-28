@@ -5,12 +5,14 @@
 // - three notes are added from the "." menu of a line selection, the header count reads 3
 // - the panel lists them with the status chip "untouched"
 // - Send all runs the action once with the three ids and the server's own notes
-// - after an edit to the noted lines the chip reads "lines changed"
+// - after an edit to the noted lines the chip reads "lines edited"
 // - a note with markup shows as text, never as an element
 // - with no owner cookie a write answers 403 and nothing is kept
 // - a basket of 501 entries sends a chosen subset of 500 and keeps every entry
 // - blob-finding-marker: a finding on lines 4-5 puts a gutter dot on those rows, its link opens
-//   the panel, and edited lines lose it
+//   the panel, and edited lines keep a hollow one
+// - blame-diff-finding-marker: blame marks the finding's rows, and after an edit the working tree
+//   diff marks the mapped span with a hollow dot
 // A screenshot of the panel goes to $TMPDIR/gt-basket-<browser>.png.
 import { mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
@@ -78,9 +80,9 @@ export function checks(env) {
           writeFileSync(join(dir, 'a.txt'), BODY.replace('line 4', 'changed 4'));
           await p.reload({ waitUntil: 'load' });
           await p.click('#basketbtn');
-          await p.waitForSelector('.basket-chip:text-is("lines changed")', WAIT).then(
-            () => r.ok(`${w}: an edited range reads lines changed`),
-            () => r.fail(`${w}: no lines changed chip`));
+          await p.waitForSelector('.basket-chip:text-is("lines edited")', WAIT).then(
+            () => r.ok(`${w}: an edited range reads lines edited`),
+            () => r.fail(`${w}: no lines edited chip`));
           const plain = await fetch(`${srv.base}/_findings`, {
             method: 'DELETE',
             headers: { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin',
@@ -175,6 +177,54 @@ export function checks(env) {
       }
     }
   }
+  // A finding on lines 4-5, then line 4 edited in the work tree: blame and the working tree diff
+  // mark the span where it is now with a hollow dot, "edited since flagged".
+  async function blameDiffFindingMarker() {
+    for (const name of browsers) {
+      const dir = mkdtempSync(join(tmpdir(), 'gt-basket-'));
+      const cfg = mkdtempSync(join(tmpdir(), 'gt-basket-cfg-'));
+      sh(dir, 'git', 'init', '-q', '-b', 'main');
+      writeFileSync(join(dir, 'a.txt'), BODY);
+      commitAll(dir, 'init');
+      const srv = await serve(bin, dir, cfg);
+      const w = `blame-diff-finding-marker ${name}`;
+      try {
+        const { b, ctx } = await context(name);
+        try {
+          await ctx.addCookies([await srv.owner()]);
+          const p = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
+          await p.goto(`${srv.base}/blob/main/a.txt#L4-L5`, { waitUntil: 'load' });
+          await p.waitForSelector('#basketbtn', WAIT);
+          await p.keyboard.press('.');
+          await p.locator('.actmenu li:has-text("Add to review")').click();
+          await p.locator('textarea.basket-note').fill('mind this');
+          await p.locator('.basket form button[type=submit]').click();
+          await p.waitForSelector('.basket', { state: 'detached', ...WAIT });
+          await p.goto(`${srv.base}/blame/main/a.txt`, { waitUntil: 'load' });
+          const rows = await p.$$eval('.blame tr.fm', (r) => r.map((x) => x.id));
+          say(rows.join() === 'L4,L5', `${w}: blame marks lines 4 and 5`,
+            `${w}: blame marked ${rows}`);
+          say((await p.$$('.blame .fm-link:not(.fe)')).length === 1, `${w}: one solid dot in blame`,
+            `${w}: blame dots wrong`);
+          writeFileSync(join(dir, 'a.txt'), BODY.replace('line 4', 'changed 4'));
+          await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
+          const rowsNow = await p.$$eval('div.diff .fm', (r) => r.map((x) => x.dataset.n));
+          say(rowsNow.join() === '4,5', `${w}: the diff marks the edited span`,
+            `${w}: diff marked ${rowsNow}`);
+          const hollow = await p.$$eval('div.diff .fm-link.fe', (a) => a.map((x) => x.title));
+          say(hollow.length === 1 && hollow[0].includes('Edited since flagged'),
+            `${w}: the dot is hollow and says edited`, `${w}: dots ${hollow}`);
+          await p.close();
+        } finally { await b.close(); }
+      } catch (e) {
+        r.fail(`${w}: ${e && e.stack}`);
+      } finally {
+        srv.stop();
+        const gone = { recursive: true, force: true, maxRetries: 10, retryDelay: 200 };
+        for (const d of [dir, cfg]) rmSync(d, gone);
+      }
+    }
+  }
   // The file view marks the lines a finding points at, and the marker opens the basket.
   async function blobFindingMarker() {
     for (const name of browsers) {
@@ -210,8 +260,9 @@ export function checks(env) {
           await p.keyboard.press('Escape');
           writeFileSync(join(dir, 'a.txt'), BODY.replace('line 4', 'changed 4'));
           await p.goto(`${srv.base}/worktree/blob/a.txt`, { waitUntil: 'load' });
-          say((await p.$$('.fm-link')).length === 0, `${w}: edited lines lose the marker`,
-            `${w}: a marker stayed on edited lines`);
+          const solid = (await p.$$('.fm-link:not(.fe)')).length;
+          say(solid === 0 && (await p.$$('.fm-link.fe')).length === 1,
+            `${w}: edited lines keep a hollow marker`, `${w}: the edited marker is wrong`);
           await p.close();
         } finally { await b.close(); }
       } catch (e) {
@@ -223,5 +274,5 @@ export function checks(env) {
       }
     }
   }
-  return { basketSendAll, basketSendSubset, blobFindingMarker };
+  return { basketSendAll, basketSendSubset, blobFindingMarker, blameDiffFindingMarker };
 }

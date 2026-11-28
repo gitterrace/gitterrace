@@ -180,10 +180,13 @@ with a note of your own. It lives in `.git/gitterrace/findings`, is capped by
 `review.findings_entries` (oldest dropped) and is not rebuildable: deleting
 the folder forgets it. `GET /api/v1/findings` and the
 `list_findings` tool list it, oldest first, and say where the code of each
-finding is now: `untouched`, `lines changed`, `file changed` or `file gone`. A
+finding is now: `untouched`, `lines changed`, `lines edited`, `file changed` or `file gone`. A
 status says what happened to the code, never whether the finding was dealt
 with. Lines are looked up as the same text, so moved lines stay `untouched`
-with their new range. When line anchoring is impossible (a binary file, a range
+with their new range. Lines that were edited are followed through the diff and
+reported as `lines edited` at the span they became, or `lines changed` when they
+were all deleted. A consumer that matches the statuses must accept the new one.
+When line anchoring is impossible (a binary file, a range
 past the end) the answer is about the whole file. Both are refused on a public
 server, and neither writes: adding and removing is a web action. Pass
 `findings` to the `review_change` prompt to include the basket in the recipe.
@@ -192,8 +195,8 @@ An action of kind `review` hands the whole basket to a script as one payload.
 In the browser the basket is the button in the top bar, with the number of
 entries on it. Select lines (or a file, hunk or commit), press `.` and choose
 **Add to review** to write a note. The button opens the panel: each entry shows
-where its code is now as a chip (`untouched`, `lines changed`, `file changed`
-or `file gone`), with a Remove button, plus **Clear**. **Send all** runs one of
+where its code is now as a chip (`untouched`, `lines changed`, `lines edited`,
+`file changed` or `file gone`), with a Remove button, plus **Clear**. **Send all** runs one of
 your actions of kind `review` with every entry in a single payload. The page
 names the entries by id and the server reads the notes from its own basket, so
 a page cannot send words of its own. Notes are plain text and shown as text.

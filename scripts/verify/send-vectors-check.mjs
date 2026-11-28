@@ -41,7 +41,7 @@ for (const p of ['notes/guide/setup.md', 'a/b.rs']) {
 }
 // Review vectors: one `source:` line per finding, equal to sourceLine(), with a closed set of
 // status words that say what became of the code and never that a finding was dealt with.
-const STATUS = ['untouched', 'lines changed', 'file changed', 'file gone'];
+const STATUS = ['untouched', 'lines changed', 'lines edited', 'file changed', 'file gone'];
 const r = data('review-vectors.json');
 const asLines = (l) => (l ? { start: l[0], end: l[1] } : null);
 for (const t of r) {

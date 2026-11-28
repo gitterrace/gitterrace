@@ -65,6 +65,9 @@
   border-radius:var(--radius);
   padding:1px var(--space-2);
 }
+.basket-chip[data-status="lines edited"]{color:var(--accent-fg);border-color:var(--accent)}
+.basket-chip[data-status="lines changed"],
+.basket-chip[data-status="file changed"]{color:var(--warn)}
 .basket-text{
   margin:var(--space-1) 0 0;
   font-size:var(--text-sm);
@@ -83,6 +86,14 @@
 }
 .basket-msg{flex:1;min-width:0;font-size:var(--text-xs)}
 .basket-pick{min-width:0;max-width:40%}
+
+/* A finding edited since it was flagged: the dot is a ring, the span is the diff's mapping. */
+.fm-link.fe::after{background:transparent;border:2px solid var(--accent)}
+/* Blame and diff rows: the dot sits in the line number cell or at the row's left edge. */
+.blame td.n{position:relative}
+.blame tr.fm td.n{box-shadow:inset 2px 0 0 var(--accent)}
+div.diff .fm-link{z-index:1}
+div.diff .add.fm,div.diff .ctx.fm{box-shadow:inset 2px 0 0 var(--accent)}
 
 /* A file row the basket points at: a dot in the gutter that opens the panel. */
 .src .l.fm::before{color:var(--accent-fg)}

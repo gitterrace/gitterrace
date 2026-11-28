@@ -518,6 +518,14 @@ async fn worktree(
             },
             files,
         );
+        // Marks are placed by the anchors, which compare with the disk: only the page of the
+        // whole uncommitted change shows the same lines.
+        let diff = if scope == gitterrace_types::WorktreeScope::All && review.since_id().is_none() {
+            let marks = crate::blob_marks::diff_marks(a, crate::blob_marks::DiffAt::Worktree);
+            crate::blob_marks::apply_diff(diff, &marks)
+        } else {
+            diff
+        };
         Ok(WorktreePage {
             head,
             c: views::chrome(a, "files").live(Mode::WORKTREE),
