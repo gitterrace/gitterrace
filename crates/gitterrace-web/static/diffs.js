@@ -18,6 +18,7 @@
       var body = p.nextElementSibling;
       p.remove();
       if (focused && body) { body.tabIndex = -1; body.focus({ preventScroll: true }); }
+      keepAnchor();
     }, function () {
       delete b.dataset.busy;
       // Watched again, so a lazy file that failed once retries when it next scrolls near.
@@ -47,18 +48,30 @@
     var bs = document.querySelectorAll("[data-load-diff][data-lazy]");
     Array.prototype.forEach.call(bs, function (b) { lazyObs.observe(b); });
   }
-  // The browser jumps to #fN itself. This only opens a folded target.
-  function openHashed() {
+  // WebKit has no scroll anchoring: files above an #fN target load and grow after the jump and
+  // push the target away. While the reader has not scrolled or keyed, each load puts it back.
+  var anchored = null;
+  function keepAnchor() {
+    var s = anchored && document.getElementById(anchored);
+    s = s && s.closest("section");
+    if (s) s.scrollIntoView({ block: "start" });
+  }
+  ["wheel", "touchstart", "mousedown", "keydown"].forEach(function (t) {
+    addEventListener(t, function () { anchored = null; }, { capture: true, passive: true });
+  });
+  // The browser jumps to #fN itself. This opens a folded target and keeps it in place.
+  function openHashed(jump) {
     var m = /^#(f\d+|p\/.+)$/.exec(location.hash), id = m && m[1], s;
     // #p/<path> names a file by path, so it survives a different file order.
     try { if (id && id[0] === "p") id = decodeURIComponent(id); } catch (x) { id = null; }
     s = id && document.getElementById(id);
     s = s && s.closest("section");
     var b = s && s.querySelector("[data-load-diff]");
+    if (jump === true) anchored = s ? id : null;
     if (b) loadDiff(b);
   }
   watchLazy();
-  openHashed();
-  window.addEventListener("hashchange", openHashed);
-  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(); });
+  openHashed(true);
+  window.addEventListener("hashchange", function () { openHashed(true); });
+  document.addEventListener("gt:live-refreshed", function () { watchLazy(); openHashed(false); });
 })();
