@@ -239,18 +239,20 @@ font-weight:501 900;ascent-override:102%;descent-override:30%;line-gap-override:
 
 /// Bricolage Grotesque's metrics against Arial, measured on the UI's own strings in a browser:
 /// its width is 104.8% of Arial's at weight 400 and 100.6% of Arial Bold's at 600, so each
-/// weight band gets its own size-adjust. The vertical overrides are the face's own (93%, 27%)
-/// divided by that.
+/// weight band gets its own size-adjust. The vertical overrides are not the face's own metrics
+/// divided by that: they are the pair that puts the ink of a 13px label in a 28px control
+/// within a quarter pixel of centre in all three engines, measured with the stand-in forced
+/// (inset-balance, "stand-in"). The face's own pair left firefox 0.75px high on Linux.
 const BODY_STANDIN: [&str; 2] = [
     "@font-face{font-family:\"Bricolage Standin\";\n\
 src:local(\"Arial\"),local(\"Liberation Sans\"),local(\"Arimo\");\n\
-font-weight:100 500;size-adjust:104.8%;ascent-override:88.7%;\n\
-descent-override:25.8%;line-gap-override:0%}",
+font-weight:100 500;size-adjust:104.8%;ascent-override:90.5%;\n\
+descent-override:24%;line-gap-override:0%}",
     "@font-face{font-family:\"Bricolage Standin\";\n\
 src:local(\"Arial Bold\"),local(\"Liberation Sans Bold\"),local(\"Arimo Bold\"),\n\
 local(\"Arial\"),local(\"Liberation Sans\");\n\
-font-weight:501 900;size-adjust:100.6%;ascent-override:92.4%;\n\
-descent-override:26.8%;line-gap-override:0%}",
+font-weight:501 900;size-adjust:100.6%;ascent-override:94%;\n\
+descent-override:24%;line-gap-override:0%}",
 ];
 
 fn fonts(design: &Value) -> Result<Vec<String>> {

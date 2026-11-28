@@ -16,6 +16,7 @@ import { eachBrowser, serve, frames } from '../../lib/browser-lib.mjs';
 const INK_SCALE = 4;
 const SHIFTS = 8;
 const INK_TOL = 0.5;
+const FACES = ['web font', 'stand-in'];
 
 /** A repository whose one file has a single line. */
 function oneLineRepo() {
@@ -231,12 +232,16 @@ export function checks(env) {
     try {
       await eachBrowser(browsers, context, async (ctx, name) => {
         const p = await ctx.newPage();
-        for (const scheme of ['light', 'dark']) {
+        for (const [face, scheme] of FACES.flatMap((f) => ['light', 'dark'].map((c) => [f, c]))) {
+          // font-display:optional keeps the stand-in when the face misses first paint, which is
+          // what a cold host shows: refusing the face here makes every host show the stand-in.
+          await ctx.unroute('**/fonts/bricolage*');
+          if (face === 'stand-in') await ctx.route('**/fonts/bricolage*', (rt) => rt.abort());
           await p.emulateMedia({ colorScheme: scheme });
           await p.setViewportSize({ width: 1200, height: 800 });
           await p.goto(srv.base + '/blame/HEAD/one.txt', { waitUntil: 'load' });
           await p.evaluate(() => document.fonts.ready);
-          judge(`inset-balance ${name} ${scheme} blame row`, await p.evaluate(blameInsets));
+          judge(`inset-balance ${name} ${face} ${scheme} blame row`, await p.evaluate(blameInsets));
           await p.goto(srv.base + '/blob/HEAD/one.txt', { waitUntil: 'load' });
           await p.evaluate(() => document.fonts.ready);
           await frames(p);
@@ -246,9 +251,10 @@ export function checks(env) {
           await p.evaluate(() => document.fonts.ready);
           await frames(p);
           const foot = await p.evaluate(footInsets, '.send-foot');
-          judge(`inset-balance ${name} ${scheme} send actions`, foot);
-          judge(`inset-balance ${name} ${scheme} title inset`, await p.evaluate(titleInsets));
-          judge(`inset-balance ${name} ${scheme} label ink`, await labelInk(p));
+          judge(`inset-balance ${name} ${face} ${scheme} send actions`, foot);
+          const title = await p.evaluate(titleInsets);
+          judge(`inset-balance ${name} ${face} ${scheme} title inset`, title);
+          judge(`inset-balance ${name} ${face} ${scheme} label ink`, await labelInk(p));
         }
       }, { deviceScaleFactor: INK_SCALE });
     } finally {
