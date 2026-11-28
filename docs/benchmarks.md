@@ -90,8 +90,17 @@ insights page. A peak during the index build is fine. `make memory-check`
 measures it on a real clone.
 
 Runs are made on a quiet machine: the harness waits for it to settle, and
-`make docs-check` refuses results from a busy one. The published run is made
-once per release, on the release candidate commit.
+`make docs-check` refuses results from a busy one. Quiet means three things. The
+1-minute load average stays under half the core count, which misses a single
+busy process on a many-core machine. So no process outside the harness's own
+tree uses more than 10% of a core, and all of them together stay under 50%, for
+20 seconds before each timed phase. The same CPU is sampled during each phase
+and the worst reading is stored, and `make docs-check` refuses a phase that saw
+more. Last, the run refuses to start while Docker, a VM or a booted iOS
+simulator is running, unless `bench-run.py --allow-noise` is given, which is
+recorded and which `make docs-check` refuses for a published run. Runs from
+before harness 5 recorded no foreign CPU and are reported as unchecked. The
+published run is made once per release, on the release candidate commit.
 
 ### Insights pages on a large history
 

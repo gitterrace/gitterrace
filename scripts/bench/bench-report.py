@@ -422,6 +422,11 @@ def newest_ok(run: Json) -> list[str]:
         for phase, v in load["phases"].items():
             if phase != "background" and v >= load["limit"]:
                 errs.append(f"{n}: {phase} timed at load {v} (limit {load['limit']})")
+        errs += bq.foreign_errors(n, load, run.get("harness", 1))
+    if run.get("noise_allowed"):
+        errs.append(
+            f"{bc.run_name(run)}: started with --allow-noise ({'; '.join(run['noise_allowed'])})"
+        )
     return errs
 
 

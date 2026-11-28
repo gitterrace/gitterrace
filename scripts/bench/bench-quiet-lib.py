@@ -46,6 +46,7 @@ class LoadSampler:
     def __init__(self) -> None:
         self.phase: str | None = None
         self.samples: dict[str, list[float]] = {}
+        self.worst: dict[str, tuple[float, float, str]] = {}
         self.stop_ev = threading.Event()
         self.lock = threading.Lock()
         self.thread = threading.Thread(target=self.loop, daemon=True)
@@ -59,9 +60,16 @@ class LoadSampler:
         with self.lock:
             phase = self.phase
         if phase:
-            cores = foreign_cores()
+            procs = foreign_procs()
+            total, single, name = foreign_summary(procs)
             with self.lock:
-                self.samples.setdefault(phase, []).append(cores)
+                self.samples.setdefault(phase, []).append(total / 100)
+                old = self.worst.get(phase, (0.0, 0.0, ""))
+                self.worst[phase] = (
+                    max(old[0], total),
+                    max(old[1], single),
+                    name if single >= old[1] else old[2],
+                )
 
     def enter(self, phase: str) -> None:
         with self.lock:
@@ -72,6 +80,15 @@ class LoadSampler:
         """Between phases (waiting for quiet) nothing is timed, so nothing is sampled."""
         with self.lock:
             self.phase = None
+
+    def foreign(self) -> Json:
+        """Per phase: the max total and max single-process foreign CPU in percent of one core,
+        and the name of the busiest process seen. Judged against TOTAL_PCT and SINGLE_PCT."""
+        with self.lock:
+            return {
+                p: {"total_pct": round(t, 1), "single_pct": round(s, 1), "top": n}
+                for p, (t, s, n) in self.worst.items()
+            }
 
     def finish(self) -> Json:
         self.stop_ev.set()
@@ -112,6 +129,54 @@ def process_cores() -> tuple[float, float]:
     return split_cores(rows, os.getpid())
 
 
+# Quiet means: no foreign process over SINGLE_PCT and all of them under TOTAL_PCT, in percent of
+# one core. One busy process adds about 1 to the load average of a 10 core machine, so the load
+# guard alone cannot see it.
+SINGLE_PCT, TOTAL_PCT = 10.0, 50.0
+
+
+def foreign_procs(me: int | None = None) -> list[tuple[float, str]]:
+    """(cpu percent, name) of every process outside the harness's own tree, busiest first."""
+    try:
+        out = bl.run(["ps", "-Ao", "pid=,ppid=,pcpu=,comm="])
+    except (OSError, subprocess.CalledProcessError):
+        return []
+    rows = [line.split(None, 3) for line in out.splitlines()]
+    return foreign_rows([r for r in rows if len(r) == 4], me or os.getpid())
+
+
+def foreign_rows(rows: list[list[str]], me: int) -> list[tuple[float, str]]:
+    """The foreign part of `pid ppid pcpu comm` rows, busiest first."""
+    parent = {int(r[0]): int(r[1]) for r in rows}
+
+    def ours(pid: int) -> bool:
+        seen = 0
+        while pid > 1 and seen < 64:
+            if pid == me:
+                return True
+            pid, seen = parent.get(pid, 1), seen + 1
+        return False
+
+    found = [(float(r[2]), Path(r[3].strip()).name) for r in rows if not ours(int(r[0]))]
+    return sorted(found, reverse=True)
+
+
+def foreign_summary(procs: list[tuple[float, str]]) -> tuple[float, float, str]:
+    """(total percent, busiest percent, busiest name) of a foreign_procs list."""
+    if not procs:
+        return 0.0, 0.0, ""
+    return sum(c for c, _ in procs), procs[0][0], procs[0][1]
+
+
+def over_budget(total: float, single: float) -> bool:
+    return single > SINGLE_PCT or total > TOTAL_PCT
+
+
+def describe(procs: list[tuple[float, str]], top: int = 3) -> str:
+    label = lambda n: f"{n} (known noisy)" if n in NOISY else n  # noqa: E731
+    return ", ".join(f"{label(n)} {c:.0f}%" for c, n in procs[:top]) or "none"
+
+
 def foreign_cores() -> float:
     """CPU in cores of every process that is not this harness or its descendants."""
     return process_cores()[1]
@@ -123,22 +188,17 @@ def load_now() -> float:
     return max(0.0, os.getloadavg()[0] - process_cores()[0])
 
 
-# Background daemons known to skew a run. Their CPU share is recorded when above 10%.
+# Daemons known to skew a run. Labels in messages only: the gate is the CPU budget above.
 NOISY = ("mediaanalysisd", "photoanalysisd", "mds_stores", "backupd")
 
 
 def busy_background():
-    """CPU percent of known noisy daemons above 10% right now, by process name."""
-    try:
-        out = bl.run(["ps", "-Ao", "pcpu=,comm="])
-    except (OSError, subprocess.CalledProcessError):
-        return {}
-    seen = {}
-    for line in out.splitlines():
-        pct, _, comm = line.strip().partition(" ")
-        name = Path(comm.strip()).name
-        if name in NOISY and float(pct) > 10:
-            seen[name] = seen.get(name, 0) + float(pct)
+    """CPU percent of foreign processes above SINGLE_PCT right now, by process name. After a
+    quiet wait it is empty, so an entry means the phase started over budget."""
+    seen: dict[str, float] = {}
+    for pct, name in foreign_procs():
+        if pct > SINGLE_PCT:
+            seen[name] = seen.get(name, 0) + pct
     return seen
 
 
@@ -148,16 +208,21 @@ def quiet(phase: str, loads: Json, wait: bool = True, sampler: Any | None = None
         sampler.pause()
     limit, calm, start = max_load(), 0, time.monotonic()
     while wait and calm < QUIET_SECS:
+        procs = foreign_procs()
+        total, single, _ = foreign_summary(procs)
         if time.monotonic() - start > 1800:
             sys.exit(
-                f"machine not quiet for 30 min before {phase} (load limit {limit}), not timing"
+                f"machine not quiet for 30 min before {phase} (load limit {limit}, "
+                f"cpu budget {SINGLE_PCT:.0f}% each / {TOTAL_PCT:.0f}% total), not timing: "
+                f"{describe(procs)}"
             )
-        if load_now() < limit:
+        if load_now() < limit and not over_budget(total, single):
             calm += 1
         else:
             if calm == 0 or calm % 60 == 0:
                 print(
-                    f"  waiting for load {load_now():.1f} < {limit:.1f} before {phase}",
+                    f"  waiting before {phase}: load {load_now():.1f} (limit {limit:.1f}), "
+                    f"top foreign cpu {describe(procs)}",
                     flush=True,
                 )
             calm = 0
@@ -168,6 +233,30 @@ def quiet(phase: str, loads: Json, wait: bool = True, sampler: Any | None = None
         loads.setdefault("background", {})[phase] = noise
     if sampler:
         sampler.enter(phase)
+
+
+# Process names (substring, lower case) of a running VM stack that skews a timed run.
+VM_NAMES = ("com.docker", "qemu", "virtualization")
+
+
+def noise_sources(procs: list[str], booted: str) -> list[str]:
+    """Why the machine is no place for a bench: VM processes, booted simulators. `procs` are
+    process names, `booted` is the output of `xcrun simctl list devices booted`."""
+    out = sorted({n for n in procs if any(v in n.lower() for v in VM_NAMES)})
+    sims = [ln.strip() for ln in booted.splitlines() if "(Booted)" in ln]
+    return [f"VM process {n}" for n in out] + [f"booted simulator {s}" for s in sims]
+
+
+def preflight_noise() -> list[str]:
+    try:
+        names = [n for _, n in foreign_procs()]
+    except OSError:
+        names = []
+    try:
+        booted = bl.run(["xcrun", "simctl", "list", "devices", "booted"])
+    except (OSError, subprocess.CalledProcessError):
+        booted = ""
+    return noise_sources(names, booted)
 
 
 def measure_pages(port: int, plan: dict[str, str], runs: int) -> Json:
@@ -269,6 +358,71 @@ def idle_cpu(server: Any, secs: int, with_events: bool) -> float:
     return 100 * (b - a) / (t2 - t)
 
 
+FOREIGN_FROM = 5
+
+
+def foreign_errors(n: str, load: Json, harness: int) -> list[str]:
+    """Phases that saw other processes over the CPU budget, or started beside a busy one. A run
+    from before harness 5 recorded no foreign CPU: it is unchecked, not failed."""
+    errs = []
+    for phase, who in (load["phases"].get("background") or {}).items():
+        names = ", ".join(f"{k} {v:.0f}%" for k, v in who.items())
+        errs.append(f"{n}: {phase} started beside busy {names}")
+    foreign = load.get("foreign")
+    if foreign is None:
+        if harness >= FOREIGN_FROM:
+            errs.append(f"{n}: harness {harness} recorded no foreign CPU")
+        else:
+            print(f"note: {n} foreign CPU unchecked (harness {harness} < {FOREIGN_FROM})")
+        return errs
+    for phase, f in foreign.items():
+        if over_budget(f["total_pct"], f["single_pct"]):
+            errs.append(
+                f"{n}: {phase} saw foreign CPU {f['top']} {f['single_pct']:.0f}%, total "
+                f"{f['total_pct']:.0f}% (budget {SINGLE_PCT:.0f}% each, {TOTAL_PCT:.0f}%)"
+            )
+    return errs
+
+
+def report_test() -> bool:
+    """A phase beside a busy process, a background entry and an old run are judged apart."""
+    ok = {"phases": {}, "foreign": {"index": {"total_pct": 12.0, "single_pct": 8.0, "top": "x"}}}
+    loud = {
+        "phases": {},
+        "foreign": {"index#2": {"total_pct": 95.0, "single_pct": 90.0, "top": "mediaanalysisd"}},
+    }
+    bg = {"phases": {"background": {"index": {"mediaanalysisd": 89.9}}}, "foreign": {}}
+    got = [foreign_errors("r", x, 5) for x in (ok, loud, bg)]
+    if (
+        got[0]
+        or "mediaanalysisd" not in " ".join(got[1])
+        or "mediaanalysisd" not in " ".join(got[2])
+    ):
+        return False
+    return not foreign_errors("r", {"phases": {}}, 4) and bool(
+        foreign_errors("r", {"phases": {}}, 5)
+    )
+
+
+def foreign_test() -> bool:
+    """The foreign CPU budget and the VM preflight judge red and green cases."""
+    ok = True
+    rows = [
+        ["10", "1", "5", "/bin/bench"],
+        ["20", "10", "90", "git"],
+        ["30", "1", "89.9", "/usr/libexec/mediaanalysisd"],
+        ["31", "1", "3", "x"],
+    ]
+    procs = foreign_rows(rows, 10)
+    t, one, name = foreign_summary(procs)
+    ok &= procs[0] == (89.9, "mediaanalysisd") and len(procs) == 2 and name == "mediaanalysisd"
+    ok &= over_budget(t, one) and not over_budget(20.0, 9.0) and over_budget(51.0, 9.0)
+    ok &= noise_sources(["bash", "com.docker.backend"], "") != []
+    ok &= noise_sources(["bash"], "    iPhone (ABC) (Booted)\n") != []
+    ok &= noise_sources(["bash", "cargo"], "== Devices ==\n") == []
+    return ok
+
+
 def self_test() -> int:
     """The control passes a probe that sees the spinner, passes one starved on its first
     try only, and fails one stuck at 0."""
@@ -294,6 +448,7 @@ def self_test() -> int:
         cpu_secs = real
         _control_done = False
     ok = verdicts == [True, True, False]
+    ok &= foreign_test() and report_test()
     print("self-test", "ok" if ok else "FAILED")
     return 0 if ok else 1
 

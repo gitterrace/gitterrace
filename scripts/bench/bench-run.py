@@ -16,6 +16,9 @@ A full run lands in tests/bench/results and `make bench` then runs bench-report.
 Every timed phase waits for a quiet machine first: the 1-minute load average must stay under
 BENCH_MAX_LOAD (default: half the core count) for QUIET_SECS. The load seen is recorded per
 phase, and bench-report --check refuses a run that was timed above the limit.
+The CPU of every process outside the harness must also stay under a budget (each under
+bq.SINGLE_PCT, all under bq.TOTAL_PCT, percent of one core), before and during each phase.
+A run refuses to start while Docker, a VM or a booted iOS simulator runs, unless --allow-noise.
 """
 
 from __future__ import annotations
@@ -42,7 +45,8 @@ bq = importlib.import_module("bench-quiet-lib")
 bc = importlib.import_module("bench-chart-lib")
 
 Json = dict[str, Any]
-HARNESS = 4
+# 5: load.foreign records the max foreign CPU per timed phase, run.noise_allowed any waiver.
+HARNESS = 5
 DEFAULT_COMMITS = 500  # `export --commits` default (cli.rs)
 
 
@@ -88,6 +92,7 @@ def bench_repo(
     finally:
         sampled = sampler.finish()
     res["load"]["sampled"] = sampled
+    res["load"]["foreign"] = sampler.foreign()
     return res
 
 
@@ -463,7 +468,19 @@ def main():
         action="store_true",
         help="only check the indexer exclusion, then exit",
     )
+    ap.add_argument(
+        "--allow-noise",
+        action="store_true",
+        help="start despite a VM or simulator; recorded, and --check refuses it for a release",
+    )
     a = ap.parse_args()
+    noise = bq.preflight_noise() if not a.synthetic and not a.fetch_only else []
+    if noise and not a.allow_noise:
+        sys.exit(
+            "machine is not silent, not benchmarking: "
+            + "; ".join(noise)
+            + "\nquit them, or pass --allow-noise for a run that is not a release"
+        )
     if a.preflight:
         preflight_index()
         return 0
@@ -503,6 +520,8 @@ def main():
         "machine": machine(a.bin),
         "repos": {},
     }
+    if noise:
+        result["noise_allowed"] = noise
     over, fails = [], []
     # Only a full run is published and repeats the cold phases. A smoke run (fewer runs, shorter
     # idle) samples once and stays in the cache.
