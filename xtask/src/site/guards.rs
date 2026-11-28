@@ -11,7 +11,10 @@
 //! 6. a fenced block in a language that is meant to be drawn, shown as source;
 //! 7. a page without a title, a meta description or the shared bar, main and footer;
 //! 8. a docs page missing from the docs index, the docs list or the previous and next chain;
-//! 11. a docs page that does not open with its title and then a lead paragraph.
+//! 11. a docs page that does not open with its title and then a lead paragraph;
+//! 12. a page that does not preload the body face, which is `font-display:optional` and sets
+//!     the bar: without the preload the first page paints the stand-in and the next one the
+//!     real face, so bar items change width between pages.
 //!
 //! 9. a page over its kind's byte budget (landing, docs, other), the budgets in the `[counts]`
 //!    of `ratchet.toml` that only fall, so an unminified inline SVG or a pasted blob fails.
@@ -93,6 +96,7 @@ pub(super) fn problems(pages: &BTreeMap<String, String>, facts: &Facts) -> Vec<S
     bad.extend(missing_head_or_frame(pages));
     bad.extend(orphan_docs(pages, facts));
     bad.extend(docs_open_with_title_and_lead(pages));
+    bad.extend(unpreloaded_faces(pages));
     bad.extend(over_budget(pages, &facts.budgets));
     bad.extend(over_requests(pages, &facts.budgets));
     bad
@@ -324,6 +328,18 @@ fn requests(html: &str) -> usize {
         .filter(|t| !t.split('>').next().unwrap_or("").contains("loading=\"lazy\""))
         .count();
     tag("<link rel=\"stylesheet\"") + tag("<script src=") + eager
+}
+
+/// Guard 12: a page that leaves out the preload of the face the bar is set in. The title face
+/// is not in the bar and is left out to keep a page inside its byte budget.
+fn unpreloaded_faces(pages: &BTreeMap<String, String>) -> Vec<String> {
+    const FACE: &str = "bricolage-grotesque";
+    let want = format!("rel=\"preload\" href=\"/assets/fonts/{FACE}.woff2");
+    pages
+        .iter()
+        .filter(|(_, html)| !html.contains(&want))
+        .map(|(path, _)| format!("{path}: no preload of the {FACE} face"))
+        .collect()
 }
 
 /// Guard 10: a page over its kind's request budget.

@@ -4,6 +4,8 @@ use super::*;
 use std::fmt::Write as _;
 
 const REPO: &str = "https://github.com/o/r";
+const FONTS: &str =
+    "<link rel=\"preload\" href=\"/assets/fonts/bricolage-grotesque.woff2?v=1\" as=\"font\">\n";
 
 fn words(n: usize) -> String {
     (0..n).fold(String::new(), |mut s, i| {
@@ -16,7 +18,7 @@ fn words(n: usize) -> String {
 fn page(main: &str) -> String {
     format!(
         "<title>T - r</title>\n<meta name=\"description\" content=\"What this page covers.\">\n\
-         <header class=\"top\"></header><main id=\"main\">{main}</main><footer></footer>"
+         {FONTS}<header class=\"top\"></header><main id=\"main\">{main}</main><footer></footer>"
     )
 }
 
@@ -233,6 +235,15 @@ fn guard_11_a_docs_page_without_title_first_and_a_lead_is_red() {
         edit_page(p, "docs/b/index.html", "<p>Lead.</p>", "");
     });
     assert!(bare.contains("docs/b/index.html: no lead paragraph right after the title"), "{bare}");
+}
+
+/// The class: the optional face the bar is set in, forgotten by a page head, which shifts the bar.
+#[test]
+fn guard_12_a_page_without_the_body_font_preload_is_red() {
+    let bad = plant(|p| edit_page(p, "docs/a/index.html", FONTS, ""));
+    assert!(bad.contains("docs/a/index.html: no preload of the bricolage-grotesque face"), "{bad}");
+    let one = plant(|p| edit_page(p, "404.html", "bricolage-grotesque.woff2", "other.woff2"));
+    assert!(one.contains("404.html: no preload of the bricolage-grotesque face"), "{one}");
 }
 
 /// The class: a page that fetches one more file than its kind may, whatever its size. The second
