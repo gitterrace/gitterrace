@@ -6,7 +6,9 @@
 #
 # The first release has no earlier tag, so its commits are the whole build-up, not changes a
 # user can compare against. Its section is a short summary of what ships instead; every later
-# release lists its commits by group.
+# release lists its commits by group, then a "Changed behavior" section with one item per
+# `Changed-behavior:` commit trailer (a setting that changed meaning; one line, no wrapping
+# needed). It renders whatever the commit type, so a docs or test commit keeps its note.
 
 [changelog]
 header = """
@@ -49,6 +51,7 @@ body = """
 
 {% else %}\
 {% for group, commits in commits | group_by(attribute="group") %}
+{% if group is containing("Changed behavior") %}{% continue %}{% endif %}\
 ### {{ group | striptags | trim | upper_first }}
 
 {% for commit in commits %}\
@@ -63,6 +66,25 @@ body = """
 {% endfor %}
 {% endfor %}\
 {% endfor %}\
+{% set_global noted = false %}\
+{% for commit in commits %}{% for f in commit.footers %}\
+{% if f.token == "Changed-behavior" %}{% set_global noted = true %}{% endif %}\
+{% endfor %}{% endfor %}\
+{% if noted %}
+### Changed behavior
+
+{% for commit in commits %}{% for f in commit.footers %}\
+{% if f.token == "Changed-behavior" %}\
+{% set_global col = 2 %}- \
+{% for w in f.value | split(pat=" ") %}\
+{% set n = w | length %}{% if not loop.first and col + 1 + n > 80 %}
+{{ "  " }}{% set_global col = 2 %}\
+{% elif not loop.first %} {% set_global col = col + 1 %}{% endif %}\
+{{ w }}{% set_global col = col + n %}\
+{% endfor %}
+{% endif %}\
+{% endfor %}{% endfor %}\
+{% endif %}\
 {% endif %}
 """
 trim = true
@@ -110,6 +132,8 @@ commit_parsers = [
   { message = "^refactor", group = "<!-- 1 -->Changed" },
   { message = "^fix", group = "<!-- 2 -->Fixed" },
   { message = "^perf", group = "<!-- 3 -->Performance" },
+  # A trailer on a type the changelog skips still renders, in the notes section only.
+  { footer = "^Changed-behavior:", group = "<!-- 9 -->Changed behavior" },
   { message = "^(docs|test|chore|ci|build|style|revert)", skip = true },
   { message = "(re-bless|lint)", skip = true },
   { message = ".*", skip = true },

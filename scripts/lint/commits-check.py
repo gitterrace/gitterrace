@@ -221,6 +221,9 @@ def test_commits_removing_product(rng: str) -> list[str]:
 
 GEN_BEGIN = re.compile(r"^<!-- BEGIN GENERATED: ([\w-]+) -->$")
 GEN_NOTE = "make docs-gen"
+TRAILER = "Changed-behavior:"
+# A key's description is its doc comment in the registry, or a line of prose in the page.
+KEY_DOC_FILES = ("crates/gitterrace-config/src/schema.rs", "docs/configuration.md")
 
 
 def gen_blocks(text: str) -> dict[str, str]:
@@ -278,6 +281,39 @@ def commits_editing_generated(rng: str) -> tuple[list[str], list[str]]:
     return hits, skipped
 
 
+def doc_lines_changed(path: str, diff: str) -> bool:
+    """Whether a diff of `path` adds or removes a key description line."""
+    for ln in diff.splitlines():
+        if ln[:1] not in "+-" or ln[:3] in ("+++", "---"):
+            continue
+        body = ln[1:].strip()
+        if path.endswith(".rs"):
+            if body.startswith("///"):
+                return True
+        elif body and not body.startswith(("<!--", "|")):
+            return True
+    return False
+
+
+def commits_needing_trailer(rng: str) -> list[str]:
+    """Commits that change a config key's description without a Changed-behavior trailer.
+
+    A hint, not a failure: a typo fix also edits a description. The trailer is what puts a
+    changed meaning into the changelog, which refuses hand edits.
+    """
+    _, shas = run(["git", "rev-list", "--no-merges", rng])
+    hits = []
+    for sha in shas.split():
+        _, msg = run(["git", "log", "-1", "--format=%B", sha])
+        if any(ln.startswith(TRAILER) for ln in msg.splitlines()):
+            continue
+        for path in KEY_DOC_FILES:
+            _, diff = run(["git", "diff", "-U0", f"{sha}~", sha, "--", path])
+            if doc_lines_changed(path, diff):
+                hits.append(f"{sha[:9]} {path}: key description changed without '{TRAILER}'")
+    return hits
+
+
 def self_test() -> int:
     ok = run([PY, "-c", "raise SystemExit(3)"])[0] == 3
     rust = "fn a() {}\nfn b() {}\n\n#[cfg(test)]\nmod tests {\n    fn t() {}\n}\n"
@@ -293,6 +329,11 @@ def self_test() -> int:
     ok = ok and hand_edited(blk.format("a"), blk.format("b")) == ["k"]  # red: hand edit
     ok = ok and not hand_edited(blk.format("a"), blk.format("a").replace("x\n", "z\n"))
     ok = ok and not hand_edited("p\n", blk.format("b"))
+    rs, md = KEY_DOC_FILES
+    ok = ok and doc_lines_changed(rs, "-    /// Old.\n+    /// New.\n")  # red: doc edit
+    ok = ok and not doc_lines_changed(rs, "+    pub x: u8,\n")
+    ok = ok and doc_lines_changed(md, "+Folding moved.\n")
+    ok = ok and not doc_lines_changed(md, "+<!-- END GENERATED: k -->\n+| a | b |\n")
     ok = ok and gen_blocks(blk.format("a\nb")) == {"k": "a\nb"}
     with tempfile.TemporaryDirectory() as d:
         g = ["git", "-C", d, "-c", "user.name=t", "-c", "user.email=t@t"]
@@ -378,6 +419,8 @@ def main() -> int:
             print(h)
         print(f"{'FAIL' if hits else 'PASS'} generated-blocks-regenerated")
         fails += bool(hits)
+        for h in commits_needing_trailer(a.range):
+            print(f"HINT {h}")
         base, _, tip = a.range.partition("..")
         # land-check reads messages over BASE..HEAD, so it speaks for the range only at HEAD.
         if run(["git", "rev-parse", tip or "HEAD"])[1] == run(["git", "rev-parse", "HEAD"])[1]:

@@ -100,6 +100,12 @@ what changed, why, and how it is tested. Run
 `git config core.hooksPath scripts/hooks` once so the message rules run on
 every commit.
 
+A change that alters what a setting means (not only what it does) carries a
+`Changed-behavior: <one sentence>` trailer. `cliff.toml` renders each one under
+"Changed behavior" in that release's changelog section, which refuses hand
+edits. `commits-check` prints a `HINT` for a commit that edits a key
+description in the config registry or `docs/configuration.md` without it.
+
 A change lands with
 `bash vendor/schwarzwald/kit/tools/land.sh <repo> <clone> <sha>`, one commit at a
 time on main's tip. The landing checkout (marked with
