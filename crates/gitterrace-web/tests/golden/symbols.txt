@@ -1,7 +1,8 @@
-ca930ce3f170f02fab4e15a3d7a9c9eb 571a51d48a74fd5996847c8463b11acb [symbols] /blob/HEAD/cmd/serve.go
-2508db961a7997bfa43b49ec76f61538 2508db961a7997bfa43b49ec76f61538 [symbols] /blob/HEAD/notes.txt
-ad08c156b01f62314af92d31ce7e038f 5166f3d062caaede0ac784d1e1c0c5ff [symbols] /blob/HEAD/src/shapes.rs
-2c480b4460df5cc076ea5ec717fb54d0 2c480b4460df5cc076ea5ec717fb54d0 [symbols] /blob/HEAD/src/two.rs
-becebf1fac6613c499b83a2dda763512 0a377b52bf69d9c27c2a2dc5813798a6 [symbols] /blob/HEAD/tools/report.py
-cf91509799a5a07c4efa1e6757d0cbf2 5099032f43ae23f8bf1c48926f9ab58a [symbols] /blob/HEAD/web/store.ts
-fdd8151f70a300084fa6f67365638bcf 6057ef188aa7b5187f04b68b8377a843 [symbols] /blob/HEAD/web/view.js
+# fix(web): render the basket button with its accessible name
+93b8cbdbcda7eea5c98ab408aa33ff86 f63e1b656d9591495f0c47efe111e0b6 [symbols] /blob/HEAD/cmd/serve.go
+786aa4b3985807477a45684d061ddded 786aa4b3985807477a45684d061ddded [symbols] /blob/HEAD/notes.txt
+6dc0a2947c7b051804ee05747a4cbf0e 1117864653dfbe454570e71ad62c82fe [symbols] /blob/HEAD/src/shapes.rs
+cca7c36e7a7681f2c6808e9fe6bd8f15 cca7c36e7a7681f2c6808e9fe6bd8f15 [symbols] /blob/HEAD/src/two.rs
+2b67e2afc2e2d8af4a9f0e2d55f0dcc1 9ea8f0c686bc24d46f787fc12608753d [symbols] /blob/HEAD/tools/report.py
+0a70270ccbcd61a79ec2cf5c9713e977 c0acb630b3efa7351f6175bfb7ff6faf [symbols] /blob/HEAD/web/store.ts
+854eb93f1cdbda0d04e632305c0ba81a 7fb7b5dfc9bb75af231cd1294e959d8e [symbols] /blob/HEAD/web/view.js

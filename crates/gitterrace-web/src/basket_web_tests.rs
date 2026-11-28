@@ -83,6 +83,30 @@ async fn a_note_with_markup_never_reaches_a_page_unescaped() {
     }
 }
 
+/// A button that is empty until a script fills it has no name for a reader or a checker that
+/// looks first. Every button the server renders carries text or an aria-label itself.
+#[tokio::test(flavor = "multi_thread")]
+async fn every_server_rendered_button_has_an_accessible_name() {
+    let tmp = tempfile::tempdir().expect("tmp");
+    let app = server(tmp.path());
+    for uri in ["/r/r/", "/r/r/blob/HEAD/a.txt", "/r/r/worktree", "/r/r/log/HEAD"] {
+        let (_, html) = call(&app, "GET", uri, "", false).await;
+        let mut rest = html.as_str();
+        while let Some(i) = rest.find("<button") {
+            rest = &rest[i..];
+            let end = rest.find("</button>").expect("button is closed");
+            let button = &rest[..end];
+            let open = &button[..button.find('>').expect("tag ends")];
+            let text = button[open.len() + 1..].trim();
+            assert!(
+                open.contains("aria-label=") || open.contains("title=") || !text.is_empty(),
+                "{uri} renders a nameless button: {open}"
+            );
+            rest = &rest[end..];
+        }
+    }
+}
+
 /// The page, the JSON API and the basket agree on the switch: with `worktree_enabled` on the
 /// anchor sees the edit made only in the working tree, with it off (file or this repository)
 /// both answer as an unknown route and no anchor is derived.

@@ -8,13 +8,12 @@
   var el = window.gtNav.el, B = window.gtNav.B;
   var ov = window.gtOverlay;
   var btn = document.getElementById("basketbtn");
-  // The button is an empty shell on every page; its icon, type and labels are set here, so the
-  // page byte budget pays for the id alone.
+  // The server renders the button with a short accessible name, so it is named before this file
+  // loads (axe can run first). It sits in no form, so it needs no type. The icon, the tooltip and
+  // the full label (with the entry count) are set here.
   if (btn && !btn.firstChild) {
     btn.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true">' +
       '<path d="M5 5h14v14H5zM9 10h6M9 14h6"/></svg>';
-    btn.type = "button";
-    btn.setAttribute("aria-label", "Review basket");
     btn.setAttribute("aria-haspopup", "dialog");
     btn.setAttribute("data-tip", "Review basket");
   }
