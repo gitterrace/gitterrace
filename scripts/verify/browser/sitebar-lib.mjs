@@ -108,7 +108,10 @@ export function checks(env) {
                       .some((e) => e.getClientRects().length > 0);
                     if (!main || side) return 0;
                     const q = main.getBoundingClientRect();
-                    return Math.round(Math.abs(q.left - (innerWidth - q.right)));
+                    // The room is the body's box: innerWidth counts a classic scrollbar, and
+                    // clientWidth drops a reserved gutter only on a page that scrolls.
+                    const body = document.body.getBoundingClientRect();
+                    return Math.round(Math.abs((q.left - body.left) - (body.right - q.right)));
                   })(),
                   // The space between each pair of shown items after the brand: one value, so
                   // no item sits closer to its neighbor than another, chevron or not.
