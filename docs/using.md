@@ -153,6 +153,15 @@ list with the terms of its risk ([listed for agents](mcp.md#review-a-change))
 and the plain facts behind them. Lockfiles, generated, binary and oversized
 files are under **Not scored**. Press `]` and `[` to walk the diff files in
 this order.
+With more than one folder the panel groups its rows into **chapters**, each
+with a heading in the same list. Files group by folder (a package under
+`crates/`, `packages/` and the like, else the top folder), the highest risk
+first. Chapters of only tests or only
+docs come after the code ones and the unscored files close as one skim chapter.
+The grouping is only an order, it never changes a file's risk. A **Why** list
+also names risk signals, each with its evidence: a test removed, a source file
+changed while the test next to it was not, a manifest or CI file changed, and a
+large deletion. Signals sit beside the risk and are not added to it.
 The panel is the same plan that `GET /api/v1/review_plan` and the `review_plan`
 tool answer, and it needs the insights index.
 

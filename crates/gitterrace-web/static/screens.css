@@ -67,6 +67,7 @@ progress:not([value])::-moz-progress-bar{background:var(--accent-soft)}
   font-size:var(--text-xs)}
 .rplan{margin:var(--space-4) 0}
 .rplan-list{padding:0}
+.rplan-list>.rplan-chapter{display:block;padding-top:var(--space-3)}
 .rplan-list>li{flex-wrap:wrap;align-items:baseline;justify-content:flex-start;
   gap:var(--space-1) var(--space-4)}
 .rplan-list>li>a{flex:0 1 auto}

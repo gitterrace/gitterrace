@@ -25,6 +25,53 @@ pub enum SkipReason {
     TooLarge,
 }
 
+/// What a chapter groups.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ChapterKind {
+    /// Files under one folder root (a crate or package, else the top folder).
+    Dir,
+    /// Files that are not scored (lockfile, generated, binary, too large): skim them.
+    Mechanical,
+}
+
+/// What a signal says is off about a file. Shown beside `risk`, never added into it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum SignalKind {
+    /// A manifest, CI or configuration file changed.
+    ConfigChange,
+    /// Many more lines removed than added.
+    LargeDeletion,
+    /// A source file changed and the test next to it did not.
+    SourceWithoutTestChange,
+    /// A test file was deleted.
+    TestRemoved,
+}
+
+/// One thing that looks off about a changed file, with the fact behind it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct PlanSignal {
+    pub evidence: String,
+    pub kind: SignalKind,
+}
+
+/// A group of changed files to review together. Chapters do not change `files`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
+pub struct PlanChapter {
+    /// Paths of the chapter, riskiest first, all among the listed `files` or `skipped`.
+    pub files: Vec<String>,
+    /// Stable within one answer: `dir:<title>` or `mechanical`.
+    pub id: String,
+    pub kind: ChapterKind,
+    /// The highest `risk` in the chapter.
+    pub risk_max: u32,
+    /// The sum of `risk` over the chapter.
+    pub risk_sum: u32,
+    /// The folder root, or `Not scored` for the mechanical chapter.
+    pub title: String,
+}
+
 /// Where a file ranks among the hotspots of the head tree.
 #[derive(Debug, Clone, PartialEq, Serialize, JsonSchema)]
 pub struct PlanHotspot {
@@ -92,6 +139,8 @@ pub struct PlanFile {
     pub permalink: Option<String>,
     /// 0 to 100, the sum of `terms`.
     pub risk: u32,
+    /// What looks off, each with its evidence. Not part of `risk`.
+    pub signals: Vec<PlanSignal>,
     /// Lines of the file after the change.
     pub size_lines: u32,
     /// The top owner holds at least 80 percent.
@@ -120,6 +169,9 @@ pub struct ReviewPlan {
     /// list were compared with the current HEAD and the plan may miss changes in between.
     /// False otherwise.
     pub baseline_missing: bool,
+    /// The listed `files` and the `skipped` ones in reading order: highest risk first, with
+    /// test-only and docs-only chapters after code, and the unscored files last.
+    pub chapters: Vec<PlanChapter>,
     /// With `since`: files whose checkpoint copy was dropped (binary, too large), listed
     /// against HEAD instead. Empty otherwise.
     pub content_gone: Vec<String>,

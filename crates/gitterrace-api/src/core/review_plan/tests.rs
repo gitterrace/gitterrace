@@ -70,6 +70,7 @@ fn row(path: &str, risk: u32, lines: u32) -> gitterrace_types::api::PlanFile {
         path: path.to_owned(),
         permalink: None,
         risk: t.sum(),
+        signals: Vec::new(),
         size_lines: lines,
         sole_owner: false,
         terms: t,

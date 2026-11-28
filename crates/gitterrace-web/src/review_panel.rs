@@ -3,10 +3,14 @@
 //! so the page, the JSON and the MCP tool agree. `]` and `[` walk the files in this order
 //! (`nav.js`).
 
+use std::collections::HashMap;
+
 use askama::Template;
 use gitterrace_api::{Params, PlanRequest};
 use gitterrace_types::WorktreeScope;
-use gitterrace_types::api::{PlanFile, PlanSkipped, ReviewPlan, SkipReason};
+use gitterrace_types::api::{
+    ChapterKind, PlanChapter, PlanFile, PlanSkipped, ReviewPlan, SignalKind, SkipReason,
+};
 
 use crate::{app::App, charttip, fmt};
 
@@ -27,8 +31,15 @@ struct Row {
     risk: u32,
     /// The four terms of the risk as "Churn 24 of 30" and so on.
     terms: Vec<String>,
-    /// Plain-words reasons: rank, owner, size, test.
+    /// Plain-words reasons: rank, owner, size, test, then the risk signals.
     why: Vec<String>,
+    /// Set on the first row of a chapter, when the plan has more than one.
+    heading: Option<Heading>,
+}
+
+struct Heading {
+    title: String,
+    summary: String,
 }
 
 struct Skipped {
@@ -40,6 +51,8 @@ struct Skipped {
 #[template(path = "review_panel.html")]
 struct Panel {
     summary: String,
+    /// How the rows are ordered, in words.
+    order: &'static str,
     rows: Vec<Row>,
     skipped: Vec<Skipped>,
     more: String,
@@ -93,17 +106,12 @@ pub(crate) fn render(a: &App, source: &Source<'_>) -> String {
 fn panel(plan: &ReviewPlan, link: impl Fn(&str) -> String) -> Panel {
     Panel {
         summary: fmt::count(plan.total_files, "file", "files"),
-        rows: plan
-            .files
-            .iter()
-            .map(|f| Row {
-                path: f.path.clone(),
-                href: link(&f.path),
-                risk: f.risk,
-                terms: terms(f),
-                why: why(f),
-            })
-            .collect(),
+        order: if headed(plan) {
+            "by chapter, riskiest first within each"
+        } else {
+            "riskiest first"
+        },
+        rows: rows(plan, &link),
         skipped: plan.skipped.iter().map(skipped).collect(),
         more: if plan.truncated {
             fmt::count(
@@ -115,6 +123,43 @@ fn panel(plan: &ReviewPlan, link: impl Fn(&str) -> String) -> Panel {
             String::new()
         },
     }
+}
+
+/// Whether the plan has more than one code chapter, so rows get chapter headings.
+fn headed(plan: &ReviewPlan) -> bool {
+    plan.chapters.iter().filter(|c| c.kind == ChapterKind::Dir).count() > 1
+}
+
+/// The scored files in chapter order, so one list serves both the chapters and the walk with
+/// `]`. A chapter heads its first row instead of listing its files a second time.
+fn rows(plan: &ReviewPlan, link: &impl Fn(&str) -> String) -> Vec<Row> {
+    let by_path: HashMap<&str, &PlanFile> =
+        plan.files.iter().map(|f| (f.path.as_str(), f)).collect();
+    let code: Vec<&PlanChapter> =
+        plan.chapters.iter().filter(|c| c.kind == ChapterKind::Dir).collect();
+    let headed = headed(plan);
+    let mut out = Vec::with_capacity(plan.files.len());
+    for c in code {
+        let mut heading = headed.then(|| Heading {
+            title: c.title.clone(),
+            summary: format!(
+                "{}, highest risk {}",
+                fmt::count(c.files.len(), "file", "files"),
+                c.risk_max
+            ),
+        });
+        for f in c.files.iter().filter_map(|p| by_path.get(p.as_str())) {
+            out.push(Row {
+                path: f.path.clone(),
+                href: link(&f.path),
+                risk: f.risk,
+                terms: terms(f),
+                why: why(f),
+                heading: heading.take(),
+            });
+        }
+    }
+    out
 }
 
 fn terms(f: &PlanFile) -> Vec<String> {
@@ -146,7 +191,17 @@ fn why(f: &PlanFile) -> Vec<String> {
     if !f.is_test && !f.has_test_sibling {
         out.push("No test next to it".to_owned());
     }
+    out.extend(f.signals.iter().map(|s| format!("{}: {}", signal_name(s.kind), s.evidence)));
     out
+}
+
+const fn signal_name(k: SignalKind) -> &'static str {
+    match k {
+        SignalKind::ConfigChange => "Config change",
+        SignalKind::LargeDeletion => "Large deletion",
+        SignalKind::SourceWithoutTestChange => "Source without test change",
+        SignalKind::TestRemoved => "Test removed",
+    }
 }
 
 fn skipped(s: &PlanSkipped) -> Skipped {
@@ -222,5 +277,27 @@ mod tests {
         assert_eq!(st, 200);
         assert_eq!(page.matches("data-rplan-path=").count(), super::PANEL_ROWS, "{page}");
         assert!(page.contains("and 5 more files."), "the rest is counted");
+    }
+
+    /// The panel names the chapters of the plan and a signal in the Why list of its file.
+    /// Catches a template that drops the chapters or computes its own grouping.
+    #[tokio::test]
+    async fn the_working_tree_page_lists_chapters_and_signals() {
+        let dir = tempfile::tempdir().expect("tmp");
+        let p = Fixture::init(dir.path())
+            .write("src/a.rs", "fn a() {}\n")
+            .write("src/a_test.rs", "fn t() {}\n")
+            .write("Cargo.toml", "[package]\n")
+            .commit("feat: one")
+            .path()
+            .to_owned();
+        std::fs::write(p.join("src/a.rs"), "fn a() {}\nfn b() {}\n").expect("write");
+        std::fs::write(p.join("Cargo.toml"), "[package]\nname = \"x\"\n").expect("write");
+        let (st, page) = gitterrace_testkit::get(&linked(&p), "/worktree").await;
+        assert_eq!(st, 200);
+        assert!(page.contains("data-rplan-chapter=\"src\""), "{page}");
+        assert_eq!(page.matches("href=\"#p/Cargo.toml\"").count(), 1, "the plan lists a file once");
+        assert!(page.contains("Source without test change"), "{page}");
+        assert!(page.contains("Config change"), "{page}");
     }
 }

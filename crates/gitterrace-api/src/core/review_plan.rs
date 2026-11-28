@@ -1,6 +1,8 @@
 //! The review plan: the changed files of a compare or the working tree, scored and ordered,
 //! see [`ApiState::review_plan`].
 
+mod chapters;
+
 use std::collections::BTreeSet;
 
 use gitterrace_git::FileDiff;
@@ -177,6 +179,7 @@ impl ApiState {
             })
             .collect();
         order(&mut files);
+        mark_signals(&mut files, &list, patterns);
         let mut skipped: Vec<PlanSkipped> = changed
             .iter()
             .filter_map(|c| c.skip.map(|reason| PlanSkipped { path: c.diff.path.clone(), reason }))
@@ -185,9 +188,11 @@ impl ApiState {
         let total_files = files.len() + skipped.len();
         let truncated = files.len() > limit;
         files.truncate(limit);
+        let chapters = chapters::chapters(&files, &skipped);
         Ok(ReviewPlan {
             base,
             baseline_missing,
+            chapters,
             content_gone,
             files,
             files_omitted,
@@ -318,6 +323,7 @@ fn plan_file(c: &Changed<'_>, f: FileFacts, fold_lines: usize) -> PlanFile {
         path: d.path.clone(),
         permalink: None,
         risk: terms.sum(),
+        signals: Vec::new(),
         size_lines: d.lines,
         sole_owner: f.sole_owner,
         terms,
@@ -354,6 +360,15 @@ fn terms(i: &Inputs) -> PlanTerms {
         ownership,
         size: size.round() as u32,
         untested: if i.untested { UNTESTED_POINTS } else { 0 },
+    }
+}
+
+/// Each file's risk signals, a test sibling counted as touched when it is in the change too.
+fn mark_signals(files: &mut [PlanFile], list: &[FileDiff], patterns: &[String]) {
+    let touched: BTreeSet<&str> = list.iter().map(|f| f.path.as_str()).collect();
+    for file in files {
+        let sibling_touched = has_sibling(&file.path, patterns, &touched);
+        file.signals = chapters::signals(file, sibling_touched);
     }
 }
 

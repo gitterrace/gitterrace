@@ -42,10 +42,11 @@ pub use review::{
     NewFinding, ViewedItem, ViewedResponse,
 };
 
-pub use work_state::{WorkCommit, WorkFile, WorkFinding, WorkSince, WorkState, WorkTree};
 pub use review_plan::{
-    PlanFile, PlanHotspot, PlanOwner, PlanSkipped, PlanSource, PlanTerms, ReviewPlan, SkipReason,
+    ChapterKind, PlanChapter, PlanFile, PlanHotspot, PlanOwner, PlanSignal, PlanSkipped,
+    PlanSource, PlanTerms, ReviewPlan, SignalKind, SkipReason,
 };
+pub use work_state::{WorkCommit, WorkFile, WorkFinding, WorkSince, WorkState, WorkTree};
 
 /// Who did something and when.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]

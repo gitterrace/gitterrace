@@ -1,7 +1,10 @@
 <details class="card files rplan" data-rplan open><summary>Review order
-<span class="counts">{{ summary }}, riskiest first</span></summary>
+<span class="counts">{{ summary }}, {{ order }}</span></summary>
 <ol class="rplan-list">
 {%- for f in rows %}
+{%- if let Some(h) = f.heading %}
+<li class="rplan-chapter" data-rplan-chapter="{{ h.title }}"><b>{{ h.title }}</b>
+<span class="muted">{{ h.summary }}</span></li>{% endif %}
 <li data-rplan-path="{{ f.path }}"><a href="{{ f.href }}">{{ f.path }}</a>
 <b class="risk" title="Risk {{ f.risk }} of 100">{{ f.risk }}</b>
 <details class="rplan-why"><summary>Why</summary><ul>
