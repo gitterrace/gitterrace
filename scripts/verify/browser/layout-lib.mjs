@@ -110,7 +110,8 @@ async function pathCells() {
 // length or count width: a short path with a one-line change, a long one with thousands.
 async function viewFileColumn() {
   const long = ['pkgs', 'long-package-name', 'src', 'a-rather-long-module-name.rs'].join('/');
-  const files = ['a.txt', long];
+  // Its own short file: a.txt is the shared fixture's, and other cases read its one line.
+  const files = ['v.txt', long];
   mkdirSync(join(dir, 'pkgs/long-package-name/src'), { recursive: true });
   for (const f of files) writeFileSync(join(dir, f), 'base\n');
   commitAll(dir, 'test: files for the working tree list');

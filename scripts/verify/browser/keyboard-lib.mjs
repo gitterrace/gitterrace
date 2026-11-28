@@ -1,6 +1,8 @@
 // Keyboard and reflow checks over every page the goldens cover: a Tab walk with a visible ring
 
-import { eachBrowser, frames } from '../../lib/browser-lib.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { eachBrowser, commitAll, synced, frames } from '../../lib/browser-lib.mjs';
 // on every stop, 320 px reflow, WCAG 1.4.12 text spacing, 24 px targets, and the shortcut off
 // switch. Each list of known pages can only shrink: a page green everywhere fails until it is
 // dropped. Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
@@ -25,7 +27,7 @@ const FIXED = {
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
 export function checks(env) {
-  const { srv, r, browsers, context } = env;
+  const { srv, r, browsers, context, dir } = env;
 
   async function pages(p) {
     await p.goto(srv.base + '/stats', { waitUntil: 'load' });
@@ -39,11 +41,11 @@ export function checks(env) {
   }
 
   /** Runs `probe` on every page in every browser. Findings per page key, against `known`. */
-  async function sweep(name, known, setup, probe, arg) {
+  async function sweep(name, known, setup, probe, arg, more = {}) {
     const red = new Map();
     await eachBrowser(browsers, context, async (ctx, bname) => {
       const p = await ctx.newPage();
-      const all = await pages(p);
+      const all = { ...(await pages(p)), ...more };
       await setup(p);
       for (const [key, path] of Object.entries(all)) {
         await p.goto(srv.base + path, { waitUntil: 'load' });
@@ -117,9 +119,13 @@ export function checks(env) {
   }
 
   async function reflow() {
-    await sweep('reflow', KNOWN_REFLOW, async (p) => {
-      await p.setViewportSize({ width: 320, height: 800 });
-    }, async (p) =>
+    // A document with a view switch and an outline menu in its head: the widest title row.
+    // Its own file, so the page is the same whatever ran before.
+    const doc = Array.from({ length: 6 }, (_, i) => `## Part ${i}\n\ntext\n`).join('\n');
+    writeFileSync(join(dir, 'reflow-outline.md'), `# Reflow\n\n${doc}`);
+    commitAll(dir, 'docs: reflow outline fixture');
+    await synced(srv, dir);
+    const measure = (p) =>
       p.evaluate(() => {
         const de = document.documentElement;
         if (de.scrollWidth <= de.clientWidth + 1) return [];
@@ -138,7 +144,18 @@ export function checks(env) {
           if (out.length > 3) break;
         }
         return out.length ? out : [`page scrolls sideways (${de.scrollWidth} > ${de.clientWidth})`];
-      }));
+      });
+    await sweep('reflow', KNOWN_REFLOW, async (p) => {
+      await p.setViewportSize({ width: 320, height: 800 });
+    }, async (p) => {
+      const found = await measure(p);
+      // The open outline menu is part of the page: its list must fit the column too.
+      const menu = p.locator('main>.ph details.outline>summary');
+      if (!(await menu.count()) || !(await menu.isVisible())) return found;
+      await menu.click();
+      await frames(p);
+      return found.concat((await measure(p)).map((f) => `menu open: ${f}`));
+    }, undefined, { 'blob-md-outline': '/blob/HEAD/reflow-outline.md' });
   }
 
   async function textSpacing() {

@@ -49,6 +49,7 @@ GATES: list[Gate] = [
     ("tests-modules", [PY, "scripts/lint/tests-check.py"], (".rs",)),
     ("types", [PY, "scripts/lint/types-check.py"], (".rs", "scripts/guards/")),
     ("css-button", [PY, "scripts/lint/css-button-check.py"], (".css", ".html", ".js")),
+    ("css-vw", [PY, "scripts/lint/css-vw-check.py"], (".css",)),
     (
         "theme",
         ["cargo", "xtask", "theme"],

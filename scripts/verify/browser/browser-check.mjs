@@ -32,6 +32,8 @@ import {
   guard,
   routeFromDisk,
   makeRepo,
+  fixtureState,
+  fixtureDrift,
   serve,
   openPage,
   reporter,
@@ -117,7 +119,14 @@ try {
     // A case that throws (a server that will not start, a command that fails) fails that case
     // alone, so the cases behind it still report.
     guard.begin(EXPECT[c]);
+    // The repository is shared: a case that leaves a file, a ref or the branch changed alters
+    // the pages every later case opens, and the run passes or fails by its order.
+    const was = fixtureState(dir);
     try { await checks[c](); } catch (e) { r.fail(`${c}: ${e?.stack ?? e}`); }
+    const drift = fixtureDrift(was, fixtureState(dir));
+    if (drift.length) {
+      r.fail(`${c}: left the shared repository changed (${drift.slice(0, 5).join('; ')})`);
+    }
     const unexpected = guard.take();
     if (unexpected.length) {
       r.fail(`${c}: unexpected same-origin error responses: ${unexpected.join(', ')}`);

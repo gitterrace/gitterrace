@@ -1,5 +1,5 @@
 /* The Send to window. */
-.ov.send{width:min(520px,94vw);max-height:80vh}
+.ov.send{width:min(520px,94%);max-height:80vh}
 .send-title{box-sizing:border-box;display:block;width:calc(100% - var(--space-4)*2);height:32px;margin:var(--space-2) var(--space-4) 0;padding:0 var(--space-3);font-size:var(--text-md);background-color:var(--bg);border:var(--border);border-radius:var(--radius);flex:none}
 /* The context box starts a few lines tall and grows with what is in it (field-sizing where the
    browser has it, send.js elsewhere), up to most of the window, then scrolls. */
@@ -13,4 +13,4 @@
 .send-head{margin:0;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-base);font-weight:var(--weight-semibold);color:var(--fg);flex:none}
 .send-lab{display:block;padding:var(--space-3) var(--space-4) 0;font-size:var(--text-xs);color:var(--muted);flex:none}
 /* On a phone the window is a sheet along the bottom edge, its footer always in reach. */
-@media (max-width:600px){.send-back[open]{align-items:flex-end;padding-top:0}.ov.send{width:100vw;max-width:none;max-height:90vh;margin:0;border-radius:var(--radius) var(--radius) 0 0}.send-foot{position:sticky;bottom:0}.send-hint{display:none}.send-pick{max-width:none;flex:1}}
+@media (max-width:600px){.send-back[open]{align-items:flex-end;padding-top:0}.ov.send{width:100%;max-width:none;max-height:90vh;margin:0;border-radius:var(--radius) var(--radius) 0 0}.send-foot{position:sticky;bottom:0}.send-hint{display:none}.send-pick{max-width:none;flex:1}}

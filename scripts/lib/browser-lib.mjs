@@ -296,6 +296,46 @@ export function commitFiles(dir, indexFile, files, ref, subject, parent = 'HEAD'
   return sha;
 }
 
+/**
+ * What a case must leave as it found it in a repository other cases read: the branch, every
+ * tracked file, every other ref and a clean work tree. New files and commits are a case's own
+ * fixture and are not listed: they change no page another case opens by its path.
+ */
+export function fixtureState(dir) {
+  const lines = (...a) => sh(dir, 'git', ...a).split('\n').filter(Boolean);
+  const branch = sh(dir, 'git', 'rev-parse', '--abbrev-ref', 'HEAD');
+  const pairs = (rows, sep) => new Map(rows.map((l) => {
+    const i = l.indexOf(sep);
+    return [l.slice(i + 1), l.slice(0, i)];
+  }));
+  const refs = pairs(lines('for-each-ref', '--format=%(objectname) %(refname)'), ' ');
+  refs.delete(`refs/heads/${branch}`);
+  return {
+    branch,
+    files: pairs(lines('ls-tree', '-r', 'HEAD'), '\t'),
+    refs,
+    // Read only: a plain status rewrites a stale index, and the server takes that write for a
+    // change, measures a clean tree and shows the next case's edit a couple of seconds late.
+    dirty: lines('--no-optional-locks', 'status', '--porcelain', '-uall'),
+  };
+}
+
+/** How `after` broke what `before` held (both from `fixtureState`), one phrase per fault. */
+export function fixtureDrift(before, after) {
+  const bad = [];
+  if (after.branch !== before.branch) bad.push(`on ${after.branch}, was on ${before.branch}`);
+  const both = [['file', before.files, after.files], ['ref', before.refs, after.refs]];
+  for (const [kind, was, now] of both) {
+    for (const [name, id] of was) {
+      if (!now.has(name)) bad.push(`${kind} ${name} is gone`);
+      else if (now.get(name) !== id) bad.push(`${kind} ${name} changed`);
+    }
+  }
+  const had = new Set(before.dirty);
+  for (const d of after.dirty) if (!had.has(d)) bad.push(`uncommitted: ${d}`);
+  return bad;
+}
+
 /** Stages everything in `dir` and commits it with `subject`. */
 export function commitAll(dir, subject) {
   sh(dir, 'git', 'add', '-A');

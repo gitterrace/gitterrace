@@ -38,10 +38,14 @@ section.file [id]{scroll-margin-top:calc(40px + var(--space-2))}
 .outline li.d1>a{padding-left:var(--space-6)}
 .outline a:hover{color:var(--fg);text-decoration:none}
 .outline.rail a.on{color:var(--fg);font-weight:var(--weight-semibold);border-left-color:var(--accent)}
-.outline.menu{position:relative;margin-left:auto;display:none}
+/* The menu is no containing block: its popover takes the row that holds it (the page head, a
+   document bar), so its width is a share of the page column. vw would count a classic
+   scrollbar and push the box past the column. Closed, the box is gone: it is never measured. */
+.outline.menu{position:static;margin-left:auto;display:none}
+.outline.menu:not([open])>.outline-pop{display:none}
 .outlinebtn{font-size:var(--text-sm);text-transform:none;letter-spacing:0;list-style:none}
 .outlinebtn::-webkit-details-marker{display:none}
-.outline-pop{position:absolute;right:0;top:calc(100% + var(--space-1));z-index:20;width:min(320px,92vw);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
+.outline-pop{position:absolute;right:0;top:auto;margin-top:var(--space-1);z-index:20;width:min(320px,100%);max-height:60vh;overflow:auto;padding:var(--space-2);background:var(--raised);border:var(--border);border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm);text-transform:none;letter-spacing:0;font-family:var(--sans);font-weight:var(--weight-regular)}
 .outline-pop a{display:block;padding:var(--space-1) var(--space-3);border-radius:var(--radius);color:var(--fg);overflow-wrap:anywhere}
 .outline-pop a:hover,.outline-pop a:focus-visible,.outline-pop a.on{background:var(--hover)}
 /* Two classes, so the global input floor (min-width:240px) cannot widen the 220 px rail. */

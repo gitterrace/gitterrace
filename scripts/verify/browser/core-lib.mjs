@@ -10,6 +10,7 @@ import {
   sweep,
   commitFiles,
   synced,
+  poll,
   reloadUntil,
   scrollSettled,
 } from '../../lib/browser-lib.mjs';
@@ -54,6 +55,13 @@ async function sideWidth() {
 async function calmHeader() {
   writeFileSync(join(dir, 'a.txt'), 'one\ndirty\n');
   await synced(srv, dir);
+  // The chip's answer is reused for a couple of seconds, so a page rendered clean just before
+  // the edit still hides it. Bounded: a server that never shows the chip fails the case.
+  await poll(async () => {
+    const page = await (await fetch(srv.base + '/')).text();
+    const chip = /<a class="wtchip" id="wtchip"[^>]*>/.exec(page);
+    return chip && !/ hidden/.test(chip[0]);
+  }, 'the served page to show the chip on a dirty tree');
   const sw = { browsers, context, widths: [1440, 900, 360], height: 400 };
   await sweep(sw, async (p, { name, scheme, width }) => {
     await p.goto(srv.base + '/', { waitUntil: 'load' });

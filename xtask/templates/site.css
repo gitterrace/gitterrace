@@ -142,10 +142,18 @@ border:solid currentColor;border-width:0 1.5px 1.5px 0;transform:translateY(-2px
 text-transform:none;letter-spacing:0}
 .top .docsmenu>summary::after{display:none}
 .bar{position:relative}
-.top .docsmenu .pop{left:auto;right:var(--page-pad);top:calc(100% - var(--space-1))}
+.top .docsmenu .pop{left:auto;right:var(--page-pad);top:calc(100% - var(--space-1));
+width:min(320px,calc(100% - 2*var(--page-pad)))}
+/* "On this page" opens against its row, the text column. A width in vw would count a classic
+   scrollbar, so both lists are sized by the box they hang from. A closed details lays its
+   content out in a contained box of no width, where that share is nothing and the list
+   would scroll sideways unseen: closed, the list has no box at all. */
+.menus{position:relative}
+.menus>.menu{position:static}
+.menu:not([open])>.pop{display:none}
 .top .docsmenu .pop a{font-size:var(--text-sm);font-weight:var(--weight-regular)}
 .menu .pop{position:absolute;left:0;top:calc(100% + var(--space-1));z-index:20;
-width:min(320px,calc(100vw - 2*var(--page-pad)));max-height:60vh;overflow:auto;
+width:min(320px,100%);max-height:60vh;overflow:auto;
 padding:var(--space-2);background:var(--raised);border:var(--border);
 border-radius:var(--radius);box-shadow:var(--shadow-2);font-size:var(--text-sm)}
 .menu .pop a{display:block;padding:6px var(--space-3);border-radius:var(--radius);

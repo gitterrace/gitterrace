@@ -12,7 +12,7 @@
   color:var(--on-accent);
   background:var(--accent);
 }
-.ov.basket{width:min(560px,94vw);max-height:80vh}
+.ov.basket{width:min(560px,94%);max-height:80vh}
 .basket-head{
   margin:0;
   padding:var(--space-3) var(--space-4) 0;

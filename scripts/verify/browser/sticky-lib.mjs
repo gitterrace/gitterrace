@@ -3,9 +3,9 @@
 // the outline button sits inside the bar, and the Markdown Code view spans the content width.
 // Imported by scripts/verify/browser/browser-check.mjs, not run on its own.
 import { execFileSync } from 'node:child_process';
-import { writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { eachBrowser, synced, frames } from '../../lib/browser-lib.mjs';
+import { eachBrowser, commitAll, synced, frames } from '../../lib/browser-lib.mjs';
 
 /** The views: a page, the head and the box it closes, and whether to switch to Code first. */
 const VIEWS = [
@@ -45,6 +45,16 @@ export function checks({ pw, dir, srv, r, browsers, context }) {
   }
 
   async function stickyLine() {
+    // The shared README is read by other cases: put it back, so they pass in any order.
+    const readme = readFileSync(join(dir, 'README.md'));
+    try { await stickyLineIn(); } finally {
+      writeFileSync(join(dir, 'README.md'), readme);
+      commitAll(dir, 'docs: restore the README');
+      await synced(srv, dir);
+    }
+  }
+
+  async function stickyLineIn() {
     await seed();
     await eachBrowser(browsers, context, async (ctx, name) => {
       for (const scheme of ['light', 'dark']) for (const width of [1400, 900]) for (const v of VIEWS) {

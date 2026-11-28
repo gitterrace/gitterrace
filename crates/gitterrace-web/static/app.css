@@ -308,10 +308,10 @@ kbd{font:var(--weight-semibold) var(--text-2xs)/1 var(--mono);color:var(--muted)
   background:var(--scrim);display:flex;justify-content:center;align-items:flex-start}
 .ov-back::backdrop{background:transparent}
 .ov{background:var(--raised);color:var(--fg);border:var(--border);border-radius:var(--radius);
-  box-shadow:var(--shadow-2);width:min(640px,92vw);max-height:70vh;padding:0;display:flex;
+  box-shadow:var(--shadow-2);width:min(640px,92%);max-height:70vh;padding:0;display:flex;
   flex-direction:column;overflow:hidden}
 .ov[popover]:not(:popover-open){display:none}
-.ov.anchored{position:fixed;inset:auto;margin:0;width:min(380px,92vw)}
+.ov.anchored{position:fixed;inset:auto;margin:0;width:min(380px,92%)}
 .ov-input{border:0;border-bottom:var(--border);border-radius:0;height:44px;min-width:0;flex:none;padding:0 var(--space-4);font-size:var(--text-md);width:100%;background:transparent}
 .ov-input:focus-visible,.send-title:focus-visible,.send-ctx:focus-visible{
   outline:2px solid var(--focus);outline-offset:-2px}
@@ -533,7 +533,7 @@ svg.chart .dot-pt{fill:var(--accent);fill-opacity:.55;stroke:var(--accent);strok
 td:has(>.actbtn.float){position:relative}
 :hover>.actbtn.float,.actbtn.float:focus-visible,.actbtn.float.sel{opacity:1}
 .actbtn.mark{position:fixed;z-index:20;box-shadow:var(--shadow-2)}
-.ov.actmenu{width:min(300px,92vw)}
+.ov.actmenu{width:min(300px,92%)}
 .actmenu .ov-list li{justify-content:space-between;align-items:center}
 .actmenu .ov-list li kbd{margin-left:auto}
 .actmenu .ov-list li.busy{opacity:.55;pointer-events:none}

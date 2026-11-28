@@ -100,9 +100,10 @@ export function checks(env) {
         await p.setViewportSize({ width, height: 900 });
         for (const [kind, url] of Object.entries(pages)) {
           await p.goto(url, { waitUntil: 'load' });
-          // The outline menu shows its list only when open: open it to measure it.
+          // A menu shows its list only when open: open the app's outline menu and the site's two
+          // to measure them.
           await p.evaluate(() => {
-            for (const d of document.querySelectorAll('details.outline.menu')) {
+            for (const d of document.querySelectorAll('details.outline.menu, details.menu')) {
               if (d.getClientRects().length) /** @type {HTMLDetailsElement} */ (d).open = true;
             }
           });
