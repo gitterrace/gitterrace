@@ -101,6 +101,22 @@ function read(id) {
   };
 }
 
+/** In the page: focus the tab stop just before `sel` (or none, so Tab starts at the top). */
+function stopBefore(sel) {
+  const scope = document.querySelector('.ov') || document;
+  const stops = [...scope.querySelectorAll(
+    'a[href],button,input,select,textarea,summary,[tabindex]')].filter((e) => {
+    const el = /** @type {HTMLElement} */ (e);
+    const q = el.getBoundingClientRect();
+    return el.tabIndex >= 0 && !(/** @type {any} */ (el)).disabled && q.width > 0 && q.height > 0
+      && getComputedStyle(el).visibility !== 'hidden';
+  });
+  const at = stops.indexOf(/** @type {HTMLElement} */ (document.querySelector(sel)));
+  if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  scrollTo(0, 0);
+  if (at > 0) /** @type {HTMLElement} */ (stops[at - 1]).focus();
+}
+
 /** WCAG contrast of text `fg` (alpha blended over `bg`) on `bg`. */
 export function contrast(fg, bg) {
   const a = (fg[3] ?? 255) / 255;
@@ -145,10 +161,10 @@ export function checks(env) {
             // Off the button before letting go, so the press never clicks (Send, Remove).
             await p.mouse.move(1, 799);
             await p.mouse.up();
-            // By keyboard, so every engine treats it as focus-visible: focus the button, step
-            // back one stop and Tab onto it again.
-            await p.focus(sel);
-            await p.keyboard.press('Shift+Tab');
+            // By keyboard, so every engine treats it as focus-visible: focus the stop before the
+            // button and Tab onto it. Shift+Tab is no way back: WebKit on Linux gets no
+            // backwards step from it, so the Tab would move on to the next stop.
+            await p.evaluate(stopBefore, sel);
             await p.keyboard.press('Tab');
             const on = await p.evaluate(
               (s) => document.activeElement === document.querySelector(s), sel);
