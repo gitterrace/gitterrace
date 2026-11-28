@@ -41,7 +41,9 @@ export function checks(env) {
   /** Layout, placement and the accessibility of the markup, at one width. */
   async function shape(p, w) {
     const cls = await p.evaluate(() => /** @type {any} */ (window).__cls);
-    say(cls === 0, `${w}: layout shift 0`, `${w}: layout shift ${cls}`);
+    const from = await p.evaluate(() => /** @type {any} */ (window).__clsFrom);
+    const shift = `${w}: layout shift ${cls} from ${JSON.stringify(from)}`;
+    say(cls === 0, `${w}: layout shift 0`, shift);
     const wide = await p.evaluate(() => document.documentElement.scrollWidth > innerWidth);
     say(!wide, `${w}: no sideways scroll`, `${w}: the page scrolls sideways`);
     const gap = await p.evaluate(() => {
@@ -131,10 +133,21 @@ export function checks(env) {
           const p = await ctx.newPage({ viewport: { width, height: 900 } });
           await p.addInitScript(() => {
             /** @type {any} */ (window).__cls = 0;
+            /** @type {any} */ (window).__clsFrom = [];
             try {
               new PerformanceObserver((l) => {
                 for (const e of /** @type {any[]} */ (l.getEntries())) {
-                  if (!e.hadRecentInput) /** @type {any} */ (window).__cls += e.value;
+                  if (e.hadRecentInput) continue;
+                  /** @type {any} */ (window).__cls += e.value;
+                  // Name the nodes that moved, so a failure points at one element.
+                  for (const s of e.sources || []) {
+                    const n = s.node;
+                    const id = n ? `${n.nodeName.toLowerCase()}.${n.className || ''}` : '?';
+                    const r = (b) =>
+                      [b.x, b.y, b.width, b.height].map((v) => v.toFixed(1)).join(',');
+                    const from = `${id} ${r(s.previousRect)} -> ${r(s.currentRect)}`;
+                    /** @type {any} */ (window).__clsFrom.push(from);
+                  }
                 }
               }).observe({ type: 'layout-shift', buffered: true });
             } catch { /* no layout-shift entries in this engine */ }
