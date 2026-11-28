@@ -225,23 +225,19 @@ export function checks(env) {
       });
       await p.reload({ waitUntil: 'load' });
       await arrived;
-      // Tab q ticks and unticks a.txt, both saved, while tab p's move is still held. q shares
-      // p's storage, so it moves the same old marks first (its own route is not held): wait for
-      // that, then click until a.txt ends unmarked by a click, which is the newer choice.
+      // Tab q moves the same old marks first (it shares p's storage, its own route is not held),
+      // then draws them: a.txt shows ticked only once q's move is answered and decorated. The
+      // response alone is not that signal, since the box is ticked a step after it, so a read
+      // taken in between sees it unticked. Wait for the tick, then unmark with one saved click,
+      // which is the newer choice.
       const q = await ctx.newPage({ viewport: { width: 1200, height: 900 } });
-      const qMoved = q.waitForResponse(
-        (x) => x.request().method() === 'POST' && /\/_viewed\/all$/.test(x.url()), WAIT);
       await q.goto(`${srv.base}${KEY}`, { waitUntil: 'load' });
-      await q.waitForSelector('section.file input.viewed', WAIT);
-      await qMoved;
       const box = 'section.file[data-path="a.txt"] input.viewed';
-      const clicks = (await q.isChecked(box)) ? 1 : 2;
-      for (let i = 0; i < clicks; i++) {
-        const saved = q.waitForResponse(
-          (x) => x.request().method() === 'POST' && /\/_viewed$/.test(x.url()), WAIT);
-        await q.click(box);
-        await saved;
-      }
+      await q.waitForSelector(`${box}:checked`, WAIT);
+      const saved = q.waitForResponse(
+        (x) => x.request().method() === 'POST' && /\/_viewed$/.test(x.url()), WAIT);
+      await q.click(box);
+      await saved;
       say(!(await q.isChecked(box)), `${w}: tab q unmarked a.txt`, `${w}: tab q left a.txt ticked`);
       release();
       await answered;
