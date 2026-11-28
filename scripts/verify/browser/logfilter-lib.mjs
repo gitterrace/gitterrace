@@ -1,5 +1,5 @@
 // The log's one filter field. Imported by browser-check.mjs, not run alone.
-import { eachBrowser } from '../../lib/browser-lib.mjs';
+import { eachBrowser, ready } from '../../lib/browser-lib.mjs';
 
 /** @param {any} env what browser-check.mjs set up (srv, r, browsers, context, ...) */
 export function checks(env) {
@@ -75,6 +75,8 @@ export function checks(env) {
           try {
             await p.setViewportSize({ width, height: 800 });
             await p.goto(srv.base + '/log/HEAD', { waitUntil: 'load' });
+            // Escape and the outside click are bound by the lazy outline script.
+            if (js) await ready(p, 'outline');
             const btn = p.locator('.filter-help > .helpbtn');
             const has = await btn.count() === 1;
             if (!has) { r.fail(`${where}: no ? button`); continue; }
@@ -98,6 +100,7 @@ export function checks(env) {
             });
             const lists = names.every((n) => shown.text.includes(n + (n === 'merge' ? '' : ':')));
             let closed = true;
+            let why = null;
             if (js) {
               await p.keyboard.press('Escape');
               const esc = await p.evaluate(() => {
@@ -110,12 +113,13 @@ export function checks(env) {
               const out = await p.evaluate(() =>
                 /** @type {HTMLDetailsElement} */ (document.querySelector('.filter-help')).open);
               closed = !esc.open && esc.focus && !out;
+              why = { escOpen: esc.open, escFocus: esc.focus, outsideOpen: out };
             }
             const ok = label === 'Filter help' && box.sameRow && box.right && box.inside
               && shown.vis && lists && shown.more && shown.fits && shown.sideways <= 0 && closed;
             if (ok) r.ok(`${where}: ? opens the help with every keyword`);
             else {
-              const got = { label, box, shown: { ...shown, text: '' }, lists, closed };
+              const got = { label, box, shown: { ...shown, text: '' }, lists, closed, why };
               r.fail(`${where}: ${JSON.stringify(got)}`);
             }
           } catch (e) { r.fail(`${where}: ${e.message.split('\n')[0]}`); }
