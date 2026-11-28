@@ -48,6 +48,22 @@ const ALL = ['truncation', 'live-tabs', 'mermaid', 'csp-style', 'chip', 'doctabs
 const wanted = arg('--checks', ALL.join(',')).split(',');
 for (const c of wanted) if (!ALL.includes(c)) { console.error(`unknown check ${c}; known: ${ALL.join(', ')}`); process.exit(2); }
 
+// Build artifacts a case reads but does not make. A missing one fails the run here with one
+// message, not as an ENOENT inside every case. scripts/lint/browser-gate-check.py holds each
+// key to a producer step in the hosted job.
+const NEEDS = {
+  'target/site/_headers': [
+    'site-theme', 'install-tabs', 'site-bar', 'site-rail', 'site-tables',
+    'doc-menus', 'bar-steady', 'header-theme', 'head-fits', 'no-sideways-scroll',
+  ],
+};
+for (const [f, cs] of Object.entries(NEEDS)) {
+  const readers = cs.filter((c) => wanted.includes(c));
+  if (!readers.length || existsSync(join(root, f))) continue;
+  console.error(`missing ${f}, which ${readers.join(', ')} read. Build it first: cargo xtask site`);
+  process.exit(2);
+}
+
 const pw = await loadPlaywright(browsers);
 const dir = makeRepo();
 // The chords check needs one action, key "x", that touches a marker file. It has to exist

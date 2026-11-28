@@ -46,7 +46,29 @@ def recipe(makefile: str, target: str) -> str:
     return m.group(1) if m else ""
 
 
-def problems(workflow: str, makefile: str, runner: str) -> list[str]:
+# The step that makes each artifact browser-check.mjs lists in NEEDS, as the job must run it.
+PRODUCERS = {"target/site/": r"\bcargo\s+xtask\s+site\b"}
+READS = re.compile(r"target/(?!debug|release|shots)[\w-]+")
+
+
+def artifact_problems(body: str, runner: str, libs: str) -> list[str]:
+    """Every artifact a case reads is in NEEDS and has a producer step in the job."""
+    found = re.search(r"const NEEDS = \{(.*?)\n\};", runner, re.S)
+    needs = re.findall(r"'(target/[^']+)':", found.group(1)) if found else []
+    bad = []
+    for art in needs:
+        pat = next((p for k, p in PRODUCERS.items() if art.startswith(k)), None)
+        if pat is None:
+            bad.append(f"{RUNNER}: NEEDS {art} has no producer in PRODUCERS of this check")
+        elif not re.search(pat, body):
+            bad.append(f"{WORKFLOW}: job browser never builds {art}, which cases read")
+    for read in sorted(set(READS.findall(libs))):
+        if not any(n.startswith(read + "/") for n in needs):
+            bad.append(f"browser libs read {read} but {RUNNER} NEEDS does not list it")
+    return bad
+
+
+def problems(workflow: str, makefile: str, runner: str, libs: str = "") -> list[str]:
     body = job_body(workflow, "browser")
     if body is None:
         return [f"{WORKFLOW}: no `browser` job, so no gate runs {RUNNER}"]
@@ -65,14 +87,18 @@ def problems(workflow: str, makefile: str, runner: str) -> list[str]:
         bad.append(f"{RUNNER}: --checks no longer defaults to the whole ALL list")
     if not re.search(r"const ALL = \[[^\]]*'[^\]]*\];", runner):
         bad.append(f"{RUNNER}: ALL is empty or unreadable")
-    return bad
+    return bad + artifact_problems(body, runner, libs)
 
 
 MK = "browser-check:\n\tnode x.mjs{flag}\nbrowser-reap:\n\tnode y\nbrowser-disk:\n\tnode z\n"
-JS = "const ALL = ['a', 'b'];\nconst wanted = arg('--checks', ALL.join(','));\n"
+JS = (
+    "const ALL = ['a', 'b'];\nconst wanted = arg('--checks', ALL.join(','));\n"
+    "const NEEDS = {\n  'target/site/_headers': ['a'],\n};\n"
+)
 JOB = (
     "jobs:\n  browser:\n    runs-on: ubuntu-latest\n    steps:\n"
-    "      - run: make browser-deps\n      - run: make browser-check BIN=b{flag}\n"
+    "      - run: cargo xtask site\n      - run: make browser-deps\n"
+    "      - run: make browser-check BIN=b{flag}\n"
 )
 
 
@@ -96,8 +122,16 @@ def self_test() -> int:
             True,
         ),
     ]
+    cases += [
+        ((JOB.format(flag="").replace("cargo xtask site", "true"), MK.format(flag=""), JS), True),
+        ((JOB.format(flag=""), MK.format(flag=""), JS.replace("site/_headers", "other/x")), True),
+    ]
+    unlisted = "join(root, 'target/other/x')"
+    if not problems(JOB.format(flag=""), MK.format(flag=""), JS, unlisted):
+        print("browser-gate-check self-test: an unlisted artifact read passed")
+        return 1
     for i, ((wf, mk, js), red) in enumerate(cases):
-        got = problems(wf, mk, js)
+        got = problems(wf, mk, js, "join(root, 'target/site/x')")
         if bool(got) != red:
             print(f"browser-gate-check self-test: case {i} {'passed' if red else 'failed'}: {got}")
             return 1
@@ -112,7 +146,10 @@ def main() -> int:
     if not (repo / RUNNER).exists():
         return 0
     bad = problems(
-        (repo / WORKFLOW).read_text(), (repo / "Makefile").read_text(), (repo / RUNNER).read_text()
+        (repo / WORKFLOW).read_text(),
+        (repo / "Makefile").read_text(),
+        (repo / RUNNER).read_text(),
+        "\n".join(p.read_text() for p in sorted((repo / RUNNER).parent.glob("*.mjs"))),
     )
     for b in bad:
         print(f"browser-gate-check: {b}", file=sys.stderr)

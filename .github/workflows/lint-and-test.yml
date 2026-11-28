@@ -142,7 +142,8 @@ jobs:
   # chromium, webkit and firefox. Nothing else runs them: a red case reached main unseen until this
   # job. Fast tier, so a push cannot go green past a red case. The whole ALL list runs: no
   # --checks filter, and scripts/lint/gate-check.py fails when this job or the Makefile adds one.
-  # Expected: about 12 minutes of cold release build, 3 for the browsers, 15 to 25 for the checks
+  # Expected: about 12 minutes of cold release build, 1 for the site build, 3 for the browsers,
+  # 15 to 25 for the checks
   # (an estimate until the first hosted run; ci-budget-check.py holds it to 75% of the limit).
   browser:
     name: Browser checks (ubuntu-latest)
@@ -156,6 +157,8 @@ jobs:
         with:
           cache: cargo-browser
       - run: cargo build --release --locked -p gitterrace
+      # The site cases serve target/site, which only this step writes (browser-check.mjs NEEDS).
+      - run: cargo xtask site
       # The runner image ships node.
       - run: make browser-deps
       # The system libraries webkit and firefox need; act's runner image ships without them.
