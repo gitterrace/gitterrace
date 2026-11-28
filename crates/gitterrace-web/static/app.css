@@ -93,6 +93,8 @@ input:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-col
 .crumbs a{color:var(--accent-fg)}.crumbs a:last-child{color:var(--fg)}
 .crumbs i{color:var(--faint);font-style:normal;font-weight:var(--weight-regular);
   margin:0 var(--space-1)}
+/* A word joiner after the slash: Firefox would break between "/" and the name. */
+.crumbs i::after{content:"\2060"}
 
 /* file table and other row tables */
 /* Text for screen readers only: table captions, header cells of a table with no header row,
