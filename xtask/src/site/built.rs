@@ -231,8 +231,10 @@ fn font_problems(css: &str, pages: &[(String, String)], files: &[String]) -> Vec
         let block = face.split('}').next().unwrap_or("");
         let srcs: Vec<&str> =
             block.split("url(").skip(1).filter_map(|u| u.split(')').next()).collect();
-        if srcs.is_empty() {
-            bad.push("assets/site.css: an @font-face without a url()".to_owned());
+        // A stand-in face names installed fonts with local() and fetches nothing; a face with
+        // neither a url() nor a local() can never load.
+        if srcs.is_empty() && !block.contains("local(") {
+            bad.push("assets/site.css: an @font-face with no url() or local()".to_owned());
         }
         for src in srcs {
             let src = src.trim_matches(['"', '\'']);
@@ -272,6 +274,10 @@ fn a_planted_external_font_or_missing_face_file_is_reported() {
     assert!(bad.contains("names @import") && bad.contains("names ://"), "{bad}");
     assert!(bad.contains("src fonts/nope.woff2 is not built"), "{bad}");
     assert!(!font_problems("", &[], &files).is_empty(), "no @font-face is red");
+    let stand_in = "@font-face{font-family:\"S\";src:local(\"Arial\")}";
+    assert_eq!(font_problems(stand_in, &[], &files), Vec::<String>::new(), "local() only");
+    let empty = font_problems("@font-face{font-family:\"E\"}", &[], &files).join("\n");
+    assert!(empty.contains("no url() or local()"), "{empty}");
 }
 
 /// The `<footer>` of a page, if it has exactly one.

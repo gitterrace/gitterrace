@@ -198,6 +198,28 @@ fn palette(light: Colours, dark: Colours) -> String {
     format!(":root{{\n{}\n}}", rows.join("\n"))
 }
 
+/// The same for Fraunces against Georgia, titles being semibold: 94.5% at weight 600. The
+/// vertical overrides are the face's own (97.8%, 25.5%) divided by that.
+const TITLE_STANDIN: &str = "@font-face{font-family:\"Fraunces Standin\";\n\
+src:local(\"Georgia Bold\"),local(\"Georgia\"),local(\"Gelasio\");\n\
+size-adjust:94.5%;ascent-override:103.5%;\n\
+descent-override:27%;line-gap-override:0%}";
+
+/// Bricolage Grotesque's metrics against Arial, measured on the UI's own strings in a browser:
+/// its width is 104.8% of Arial's at weight 400 and 100.6% of Arial Bold's at 600, so each
+/// weight band gets its own size-adjust. The vertical overrides are the face's own (93%, 27%)
+/// divided by that.
+const BODY_STANDIN: [&str; 2] = [
+    "@font-face{font-family:\"Bricolage Standin\";\n\
+src:local(\"Arial\"),local(\"Liberation Sans\"),local(\"Arimo\");\n\
+font-weight:100 500;size-adjust:104.8%;ascent-override:88.7%;\n\
+descent-override:25.8%;line-gap-override:0%}",
+    "@font-face{font-family:\"Bricolage Standin\";\n\
+src:local(\"Arial Bold\"),local(\"Arial\"),local(\"Liberation Sans\");\n\
+font-weight:501 900;size-adjust:100.6%;ascent-override:92.4%;\n\
+descent-override:26.8%;line-gap-override:0%}",
+];
+
 fn fonts(design: &Value) -> Result<Vec<String>> {
     let f = &design["font"];
     let web = |k: &str| f[k]["web"].as_str().with_context(|| format!("font.{k}.web"));
@@ -208,21 +230,32 @@ fn fonts(design: &Value) -> Result<Vec<String>> {
         "the font roles changed in the snapshot"
     );
     let faces = [
-        ("Fraunces", "fraunces", "100 900"),
-        ("Bricolage Grotesque", "bricolage-grotesque", "200 800"),
-        ("JetBrains Mono", "jetbrains-mono", "100 800"),
+        ("Fraunces", "fraunces", "100 900", "optional"),
+        ("Bricolage Grotesque", "bricolage-grotesque", "200 800", "optional"),
+        ("JetBrains Mono", "jetbrains-mono", "100 800", "swap"),
     ];
     let mut lines: Vec<String> = faces
         .iter()
-        .map(|(fam, slug, w)| {
+        .map(|(fam, slug, w, display)| {
             format!(
                 "@font-face{{font-family:\"{fam}\";src:url(/static/fonts/{slug}.woff2) \
-                 format(\"woff2\");font-weight:{w};font-display:swap}}"
+                 format(\"woff2\");font-weight:{w};font-display:{display}}}"
             )
         })
         .collect();
+    // Title and body are `optional` and preloaded by the page head: the browser never swaps
+    // them in after first layout, so a late font moves nothing. Mono is below the fold and
+    // keeps `swap`. A face that missed first paint shows its stand-in: Arial or Georgia sized
+    // and spaced like it, so the page still lays out the same.
+    lines.extend(BODY_STANDIN.map(str::to_owned));
+    lines.push(TITLE_STANDIN.to_owned());
     let stack = |k: &str| -> Result<String> {
         let mut names = vec![web(k)?.to_owned()];
+        match k {
+            "body" => names.push("Bricolage Standin".to_owned()),
+            "title" => names.push("Fraunces Standin".to_owned()),
+            _ => {}
+        }
         for n in f[k]["fallback"].as_array().context("fallback")? {
             names.push(n.as_str().context("fallback name")?.to_owned());
         }

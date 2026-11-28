@@ -2,6 +2,8 @@
 //
 // A repository with five uncommitted files. On /worktree, in each browser:
 // - the bar is in the server's HTML and the page shifts by nothing while the scripts load
+//   and while the web fonts swap in
+// - opening find and running a query leaves every header box where it was
 // - f focuses the box, "/" still belongs to global search
 // - a query shows "n of m" after a step, n and N and Enter and Shift+Enter move it, and the
 //   match ranges are painted without adding one element to the page
@@ -37,7 +39,20 @@ export function checks(env) {
     .reduce((n, k) => n + (CSS.highlights.get(k)?.size ?? 0), 0));
   const onBox = (p) => p.evaluate((q) => document.activeElement.matches(q), BOX);
   const count = (p) => p.evaluate(() => document.getElementsByTagName('*').length);
-
+  /** Every box of the page header in page coordinates (a scroll is no move): find leaves it be. */
+  const headBoxes = (p) => p.evaluate(() => [...document.querySelectorAll(
+    'header.top, header.top *')].filter((e) => e.getClientRects().length).map((e) => {
+    const b = e.getBoundingClientRect();
+    return `${e.nodeName.toLowerCase()}.${e.getAttribute('class') || ''} ${[b.x + scrollX,
+      b.y + scrollY, b.width, b.height].map((v) => v.toFixed(1)).join(',')}`;
+  }));
+  /**
+   * Waits for the web fonts and two frames after them, so a swap's shift is in the count. The
+   * count is never reset: the stand-in face for Bricolage Grotesque has its metrics, so the swap
+   * moves nothing, and a regression in that shows up as a shift here.
+   */
+  const settle = (p) => p.evaluate(() => document.fonts.ready.then(() => new Promise((r) =>
+    requestAnimationFrame(() => requestAnimationFrame(r)))));
   /** Layout, placement and the accessibility of the markup, at one width. */
   async function shape(p, w) {
     const cls = await p.evaluate(() => /** @type {any} */ (window).__cls);
@@ -66,6 +81,7 @@ export function checks(env) {
   /** The keyboard flow and the states, at 1440. */
   async function flow(p, w) {
     const before = await count(p);
+    const heads = await headBoxes(p);
     await p.keyboard.press('f');
     say(await onBox(p), `${w}: f focuses the find box`, `${w}: f did not focus the box`);
     say((await status(p)) === '', `${w}: an empty box shows no status`, `${w}: status shown`);
@@ -81,6 +97,9 @@ export function checks(env) {
     }
     const n = await painted(p);
     say(n >= 3, `${w}: ${n} ranges painted with CSS.highlights`, `${w}: ${n} ranges painted`);
+    const moved = (await headBoxes(p)).filter((b, i) => b !== heads[i]);
+    say(moved.length === 0, `${w}: every header box holds still while find is open`,
+      `${w}: header boxes moved with find open: ${moved.slice(0, 4).join(' | ')}`);
     const after = await count(p);
     say(after === before, `${w}: a query adds no element (${after})`, `${w}: ${before}->${after}`);
     await p.evaluate(() => /** @type {any} */ (document.activeElement).blur());
@@ -135,7 +154,7 @@ export function checks(env) {
             /** @type {any} */ (window).__cls = 0;
             /** @type {any} */ (window).__clsFrom = [];
             try {
-              new PerformanceObserver((l) => {
+              const obs = new PerformanceObserver((l) => {
                 for (const e of /** @type {any[]} */ (l.getEntries())) {
                   if (e.hadRecentInput) continue;
                   /** @type {any} */ (window).__cls += e.value;
@@ -149,16 +168,15 @@ export function checks(env) {
                     /** @type {any} */ (window).__clsFrom.push(from);
                   }
                 }
-              }).observe({ type: 'layout-shift', buffered: true });
+              });
+              obs.observe({ type: 'layout-shift', buffered: true });
             } catch { /* no layout-shift entries in this engine */ }
           });
           await p.goto(`${srv.base}/worktree`, { waitUntil: 'load' });
           await p.waitForSelector('section.file input.viewed', { timeout: 10000 });
           // The find keys (f, n, /) are bound by the lazy script, which loads apart from viewed.
           await ready(p, 'diffs-find');
-          // Layout shifts land after fonts swap in, one frame past paint.
-          await p.evaluate(() => document.fonts.ready.then(() => new Promise((r) =>
-            requestAnimationFrame(() => requestAnimationFrame(r)))));
+          await settle(p);
           const w = `${where} at ${width}`;
           await shape(p, w);
           if (width === 1440) {
