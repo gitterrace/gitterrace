@@ -96,14 +96,33 @@ async function aboutPlace() {
 async function siteTheme() {
   const { server, url: root_ } = await serve();
   const url = `${root_}/`;
-  // What the page shows: data-theme, the visible logo, the visible screenshot images, each by file.
+  // What the page shows: data-theme, the bar's logo (an inline mark painted from the theme's
+  // ink, so its colour is the check), and every screenshot picture that has picked an image
+  // (currentSrc: the dark source wins under the system query, so the img src alone says nothing).
   const state = (p) => p.evaluate(() => {
-    const shown = (sel) => [...document.querySelectorAll(sel)].filter((i) => i.offsetParent && getComputedStyle(i).display !== 'none').map((i) => i.getAttribute('src'));
-    const pic = document.querySelector('.hero picture');
-    const media = [...(pic?.querySelectorAll('source') || [])]
+    const luma = (c) => {
+      const m = c.match(/[\d.]+/g).map(Number);
+      return 0.2126 * m[0] + 0.7152 * m[1] + 0.0722 * m[2];
+    };
+    const marks = [...document.querySelectorAll('.top .brand .logo')]
+      .filter((e) => e.getClientRects().length);
+    const ink = marks.length
+      ? luma(getComputedStyle(marks[0].querySelector('.i')).fill) : -1;
+    const pics = [...document.querySelectorAll('.shots picture, .lv2 picture')];
+    const first = document.querySelector('.shots picture');
+    const media = [...(first?.querySelectorAll('source') || [])]
       .map((s) => `${s.media} ${s.srcset}`);
-    const img = pic?.querySelector('img')?.currentSrc || '';
-    return { theme: document.documentElement.dataset.theme || 'system', logo: shown('.hero h1 img'), pic: img, media, shots: shown('.shots a:not(.lightbox) img'), label: document.getElementById('theme')?.getAttribute('aria-label') };
+    const src = (q) => q?.querySelector('img')?.currentSrc || '';
+    // A selector that matches nothing is a stale case, not a page that shows nothing.
+    const missing = [['.top .brand .logo', marks.length], ['.shots picture', first ? 1 : 0],
+      ['.lv2 picture', document.querySelectorAll('.lv2 picture').length]]
+      .filter(([, n]) => !n).map(([q]) => q);
+    return {
+      missing, theme: document.documentElement.dataset.theme || 'system',
+      logo: marks.length, ink: ink > 127 ? 'light' : 'dark', pic: src(first), media,
+      shots: pics.map(src).filter(Boolean),
+      label: document.getElementById('theme')?.getAttribute('aria-label'),
+    };
   });
   try {
     await eachLaunch(pw, browsers, async (b, browser) => {
@@ -117,11 +136,20 @@ async function siteTheme() {
         p.on('pageerror', (e) => errors.push(String(e)));
         const want = (t, s, what) => {
           const other = t === 'light' ? 'dark' : 'light';
-          const bad = [...s.logo, ...s.shots, s.pic].filter((x) => !x.includes(`-${t}`));
+          if (s.missing.length) {
+            r.fail(`site-theme ${where} ${what}: no element matches ${s.missing.join(', ')}:`
+              + ' the case is stale');
+            return other;
+          }
+          const bad = [...s.shots, s.pic].filter((x) => !x.includes(`-${t}`));
+          // Light ink on the dark theme, dark ink on the light one.
+          if (s.ink === t) bad.push('logo ink ' + s.ink);
           // The landing picture: a source per scheme, the dark one under the system query.
           const dark = s.media
             .some((m) => m.includes('-dark') && /prefers-color-scheme: ?dark|^all|not all/.test(m));
-          if (s.logo.length !== 1 || !s.shots.length || bad.length || !dark) r.fail(`site-theme ${where} ${what}: shows ${JSON.stringify(s)} for ${t}`);
+          if (s.logo !== 1 || !s.shots.length || bad.length || !dark) {
+            r.fail(`site-theme ${where} ${what}: shows ${JSON.stringify(s)} for ${t}`);
+          }
           else r.ok(`site-theme ${where} ${what}: logo, picture and ${s.shots.length} shots`
             + ` are ${t}`);
           return other;
@@ -140,8 +168,9 @@ async function siteTheme() {
         for (const t of ['light', 'dark', 'system']) {
           await p.click('#theme');
           // A swapped source sets currentSrc only once it has loaded.
-          const done = () => document.querySelector('.hero picture')?.querySelector('img')
-            ?.complete !== false;
+          const done = () => [...document.querySelectorAll('.shots picture img')]
+            .every((i) => /** @type {HTMLImageElement} */ (i).complete
+              || !(/** @type {HTMLImageElement} */ (i)).currentSrc);
           await p.waitForFunction(done, null, { timeout: 5000 }).catch(() => {});
           await frames(p);
           s = await state(p);
