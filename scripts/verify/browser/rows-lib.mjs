@@ -64,6 +64,15 @@ export function checks(env) {
     const hint = await fp.evaluate(rowsAboveContent);
     if (!hint.length) r.ok('lone-rows fixture: a hint paragraph with a link is prose');
     else r.fail(`lone-rows fixture: a hint paragraph was reported: ${hint.join('; ')}`);
+    await fp.setContent(fixture(
+      '<p class="meta"><a class="who" href="#"><b>t</b></a> <span>2 days ago</span></p>'));
+    const facts = await fp.evaluate(rowsAboveContent);
+    if (!facts.length) r.ok('lone-rows fixture: an author link beside a date is a line of facts');
+    else r.fail(`lone-rows fixture: an author and date line was reported: ${facts.join('; ')}`);
+    await fp.setContent(fixture('<p><a href="#">Open</a> now</p>'));
+    const link = await fp.evaluate(rowsAboveContent);
+    if (link.length === 1) r.ok('lone-rows fixture: a link with one orphan word is still reported');
+    else r.fail(`lone-rows fixture: a link with one orphan word gave ${link.length} findings`);
     await fb.close();
     for (const [key, row] of Object.entries(KNOWN)) {
       if (!red.has(key)) r.fail(`lone-rows: KNOWN names ${key}, which is not walked`);
@@ -170,6 +179,8 @@ function rowsAboveContent() {
       // says more than its one control does. A paragraph holding only the control is a row.
       const rest = (c.textContent || '').replace(u[0].textContent || '', '').trim();
       if (c.tagName === 'P' && rest.split(/\s+/).filter(Boolean).length >= 3) continue;
+      // The byline (author link and date, a.who) is a line of facts, not a row of controls.
+      if (c.tagName === 'P' && u[0].matches('a.who') && rest) continue;
       const share = u[0].getBoundingClientRect().width / c.getBoundingClientRect().width;
       const box = `${c.tagName.toLowerCase()}.${String(c.className || '').split(' ')[0]}`;
       const pct = Math.round(share * 100);
