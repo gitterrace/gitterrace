@@ -190,6 +190,46 @@ async function siteTheme() {
     });
   } finally { server.close(); }
 }
+// The landing page at phone widths: nothing on it reaches past the viewport. Every element is
+// measured, not just the ones that overflowed once: an element wider than the screen passes
+// only inside a box that scrolls or clips it on purpose (the install command, the window's
+// row of views). The root and the body do not count as such boxes, since the body's clip is
+// what keeps the headline's ink from scrolling the page.
+async function landingNoSideways() {
+  const { server, url } = await serve();
+  try {
+    await eachLaunch(pw, browsers, async (b, browser) => {
+      for (const scheme of ['light', 'dark']) {
+        for (const width of [320, 390]) {
+          const ctx = await b.newContext({ colorScheme: scheme, viewport: { width, height: 844 } });
+          const p = await ctx.newPage();
+          await p.goto(url + '/', { waitUntil: 'load' });
+          const bad = await p.evaluate(() => {
+            const clips = (e) => {
+              for (let a = e.parentElement; a && a !== document.body; a = a.parentElement) {
+                if (getComputedStyle(a).overflowX !== 'visible') return true;
+              }
+              return false;
+            };
+            const out = [];
+            for (const e of document.body.querySelectorAll('*')) {
+              const q = e.getBoundingClientRect();
+              if (q.width === 0 || (q.right <= innerWidth + 0.5 && q.left >= -0.5)) continue;
+              if (!clips(e)) out.push(`${e.tagName.toLowerCase()}.${e.className} ends at ${Math.round(q.right)}`);
+            }
+            const root = document.documentElement;
+            if (root.scrollWidth > innerWidth) out.push(`page scrolls ${root.scrollWidth - innerWidth} px`);
+            return out.slice(0, 5);
+          });
+          const where = `landing-no-sideways ${browser} ${scheme} ${width}`;
+          if (bad.length) r.fail(`${where}: ${bad.join('; ')}`);
+          else r.ok(`${where}: no element past the viewport`);
+          await ctx.close();
+        }
+      }
+    });
+  } finally { server.close(); }
+}
 // An export opened from disk (a file:// URL, no server): the forwarding index lands on the
 // repository, the page shows its content, the stylesheets load, and a link reaches a
 // second page. On every exported page with a form or a switcher (the overview, the log with
@@ -374,5 +414,5 @@ async function exportSwitch() {
   rmSync(join(other, '..'), { recursive: true, force: true });
 }
 
-  return { markSeam, aboutPlace, siteTheme, exportFromDisk, exportSwitch, installTabs };
+  return { markSeam, aboutPlace, siteTheme, landingNoSideways, exportFromDisk, exportSwitch, installTabs };
 }

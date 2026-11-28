@@ -8,8 +8,8 @@ fn landing() -> String {
 }
 
 /// The window on the landing page turns through the views of `REEL`, each one picture whose
-/// dark source follows the system and each with a link that names it. The phone's first view
-/// and the hand-off's crop are the only other pictures.
+/// dark source follows the system and each with a link that names it. The hand-off's crop is
+/// the only other picture, so a phone gets the same views, cropped by the stylesheet.
 #[test]
 fn the_window_shows_every_view_once_with_a_link_to_it() {
     let page = landing().replace('\n', " ");
@@ -20,7 +20,7 @@ fn the_window_shows_every_view_once_with_a_link_to_it() {
         assert_eq!(page.matches(&format!(" id=\"{stem}\"")).count(), 1, "{stem}");
         assert_eq!(page.matches(&format!(" href=\"#{stem}\"")).count(), 1, "{stem}");
     }
-    assert_eq!(page.matches("<picture").count(), landing::REEL.len() + 2);
+    assert_eq!(page.matches("<picture").count(), landing::REEL.len() + 1);
     assert!(!page.contains(".thumb.webp"));
 }
 
@@ -62,6 +62,20 @@ fn the_fold_shows_brew_and_git_terrace_with_a_copy_button() {
     assert!(fold.contains("data-copy=\"brew install "), "{fold}");
     assert!(fold.contains("href=\"/docs/getting-started/#install\""));
     assert_eq!(fold.matches("class=\"btn\"").count(), 1, "one button beside the command");
+}
+
+/// The demo link says what the demo is, and each place a finding goes names what it receives,
+/// so neither is a bare list of words. The footer's version is the crate's, never typed here.
+#[test]
+fn the_demo_note_and_the_destinations_say_what_they_are() {
+    let page = landing().replace('\n', " ");
+    assert!(page.contains("<span>Demo repos: "), "the demo note has no label");
+    let list = page.split_once("<ul class=\"to\">").map_or("", |h| h.1);
+    let list = list.split_once("</ul>").map_or("", |h| h.0);
+    assert_eq!(list.matches("<span>").count(), list.matches("<li>").count(), "{list}");
+    let ws = crate::facts::load(&crate::repo_root()).expect("facts");
+    let version = &ws.packages["gitterrace"].version;
+    assert!(page.contains(&format!(">v{version}</a>")), "footer version is not {version}");
 }
 
 /// The page carries its script inline, and the buttons that script switches on are hidden

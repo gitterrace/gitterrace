@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::{Context as _, Result};
 
 use crate::out::Out;
-use crate::site::landing::{CROPS, NARROW, REEL};
+use crate::site::landing::{CROPS, REEL};
 use crate::site::{SHOTS, at, sizes};
 
 pub(super) const SHOT_DIR: &str = "docs/screenshots";
@@ -48,12 +48,12 @@ pub(super) fn check_shots(root: &Path) -> Result<()> {
 }
 
 /// The site's copy of the files the landing page shows, under `assets/screenshots/`, at full
-/// size: the views of the window, the phone's first view and the hand-off's crop. The rest
+/// size: the views of the window and the hand-off's crop. The rest
 /// stay in the repository for the README. Run after `check_shots`, so each one is there at its
 /// size.
 pub(super) fn site_shots(root: &Path) -> Result<Vec<Out>> {
     let mut outs = Vec::new();
-    for n in REEL.iter().chain(&CROPS).chain([&NARROW]) {
+    for n in REEL.iter().chain(&CROPS) {
         for c in ["light", "dark"] {
             let f = format!("{n}-{c}.webp");
             let path = format!("{SHOT_DIR}/{f}");

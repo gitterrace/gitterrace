@@ -1,5 +1,6 @@
-//! The landing page from `templates/landing.html`: the pitch broken over a step, the install
-//! command, the app in a window that turns through a few real views, the hand-off beside its
+//! The landing page from `templates/landing.html`: the pitch broken over a step, the demo and
+//! the install command on one row, the app in a window that turns through a few real views
+//! (each a crop without the app's own bars), the hand-off beside its
 //! Send to window, and the promises. Its prose lives in `docs/landing.md`, each sentence once,
 //! and no landing sentence repeats on the page or in another doc.
 
@@ -19,8 +20,8 @@ pub(crate) const SAFETY: &str = "What it does with your code";
 const CACHE_DIR: &str = ".git/gitterrace/";
 
 /// The screenshots: file stem, alt text ("Caption: what it shows"), caption. The repository
-/// has a WebP pair per entry, the README shows two, and the landing page shows `REEL`,
-/// `NARROW` and the crop.
+/// has a WebP pair per entry, the README shows two, and the landing page shows `REEL`
+/// and the crop. The phone shots stay for the README.
 pub const SHOTS: [(&str, &str, &str); 9] = [
     (
         "insights",
@@ -40,7 +41,7 @@ pub const SHOTS: [(&str, &str, &str); 9] = [
     ("commit", "Commit: the message, the changed files and a highlighted diff.", "Commit"),
     ("narrow", "Phone: the commit page on a 390 px wide screen.", "Phone"),
     (
-        NARROW,
+        "narrow-insights",
         "Hotspots on a phone: the key numbers and the chart on a 390 px wide screen.",
         "Hotspots on a phone",
     ),
@@ -64,11 +65,9 @@ pub const SHOTS: [(&str, &str, &str); 9] = [
 
 /// The views the window on the landing page turns through, in order: one of each kind of page
 /// (insights, a file, a change, the repository), so no view repeats another's proof. The
-/// first loads with the page, the others when they come near.
+/// first loads with the page, the others when they come near. The page crops each one in CSS
+/// (`.c-<stem>`) to the part below the app's own bars, so the window's bar is the only one.
 pub(super) const REEL: [&str; 4] = ["insights", "blame", "commit", "overview"];
-/// The first view on a phone: hotspots in the 390 px layout, where the wide shot would be
-/// too small to read.
-pub(super) const NARROW: &str = "narrow-insights";
 /// The shot the hand-off shows a part of: the Send to window.
 pub(super) const CROPS: [&str; 1] = ["send"];
 
@@ -77,21 +76,21 @@ pub(super) const CROPS: [&str; 1] = ["send"];
 pub(crate) fn sizes(stem: &str) -> ((u32, u32), (u32, u32)) {
     match stem {
         "narrow" => ((390, 780), (780, 1560)),
-        NARROW => ((390, 600), (780, 1200)),
+        "narrow-insights" => ((390, 600), (780, 1200)),
         _ => ((1280, 800), (2560, 1600)),
     }
 }
 
 /// Where a finding goes, as a ruled list beside the hand-off picture, so "any tool" reads at
-/// a glance: (label, docs path with anchor). The site's link check fails on an anchor that
-/// is gone.
-const DESTINATIONS: [(&str, &str); 6] = [
-    ("Coding agents", "docs/actions/#hand-a-finding-to-an-agent"),
-    ("Your editor", "docs/actions/#the-starter-file"),
-    ("Issues and tasks", "docs/actions/#send-to"),
-    ("Mail", "docs/actions/#send-to"),
-    ("Scripts and webhooks", "docs/actions/#actions"),
-    ("API and MCP", "docs/api/"),
+/// a glance: (label, docs path with anchor, what the destination receives). The site's link
+/// check fails on an anchor that is gone.
+const DESTINATIONS: [(&str, &str, &str); 6] = [
+    ("Coding agents", "docs/actions/#hand-a-finding-to-an-agent", "prompt"),
+    ("Your editor", "docs/actions/#the-starter-file", "path:line"),
+    ("Issues and tasks", "docs/actions/#send-to", "new issue"),
+    ("Mail", "docs/actions/#send-to", "mailto:"),
+    ("Scripts and webhooks", "docs/actions/#actions", "stdin"),
+    ("API and MCP", "docs/api/", "json"),
 ];
 
 #[derive(Template)]
@@ -107,9 +106,8 @@ struct Landing<'a> {
     cmd: &'a str,
     addr: &'a str,
     reel: Vec<(&'a str, &'a str, &'a str)>,
-    narrow: (&'a str, &'a str),
     handoff: &'a str,
-    handoff_links: &'a [(&'a str, &'a str)],
+    handoff_links: &'a [(&'a str, &'a str, &'a str)],
     send: (&'a str, &'a str),
     promises: &'a str,
 }
@@ -141,7 +139,6 @@ pub(crate) fn body(
         cmd: install.first().map_or("", |(_, l)| l.as_str()),
         addr: gitterrace_config::DEFAULT_ADDR,
         reel,
-        narrow: pair(NARROW)?,
         handoff: &md(opening(part("Hand-off")?), links)?,
         handoff_links: &DESTINATIONS,
         send: pair(CROPS[0])?,
@@ -302,7 +299,7 @@ mod tests {
     /// Every shot the page shows is in `SHOTS`, so its files are checked and it has alt text.
     #[test]
     fn every_shot_the_page_shows_is_registered() {
-        for stem in REEL.iter().chain(&CROPS).chain([&NARROW]) {
+        for stem in REEL.iter().chain(&CROPS) {
             shot(stem).expect("registered");
         }
     }

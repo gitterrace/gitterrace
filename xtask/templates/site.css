@@ -222,12 +222,12 @@ text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
 .pager .next{margin-left:0}}
 
 /* The landing page. The pitch is broken over a step: line one stands on an ink tread, the
-   riser drops, line two stands on the accent slab, which runs off the right edge. That is the
+   riser drops, line two stands on the accent slab, which ends at the column's edge. That is the
    mark at headline size. The riser's place comes from line two's own width, and the hand-off
    further down steps at the same place, through one shared grid. Every gap is a step of the
    4 px space grid, and the headline is the kit's display step. */
-/* The slab leaves the page on the right. The root's clip goes to the viewport, so the body's
-   own is what stops the page from scrolling sideways. */
+/* The negative margins that set the headline's ink on the column's edges must never scroll the
+   page sideways. */
 :is(html,body):has(.stage){overflow-x:clip}
 .stage{--slab:var(--space-3);--in:calc(var(--space-6) + var(--space-1));
 --gut:calc(var(--space-8) + var(--space-4));
@@ -242,23 +242,26 @@ letter-spacing:var(--tracking-display)}
 .step::before{content:"";grid-area:2/1;border-top:2px solid var(--fg)}
 .l2{grid-area:2/2;position:relative;margin-right:-.02em;
 padding:.15em 0 .17em var(--in);border-left:2px solid var(--fg)}
-.l2::after{content:"";position:absolute;left:-2px;top:100%;width:100vw;height:var(--slab);
+.l2::after{content:"";position:absolute;left:-2px;top:100%;
+width:calc(100% + 2px);height:var(--slab);
 background:var(--accent)}
-.pitch{grid-area:2/1/4/2;display:flex;flex-direction:column;
-padding:var(--space-6) var(--gut) 0 0;font-size:var(--text-lg)}
+.pitch{grid-area:2/1;padding:var(--space-5) var(--gut) 0 0;font-size:var(--text-lg)}
 .pitch p{margin:0;text-wrap:balance}
-.pitch .go{display:flex;flex-wrap:wrap;align-items:center;gap:var(--space-3) var(--space-4);
-margin-top:auto;padding-top:var(--space-6)}
+/* The demo button and the install box share row three and one top edge: the button and what
+   the demo shows stand under the claim, the command under the slab. */
+.go{grid-area:3/1;align-self:start;display:flex;flex-direction:column;align-items:flex-start;
+gap:var(--space-2);margin:calc(var(--slab) + var(--space-6)) 0 0}
 .btn{display:inline-block;padding:var(--space-3) var(--space-5);border-radius:var(--radius);
 background:var(--accent);color:var(--on-accent);font-size:var(--text-md);
 font-weight:var(--weight-semibold);line-height:var(--leading-tight);text-decoration:none;
 transition:background var(--dur-fast) var(--ease)}
 .btn:hover{background:var(--accent-hover)}
 .btn:active{background:var(--accent-press)}
-.go span{font:var(--weight-regular) var(--text-sm)/var(--leading-tight) var(--mono);
+.go span{padding-left:1px;
+font:var(--weight-regular) var(--text-sm)/var(--leading-tight) var(--mono);
 color:var(--muted)}
-/* Install: a terminal on the page, dark in both themes. It hangs under the slab, its prompt in
-   line with the headline above it. */
+/* Install: a terminal on the page, dark in both themes. It hangs under the slab, as wide as the
+   slab, its prompt in line with the headline above it. */
 .inst{grid-area:3/2;align-self:start;display:grid;grid-template-columns:minmax(0,1fr) auto;
 gap:0 var(--space-3);margin-top:calc(var(--slab) + var(--space-6));
 padding:var(--space-3) var(--space-3) var(--space-3) calc(var(--in) + 1px);color-scheme:dark;
@@ -309,15 +312,22 @@ color:var(--muted);text-decoration:none}
 overscroll-behavior-x:contain;scrollbar-width:none}
 .reel:focus-visible{outline-offset:-2px}
 .reel>div{flex:none;width:100%;scroll-snap-align:start}
-/* A view is the window from its top, cut to 16:9 above the page's last empty rows. */
-.reel picture{display:block;aspect-ratio:16/9;overflow:hidden}
+/* A view is a crop of its shot without the app's own bars, so the window's bar is the only
+   one and each view shows one thing. */
 .reel img,.crop img{display:block;width:100%;height:auto}
-.reel .narrow{display:none}
 /* A crop shows one part of a shot at a readable size. --x, --y, --w and --h are in units of
    1/1440 of the shot's width. */
 .crop{display:block;overflow:hidden;aspect-ratio:var(--w)/var(--h)}
 .crop img{max-width:none;width:calc(144000%/var(--w));
 margin:calc(var(--y)*-100%/var(--w)) 0 0 calc(var(--x)*-100%/var(--w))}
+/* The four views share a frame, so the window keeps its height: the key numbers and chart, the
+   blame rows, the changed files with the diff, the file list. */
+.crop{--x:64}
+.reel .crop{--w:1304;--h:548}
+.c-insights{--y:312}
+.c-blame{--y:270}
+.c-commit{--y:326}
+.c-overview{--y:230}
 /* The hand-off shows the Send to window whole. */
 .c-send{--x:430;--y:288;--w:580;--h:353}
 /* The second level, in ink only: the claim stands on the upper tread and the window that
@@ -334,9 +344,13 @@ border-left:2px solid var(--fg)}
 .to{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 var(--space-6);
 margin:auto 0 0;padding:0;list-style:none;font-size:var(--text-base)}
 .to li{border-top:var(--border)}
-.to a{display:flex;align-items:center;min-height:var(--row-h);color:var(--fg);
-text-decoration:none;transition:color var(--dur-fast) var(--ease)}
+.to a{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);
+min-height:var(--row-h);color:var(--fg);text-decoration:none;
+transition:color var(--dur-fast) var(--ease)}
 .to a:hover{color:var(--accent-ink)}
+/* What a destination takes, in the app's mono: the format the finding arrives in. */
+.to span{font:var(--weight-regular) var(--text-2xs)/var(--leading-tight) var(--mono);
+letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--muted)}
 /* The promises: four short ones in a row, two by two on a tablet, one column on a phone. */
 .facts{margin-top:var(--space-8);padding-top:var(--space-5);
 border-top:var(--border)}
@@ -350,16 +364,17 @@ font-size:var(--text-base);color:var(--muted)}
 /* Under 1024 px the stair keeps its shape and everything else stacks under it. */
 @media (max-width:1023px){
 .pitch{grid-area:3/1/4/-1;padding:calc(var(--slab) + var(--space-6)) 0 0}
-.pitch .go{margin-top:0}
-.inst{grid-area:4/1/5/-1;max-width:34rem;margin-top:var(--space-6);
+.go{grid-area:4/1/5/-1;flex-direction:row;flex-wrap:wrap;align-items:center;
+gap:var(--space-3) var(--space-4);margin-top:var(--space-6)}
+.inst{grid-area:5/1/6/-1;max-width:34rem;margin-top:var(--space-6);
 padding-left:var(--space-4)}
 .levels{display:block}
 .lv{padding-right:0}
 .lv2{max-width:34rem;margin-top:var(--space-5);padding:0;border:0}
 .lv2::before{content:none}
 .facts ul{grid-template-columns:repeat(2,minmax(0,1fr))}}
-/* A phone: a short tread over a long slab, as in the mark. The first view is its own shot
-   of the 390 px layout, the others show the window's left part at a readable size. */
+/* A phone: a short tread over a long slab, as in the mark. Each view crops the window's left
+   part, so its text and chart are as large as the phone's own. */
 @media (max-width:599px){
 .stage{--slab:var(--space-2);--in:var(--space-3)}
 .inst{grid-template-columns:minmax(0,1fr);padding:var(--space-3)}
@@ -374,11 +389,15 @@ padding:var(--space-1) var(--space-1) 0 var(--space-3)}
 margin:var(--space-1) calc(-1*var(--space-1)) -1px calc(-1*var(--space-3));min-height:0;
 padding:0 var(--space-3);border-top:var(--border)}
 .marks a{min-height:var(--row-h)}
-.reel picture{aspect-ratio:13/20}
-.reel img{height:100%;object-fit:cover;object-position:0 0}
-.reel .wide{display:none}
-.reel .narrow{display:block}
-.c-send{--x:438;--w:460;--h:285}
+.reel .crop{--w:504;--h:378}
+/* Ends in the empty gap before x=200, so no dot is cut by the frame. The longer selector is
+   needed to beat `.reel .crop` above. */
+.reel .c-insights{--y:496;--w:600;--h:430}
+.c-blame{--w:540;--h:405;--y:276}
+.c-commit{--y:330}
+.c-overview{--y:236}
+.to{grid-template-columns:minmax(0,1fr)}
+.to span{white-space:nowrap}
 .facts ul{grid-template-columns:minmax(0,1fr)}}
 /* Important, because the rules above name their own transitions and would win otherwise. */
 @media (prefers-reduced-motion:reduce){.stage *{transition:none!important}

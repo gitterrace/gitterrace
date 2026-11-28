@@ -4,19 +4,18 @@ hand-off one step down (the claim on the upper tread, the Send to window on the 
 the promises. Its prose comes from docs/landing.md, each sentence once, the rest from the
 code. The window is a scroll-snap row whose bar holds the views as tabs, so it turns with no
 script; the page's script shows the two buttons in that bar and marks the view in sight.
-Only the first view loads at once, the rest are lazy. A phone gets its own hotspots shot,
-a second picture because the theme button rewrites every source's media. Every image is one
-picture whose dark source follows the system, and the theme button points that source's media
-at its choice. -#}
+Only the first view loads at once, the rest are lazy. Each view is a crop of its shot that
+leaves out the app's own bars and shows one thing (a phone gets a tighter one from the same
+file). Every image is one picture whose dark source follows the system, and the theme button
+points that source's media at its choice. -#}
 <div class="stage">
 <div class="step">
 <h1><span class="l1">{{ l1 }}</span> <span class="l2">{{ l2 }}</span></h1>
-<div class="pitch">{{ why|safe }}
+<div class="pitch">{{ why|safe }}</div>
 {%- if !demo.is_empty() %}
 <p class="go"><a class="btn" href="{{ demo }}">Try the live demo</a>
-<span>{{ demo_note }}</span></p>
+<span>Demo repos: {{ demo_note }}</span></p>
 {%- endif %}
-</div>
 <div class="inst" id="install">
 <pre><i>$ </i><b>{{ cmd }}</b>
 <i>$ </i>git terrace  <em># serves on {{ addr }}</em></pre>
@@ -37,18 +36,13 @@ aria-live="polite">Copy</button>
 <button type="button">Next</button></span></div>
 <div class="reel" id="reel" tabindex="0" role="group" aria-label="Screenshots">
 {%- for s in reel %}
-<div id="{{ s.0 }}"><picture{% if loop.first %} class="wide"{% endif %}>
+<div id="{{ s.0 }}"><picture class="crop c-{{ s.0 }}">
 <source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ s.0 }}-dark.webp">
 <img src="/assets/screenshots/{{ s.0 }}-light.webp" alt="{{ s.1 }}" width="2560" height="1600"
 {%- if loop.first %} fetchpriority="high" decoding="async"
 {%- else %} loading="lazy"
 {%- endif %}></picture>
-{%- if loop.first %}
-<picture class="narrow">
-<source media="(prefers-color-scheme: dark)" srcset="/assets/screenshots/{{ narrow.0 }}-dark.webp">
-<img src="/assets/screenshots/{{ narrow.0 }}-light.webp" alt="{{ narrow.1 }}" width="780"
-height="1200" loading="lazy"></picture>
-{%- endif %}</div>
+</div>
 {%- endfor %}
 </div>
 </div>
@@ -60,7 +54,7 @@ height="1200" loading="lazy"></picture>
 {{ handoff|safe }}
 <ul class="to">
 {%- for l in handoff_links %}
-<li><a href="/{{ l.1 }}">{{ l.0 }}</a></li>
+<li><a href="/{{ l.1 }}">{{ l.0 }} <span>{{ l.2 }}</span></a></li>
 {%- endfor %}
 </ul>
 </section>
