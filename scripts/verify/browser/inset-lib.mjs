@@ -206,6 +206,8 @@ export function checks(env) {
    * moved by a fraction of a pixel each time: a browser snaps the text line to whole pixels, so
    * one position can hide or invent a 1 px offset. 4x, so a quarter pixel is one row. */
   async function labelInk(p) {
+    // The popup fades in: a screenshot taken mid-fade has ink too faint to read.
+    await p.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
     const sels = await p.evaluate(inkProbes);
     const sum = new Map();
     for (let i = 0; i < SHIFTS; i++) {
