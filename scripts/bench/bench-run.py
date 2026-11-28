@@ -474,6 +474,11 @@ def main():
         help="start despite a VM or simulator; recorded, and --check refuses it for a release",
     )
     a = ap.parse_args()
+    # --preflight answers one question, the indexer exclusion, so `make setup` and the
+    # self-test give the same answer on a busy desk as on a silent one.
+    if a.preflight:
+        preflight_index()
+        return 0
     noise = bq.preflight_noise() if not a.synthetic and not a.fetch_only else []
     if noise and not a.allow_noise:
         sys.exit(
@@ -481,9 +486,6 @@ def main():
             + "; ".join(noise)
             + "\nquit them, or pass --allow-noise for a run that is not a release"
         )
-    if a.preflight:
-        preflight_index()
-        return 0
     if not a.synthetic and not a.fetch_only:
         preflight_index()
     a.bin = str(Path(a.bin).resolve())
