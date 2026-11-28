@@ -60,7 +60,8 @@ body[data-diff-wrap] div.diff .ch{width:auto}
 .dt-bar::-webkit-progress-bar{background:var(--line)}
 .dt-bar::-webkit-progress-value{background:var(--accent)}
 .dt-bar::-moz-progress-bar{background:var(--accent)}
-.find-status{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.find-status{color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap;
+  min-width:12ch}
 .difftools[data-state=none] .find-status{color:var(--warn)}
 .difftools[data-state=none] input[type=search]{border-color:var(--warn)}
 .difftools[data-state=error] .find-status{color:var(--del)}

@@ -29,8 +29,7 @@ header.top{background:var(--header);border-bottom:var(--border)}
 /* A bare bar (settings) has no branch switcher, but keeps the two rows the narrow bar of the
    other pages has, so the nav and the content do not move. */
 @media (max-width:600px){.topbar.bare{min-height:calc(var(--header-h) + 56px)}}
-.brand{display:flex;align-items:center;color:var(--fg)}
-.brand:hover{text-decoration:none}
+.brand{display:flex;align-items:center;color:var(--fg)}.brand:hover{text-decoration:none}
 .logo{width:24px;height:24px;display:block}
 .logo .i{fill:var(--fg)}.logo .a{fill:var(--accent-ink)}
 .reponame{font:var(--weight-semibold) var(--text-lg)/1.3 var(--serif);letter-spacing:-.01em;color:var(--fg);min-width:0;overflow-wrap:break-word}
@@ -209,10 +208,13 @@ section.file>header a{color:var(--fg)}
 section.file>header :is(.counts,.media-counts){flex:none;min-width:12ch;text-align:right;
   white-space:nowrap;font-variant-numeric:tabular-nums}
 /* The Viewed toggle sits right after the +/- counts. diffs-viewed.js adds it, so a header
-   reserves its slot until then and the page holds still. */
-section.file>header:not(:has(.viewed-mark))::after{content:"";flex:none;width:9ch}
+   reserves its slot until then. Placeholder and toggle are one fixed box, so the swap moves
+   nothing whichever font loads. */
+section.file>header:not(:has(.viewed-mark))::after{content:""}
+section.file>header:not(:has(.viewed-mark))::after,.viewed-mark{flex:none;box-sizing:border-box;
+  width:9ch;height:var(--space-5);overflow:hidden;white-space:nowrap}
 section.file>header :is(.counts,.media-counts){margin-left:auto}
-.viewed-mark{flex:none;width:9ch;display:inline-flex;align-items:center;justify-content:flex-end;
+.viewed-mark{display:inline-flex;align-items:center;justify-content:flex-end;
   gap:var(--space-1);line-height:1;color:var(--muted);cursor:pointer}
 .viewed-mark input{margin:0}.viewed-changed{flex:none}
 table.code{border-collapse:collapse;width:100%}
