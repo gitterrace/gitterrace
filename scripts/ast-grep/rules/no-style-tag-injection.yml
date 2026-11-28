@@ -1,0 +1,12 @@
+id: no-style-tag-injection
+language: javascript
+severity: error
+message: addStyleTag injects a <style> element the strict style-src refuses.
+note: The page policy drops the sheet and the call throws, or a check that plants it goes blind. Build a CSSStyleSheet in page.evaluate and add it to document.adoptedStyleSheets, which the CSSOM allows.
+files: [scripts/verify/browser/*.mjs, scripts/lib/*.mjs]
+rule:
+  kind: call_expression
+  has:
+    field: function
+    kind: member_expression
+    has: {field: property, regex: '^addStyleTag$'}

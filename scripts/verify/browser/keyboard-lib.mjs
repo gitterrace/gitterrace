@@ -145,10 +145,14 @@ export function checks(env) {
     await sweep('text-spacing', KNOWN_SPACING, async (p) => {
       await p.setViewportSize({ width: 1280, height: 800 });
     }, async (p) => {
-      await p.addStyleTag({
-        content:
+      // A constructed sheet: the page policy refuses an injected <style>, not the CSSOM.
+      await p.evaluate(() => {
+        const sheet = new CSSStyleSheet();
+        sheet.replaceSync(
           '*{line-height:1.5 !important;letter-spacing:0.12em !important;'
             + 'word-spacing:0.16em !important}p{margin-bottom:2em !important}',
+        );
+        document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
       });
       await frames(p);
       return p.evaluate(() => {

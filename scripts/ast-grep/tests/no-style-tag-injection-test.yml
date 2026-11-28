@@ -1,0 +1,7 @@
+id: no-style-tag-injection
+valid:
+  - 'await p.evaluate(() => { document.adoptedStyleSheets = [sheet]; });'
+  - 'await p.addScriptTag({ content: js });'
+invalid:
+  - 'await p.addStyleTag({ content: css });'
+  - 'page.addStyleTag({ url })'
