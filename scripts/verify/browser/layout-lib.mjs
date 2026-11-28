@@ -10,7 +10,8 @@ export function checks(env) {
   const { dir, srv, r, browsers, context } = env;
 // A metadata line's controls (the sha chip, Copy, the actions trigger) are one size on one
 // line: a trigger that is a pixel shorter or lower than its neighbours reads as a different
-// control. The commit page in light and dark, after the actions script added its trigger.
+// control. The commit page in light and dark, after the actions script added its trigger. The
+// ids row (`.meta.ids`) holds the shas and the trigger, the identity line above has neither.
 async function inlineControls() {
   await eachBrowser(browsers, context, async (ctx, name) => {
     for (const scheme of ['light', 'dark']) {
@@ -18,8 +19,8 @@ async function inlineControls() {
       await p.emulateMedia({ colorScheme: scheme });
       await p.setViewportSize({ width: 1400, height: 700 });
       await p.goto(srv.base + '/commit/HEAD', { waitUntil: 'load' });
-      await p.waitForSelector('p.meta .actbtn', { timeout: 5000 }).catch(() => {});
-      const m = await p.$$eval('p.meta > :is(a.sha, button)', (els) => els.map((e) => {
+      await p.waitForSelector('div.meta.ids .actbtn', { timeout: 5000 }).catch(() => {});
+      const m = await p.$$eval('div.meta.ids :is(a.sha, button)', (els) => els.map((e) => {
         const r = e.getBoundingClientRect(), s = getComputedStyle(e);
         return { what: e.className || e.tagName, h: Math.round(r.height), top: Math.round(r.top), bg: s.backgroundColor };
       }));
