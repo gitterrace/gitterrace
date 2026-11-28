@@ -28,6 +28,12 @@
   }
   // The sections near the top of the window: the first one still in view is the current file.
   var seen = {};
+  // A clicked row stays current until the reader scrolls by hand: a short page cannot bring the
+  // target to the top, so the observer alone would name an earlier file and undo the click.
+  var pinned = null;
+  ["wheel", "touchstart", "keydown"].forEach(function (t) {
+    window.addEventListener(t, function () { pinned = null; }, { passive: true });
+  });
   function observe() {
     if (io) io.disconnect();
     seen = {};
@@ -36,14 +42,18 @@
       entries.forEach(function (e) { seen[e.target.id] = e.isIntersecting; });
       var first = Array.prototype.slice.call(document.querySelectorAll("section.file[id]"))
         .filter(function (s) { return seen[s.id]; })[0];
-      if (first) mark(first.id);
+      if (pinned) mark(pinned);
+      else if (first) mark(first.id);
     }, { rootMargin: "0px 0px -60% 0px" });
     document.querySelectorAll("section.file[id]").forEach(function (s) { io.observe(s); });
   }
   // A click names the file at once: the observer catches up once the page has scrolled.
   document.addEventListener("click", function (e) {
     var a = e.target.closest && e.target.closest("[data-rail] a");
-    if (a) mark(a.getAttribute("href").slice(1));
+    if (a) {
+      pinned = a.getAttribute("href").slice(1);
+      mark(pinned);
+    }
   });
   // Viewed state is read from the sections diffs-viewed.js marks, so the two never disagree.
   function viewed() {
