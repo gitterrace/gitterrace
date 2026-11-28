@@ -102,6 +102,26 @@ recorded and which `make docs-check` refuses for a published run. Runs from
 before harness 5 recorded no foreign CPU and are reported as unchecked. The
 published run is made once per release, on the release candidate commit.
 
+### The release regression gate
+
+A release goes out only if the numbers get better or do not get worse. `make
+release-gate` runs `bench-report.py --regress`, which compares the newest run
+with the newest run of the previous release (a pre-release run never moves the
+bar, `--against <run>` names another), per repo, per budget metric and per
+page, cold and warm. It has no override and never widens its band to let a run
+pass: a refused release needs a faster build.
+
+- A different machine label means no comparison and a refusal. Numbers from two
+  machines prove nothing.
+- A change counts only beyond the larger of a floor per kind of metric and the
+  spread (min to max) of the two runs' own samples. Floors: 5% and 0.05 s for
+  seconds, 5% and 0.5 ms for page timings (10% under 5 ms, where one wakeup
+  dominates), 5% and 1 MB for memory, 10% and 0.1 points for idle CPU. The
+  table is `NOISE` in `scripts/bench/bench-regress-lib.py`, with the reason for
+  each value.
+- A metric the older harness did not record is reported as unmeasured and does
+  not refuse. One the newest run lost refuses. Improvements are reported too.
+
 ### Insights pages on a large history
 
 The pages that read every change of every file have a cold target for the first

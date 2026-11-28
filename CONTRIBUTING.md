@@ -182,7 +182,10 @@ on http://127.0.0.1:4343.
 3. `make release-gate VERSION=x.y.z` on main: it removes any old x.y.z
    section, writes it with `make changelog` and commits it, so a hand edit or
    an old date never ships. It then runs both changelog checks with the tag on
-   that commit, the gate on macOS, the smoke test, and `ci.yml` with
+   that commit, the gate on macOS, the smoke test, the benchmark regression
+   check (`bench-report.py --regress`, no override: the newest run must not be
+   worse than the previous release's on the same machine, outside the noise
+   band), and `ci.yml` with
    `full=true` on the hosted runners for that exact commit (pushed to a temporary branch,
    deleted after): some races show only on x86_64 runners, never in `act` on
    an arm64 Mac. `ACT=1` adds the Ubuntu jobs through `act`. On pass it pushes

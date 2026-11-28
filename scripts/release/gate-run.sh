@@ -15,6 +15,9 @@
 #    ci.yml runs there with full=true, the gate waits for it and deletes the branch. Races that
 #    only show on x86_64 runners never show in act on an arm64 Mac, so act cannot stand in.
 #    ACT=1 also runs the release check's Ubuntu jobs through act, as an extra.
+#    The benchmark regression check (bench-report.py --regress) refuses a newest run that is
+#    worse than the previous release's outside the noise band, or that has no same-machine
+#    baseline. It has no override.
 # On pass it writes .git/release-gate/<sha> (the tag and the CI run), which scripts/hooks/pre-push
 # requires, and pushes. On fail it deletes the local tag. RETAG=1 re-tags an unpublished
 # release: the remote tag is moved by the same atomic push. PUSH=0 stops after the pass record.
@@ -34,6 +37,7 @@ make -k check CROSS=x86_64-pc-windows-gnu
 bash scripts/release/browser-run.sh
 bash scripts/dev/macos-run.sh
 python3 scripts/verify/ci-budget-check.py
+python3 scripts/bench/bench-report.py --regress
 @ci
 EOF2
   [ "${ACT:-0}" = 1 ] && act_steps
@@ -226,7 +230,7 @@ self_test() {
   local list jobs job
   list=$(steps)
   for want in scripts/lint/changelog-check.py kit/lint/changelog.py "CROSS=x86_64-pc-windows-gnu" \
-    scripts/dev/macos-run.sh scripts/release/browser-run.sh @ci @tag; do
+    scripts/dev/macos-run.sh scripts/release/browser-run.sh "bench-report.py --regress" @ci @tag; do
     grep -qF -- "$want" <<<"$list" || fail "no step runs $want"
   done
   [ "$(sed -n 1p <<<"$list")" = python3\ scripts/lint/changelog-check.py ] &&

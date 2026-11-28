@@ -6,16 +6,17 @@ tests/bench/results/<date>-<machine>/ (<metric>.svg and <metric>-dark.svg), draw
 and untracked. The newest runs are kept (KEEP): the newest in full, the ones before it as the
 baselines of the comparison table, each repo against the newest of them that measured it.
 The machine label comes from the CPU, never the hostname. Stdlib only, no PNG, no JS, no
-fonts. The charts are files, not inline SVG, since a
-markdown sanitizer strips inline <svg> and <style>, and the doc links them through <picture>.
+fonts. The charts are files, not inline SVG, since a markdown sanitizer strips inline <svg>
+and <style>, and the doc links them through <picture>.
 
   scripts/bench/bench-report.py                  normalize, render charts, prune, rewrite the doc
   scripts/bench/bench-report.py --check          fail when anything above is stale, writes nothing
-  scripts/bench/bench-report.py --print          print the short results block that
-                                                 `cargo xtask` splices
+  scripts/bench/bench-report.py --print          print the results block `cargo xtask` splices
   scripts/bench/bench-report.py --corpus         print the corpus list, one source link per repo
   scripts/bench/bench-report.py --budgets        print the budget table and the run defaults
   scripts/bench/bench-report.py --gates          print the cold insights page targets
+  scripts/bench/bench-report.py --regress [--against RUN]
+                                                 refuse a regression on the last release
   scripts/bench/bench-report.py --normalize F    rewrite one result file in the published format
 
 --check also guards publication: no result file, chart or doc may carry this machine's hostname
@@ -42,6 +43,7 @@ bd = importlib.import_module("bench-doc-lib")
 bl = importlib.import_module("bench-lib")
 bq = importlib.import_module("bench-quiet-lib")
 bb = importlib.import_module("bench-budget-lib")
+bg = importlib.import_module("bench-regress-lib")
 
 Json = dict[str, Any]
 _own: set[str] = set()
@@ -156,6 +158,7 @@ def self_test() -> None:
     wrap_test()
     footprint_test()
     bd.baseline_guard_test()
+    bg.self_test()
     bl.phase_cpu_test()
     bl.ready_recorded_test()
     export_test()
@@ -565,6 +568,8 @@ def main() -> None:
     if "--corpus" in args:
         sys.stdout.write(bc.corpus_list())
         return
+    if "--regress" in args:
+        sys.exit(bg.run_cli(args[args.index("--against") + 1] if "--against" in args else None))
     if "--self-test" in args:
         self_test()
         return
